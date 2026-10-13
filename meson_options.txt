@@ -8,7 +8,7 @@ option(
 option(
     'modules',
     type: 'array',
-    choices: ['', 'ui', 'input', 'runtime', 'audio', 'motion'],
+    choices: ['', 'ui', 'input', 'runtime', 'audio', 'motion', 'diagram'],
     value: [''],
     description: 'Build selected optional viscript native modules',
 )
