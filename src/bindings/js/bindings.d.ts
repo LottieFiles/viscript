@@ -356,7 +356,8 @@ export interface TexOptions extends TexStyle {
 }
 /** How an entry sits across its column. */
 export type Justify = "left" | "center" | "right";
-/** A number counts as `number` does; a string is set as it is. */
+/** A number counts as `number` does. A string is set as it is in a table; in a matrix it is inline TeX
+ * when the tex module is built in, and text otherwise. */
 export type MatrixEntry = number | string;
 /** The matrix's id, opacity, progress and layer effects go to its group; color and fill to its entries,
  * color, stroke and width to its brackets, and layer to every part. */

@@ -78,7 +78,7 @@ definition.track(radius, 2, 1, "linear");
 
 Text size is in points: the em spans `4/3 * size` screen pixels for billboard text and world units for plane text. Theme roles choose fonts and semantic colors. `measure: true` gives text a layout box; `baseline: true` pins the first baseline at `point`. `reserve: "-0.00"` keeps a stable box, and `tabular: true` gives digits, minus, and spaces equal advance cells.
 
-`number` animates `value` and formats decimals, sign, separator, prefix, and suffix. `matrix` and `table` return row/entry groups accessible through one-based `row`, `entry`, and `column` methods.
+`number` animates `value` and formats decimals, sign, separator, prefix, and suffix. `matrix` and `table` return row/entry groups accessible through one-based `row`, `entry`, and `column` methods. Matrix string entries are inline TeX when the tex module is present (plain text otherwise); numbers stay countable and table strings stay text.
 
 `spans(parts, options)` combines strings and styled parts on shared baselines. Parts can set `rise` or contain `{tex}`. `split`, `wrap`, and `leading` control readable text flow.
 

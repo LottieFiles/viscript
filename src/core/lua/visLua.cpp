@@ -2431,6 +2431,11 @@ struct LuaGridEntry
 {
     Text* text = nullptr;
     TextExtent extent;
+    // A box a module made in place of the text, such as a tex formula: the width reserve keeps
+    // for it, and where its baseline starts once placed.
+    bool box = false;
+    float reserve = 0.0f;
+    Vec3 at{};
 };
 
 // The most entries one matrix holds.
@@ -2541,7 +2546,7 @@ static Text* _gridText(lua_State* lua, LuaScene* box, int index, const char* nam
 // height: the glyphs sit ascent below the top of the cell's inside, on the row's baseline,
 // and across it by justify. The text's box is the whole cell, so bounds, layout and around
 // see the cell; one align pins both the glyphs and the box to the point.
-static void _gridPlace(const LuaGridEntry& entry, float left, float top, float width, float height,
+static void _gridPlace(LuaGridEntry& entry, float left, float top, float width, float height,
                        float ascent, const Vec2& padding, LuaJustify justify, float z)
 {
     auto& extent = entry.extent;
@@ -2549,6 +2554,10 @@ static void _gridPlace(const LuaGridEntry& entry, float left, float top, float w
     auto share = justify == LuaJustify::Left ? 0.0f : justify == LuaJustify::Right ? 1.0f : 0.5f;
     auto glyphLeft = left + padding.x + share * (width - 2.0f * padding.x - extent.width);
     auto glyphTop = top - padding.y - ascent + extent.ascent;
+    if (entry.box) {
+        entry.at = {glyphLeft, top - padding.y - ascent, z};
+        return;
+    }
     auto spareX = width - extent.width;
     auto spareY = height - glyphHeight;
     auto alignX = spareX > 1.0e-5f * width ? std::clamp((glyphLeft - left) / spareX, 0.0f, 1.0f) : 0.5f;
@@ -2593,7 +2602,8 @@ enum struct LuaBrackets : uint8_t
 
 // scene:matrix{rows = {{...}, ...}}: entries in rows and columns between brackets, as a group
 // whose children are its rows, each a group of the texts of its entries, and then its
-// brackets. A number entry counts as scene:number does.
+// brackets. A number entry counts as scene:number does. With the tex module a string entry is
+// set as inline math, as a cell of a TeX matrix is; without it, as text.
 static int _matrixGen(lua_State* lua)
 {
     auto space = _space(lua);
@@ -2650,13 +2660,53 @@ static int _matrixGen(lua_State* lua)
     // The matrix's id, kept on the stack while its rows and entries take their names from it.
     lua_getfield(lua, 2, "id");
     auto matrixId = lua_type(lua, -1) == LUA_TSTRING ? lua_tostring(lua, -1) : nullptr;
+    // The maker the tex module gave spans, which sets a string entry as a formula, or nil.
+    lua_getfield(lua, LUA_REGISTRYINDEX, SPAN_PART_REGISTRY);
+    lua_getfield(lua, -1, "tex");
+    lua_remove(lua, -2);
+    auto texMaker = lua_isfunction(lua, -1) ? lua_gettop(lua) : 0;
     for (auto r = 0u; r < rows; r++) {
         for (auto c = 0u; c < columns; c++) {
             auto i = r * columns + c;
             lua_rawgeti(lua, list, r + 1u);
             lua_rawgeti(lua, -1, c + 1u);
             auto& entry = *new (entries + i) LuaGridEntry();
-            entry.text = _gridText(lua, space.scene, 2, "matrix", decimals, orientation);
+            size_t length = 0;
+            auto formula = texMaker && lua_type(lua, -1) == LUA_TSTRING && lua_tolstring(lua, -1, &length)
+                        && std::strspn(lua_tostring(lua, -1), " \t") < length;
+            if (formula) {
+                // maker(handle, {tex = entry}, setting) measures the formula and returns its box
+                // and place(row, style, x, y, z), which handles keeps until the rows attach.
+                auto top = lua_gettop(lua);
+                lua_pushvalue(lua, texMaker);
+                lua_pushvalue(lua, 1);
+                lua_createtable(lua, 0, 1);
+                lua_pushvalue(lua, top);
+                lua_setfield(lua, -2, "tex");
+                _spanSetting(lua, 2, 0, orientation);
+                lua_call(lua, 3, 6);
+                auto& extent = entry.extent;
+                auto number = [&](int at) {
+                    return lua_type(lua, at) == LUA_TNUMBER ? static_cast<float>(lua_tonumber(lua, at)) : NAN;
+                };
+                extent.width = number(top + 1);
+                extent.ascent = number(top + 2);
+                extent.descent = number(top + 3);
+                extent.top = number(top + 4);
+                extent.bottom = number(top + 5);
+                if (!std::isfinite(extent.width) || !std::isfinite(extent.ascent) || !std::isfinite(extent.descent)
+                    || extent.width < 0.0f || extent.ascent + extent.descent < 0.0f || !lua_isfunction(lua, top + 6)) {
+                    luaL_error(lua, "a tex entry of matrix measured no box");
+                }
+                extent.height = extent.ascent + extent.descent;
+                extent.right = extent.width;
+                extent.lines = 1u;
+                entry.box = true;
+                lua_replace(lua, top);
+                lua_settop(lua, top);
+            } else {
+                entry.text = _gridText(lua, space.scene, 2, "matrix", decimals, orientation);
+            }
             lua_rawseti(lua, handles, i + 1u);
             lua_pop(lua, 1);
             _spanStyle(lua, 2, 0);
@@ -2665,8 +2715,10 @@ static int _matrixGen(lua_State* lua)
                 lua_setfield(lua, -2, "id");
             }
             lua_rawseti(lua, styles, i + 1u);
-            entry.text->tabular = _fieldBool(lua, 2, "tabular", false);
-            entry.extent = _measured(lua, scene, entry.text);
+            if (entry.text) {
+                entry.text->tabular = _fieldBool(lua, 2, "tabular", false);
+                entry.extent = _measured(lua, scene, entry.text);
+            }
             lua_getfield(lua, 2, "reserve");
             if (lua_istable(lua, -1)) {
                 if (lua_rawlen(lua, -1) != columns) luaL_error(lua, "matrix reserve needs one string per column");
@@ -2680,10 +2732,16 @@ static int _matrixGen(lua_State* lua)
                 auto sample = lua_tolstring(lua, -1, &length);
                 if (std::strlen(sample) != length) luaL_error(lua, "reserve cannot contain zero bytes");
                 if (length > LUA_TEXT_LIMIT) luaL_error(lua, "reserve exceeds the 1 MiB limit");
+                // A formula reserves the width of the sample as text in the matrix's style.
+                auto sampler = entry.text ? entry.text : _spanText(lua, space.scene, 2, 0, "", 0, orientation);
                 TextExtent reserved;
-                auto result = scene->measure(entry.text, sample, reserved);
+                auto result = scene->measure(sampler, sample, reserved);
                 if (result != Result::Success) luaL_error(lua, "could not reserve text: %s", _reason(scene, result));
-                entry.text->box.x = reserved.width;
+                if (entry.text) entry.text->box.x = reserved.width;
+                else {
+                    entry.reserve = reserved.width;
+                    lua_pop(lua, 1);
+                }
             }
             lua_pop(lua, 1);
         }
@@ -2700,7 +2758,7 @@ static int _matrixGen(lua_State* lua)
         widths[c] = 0.0f;
         for (auto r = 0u; r < rows; r++) {
             auto& entry = entries[r * columns + c];
-            widths[c] = std::max(widths[c], std::max(entry.extent.width, entry.text->box.x));
+            widths[c] = std::max(widths[c], std::max(entry.extent.width, entry.text ? entry.text->box.x : entry.reserve));
         }
         contentWidth += widths[c];
     }
@@ -2765,8 +2823,21 @@ static int _matrixGen(lua_State* lua)
             lua_rawgeti(lua, styles, i + 1u);
             auto style = lua_gettop(lua);
             lua_rawgeti(lua, handles, i + 1u);
-            auto entryOwner = static_cast<LuaObject*>(lua_touserdata(lua, -1));
-            _add(lua, members, entryOwner, entries[i].text, style, "matrix entry");
+            auto& entry = entries[i];
+            if (entry.box) {
+                auto children = rowGroup ? rowGroup->childCount() : 0u;
+                lua_pushvalue(lua, rowTop);
+                lua_pushvalue(lua, style);
+                lua_pushnumber(lua, entry.at.x);
+                lua_pushnumber(lua, entry.at.y);
+                lua_pushnumber(lua, entry.at.z);
+                lua_call(lua, 5, 1);
+                if (!rowGroup || rowGroup->childCount() != children + 1u) {
+                    return luaL_error(lua, "a tex entry of matrix must attach one object below its row");
+                }
+            } else {
+                _add(lua, members, static_cast<LuaObject*>(lua_touserdata(lua, -1)), entry.text, style, "matrix entry");
+            }
             lua_settop(lua, rowTop);
         }
         lua_settop(lua, result);

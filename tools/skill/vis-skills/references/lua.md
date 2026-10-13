@@ -103,7 +103,7 @@ Text `size` is in points: the em spans `4/3 * size` screen pixels for billboard 
 
 `text:measure()` returns width and height in world units. `measure = true` stores a layout box at creation. `baseline = true` pins the first baseline at `point`, with `align.x` selecting horizontal alignment. `reserve = "-0.00"` fixes a box from a sample string and the initial text. `tabular = true` gives digits, minus, and spaces equal advance cells.
 
-`number` animates `value`; `decimals`, `separator`, `sign`, `prefix`, and `suffix` format it. `matrix` and `table` return row groups with entry texts. Access parts with `row(r)`, `entry(r, c)`, and `column(c)`; indices start at 1. Matrix children also include its brackets; table children include stripes and rules.
+`number` animates `value`; `decimals`, `separator`, `sign`, `prefix`, and `suffix` format it. `matrix` and `table` return row groups with entry texts. Access parts with `row(r)`, `entry(r, c)`, and `column(c)`; indices start at 1. Matrix children also include its brackets; table children include stripes and rules. A matrix string entry is inline TeX when the tex module is built in (`"\\cos\\theta"`, `"x^2"`; use `"\\text{word}"` for words), and plain text otherwise; numbers stay countable texts, and `""` stays blank. Table strings are always text.
 
 `spans` returns measured texts and formulas on shared baselines. Strings retain their spaces; `split = "words"` or `"letters"` creates separate handles. Parts set local styling and `rise`, and `wrap` sets a width in world units. `leading` sets baseline spacing. Texts/formulas with no explicit ID use `<row-id>/<n>`.
 

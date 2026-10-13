@@ -696,6 +696,40 @@ return s
     delete scene;
 }
 
+// matrix{rows = ...}: with the tex module a string entry is an inline formula in the matrix's
+// size and color, on its row's baseline, while numbers stay texts that count and blanks stay
+// texts.
+static void _matrixEntries()
+{
+    static constexpr char source[] = R"lua(
+local s = vis.scene {width = 1280, height = 720, camera = {mode = "fixed", view = "2d", height = 720}}
+local m = s:matrix {rows = {{1, "x^2", "\\frac{1}{2}"}, {"", "y_i", 3}}, size = 30, color = "#336699", id = "m"}
+if not rawequal(m:entry(1, 2), s:find("m/1/2")) then error("a formula entry keeps its name") end
+if not rawequal(m:entry(1, 2):part("x"), s:find("m/1/2/1")) then error("part finds a glyph of an entry") end
+s:play({target = m:entry(1, 1), value = 7}, 1)
+return s
+)lua";
+    auto scene = _load(source, "tex-matrix.lua");
+    if (!scene) return;
+    auto x = scene->object("m/1/2");
+    CHECK(x && x->type() == Type::Group && static_cast<const Group*>(x)->typeset && x->parent() == scene->object("m/1"));
+    CHECK(x && _same(x->style.fill, Color{0x33, 0x66, 0x99, 255}));
+    auto glyph = _text(scene, "m/1/2/1");
+    CHECK(glyph && glyph->size == 30.0f);
+    // A number counts as before, and a blank entry is a text.
+    auto one = _text(scene, "m/1/1");
+    CHECK(one && one->counting());
+    CHECK(_text(scene, "m/2/1") != nullptr);
+    // Formulas center their TeX boxes in their column, which a script's space after it leaves a
+    // little off their ink, and the second row lies below the first.
+    Bounds square;
+    Bounds sub;
+    CHECK(x && x->bounds(square) && scene->object("m/2/2")->bounds(sub));
+    CHECK(_near(0.5f * (square.min.x + square.max.x), 0.5f * (sub.min.x + sub.max.x), 2.0f));
+    CHECK(sub.max.y < square.min.y);
+    delete scene;
+}
+
 // baseline = true pins a formula's baseline at its point, where a text pinned the same way
 // sits, and align.x still places it along the line.
 static void _baselinePinned()
@@ -800,6 +834,7 @@ int main()
         _framing(renderer);
         _bracing(renderer);
         _inline(renderer);
+        _matrixEntries();
         _inlineLayers(renderer);
         _leading();
         _baselinePinned();
