@@ -1,0 +1,47 @@
+option(
+    'engines',
+    type: 'array',
+    choices: ['cpu', 'gl'],
+    value: ['cpu', 'gl'],
+    description: 'Build the selected viscript render engines (GL is dropped with a warning on Emscripten or when the platform has no OpenGL)',
+)
+option(
+    'modules',
+    type: 'array',
+    choices: [''],
+    value: [''],
+    description: 'Build selected optional viscript native modules',
+)
+option(
+    'savers',
+    type: 'array',
+    choices: ['', 'gif', 'video', 'all'],
+    value: ['all'],
+    description: 'Build selected viscript animation savers; PNG remains in core',
+)
+option(
+    'tools',
+    type: 'array',
+    choices: ['', 'cli', 'audit', 'all'],
+    value: ['all'],
+    description: 'Build selected native viscript tools',
+)
+option(
+    'bundled_thorvg',
+    type: 'boolean',
+    value: false,
+    description: 'Build the pinned ThorVG subproject',
+)
+option(
+    'lua',
+    type: 'feature',
+    value: 'enabled',
+    description: 'Build the Lua scene binding and CLI',
+)
+option('tests', type: 'boolean', value: true, description: 'Build tests')
+option(
+    'examples',
+    type: 'boolean',
+    value: true,
+    description: 'Install Lua examples',
+)

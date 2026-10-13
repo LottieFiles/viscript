@@ -1,0 +1,24 @@
+# Meson build directories (meson setup build, build-wasm, ...)
+/build*/
+/out*/
+compile_commands.json
+
+# Downloaded subprojects
+/subprojects/.wraplock
+/subprojects/lua/
+/subprojects/miniaudio-*/
+/subprojects/thorvg/
+/subprojects/packagecache/
+
+# Local render output
+/media/
+**/temp/**
+/review*.png
+/test-*.png
+/*.mp4
+/*.gif
+.vscode
+.DS_Store
+
+# Local scratch (archived examples/templates)
+/.temp/

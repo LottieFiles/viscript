@@ -1,0 +1,10 @@
+[wrap-git]
+url = https://github.com/lua/lua.git
+revision = v5.4.8
+depth = 1
+patch_directory = lua
+
+[provide]
+lua-5.4 = lua_dep
+lua54 = lua_dep
+lua = lua_dep
