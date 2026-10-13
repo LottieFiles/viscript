@@ -1,0 +1,6 @@
+node_modules/
+out/
+*.vsix
+*.log
+media/shiki/
+media/savers.js

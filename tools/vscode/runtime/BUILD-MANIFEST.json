@@ -1,0 +1,106 @@
+{
+  "schemaVersion": 1,
+  "project": "viscript",
+  "projectVersion": "0.1.0",
+  "sourceCommit": "eb77963c1e15",
+  "sourceDirty": true,
+  "buildDate": "2026-10-13",
+  "toolchain": {
+    "emscripten": "4.0.19",
+    "buildType": "minsize",
+    "optimization": [
+      "-Oz",
+      "-flto"
+    ],
+    "renderer": "ThorVG CPU engine",
+    "thorvg": "1.2.0 (87b2684)",
+    "lua": "5.4.8"
+  },
+  "features": {
+    "javascriptBuilder": true,
+    "luaRuntime": true,
+    "retainedLuaRuntime": true,
+    "canvasRgba": true,
+    "glRenderer": false,
+    "renderEngineSelection": true,
+    "interactiveUi": true,
+    "interactiveInput": true,
+    "audio": true,
+    "runtimeSoundEvents": true,
+    "semanticMotion": true,
+    "diagramAuthoring": true,
+    "texMath": true
+  },
+  "artifacts": [
+    {
+      "path": "vis-wasm.js",
+      "bytes": 24778,
+      "sha256": "0d3a11e85f0e9593a3d14de9d877a6016ac9cdf4ca9a113d090b32c4fde14a0e"
+    },
+    {
+      "path": "vis-wasm.wasm",
+      "bytes": 1467737,
+      "sha256": "015e6c41d40488024ae9dd4bbcf6ee56bc91784f67d098b8ee70a9dd9341c0f8"
+    },
+    {
+      "path": "client.js",
+      "bytes": 46072,
+      "sha256": "73f4fc92387144b57aa41fe036d31efe568c5a31437fc3f9739829fa4711f485"
+    },
+    {
+      "path": "client.d.ts",
+      "bytes": 13188,
+      "sha256": "ea7ae4da86d0c87a349a50970c6e3e3cffdbd9bf7bc4e3bdec78a6b1e43c0b81"
+    },
+    {
+      "path": "bindings.js",
+      "bytes": 213755,
+      "sha256": "0d1f7ebc38b31d4873bbce680ae2891f6e55a5e59c3a86d2ab769fa7d00da19d"
+    },
+    {
+      "path": "bindings.d.ts",
+      "bytes": 66802,
+      "sha256": "12161d0dff5a93bf3365dc78ab3c336f489bedfe6c1e4286132f0516b5ec338a"
+    },
+    {
+      "path": "Pretendard.ttf",
+      "bytes": 2725828,
+      "sha256": "6d0af5258997aec7354a6e340fc2325ba321c410ca48b3af858c8c3d6e92a324"
+    },
+    {
+      "path": "Pretendard-OFL.txt",
+      "bytes": 4418,
+      "sha256": "85fce85e25260b03777bf10373d3bd9363b9da96d9e0ca86a280dd37ed7667a0"
+    },
+    {
+      "path": "IBMPlexSansKR-SemiBold.ttf",
+      "bytes": 2481868,
+      "sha256": "c1640995dae522401987918ac5caf90c2d7ecc90552216b653c97754fa941eb3"
+    },
+    {
+      "path": "IBM-Plex-Sans-KR-OFL.txt",
+      "bytes": 4362,
+      "sha256": "d741e57d5f865e294df801f96b7b5161a88b211df65887e4358d271c9fc5fb4f"
+    },
+    {
+      "path": "SourceSerif4-Semibold.ttf",
+      "bytes": 272088,
+      "sha256": "36db62940cb5728b12b1802476dc7fcf4c6c519a7bdd476ba23a4e555fc4655f"
+    },
+    {
+      "path": "Source-Serif-4-OFL.txt",
+      "bytes": 4492,
+      "sha256": "75784a295293a8992f5a8d99210566e0064a012e6dab6731305e3787f15896c7"
+    },
+    {
+      "path": "JetBrainsMono.ttf",
+      "bytes": 208576,
+      "sha256": "fb3b2575d7b0657359707993288f12a7360344d39387bb26050e276d61f6bd2a"
+    },
+    {
+      "path": "JetBrainsMono-OFL.txt",
+      "bytes": 4399,
+      "sha256": "30f0c136e3c88e422d0791acd97238870f9054a9729bc34cf2ff0d4ed8cac4ad"
+    }
+  ]
+}

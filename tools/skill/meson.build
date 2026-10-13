@@ -1,0 +1,71 @@
+# Skill templates are checked through the CLI.
+# Each entry: test-name suffix, template path, build condition, whether it
+# measures text and so needs the example font ('font'), and whether to add a CPU
+# render ('render') or a layout audit ('audit') test.
+skill_templates = [
+    {'name': '', 'src': 'vis-skills/templates/core/scene.lua'},
+    {'name': '-math-shortform-circle-wave-projections', 'src': 'vis-skills/templates/math-shortform/circle-wave-projections.lua'},
+    {'name': '-math-shortform-linear-space-transform', 'src': 'vis-skills/templates/math-shortform/linear-space-transform.lua'},
+    {'name': '-math-shortform-tracked-tangent', 'src': 'vis-skills/templates/math-shortform/tracked-tangent.lua'},
+    {'name': '-graphics-3d-surface-morph', 'src': 'vis-skills/templates/graphics/3d/surface-morph.lua', 'font': true, 'render': true, 'audit': []},
+    {'name': '-interactive-button-state-motion', 'src': 'vis-game/templates/button-state-motion.lua', 'when': ui_enabled},
+    {'name': '-interactive-ui-input-routing', 'src': 'vis-game/templates/ui-input-routing.lua', 'when': ui_enabled and input_enabled},
+    {'name': '-input-keyboard-object-motion', 'src': 'vis-game/templates/keyboard-object-motion.lua', 'when': input_enabled},
+    {
+        'name': '-input-retained-lua-2d-game', 'src': 'vis-game/templates/retained-lua-2d-game.lua',
+        'when': input_enabled and lua_runtime_enabled, 'render': true,
+    },
+    {'name': '-ai-systems-scaled-dot-product-attention', 'src': 'vis-skills/templates/ai-systems/scaled-dot-product-attention.lua', 'font': true},
+    {'name': '-ai-systems-transformer-block', 'src': 'vis-skills/templates/ai-systems/transformer-block.lua', 'font': true},
+    {'name': '-algorithm-and-code-binary-search', 'src': 'vis-skills/templates/algorithm-and-code/binary-search.lua'},
+    {'name': '-algorithm-and-code-call-stack-and-heap', 'src': 'vis-skills/templates/algorithm-and-code/call-stack-and-heap.lua'},
+    {'name': '-algorithm-and-code-merge-sort', 'src': 'vis-skills/templates/algorithm-and-code/merge-sort.lua'},
+    {'name': '-diagram-structure-scenario', 'src': 'vis-skills/templates/diagram/source-code/structure-scenario.lua'},
+    {'name': '-graphics-2d-coverage-rasterization', 'src': 'vis-skills/templates/graphics/2d/advanced/coverage-rasterization.lua'},
+    {'name': '-graphics-2d-linear-gradient', 'src': 'vis-skills/templates/graphics/2d/linear-gradient.lua'},
+    {'name': '-graphics-2d-sin-cos-function-plot', 'src': 'vis-skills/templates/graphics/2d/sin-cos-function-plot.lua'},
+    {'name': '-graphics-2d-space-coordinates', 'src': 'vis-skills/templates/graphics/2d/space-coordinates.lua'},
+    {'name': '-graphics-3d-blinn-phong', 'src': 'vis-skills/templates/graphics/3d/blinn-phong.lua'},
+    {'name': '-graphics-3d-model-view-projection', 'src': 'vis-skills/templates/graphics/3d/model-view-projection.lua'},
+    {'name': '-graphics-3d-quaternion-slerp', 'src': 'vis-skills/templates/graphics/3d/quaternion-slerp.lua'},
+    {'name': '-diagram-causal-loop', 'src': 'vis-skills/templates/diagram/causal-loop.lua'},
+    {'name': '-diagram-swimlane', 'src': 'vis-skills/templates/diagram/swimlane.lua', 'render': true},
+    {
+        'name': '-diagram-native', 'src': 'vis-skills/templates/diagram/native-diagram.lua',
+        'when': diagram_enabled, 'render': true,
+        'audit': [
+            '--require-containment-ledger',
+            '--allow-uncontained', 'request-flow:edge:request:label',
+            '--allow-uncontained', 'request-flow:edge:dispatch:label',
+            '--allow-uncontained', 'request-flow:edge:persist:label',
+        ],
+    },
+]
+
+foreach t : skill_templates
+    if t.get('when', true)
+        name = 'skill-template' + t['name']
+        template = files(t['src'])
+        # Fonts load through a renderer, so a template that measures text needs the CPU engine.
+        if not t.get('font', false)
+            test(name, vis_cli, args: ['inspect', template])
+        elif cpu_enabled
+            test(name, vis_cli, args: ['inspect', template] + example_fonts)
+        endif
+        if t.get('render', false) and cpu_enabled
+            test(
+                'render-' + name,
+                vis_cli,
+                args: ['render', template] + example_fonts + ['-o', name + '.png'],
+            )
+        endif
+        if t.has_key('audit') and audit_enabled
+            test('audit-' + name, vis_cli, args: ['audit', template] + example_fonts + t['audit'])
+        endif
+    endif
+endforeach
+
+node = find_program('node', required: false)
+if node.found()
+    test('skill-static-check', node, args: [files('check.mjs'), meson.project_source_root()])
+endif

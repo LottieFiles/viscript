@@ -1,0 +1,4 @@
+interface:
+  display_name: "viscript VS Code"
+  short_description: "Link viscript scenes to product code in VS Code"
+  default_prompt: "Use $vis-vscode to pick code evidence, write the .vscode/vis manifest, and preview source-linked viscript scenes in VS Code."

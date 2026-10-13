@@ -1,0 +1,137 @@
+{
+  "name": "vis-preview",
+  "displayName": "viscript Preview",
+  "description": "Live canvas previews for viscript Lua scenes in Visual Studio Code.",
+  "version": "0.7.79",
+  "publisher": "viscript",
+  "license": "MIT",
+  "icon": "media/icon.png",
+  "engines": {
+    "vscode": "^1.96.0"
+  },
+  "categories": [
+    "Visualization",
+    "Other"
+  ],
+  "keywords": [
+    "viscript",
+    "lua",
+    "animation",
+    "canvas",
+    "thorvg"
+  ],
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onLanguage:lua",
+    "onLanguage:c",
+    "onLanguage:cpp",
+    "workspaceContains:.vscode/vis/visualizations.json",
+    "onCommand:visPreview.openVisualization",
+    "onCommand:visPreview.openViewer",
+    "onCommand:visPreview.openToSide",
+    "onCommand:visPreview.savePng",
+    "onCommand:visPreview.saveGif",
+    "onCommand:visPreview.saveMp4",
+    "onCommand:visPreview.openRuntimeFolder",
+    "onCommand:visPreview.enableLuaLs"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "visPreview.openViewer",
+        "title": "viscript: Open Viewer"
+      },
+      {
+        "command": "visPreview.openToSide",
+        "title": "viscript: Open Preview to the Side",
+        "icon": {
+          "light": "media/icon.svg",
+          "dark": "media/icon.svg"
+        }
+      },
+      {
+        "command": "visPreview.refresh",
+        "title": "viscript: Refresh Preview"
+      },
+      {
+        "command": "visPreview.openRuntimeFolder",
+        "title": "viscript: Open Bundled Runtime Folder"
+      },
+      {
+        "command": "visPreview.enableLuaLs",
+        "title": "viscript: Enable LuaLS Type Definitions"
+      },
+      {
+        "command": "visPreview.savePng",
+        "title": "viscript: Save Current Viewer as PNG",
+        "enablement": "visPreview.hasPreview"
+      },
+      {
+        "command": "visPreview.saveGif",
+        "title": "viscript: Save Current Viewer as GIF",
+        "enablement": "visPreview.hasPreview"
+      },
+      {
+        "command": "visPreview.saveMp4",
+        "title": "viscript: Save Current Viewer as MP4",
+        "enablement": "visPreview.hasPreview"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "visPreview.openToSide",
+          "when": "false"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "visPreview.openToSide",
+          "when": "editorLangId == lua && visPreview.isScene",
+          "group": "navigation"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "viscript Preview",
+      "properties": {
+        "visPreview.updateDelay": {
+          "type": "number",
+          "default": 280,
+          "minimum": 100,
+          "maximum": 2000,
+          "description": "Milliseconds to wait after a Lua edit before refreshing the preview."
+        }
+      }
+    },
+    "jsonValidation": [
+      {
+        "fileMatch": ".vscode/vis/visualizations.json",
+        "url": "./schemas/visualizations.schema.json"
+      }
+    ]
+  },
+  "scripts": {
+    "compile": "npm run generate:api && tsc -p . && npm run build:webview",
+    "generate:api": "node scripts/generate-lua-meta.mjs",
+    "build:webview": "node esbuild.mjs",
+    "watch": "tsc -watch -p .",
+    "check": "tsc --noEmit -p .",
+    "test": "npm run compile && node test/open-viewer-command.mjs && node test/preview-target.mjs && node test/visualization-manifest.mjs && node test/symbol-locator.mjs && node test/unified-diff.mjs && node test/markdown.mjs && node test/source-inspector.mjs && node test/syntax-highlighter.mjs && node test/horizontal-wheel.mjs && node test/control-states.mjs && node test/audio-preview.mjs && node test/series-navigation.mjs && node test/series-step.mjs && node test/canvas-fullscreen.mjs && node test/viewer-layout.mjs && node test/scene-switch-layout.mjs && node test/adaptive-theme.mjs && node test/api-sync.mjs && node test/time.mjs && node test/playback-range.mjs && node test/retained-runtime.mjs && node test/viewport.mjs && node test/canvas-input.mjs && node test/camera.mjs && node test/runtime-module-boundary.mjs && node test/runtime-motion.mjs && node test/runtime-ui.mjs && node test/runtime-input.mjs && node test/runtime-retained-autonomous.mjs && node test/runtime-retained-lua.mjs && node test/runtime-interactive-templates.mjs && node test/runtime-authoring-modules.mjs && node test/layout-report.mjs && node test/export-plan.mjs && node test/export-codec.mjs && node test/runtime-render-density.mjs && node test/runtime-adaptive-theme.mjs && node test/runtime-seek.mjs",
+    "test:seek": "node test/runtime-seek.mjs",
+    "package": "vsce package --no-dependencies --allow-missing-repository",
+    "vscode:prepublish": "npm run compile"
+  },
+  "dependencies": {
+    "gifenc": "1.0.3",
+    "mediabunny": "1.55.1",
+    "shiki": "4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/vscode": "^1.96.0",
+    "@vscode/vsce": "^3.2.1",
+    "esbuild": "^0.28.2",
+    "typescript": "^5.7.2"
+  }
+}

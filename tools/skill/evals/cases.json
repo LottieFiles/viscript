@@ -1,0 +1,8 @@
+[
+  {"id": "bubble-sort", "prompt": "Make an animation that shows how bubble sort works, clear enough for someone seeing it for the first time."},
+  {"id": "pythagoras", "prompt": "Prove visually why the Pythagorean theorem holds by moving shapes around."},
+  {"id": "gradient-descent", "prompt": "Animate how gradient descent walks down a loss curve to the minimum. Also show what happens when the learning rate is too large."},
+  {"id": "http-request", "prompt": "Show, as an animated diagram, the request flow from typing a URL in a browser through DNS, the web server, and the database until the page appears."},
+  {"id": "unit-circle", "prompt": "Show how the sin and cos graphs are traced as a point goes around the unit circle, connecting the two."},
+  {"id": "attention", "prompt": "Show step by step how transformer self-attention computes the weights between the words in a sentence."}
+]

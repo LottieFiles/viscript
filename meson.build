@@ -204,6 +204,9 @@ endif
 
 subdir('src/examples')
 if get_option('tests')
+    if cli_enabled
+        subdir('tools/skill')
+    endif
     subdir('src/test')
 endif
 

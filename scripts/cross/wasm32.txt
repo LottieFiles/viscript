@@ -1,0 +1,19 @@
+[binaries]
+c = 'emcc'
+cpp = 'em++'
+ar = 'emar'
+strip = 'emstrip'
+exe_wrapper = 'node'
+
+[host_machine]
+system = 'emscripten'
+cpu_family = 'wasm32'
+cpu = 'wasm32'
+endian = 'little'
+
+[built-in options]
+buildtype = 'minsize'
+c_args = ['-Oz', '-flto']
+cpp_args = ['-Oz', '-flto', '-fno-exceptions', '-fno-rtti']
+c_link_args = ['-Oz', '-flto']
+cpp_link_args = ['-Oz', '-flto']

@@ -1,0 +1,4 @@
+interface:
+  display_name: "viscript Authoring"
+  short_description: "Author portable source-grounded viscript scenes"
+  default_prompt: "Use $vis-skills to build a portable, source-grounded viscript scene with the appropriate Lua or JavaScript API and evidence profile."

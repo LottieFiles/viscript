@@ -1,0 +1,14 @@
+# Diagram evidence
+
+Use this profile for topology-first architecture, process, sequence, hierarchy, dependency, schema, timeline, chart, or source-grounded relationship work. Pick the family that answers the reader's question: components/ownership, handoff/sequence, state, hierarchy, loop, time, schema, or aligned quantitative comparison. Split incompatible reading orders rather than making a dense universal diagram.
+
+Before geometry, make an evidence ledger: question, scope, containers, nodes, ports, relation meaning/direction, labels, states, stable IDs, reading order, uncertainty, and source anchors. A source fact, observed behavior, stated intent, inference, and illustrative value are different claims. For code, revisions, papers, AI/HPC, traces, or measurements, read [source-grounding.md](../diagram/source-grounding.md).
+
+Lay out measured node and container bounds first, reserve route corridors, then add explicit ports or waypoints where meaning or congestion requires them. When a node owns text, attach it with `object:label`/`object:text` or compare its production-font bounds against explicit box insets; no title, caption, or subtitle may cross its boundary. Keep route labels clear of shafts, heads, ports, and container edges. Use one primary reading spine and thin, Theme-derived structure. A backing shape must communicate a real boundary, ownership, clipping, selection, or local contrast.
+
+- One straight directed relation is an `Arrow`; an orthogonal/polyline directed relation is one `Route`; bespoke directed geometry is one closed filled `Path`.
+- Never overlay a second shaft or head for a single relation. `Connector` is not an obstacle router.
+- Use semantic Groups and explicit bands: background, containers, routes, masks, nodes, node text, route text, annotations/focus. Preserve stable IDs and do not change settled topology during a trace unless reconfiguration is the subject.
+- Construction, causal trace, state transition, operational loop, and comparison each need a readable settled endpoint. A dashed flow moves by exactly one dash period for a seamless loop; an arriving payload exists only when the payload itself is evidence.
+
+For the optional native Lua `vis.diagram` sidecar, its semantic inventory, lowering, ports, and routing workflow are in [native-authoring.md](../diagram/native-authoring.md). Use ordinary scene objects for custom structures. For SVG migration and the atomic-vs-native decision, read [svg-migration.md](../diagram/svg-migration.md). The additional [diagram contract](../diagram/diagram-contract.md) and [motion rules](../diagram/motion.md) are detailed review references, not a second scene contract.
