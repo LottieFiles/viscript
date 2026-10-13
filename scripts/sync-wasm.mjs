@@ -23,6 +23,14 @@ const sources = {
     "bindings.d.ts": join(root, "src/bindings/js/bindings.d.ts"),
     "JetBrainsMono.ttf": join(root, "src/examples/assets/JetBrainsMono.ttf"),
     "JetBrainsMono-OFL.txt": join(root, "src/examples/assets/JetBrainsMono-OFL.txt"),
+    // Licenses for everything compiled into vis-wasm.wasm.
+    "LICENSE-viscript.txt": join(root, "LICENSE"),
+    "LICENSE-ThorVG.txt": join(root, "licenses/LICENSE-ThorVG.txt"),
+    "LICENSE-libwebp.txt": join(root, "licenses/LICENSE-libwebp.txt"),
+    "LICENSE-LodePNG.txt": join(root, "licenses/LICENSE-LodePNG.txt"),
+    "LICENSE-Lua.txt": join(root, "licenses/LICENSE-Lua.txt"),
+    "LICENSE-miniaudio.txt": join(root, "licenses/LICENSE-miniaudio.txt"),
+    "NotoSansMath-OFL.txt": join(root, "src/core/renderer/tvg/NotoSansMath-OFL.txt"),
 };
 for (const [name, path] of Object.entries(sources)) {
     if (!existsSync(path)) throw new Error(`missing ${name}: ${path}`);
@@ -40,7 +48,7 @@ for (const bundle of bundles) {
     manifest.sourceCommit = commit;
     manifest.sourceDirty = dirty;
     manifest.buildDate = new Date().toISOString().slice(0, 10);
-    for (const path of ["JetBrainsMono.ttf", "JetBrainsMono-OFL.txt"]) {
+    for (const path of Object.keys(sources)) {
         if (!manifest.artifacts.some((artifact) => artifact.path === path)) manifest.artifacts.push({path});
     }
     manifest.artifacts = manifest.artifacts.map(({path}) => {

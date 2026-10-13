@@ -102,3 +102,32 @@ build also mixes the scene's authored cues into the soundtrack. See [Audio](docs
 - [Lua API](tools/skill/vis-skills/references/lua.md) and [JavaScript API](tools/skill/vis-skills/references/javascript.md)
 - [Examples](src/examples/lua) and [VS Code extension](tools/vscode/README.md)
 - [MIT License](LICENSE)
+
+## Third-party software
+
+viscript builds on these projects. Binary bundles (`tools/vscode/runtime/`,
+`tools/skill/vis-skills/assets/wasm/`) ship their license files; copies also live in
+[`licenses/`](licenses).
+
+| Component | License | Use |
+|---|---|---|
+| [ThorVG](https://github.com/thorvg/thorvg) | MIT | Renderer |
+| [libwebp](https://chromium.googlesource.com/webm/libwebp) | BSD-3-Clause | ThorVG WebP loader |
+| [LodePNG](https://github.com/lvandeve/lodepng) | zlib | ThorVG PNG loader |
+| jpgd | Public Domain | ThorVG JPEG loader |
+| [Lua 5.4](https://www.lua.org) | MIT | Scene scripting |
+| [miniaudio](https://github.com/mackron/miniaudio) | Public Domain / MIT-0 | Audio module |
+| [Noto Sans Math](https://github.com/notofonts/math) | OFL 1.1 | Embedded TeX glyph outlines ([license](src/core/renderer/tvg/NotoSansMath-OFL.txt)) |
+| [Pretendard](https://github.com/orioncactus/pretendard) | OFL 1.1 | Bundled font ([license](src/examples/assets/Pretendard-OFL.txt)) |
+| [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) | OFL 1.1 | Bundled font ([license](src/examples/assets/JetBrainsMono-OFL.txt)) |
+| [IBM Plex Sans KR](https://github.com/IBM/plex) | OFL 1.1 | Bundled font (runtime bundles) |
+| [Source Serif 4](https://github.com/adobe-fonts/source-serif) | OFL 1.1 | Bundled font (runtime bundles) |
+| [FFmpeg](https://ffmpeg.org) | LGPL/GPL | Optional MP4 export, run as an external program; not linked or distributed |
+
+The VS Code extension also bundles gifenc (MIT), Mediabunny (MPL-2.0), and Shiki (MIT);
+see [THIRD_PARTY_NOTICES](tools/vscode/THIRD_PARTY_NOTICES.md).
+
+## Inspired by
+
+- [Manim](https://github.com/3b1b/manim)
+- [Motion Canvas](https://github.com/motion-canvas/motion-canvas)

@@ -8,6 +8,14 @@ The Webview media export bundle includes:
 
 The Preview runtime includes:
 
+- viscript, licensed under the MIT License. See `runtime/LICENSE-viscript.txt`.
+- ThorVG, Copyright (c) 2020 - 2026 ThorVG Project, licensed under the MIT License. See `runtime/LICENSE-ThorVG.txt`.
+- libwebp (ThorVG WebP loader), Copyright 2012 Google Inc., licensed under the BSD 3-Clause License with an additional patent grant. See `runtime/LICENSE-libwebp.txt`.
+- LodePNG (ThorVG PNG loader), Copyright (c) 2005-2020 Lode Vandevenne, licensed under the zlib License. See `runtime/LICENSE-LodePNG.txt`.
+- jpgd (ThorVG JPEG loader), by Rich Geldreich, used under Public Domain terms.
+- Lua 5.4, Copyright (C) 1994-2025 Lua.org, PUC-Rio, licensed under the MIT License. See `runtime/LICENSE-Lua.txt`.
+- miniaudio 0.11.25, by David Reid, available as Public Domain or MIT No Attribution. See `runtime/LICENSE-miniaudio.txt`.
+- Noto Sans Math glyph outlines, Copyright 2022 The Noto Project Authors, licensed under the SIL Open Font License 1.1. See `runtime/NotoSansMath-OFL.txt`.
 - JetBrains Mono NL Regular 2.304, licensed under the SIL Open Font License 1.1. See `runtime/JetBrainsMono-OFL.txt`.
 - Pretendard, licensed under the SIL Open Font License 1.1. See `runtime/Pretendard-OFL.txt`.
 - IBM Plex Sans KR SemiBold, Copyright © 2017 IBM Corp., licensed under the SIL Open Font License 1.1. See `runtime/IBM-Plex-Sans-KR-OFL.txt`. The unmodified font is pinned from <https://github.com/IBM/plex/tree/bf260093582f04622aacc1e9f9ca604d7ccd0c42/packages/plex-sans-kr>.

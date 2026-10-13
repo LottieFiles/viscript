@@ -100,6 +100,41 @@
       "path": "JetBrainsMono-OFL.txt",
       "bytes": 4399,
       "sha256": "30f0c136e3c88e422d0791acd97238870f9054a9729bc34cf2ff0d4ed8cac4ad"
+    },
+    {
+      "path": "LICENSE-viscript.txt",
+      "bytes": 1078,
+      "sha256": "f2660c8e3ecad44b8b68c67291782b94f10a93f9b92119e252bc4004ae72e53f"
+    },
+    {
+      "path": "LICENSE-ThorVG.txt",
+      "bytes": 1077,
+      "sha256": "74242cdc4ccaebc73fa04fbd52a538429eae2be7a231f9eaf1dbf59d2bedc16b"
+    },
+    {
+      "path": "LICENSE-libwebp.txt",
+      "bytes": 2995,
+      "sha256": "af5fa202c3ee5483a32fe6d3b060233f77cc6711a7ed7a52d6013ff4e73db5e1"
+    },
+    {
+      "path": "LICENSE-LodePNG.txt",
+      "bytes": 891,
+      "sha256": "e77b75c707396f59591a57d440901c39bda2a5ae30339e069db6a0456315d2e7"
+    },
+    {
+      "path": "LICENSE-Lua.txt",
+      "bytes": 1083,
+      "sha256": "ae12837e770c5401d09feba37e0c6e306216b78f5492369e6c4699b4287dc0ed"
+    },
+    {
+      "path": "LICENSE-miniaudio.txt",
+      "bytes": 2597,
+      "sha256": "457f1b500e0adf6bc059edddfa78a2f62012e7c3bb43476c20e0bd23b25ba0eb"
+    },
+    {
+      "path": "NotoSansMath-OFL.txt",
+      "bytes": 4380,
+      "sha256": "403a95275b469061b7d4371c328e0ada3bc7d63328abe2e88aad5cd243b2fe21"
     }
   ]
 }
