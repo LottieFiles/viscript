@@ -6,7 +6,9 @@ import {fileURLToPath} from "node:url";
 const extensionRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const repositoryRoot = path.resolve(extensionRoot, "..", "..");
 const api = JSON.parse(fs.readFileSync(path.join(extensionRoot, "api", "vis-api.json"), "utf8"));
-const binding = fs.readFileSync(path.join(repositoryRoot, "src", "core", "lua", "visLua.cpp"), "utf8");
+const binding = ["visLua.cpp", "visLuaApi.cpp", "visLuaValues.h", "visLuaStyle.h"]
+    .map((name) => fs.readFileSync(path.join(repositoryRoot, "src", "core", "lua", name), "utf8"))
+    .join("\n");
 const uiBinding = fs.readFileSync(path.join(repositoryRoot, "src", "core", "ui", "visUiLua.cpp"), "utf8");
 const inputBinding = fs.readFileSync(path.join(repositoryRoot, "src", "core", "input", "visInputLua.cpp"), "utf8");
 const runtimeBinding = fs.readFileSync(path.join(repositoryRoot, "src", "core", "lua_runtime", "visLuaRuntime.cpp"), "utf8");
@@ -14,8 +16,9 @@ const motionBinding = fs.readFileSync(path.join(repositoryRoot, "src", "core", "
 const diagramBinding = fs.readFileSync(path.join(repositoryRoot, "src", "core", "diagram", "visDiagramLua.cpp"), "utf8");
 const texBinding = fs.readFileSync(path.join(repositoryRoot, "src", "core", "tex", "visTexLua.cpp"), "utf8");
 
-const sceneMethods = registrationNames(binding, "SCENE_METHODS");
-const objectMethods = registrationNames(binding, "OBJECT_METHODS");
+const sharedFactories = registrationNames(binding, "FACTORY_METHODS");
+const sceneMethods = [...sharedFactories, ...registrationNames(binding, "SCENE_METHODS")].sort();
+const objectMethods = [...sharedFactories, ...registrationNames(binding, "OBJECT_METHODS")].sort();
 const groupMethods = registrationNames(binding, "GROUP_METHODS");
 const viewMethods = registrationNames(binding, "VIEW_METHODS");
 const panelMethods = registrationNames(uiBinding, "methods");

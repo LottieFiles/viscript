@@ -9,19 +9,24 @@
 #include "vis.h"
 #include "visRendererBackend.h"
 #include "visScene.h"
+#include "visMatch.h"
+#include "visMorph.h"
+#include "visGeometry64.h"
+#include "visTimeline.h"
+#include "../common/visHash.h"
+#include "../common/visString.h"
+#include "visSceneValidation.h"
+#include "visWarp.h"
 
 namespace vis
 {
 
 static constexpr uint32_t MAX_OBJECTS = 1048576;
-static constexpr uint32_t MAX_ANIMATION_GROUP = 4096;
 static constexpr uint32_t MAX_OBJECT_DEPTH = 64;
 static constexpr uint32_t MAX_VIEWPORTS = 64;
 static constexpr uint32_t MAX_VIEWPORT_DEPTH = 16;
 static constexpr uint32_t MAX_VIEWS = 64;
 static constexpr uint32_t MAX_VIEW_HIDDEN = 256;
-static constexpr uint32_t MAX_MARKERS = 256;
-static constexpr size_t MAX_MARKER_NAME = 128;
 static constexpr auto SOURCE_SERIF_FONT = "Source Serif 4";
 static constexpr auto KOREAN_FONT = "IBM Plex Sans KR";
 
@@ -43,15 +48,6 @@ Mat4 Scene::Impl::billboardReference(const Object* object) const noexcept
         if (auto item = entry(owner)) reference = item->base.model * reference;
     }
     return reference;
-}
-
-static char* _duplicate(const char* text)
-{
-    if (!text) return nullptr;
-    auto size = std::strlen(text) + 1u;
-    auto copy = new (std::nothrow) char[size];
-    if (copy) std::memcpy(copy, text, size);
-    return copy;
 }
 
 static bool _equal(const Color& first, const Color& second)
@@ -188,21 +184,6 @@ static bool _colorChanged(const Object* object)
     auto style = _defaultStyle(object->type());
     return !_equal(object->style.stroke, style.stroke)
            || !_equal(object->style.fill, style.fill);
-}
-
-static void _hash(uint64_t& hash, const void* data, size_t size)
-{
-    auto bytes = static_cast<const uint8_t*>(data);
-    for (auto i = 0u; i < size; i++) {
-        hash ^= bytes[i];
-        hash *= 1099511628211ull;
-    }
-}
-
-template<typename T>
-static void _hash(uint64_t& hash, const T& value)
-{
-    _hash(hash, &value, sizeof(value));
 }
 
 static void _hash(uint64_t& hash, const Vec2& value)
@@ -491,280 +472,12 @@ uint64_t fingerprint(const Object* object) noexcept
     return hash;
 }
 
-static bool _finite(const Vec2& value)
-{
-    return std::isfinite(value.x) && std::isfinite(value.y);
-}
-
-static bool _finite(const Vec3& value)
-{
-    return std::isfinite(value.x) && std::isfinite(value.y) && std::isfinite(value.z);
-}
-
-static bool _finite(const Range& value)
-{
-    return std::isfinite(value.min) && std::isfinite(value.max) && std::isfinite(value.step) && value.min <= value.max && value.step > 0.0f;
-}
-
-static bool _finite(const Mat4& value)
-{
-    for (auto item : value.e) {
-        if (!std::isfinite(item)) return false;
-    }
-    return true;
-}
-
-static bool _affine(const Mat4& value)
-{
-    return _finite(value) && value.e[12] == 0.0f && value.e[13] == 0.0f && value.e[14] == 0.0f && value.e[15] == 1.0f;
-}
-
-static bool _identity(const Mat4& value)
-{
-    auto identity = Mat4::identity();
-    for (auto i = 0u; i < 16u; i++) {
-        if (value.e[i] != identity.e[i]) return false;
-    }
-    return true;
-}
-
 static bool _equal(const Mat4& first, const Mat4& second)
 {
     for (auto i = 0u; i < 16u; i++) {
         if (first.e[i] != second.e[i]) return false;
     }
     return true;
-}
-
-bool valid(const Config& config) noexcept
-{
-    if (!config.width || !config.height || !config.fps) return false;
-    if (config.cameraMode != CameraMode::Fixed && config.cameraMode != CameraMode::Interactive) return false;
-    if (config.cameraView != CameraView::TwoD && config.cameraView != CameraView::ThreeD) return false;
-    auto& camera = config.camera;
-    if (!_finite(camera.eye) || !_finite(camera.target) || !_finite(camera.up)) return false;
-    if (camera.projection != Projection::Perspective && camera.projection != Projection::Orthographic) return false;
-    if (!std::isfinite(camera.near) || !std::isfinite(camera.far) || camera.near <= 0.0f || camera.far <= camera.near) {
-        return false;
-    }
-    if (!std::isfinite(camera.fov) || camera.fov <= 0.0f || camera.fov >= 3.14159265359f) return false;
-    if (!std::isfinite(camera.orthoHeight) || camera.orthoHeight <= 0.0f) return false;
-    if (config.cameraView == CameraView::TwoD && (camera.projection != Projection::Orthographic || camera.eye.x != camera.target.x || camera.eye.y != camera.target.y || camera.eye.z <= camera.target.z || camera.up.x != 0.0f || camera.up.y <= 0.0f || camera.up.z != 0.0f)) {
-        return false;
-    }
-    auto fx = static_cast<double>(camera.target.x) - camera.eye.x;
-    auto fy = static_cast<double>(camera.target.y) - camera.eye.y;
-    auto fz = static_cast<double>(camera.target.z) - camera.eye.z;
-    auto forwardScale = std::fmax(std::fmax(std::fabs(fx), std::fabs(fy)), std::fabs(fz));
-    auto upScale = std::fmax(std::fmax(std::fabs(camera.up.x), std::fabs(camera.up.y)), std::fabs(camera.up.z));
-    if (!std::isfinite(forwardScale) || !std::isfinite(upScale) || forwardScale == 0.0 || upScale == 0.0) return false;
-    fx /= forwardScale;
-    fy /= forwardScale;
-    fz /= forwardScale;
-    auto forwardLength = std::hypot(fx, fy, fz);
-    auto ux = static_cast<double>(camera.up.x) / upScale;
-    auto uy = static_cast<double>(camera.up.y) / upScale;
-    auto uz = static_cast<double>(camera.up.z) / upScale;
-    auto upLength = std::hypot(ux, uy, uz);
-    fx /= forwardLength;
-    fy /= forwardLength;
-    fz /= forwardLength;
-    ux /= upLength;
-    uy /= upLength;
-    uz /= upLength;
-    return std::hypot(fy * uz - fz * uy, fz * ux - fx * uz, fx * uy - fy * ux) > 1.0e-6;
-}
-
-bool valid(const Shadow& shadow) noexcept
-{
-    return std::isfinite(shadow.offset.x) && std::isfinite(shadow.offset.y) && std::isfinite(shadow.blur)
-           && shadow.blur >= 0.0f && shadow.blur <= EFFECT_SIGMA_LIMIT;
-}
-
-bool valid(const Object* object) noexcept
-{
-    if (!object || !std::isfinite(object->blur) || object->blur < 0.0f || object->blur > EFFECT_SIGMA_LIMIT
-        || !valid(object->shadow)) {
-        return false;
-    }
-    if (static_cast<uint8_t>(object->type()) > static_cast<uint8_t>(Type::Angle) || !std::isfinite(object->style.width) || object->style.width < 0.0f || !std::isfinite(object->style.radius) || object->style.radius <= 0.0f || object->style.dashCount > Style::DashLimit || !std::isfinite(object->style.dashOffset) || !std::isfinite(object->opacity) || object->opacity < 0.0f || object->opacity > 1.0f || !std::isfinite(object->progress) || object->progress < 0.0f || object->progress > 1.0f) {
-        return false;
-    }
-    auto dashVisible = !object->style.dashCount;
-    for (auto i = 0u; i < object->style.dashCount; i++) {
-        if (!std::isfinite(object->style.dash[i]) || object->style.dash[i] < 0.0f) return false;
-        if (object->style.dash[i] > 0.0f) dashVisible = true;
-    }
-    if (!dashVisible) return false;
-    if (!_affine(object->model)) return false;
-    switch (object->type()) {
-        case Type::Line: {
-            auto value = static_cast<const Line*>(object);
-            return _finite(value->buff) && value->buff.x >= 0.0f && value->buff.y >= 0.0f && _finite(value->from) && _finite(value->to);
-        }
-        case Type::Arrow: {
-            auto value = static_cast<const Arrow*>(object);
-            return _finite(value->buff) && value->buff.x >= 0.0f && value->buff.y >= 0.0f && _finite(value->from) && _finite(value->to) && std::isfinite(value->tail) && value->tail >= 0.0f && std::isfinite(value->tip) && value->tip >= 0.0f;
-        }
-        case Type::Point: return _finite(static_cast<const Point*>(object)->point);
-        case Type::Text: {
-            auto value = static_cast<const Text*>(object);
-            return value->text() && _finite(value->point) && std::isfinite(value->size)
-                   && value->size >= 0.0f && _finite(value->align) && _finite(value->box)
-                   && value->box.x >= 0.0f && value->box.y >= 0.0f && _finite(value->boxOffset)
-                   && std::isfinite(value->slant) && std::fabs(value->slant) <= 1.0f
-                   && (value->orientation == TextOrientation::Billboard
-                       || value->orientation == TextOrientation::Plane)
-                   && static_cast<uint8_t>(value->role)
-                          <= static_cast<uint8_t>(TextRole::Code)
-                   && (!value->counting() || std::isfinite(value->value()));
-        }
-        case Type::Vector: {
-            auto value = static_cast<const Vector*>(object);
-            return _finite(value->buff) && value->buff.x >= 0.0f && value->buff.y >= 0.0f && _finite(value->value) && _finite(value->origin) && std::isfinite(value->tail) && value->tail >= 0.0f && std::isfinite(value->tip) && value->tip >= 0.0f;
-        }
-        case Type::Space: {
-            auto value = static_cast<const Space*>(object);
-            return std::isfinite(value->axisWidth) && (value->axisWidth == -1.0f || value->axisWidth >= 0.0f)
-                   && _finite(value->x) && _finite(value->y) && _finite(value->z)
-                   && (value->numberMode == NumberMode::Fixed || value->numberMode == NumberMode::Relative)
-                   && std::isfinite(value->numberSize) && value->numberSize > 0.0f && _finite(value->ticks)
-                   && value->ticks.x >= 0.0f && value->ticks.y >= 0.0f && value->ticks.z >= 0.0f
-                   && std::isfinite(value->tickLength) && value->tickLength >= 0.0f;
-        }
-        case Type::Arc: {
-            auto value = static_cast<const Arc*>(object);
-            return _finite(value->center) && std::isfinite(value->radius) && value->radius > 0.0f
-                   && std::isfinite(value->start) && std::isfinite(value->angle) && std::fabs(value->angle) <= 6.28318530718f;
-        }
-        case Type::Angle: {
-            auto value = static_cast<const Angle*>(object);
-            return _finite(value->vertex) && _finite(value->from) && _finite(value->to)
-                   && std::isfinite(value->radius) && value->radius > 0.0f
-                   && std::isfinite(value->labelDistance) && value->labelDistance >= 0.0f
-                   && static_cast<uint8_t>(value->right) <= static_cast<uint8_t>(RightAngle::Always);
-        }
-        case Type::Circle: {
-            auto value = static_cast<const Circle*>(object);
-            return _finite(value->center) && std::isfinite(value->radius) && value->radius > 0.0f;
-        }
-        case Type::Polygon: {
-            auto value = static_cast<const Polygon*>(object);
-            if (!value->points() || value->count() < 3) return false;
-            for (auto i = 0u; i < value->count(); i++) {
-                if (!_finite(value->points()[i])) return false;
-            }
-            return true;
-        }
-        case Type::Plot: {
-            auto value = static_cast<const Plot*>(object);
-            if (!std::isfinite(value->endpointRadius) || value->endpointRadius < 0.0f) return false;
-            // A geometry clip may leave a plot with no points and no pieces.
-            if (!value->count() && !value->contours()) return true;
-            if (!value->points() || value->count() < 2) return false;
-            for (auto i = 0u; i < value->count(); i++) {
-                if (!_finite(value->points()[i])) return false;
-            }
-            // Every piece holds two points or more.
-            auto start = 0u;
-            for (auto i = 0u; i < value->contours(); i++) {
-                auto end = value->contourEnd(i);
-                if (end < start || end - start < 2u || end > value->count()) return false;
-                start = end;
-            }
-            return true;
-        }
-        case Type::Route: {
-            auto value = static_cast<const DirectedRoute*>(object);
-            if (!value->points() || value->count() < 2 || !std::isfinite(value->tail)
-                || value->tail < 0.0f || !std::isfinite(value->tip) || value->tip < 0.0f) {
-                return false;
-            }
-            for (auto i = 0u; i < value->count(); i++) {
-                if (!_finite(value->points()[i])) return false;
-            }
-            return true;
-        }
-        case Type::Path: {
-            auto value = static_cast<const Path*>(object);
-            if (!value->points() || value->count() < (value->closed() ? 3u : 2u)) return false;
-            for (auto i = 0u; i < value->count(); i++) {
-                if (!_finite(value->points()[i])) return false;
-            }
-            return true;
-        }
-        case Type::Curve: {
-            auto value = static_cast<const Curve*>(object);
-            if (!value->points() || value->count() < 2u) return false;
-            for (auto i = 0u; i < value->count(); i++) {
-                if (!_finite(value->points()[i])) return false;
-            }
-            return true;
-        }
-        case Type::Picture: {
-            auto value = static_cast<const Picture*>(object);
-            auto source = (value->encoded() && value->encodedSize() && value->mime()) || value->pixels();
-            return source && value->pixelWidth() && value->pixelHeight() && _finite(value->center) && std::isfinite(value->width) && value->width > 0.0f && (value->filter == ImageFilter::Bilinear || value->filter == ImageFilter::Nearest);
-        }
-        case Type::Cell: {
-            auto value = static_cast<const Cell*>(object);
-            auto frames = sampleFrames(value);
-            auto duration = sampleDuration(value);
-            return value->colors() && value->columns() && value->rows()
-                   && value->rows() <= 16384u / value->columns()
-                   && frames && std::isfinite(duration) && duration >= 0.0f
-                   && (frames == 1u) == (duration == 0.0f)
-                   && _finite(value->origin) && std::isfinite(value->depth)
-                   && value->depth > 0.0f
-                   && (value->mode == CellMode::Full || value->mode == CellMode::Padd)
-                   && std::isfinite(value->padding) && value->padding >= 0.0f
-                   && value->padding < 0.5f;
-        }
-        case Type::Group: return true;
-        case Type::Rectangle: {
-            auto value = static_cast<const Rectangle*>(object);
-            return _finite(value->center) && _finite(value->size) && value->size.x > 0.0f && value->size.y > 0.0f
-                   && std::isfinite(value->corner) && value->corner >= 0.0f
-                   && value->corner <= std::fmin(value->size.x, value->size.y) * 0.5f;
-        }
-        case Type::Connector: {
-            auto value = static_cast<const Connector*>(object);
-            return _identity(value->model) && value->from() && value->to() && value->from() != value->to()
-                   && std::isfinite(value->padding) && value->padding >= 0.0f
-                   && std::isfinite(value->tail) && value->tail >= 0.0f
-                   && std::isfinite(value->tip) && value->tip >= 0.0f;
-        }
-        case Type::SurfaceMesh: {
-            auto value = static_cast<const SurfaceMesh*>(object);
-            if (!value->points() || value->columns() < 2u || value->rows() < 2u
-                || value->rows() > 65536u / value->columns()
-                || (value->mode != SurfaceMode::Solid && value->mode != SurfaceMode::Mesh
-                    && value->mode != SurfaceMode::SolidMesh)) {
-                return false;
-            }
-            auto count = value->columns() * value->rows();
-            for (auto i = 0u; i < count; i++) {
-                if (!_finite(value->points()[i])) return false;
-            }
-            if ((value->meshColumns == 1u || value->meshColumns > value->columns())
-                || (value->meshRows == 1u || value->meshRows > value->rows())) {
-                return false;
-            }
-            auto& light = value->light;
-            if (!_finite(light.direction) || !std::isfinite(light.ambient) || light.ambient < 0.0f
-                || light.ambient > 1.0f) {
-                return false;
-            }
-            auto& colormap = value->colormap;
-            if (colormap.map == Colormap::None) return true;
-            auto span = static_cast<double>(colormap.max) - colormap.min;
-            return static_cast<uint8_t>(colormap.map) <= static_cast<uint8_t>(Colormap::Cividis)
-                   && _finite(colormap.axis) && colormap.axis.dot(colormap.axis) > 0.0f
-                   && std::isfinite(colormap.min) && std::isfinite(colormap.max) && span != 0.0
-                   && std::isfinite(static_cast<float>(span));
-        }
-    }
-    return false;
 }
 
 static float _clamp(float value)
@@ -805,26 +518,6 @@ struct Rotation
     double z = 0.0;
     double w = 1.0;
 };
-
-struct Vector64
-{
-    double x = 0.0;
-    double y = 0.0;
-    double z = 0.0;
-};
-
-static bool _normalize(double x, double y, double z, Vector64& output)
-{
-    auto scale = std::fmax(std::fmax(std::fabs(x), std::fabs(y)), std::fabs(z));
-    if (!std::isfinite(scale) || scale == 0.0) return false;
-    x /= scale;
-    y /= scale;
-    z /= scale;
-    auto length = std::hypot(x, y, z);
-    if (!std::isfinite(length) || length == 0.0) return false;
-    output = {x / length, y / length, z / length};
-    return true;
-}
 
 static bool _normalize(Rotation& value)
 {
@@ -926,17 +619,6 @@ static bool _rotate(const Rotation& rotation, const Vector64& value, Vector64& o
                       value.y + rotation.w * ty + rotation.z * tx - rotation.x * tz,
                       value.z + rotation.w * tz + rotation.x * ty - rotation.y * tx,
                       output);
-}
-
-static bool _narrow(const Vector64& value, Vec3& output)
-{
-    auto limit = static_cast<double>(std::numeric_limits<float>::max());
-    if (!std::isfinite(value.x) || !std::isfinite(value.y) || !std::isfinite(value.z)
-        || std::fabs(value.x) > limit || std::fabs(value.y) > limit || std::fabs(value.z) > limit) {
-        return false;
-    }
-    output = {static_cast<float>(value.x), static_cast<float>(value.y), static_cast<float>(value.z)};
-    return true;
 }
 
 // Row-major 3x3 linear part of an affine Mat4, in double precision.
@@ -1081,16 +763,6 @@ static Mat4 _model(const Linear& linear, const Vector64& translation)
     model.e[7] = static_cast<float>(translation.y);
     model.e[11] = static_cast<float>(translation.z);
     return model;
-}
-
-static Vector64 _point(const Mat4& model, const Vec3& point)
-{
-    auto x = static_cast<double>(point.x);
-    auto y = static_cast<double>(point.y);
-    auto z = static_cast<double>(point.z);
-    return {model.e[0] * x + model.e[1] * y + model.e[2] * z + model.e[3],
-            model.e[4] * x + model.e[5] * y + model.e[6] * z + model.e[7],
-            model.e[8] * x + model.e[9] * y + model.e[10] * z + model.e[11]};
 }
 
 static bool _inverse(const Mat4& value, Mat4& output)
@@ -1876,195 +1548,6 @@ static void _apply(VisualState& state, const VisualState& source, uint32_t chann
     }
 }
 
-// The codepoint of the UTF-8 sequence at text, and its length in bytes; a byte that starts no
-// well-formed sequence stands alone as codepoint zero.
-static uint32_t _codepoint(const char* text, uint32_t& length)
-{
-    auto lead = static_cast<uint8_t>(text[0]);
-    uint32_t codepoint;
-    length = 1u;
-    if (lead < 0x80u) return lead;
-    if ((lead & 0xe0u) == 0xc0u) {
-        codepoint = lead & 0x1fu;
-        length = 2u;
-    } else if ((lead & 0xf0u) == 0xe0u) {
-        codepoint = lead & 0x0fu;
-        length = 3u;
-    } else if ((lead & 0xf8u) == 0xf0u) {
-        codepoint = lead & 0x07u;
-        length = 4u;
-    } else {
-        return 0u;
-    }
-    for (auto i = 1u; i < length; i++) {
-        auto next = static_cast<uint8_t>(text[i]);
-        if ((next & 0xc0u) != 0x80u) {
-            length = 1u;
-            return 0u;
-        }
-        codepoint = (codepoint << 6u) | (next & 0x3fu);
-    }
-    return codepoint;
-}
-
-// Codepoints that belong to the one before them: combining marks, the vowels and finals of
-// conjoining Hangul, variation selectors, emoji modifiers and tags.
-static bool _extends(uint32_t codepoint)
-{
-    return (codepoint >= 0x300u && codepoint <= 0x36fu) || (codepoint >= 0x1ab0u && codepoint <= 0x1affu)
-           || (codepoint >= 0x1dc0u && codepoint <= 0x1dffu) || (codepoint >= 0x20d0u && codepoint <= 0x20ffu)
-           || (codepoint >= 0xfe20u && codepoint <= 0xfe2fu) || (codepoint >= 0x3099u && codepoint <= 0x309au)
-           || (codepoint >= 0x1160u && codepoint <= 0x11ffu) || (codepoint >= 0xd7b0u && codepoint <= 0xd7ffu)
-           || (codepoint >= 0xfe00u && codepoint <= 0xfe0fu) || (codepoint >= 0xe0100u && codepoint <= 0xe01efu)
-           || (codepoint >= 0x1f3fbu && codepoint <= 0x1f3ffu) || (codepoint >= 0xe0020u && codepoint <= 0xe007fu);
-}
-
-static bool _indicator(uint32_t codepoint)
-{
-    return codepoint >= 0x1f1e6u && codepoint <= 0x1f1ffu;
-}
-
-// The bytes of the character at text, which a text change never splits: a codepoint with
-// those that belong to it, the two regional indicators of a flag, or emoji that zero width
-// joiners join.
-static size_t _character(const char* text)
-{
-    if (!*text) return 0u;
-    uint32_t length;
-    auto first = _codepoint(text, length);
-    size_t size = length;
-    if (_indicator(first) && text[size] && _indicator(_codepoint(text + size, length))) size += length;
-    while (text[size]) {
-        auto next = _codepoint(text + size, length);
-        if (next == 0x200du) {
-            size += length;
-            if (!text[size]) break;
-            _codepoint(text + size, length);
-        } else if (!_extends(next)) {
-            break;
-        }
-        size += length;
-    }
-    return size;
-}
-
-static size_t _characters(const char* text)
-{
-    size_t count = 0u;
-    for (auto at = text; *at; at += _character(at))
-        count++;
-    return count;
-}
-
-// Writes what a text change from one string to another shows at progress into output, which
-// has room for the bytes of both and a terminating zero, and returns its length in bytes.
-static size_t _lerpText(const char* from, const char* to, double progress, TextChange change, char* output)
-{
-    progress = progress < 0.0 ? 0.0 : progress > 1.0 ? 1.0 : progress;
-    auto fromCount = _characters(from);
-    auto toCount = _characters(to);
-    auto at = output;
-    // Copies the next character of text to output; both move past it.
-    auto copy = [&at](const char*& text) {
-        auto size = _character(text);
-        std::memcpy(at, text, size);
-        at += size;
-        text += size;
-    };
-    auto skip = [](const char*& text) { text += _character(text); };
-    if (change == TextChange::Retype) {
-        // What both strings begin with stays; erasing the rest of from and typing the rest of
-        // to take a step per character.
-        size_t common = 0u;
-        for (auto a = from, b = to; *a && *b; common++) {
-            auto size = _character(a);
-            if (size != _character(b) || std::memcmp(a, b, size) != 0) break;
-            a += size;
-            b += size;
-        }
-        auto erased = fromCount - common;
-        auto steps = erased + toCount - common;
-        auto done = static_cast<size_t>(std::floor(static_cast<double>(steps) * progress));
-        if (done > steps) done = steps;
-        auto source = done <= erased ? from : to;
-        auto count = done <= erased ? fromCount - done : common + done - erased;
-        for (size_t i = 0u; i < count; i++)
-            copy(source);
-    } else if (toCount >= fromCount) {
-        // Sweep replaces the prefix with target characters while interpolating the string length.
-        auto fromSize = static_cast<double>(fromCount);
-        auto toSize = static_cast<double>(toCount);
-        auto current = std::floor(toSize * progress);
-        auto reach = std::floor(fromSize - 1.0 + (toSize - fromSize + 1.0) * progress) + 1.0;
-        auto length = static_cast<size_t>(std::fmin(toSize, std::fmax(current, std::fmax(fromSize, reach))));
-        auto turned = static_cast<size_t>(current);
-        for (size_t i = 0u; i < length; i++) {
-            if (i < turned || i >= fromCount) {
-                copy(to);
-                if (i < fromCount) skip(from);
-            } else {
-                copy(from);
-                skip(to);
-            }
-        }
-    } else {
-        // Right to left: the characters from current on turn into to's, and those past to's
-        // end drop while the length shrinks from from's to to's.
-        auto fromSize = static_cast<double>(fromCount);
-        auto toSize = static_cast<double>(toCount);
-        auto current = std::floor(fromSize * (1.0 - progress) + 0.5);
-        auto reach = std::floor(fromSize + 1.0 + (toSize - fromSize - 1.0) * progress);
-        auto length = static_cast<size_t>(std::fmin(fromSize, std::fmax(current, std::fmax(toSize, reach))));
-        auto kept = static_cast<size_t>(current);
-        for (size_t i = 0u; i < length; i++) {
-            if (i < kept || i >= toCount) {
-                copy(from);
-                if (i < toCount) skip(to);
-            } else {
-                copy(to);
-                skip(from);
-            }
-        }
-    }
-    *at = '\0';
-    return static_cast<size_t>(at - output);
-}
-
-Result shown(const Text* text, const VisualState& state, const char*& value, char*& written) noexcept
-{
-    value = text->text();
-    written = nullptr;
-    if (text->counting()) {
-        // A counting text writes the number it shows at this time; its string holds the room
-        // any number needs beside the prefix and suffix.
-        auto capacity = static_cast<uint32_t>(std::strlen(value)) + 65u;
-        written = new (std::nothrow) char[capacity];
-        if (!written) return Result::OutOfMemory;
-        if (!text->write(state.value, written, capacity)) {
-            delete[] written;
-            written = nullptr;
-            return Result::InvalidArguments;
-        }
-        value = written;
-        return Result::Success;
-    }
-    if (!state.text) return Result::Success;
-    value = state.text;
-    if (!state.textFrom || state.textFrom == state.text || state.textProgress >= 1.0f) return Result::Success;
-    if (state.textProgress <= 0.0f) {
-        value = state.textFrom;
-        return Result::Success;
-    }
-    auto fromLength = std::strlen(state.textFrom);
-    auto toLength = std::strlen(state.text);
-    if (fromLength > SIZE_MAX - 1u - toLength) return Result::OutOfMemory;
-    written = new (std::nothrow) char[fromLength + toLength + 1u];
-    if (!written) return Result::OutOfMemory;
-    _lerpText(state.textFrom, state.text, state.textProgress, state.textChange, written);
-    value = written;
-    return Result::Success;
-}
-
 // Latest end among the clips already authored on these channels of one object.
 static float _channelEnd(const ObjectEntry& entry, uint32_t channels)
 {
@@ -2134,9 +1617,7 @@ static constexpr auto MOTION_VALUES = "the pivot, shift, angle and scale factors
 static constexpr auto MOTION_SELF = "an object cannot move along itself";
 static constexpr auto MOTION_PATH = "moving along a path needs the path object";
 static constexpr auto MOTION_FRACTION = "from and to must be fractions of the path length between 0 and 1";
-static constexpr auto SCENE_MOUNTED = "the scene is shown inside another scene and can no longer change";
 static constexpr auto SCENE_MEMORY = "out of memory";
-static constexpr auto TIMELINE_RANGE = "the timeline would end beyond the representable time range";
 static constexpr auto PLAY_EMPTY = "there is nothing to animate";
 static constexpr auto PLAY_DURATION = "the duration must be a positive number of seconds";
 static constexpr auto PLAY_LAG = "the lag must be zero or positive";
@@ -2304,8 +1785,6 @@ static constexpr auto CAMERA_POSE =
 static constexpr auto ORBIT_VIEW = "only a 3D camera orbits; use look to pan or zoom a 2D camera";
 static constexpr auto ORBIT_ANGLE = "the orbit angle must be a finite, non-zero number of radians";
 static constexpr auto ORBIT_AXIS = "the orbit axis must be a finite, non-zero vector";
-static constexpr auto WAIT_DURATION = "the wait must be zero or a positive number of seconds";
-static constexpr auto SEEK_TIME = "the time must be zero or a positive number of seconds";
 static constexpr auto VIEWPORT_SCENE = "a scene can be shown once, by another scene, outside its own viewports";
 static constexpr auto VIEWPORT_RECT = "the viewport must lie inside the unit square with a positive size";
 static constexpr auto VIEWPORT_LIMIT = "viewports nest at most 16 scenes deep and 64 per scene";
@@ -2373,11 +1852,6 @@ struct MotionPath
     bool relative = false;
 };
 
-static double _distance(const Vector64& first, const Vector64& second)
-{
-    return std::hypot(first.x - second.x, first.y - second.y, first.z - second.z);
-}
-
 static bool _direction(const Vector64& from, const Vector64& to, Vector64& direction)
 {
     return _normalize(to.x - from.x, to.y - from.y, to.z - from.z, direction);
@@ -2414,15 +1888,7 @@ static Result _motionPath(const Object* source, const Mat4& space, MotionPath& p
     }
     delete[] raw;
     auto tolerance = extent * 1.0e-9;
-    auto unique = 1u;
-    for (auto i = 1u; i < count; i++) {
-        if (_distance(points[i], points[unique - 1u]) > tolerance) points[unique++] = points[i];
-    }
-    if (closed && unique > 1u && _distance(points[unique - 1u], points[0]) <= tolerance) unique--;
-    if (closed && unique > 1u) points[unique++] = points[0];
-    lengths[0] = 0.0;
-    for (auto i = 1u; i < unique; i++)
-        lengths[i] = lengths[i - 1u] + _distance(points[i - 1u], points[i]);
+    auto unique = _parameterize(points, count, closed, tolerance, lengths);
     auto total = lengths[unique - 1u];
     if (!std::isfinite(extent) || unique < 2u || !std::isfinite(total) || total <= 0.0
         || total > std::numeric_limits<float>::max()) {
@@ -2632,523 +2098,6 @@ void Scene::Impl::dropPaths(uint32_t count, uint32_t vertices) noexcept
     pathVertices = vertices;
 }
 
-// Points the morphs of one scene keep in all.
-static constexpr uint32_t MAX_MORPH_POINTS = 1048576;
-static constexpr uint32_t MAX_MORPH_COLOR_STEPS = 64;
-// Even samples along both outlines that line a morph up.
-static constexpr uint32_t MORPH_SAMPLES = 128;
-// Fractions of the outline length closer than this are one point.
-static constexpr double MORPH_EPSILON = 1.0e-9;
-
-// An outline in local space as an arc-length polyline: points without repeats and, when it
-// is closed, the first point again at the end. lengths[i] is the distance to point i.
-struct MorphOutline
-{
-    Vector64* points = nullptr;
-    double* lengths = nullptr;
-    uint32_t count = 0;
-    bool closed = false;
-
-    ~MorphOutline()
-    {
-        delete[] points;
-        delete[] lengths;
-    }
-};
-
-static Result _morphOutline(const Vec3* raw, uint32_t count, bool closed, MorphOutline& output)
-{
-    if (count < 2u) return Result::InvalidArguments;
-    if (count >= MAX_MORPH_POINTS) return Result::InsufficientCondition;
-    output.points = new (std::nothrow) Vector64[count + 1u];
-    output.lengths = new (std::nothrow) double[count + 1u];
-    if (!output.points || !output.lengths) {
-        return Result::OutOfMemory;
-    }
-    auto points = output.points;
-    auto extent = 0.0;
-    for (auto i = 0u; i < count; i++) {
-        points[i] = {raw[i].x, raw[i].y, raw[i].z};
-        extent = std::fmax(extent, std::fmax(std::fabs(points[i].x),
-                                             std::fmax(std::fabs(points[i].y), std::fabs(points[i].z))));
-    }
-    auto tolerance = extent * 1.0e-9;
-    auto unique = 1u;
-    for (auto i = 1u; i < count; i++) {
-        if (_distance(points[i], points[unique - 1u]) > tolerance) points[unique++] = points[i];
-    }
-    if (closed && unique > 1u && _distance(points[unique - 1u], points[0]) <= tolerance) unique--;
-    if (closed && unique > 1u) points[unique++] = points[0];
-    output.lengths[0] = 0.0;
-    for (auto i = 1u; i < unique; i++)
-        output.lengths[i] = output.lengths[i - 1u] + _distance(points[i - 1u], points[i]);
-    output.count = unique;
-    output.closed = closed;
-    auto total = output.lengths[unique - 1u];
-    if (!std::isfinite(extent) || unique < 2u || !std::isfinite(total) || total <= 0.0) {
-        return Result::InvalidArguments;
-    }
-    return Result::Success;
-}
-
-static Result _morphOutline(const Object* object, MorphOutline& output)
-{
-    auto closed = false;
-    auto count = outline(object, nullptr, 0u, closed);
-    if (count < 2u) return Result::InvalidArguments;
-    if (count >= MAX_MORPH_POINTS) return Result::InsufficientCondition;
-    auto raw = new (std::nothrow) Vec3[count];
-    if (!raw) return Result::OutOfMemory;
-    outline(object, raw, count, closed);
-    auto result = _morphOutline(raw, count, closed, output);
-    delete[] raw;
-    return result;
-}
-
-// The point at the fraction u of the outline's length.
-static Vector64 _morphPoint(const MorphOutline& outline, double u)
-{
-    auto lengths = outline.lengths;
-    auto distance = std::fmin(std::fmax(u, 0.0), 1.0) * lengths[outline.count - 1u];
-    auto low = 0u;
-    auto high = outline.count - 1u;
-    while (high - low > 1u) {
-        auto middle = low + (high - low) / 2u;
-        if (lengths[middle] <= distance) low = middle;
-        else high = middle;
-    }
-    auto& a = outline.points[low];
-    auto& b = outline.points[low + 1u];
-    auto span = lengths[low + 1u] - lengths[low];
-    auto t = span > 0.0 ? std::fmin(std::fmax((distance - lengths[low]) / span, 0.0), 1.0) : 0.0;
-    return {a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, a.z + (b.z - a.z) * t};
-}
-
-// Lines the target up with the source in the parent space they share, by the even samples
-// that lie closest: the fraction of the target's length where the source's start lands, and
-// whether the target runs the other way. A closed outline may start anywhere, an open one at
-// either end.
-static void _alignMorph(const MorphOutline& source, const Mat4& sourceModel, const MorphOutline& target,
-                        const Mat4& targetModel, double& offset, bool& reversed, int directionOnly = -1)
-{
-    Vector64 from[MORPH_SAMPLES];
-    Vector64 to[MORPH_SAMPLES];
-    auto closed = source.closed;
-    auto steps = static_cast<double>(closed ? MORPH_SAMPLES : MORPH_SAMPLES - 1u);
-    for (auto i = 0u; i < MORPH_SAMPLES; i++) {
-        auto u = static_cast<double>(i) / steps;
-        auto a = _morphPoint(source, u);
-        auto b = _morphPoint(target, u);
-        from[i] = _point(sourceModel, Vec3{static_cast<float>(a.x), static_cast<float>(a.y), static_cast<float>(a.z)});
-        to[i] = _point(targetModel, Vec3{static_cast<float>(b.x), static_cast<float>(b.y), static_cast<float>(b.z)});
-    }
-    auto best = std::numeric_limits<double>::infinity();
-    auto shifts = closed ? MORPH_SAMPLES : 1u;
-    offset = 0.0;
-    reversed = false;
-    for (auto direction = 0u; direction < 2u; direction++) {
-        if (directionOnly >= 0 && direction != static_cast<uint32_t>(directionOnly)) continue;
-        for (auto shift = 0u; shift < shifts; shift++) {
-            auto cost = 0.0;
-            for (auto i = 0u; i < MORPH_SAMPLES && cost < best; i++) {
-                uint32_t j;
-                if (closed) j = direction ? (shift + MORPH_SAMPLES - i) % MORPH_SAMPLES : (shift + i) % MORPH_SAMPLES;
-                else j = direction ? MORPH_SAMPLES - 1u - i : i;
-                auto x = from[i].x - to[j].x;
-                auto y = from[i].y - to[j].y;
-                auto z = from[i].z - to[j].z;
-                cost += x * x + y * y + z * z;
-            }
-            if (cost < best) {
-                best = cost;
-                offset = closed ? static_cast<double>(shift) / MORPH_SAMPLES : 0.0;
-                reversed = direction != 0u;
-            }
-        }
-    }
-}
-
-// Where the target's vertices land along the source, in increasing order: the fraction of the
-// source's length that meets each of them once the target is lined up.
-static void _morphStops(const MorphOutline& target, double offset, bool reversed, double* stops)
-{
-    auto lengths = target.lengths;
-    auto total = lengths[target.count - 1u];
-    if (!target.closed) {
-        for (auto i = 0u; i < target.count; i++) {
-            auto vertex = reversed ? target.count - 1u - i : i;
-            auto t = lengths[vertex] / total;
-            stops[i] = reversed ? 1.0 - t : t;
-        }
-        return;
-    }
-    // A closed outline repeats its first point at the end, which is not a vertex of its own.
-    auto vertices = target.count - 1u;
-    auto count = 0u;
-    auto stop = [&](uint32_t vertex, double shift) {
-        auto t = lengths[vertex] / total;
-        auto u = (reversed ? offset - t : t - offset) + shift;
-        stops[count++] = std::fmin(std::fmax(u, 0.0), 1.0);
-    };
-    if (reversed) {
-        auto first = 0u;
-        while (first + 1u < vertices && lengths[first + 1u] / total <= offset) first++;
-        for (auto i = first + 1u; i-- > 0u;)
-            stop(i, 0.0);
-        for (auto i = vertices; i-- > first + 1u;)
-            stop(i, 1.0);
-    } else {
-        auto first = 0u;
-        while (first < vertices && lengths[first] / total < offset) first++;
-        for (auto i = first; i < vertices; i++)
-            stop(i, 0.0);
-        for (auto i = 0u; i < first; i++)
-            stop(i, 1.0);
-    }
-}
-
-static Result _resampleMorph(const MorphOutline& from, const Mat4& sourceModel,
-                             const MorphOutline& to, const Mat4& targetModel,
-                             MorphShape& shape, int directionOnly = -1)
-{
-    auto offset = 0.0;
-    auto reversed = false;
-    _alignMorph(from, sourceModel, to, targetModel, offset, reversed, directionOnly);
-
-    // Every vertex of either outline is a point of both.
-    auto closed = from.closed;
-    auto sourceVertices = closed ? from.count - 1u : from.count;
-    auto targetVertices = closed ? to.count - 1u : to.count;
-    auto stops = new (std::nothrow) double[targetVertices];
-    auto fractions = new (std::nothrow) double[sourceVertices + targetVertices];
-    if (!stops || !fractions) {
-        delete[] stops;
-        delete[] fractions;
-        return Result::OutOfMemory;
-    }
-    _morphStops(to, offset, reversed, stops);
-    auto count = 0u;
-    auto add = [&](double u) {
-        if (count && u - fractions[count - 1u] <= MORPH_EPSILON) return;
-        if (closed && u >= 1.0 - MORPH_EPSILON) return;
-        fractions[count++] = u;
-    };
-    auto sourceTotal = from.lengths[from.count - 1u];
-    auto i = 0u;
-    auto j = 0u;
-    while (i < sourceVertices || j < targetVertices) {
-        auto own = i < sourceVertices ? from.lengths[i] / sourceTotal : 2.0;
-        if (j >= targetVertices || own <= stops[j]) {
-            add(own);
-            i++;
-        } else {
-            add(stops[j++]);
-        }
-    }
-    delete[] stops;
-    if (count > MAX_MORPH_POINTS) {
-        delete[] fractions;
-        return Result::InsufficientCondition;
-    }
-    shape.from = new (std::nothrow) Vec3[count];
-    shape.to = new (std::nothrow) Vec3[count];
-    if (!shape.from || !shape.to) {
-        delete[] fractions;
-        return Result::OutOfMemory;
-    }
-    auto valid = true;
-    for (auto k = 0u; k < count && valid; k++) {
-        auto u = fractions[k];
-        auto t = closed ? (reversed ? offset - u : offset + u) : (reversed ? 1.0 - u : u);
-        if (closed) t -= std::floor(t);
-        valid = _narrow(_morphPoint(from, u), shape.from[k]) && _narrow(_morphPoint(to, t), shape.to[k]);
-    }
-    delete[] fractions;
-    if (!valid) return Result::InvalidArguments;
-    shape.count = count;
-    shape.closed = closed;
-    return Result::Success;
-}
-
-// Pairs the outlines of source and target point by point. Two outlines of one kind with the
-// same number of points keep the pairing their points were given in. Any others are lined up
-// and then resampled at the vertices of both, so that each keeps its corners and neither
-// twists.
-static Result _pairMorph(const Object* source, const Object* target, MorphShape& shape)
-{
-    auto type = source->type();
-    if (type == Type::SurfaceMesh) {
-        // Two surfaces on one grid pair point for point.
-        auto from = static_cast<const SurfaceMesh*>(source);
-        auto to = static_cast<const SurfaceMesh*>(target);
-        auto count = from->columns() * from->rows();
-        if (count > MAX_MORPH_POINTS) return Result::InsufficientCondition;
-        shape.from = new (std::nothrow) Vec3[count];
-        shape.to = new (std::nothrow) Vec3[count];
-        if (!shape.from || !shape.to) return Result::OutOfMemory;
-        std::memcpy(shape.from, from->points(), sizeof(Vec3) * count);
-        std::memcpy(shape.to, to->points(), sizeof(Vec3) * count);
-        shape.count = count;
-        return Result::Success;
-    }
-    auto sourceClosed = false;
-    auto targetClosed = false;
-    auto sourceCount = outline(source, nullptr, 0u, sourceClosed);
-    auto targetCount = outline(target, nullptr, 0u, targetClosed);
-    if (type == target->type() && sourceCount == targetCount && sourceCount >= 2u
-        && (type == Type::Polygon || type == Type::Plot || type == Type::Path || type == Type::Curve)) {
-        if (sourceCount > MAX_MORPH_POINTS) return Result::InsufficientCondition;
-        shape.from = new (std::nothrow) Vec3[sourceCount];
-        shape.to = new (std::nothrow) Vec3[sourceCount];
-        if (!shape.from || !shape.to) return Result::OutOfMemory;
-        outline(source, shape.from, sourceCount, sourceClosed);
-        outline(target, shape.to, targetCount, targetClosed);
-        shape.count = sourceCount;
-        shape.closed = sourceClosed;
-        return Result::Success;
-    }
-    MorphOutline from;
-    MorphOutline to;
-    auto result = _morphOutline(source, from);
-    if (result == Result::Success) result = _morphOutline(target, to);
-    if (result != Result::Success) return result;
-    return _resampleMorph(from, source->model, to, target->model, shape);
-}
-
-// Frees what a morph pairing holds.
-static void _freeMorph(MorphShape& shape)
-{
-    delete[] shape.from;
-    delete[] shape.to;
-    delete[] shape.ends;
-    delete[] shape.growth;
-    delete[] shape.colors[0];
-    delete[] shape.colors[1];
-    shape = {};
-}
-
-// Piece indices follow the retained path, plot or warp, before pairing reorders them.
-static uint32_t _morphPieceCount(const Object* object)
-{
-    if (auto warp = warped(object)) return warp->runCount;
-    if (object->type() == Type::Path) return static_cast<const Path*>(object)->contours();
-    if (object->type() == Type::Plot) return static_cast<const Plot*>(object)->contours();
-    return 1u;
-}
-
-struct MorphComponent
-{
-    MorphOutline outline;
-    Vector64 center;
-    Vector64 position;
-    double area = 0.0;
-    double measure = 0.0;
-    bool used = false;
-};
-
-// Closed pieces use signed area and its centroid; open pieces use length and its midpoint
-// weighted by segment length. Positions are normalized against the bounds of the whole side.
-static Result _morphComponents(const Object* object, MorphComponent* pieces, uint32_t count)
-{
-    auto warp = warped(object);
-    auto path = object->type() == Type::Path ? static_cast<const Path*>(object) : nullptr;
-    auto plot = object->type() == Type::Plot ? static_cast<const Plot*>(object) : nullptr;
-    Vector64 low = {INFINITY, INFINITY, INFINITY};
-    Vector64 high = {-INFINITY, -INFINITY, -INFINITY};
-    auto start = 0u;
-    for (auto i = 0u; i < count; i++) {
-        auto& part = pieces[i];
-        auto& line = part.outline;
-        Result result;
-        if (warp || path || plot) {
-            auto end = warp ? warp->runs[i].end : path ? path->contourEnd(i) : plot->contourEnd(i);
-            auto points = warp ? warp->to : path ? path->points() : plot->points();
-            auto closed = warp ? warp->closed : path ? path->closed() : false;
-            // A contour plot keeps its closing point even though Plot has no closed flag.
-            if (plot && end > start + 2u) {
-                auto delta = points[end - 1u] - points[start];
-                closed = delta.length() == 0.0f;
-            }
-            result = _morphOutline(points + start, end - start, closed, line);
-            start = end;
-        } else result = _morphOutline(object, line);
-        if (result != Result::Success) return result;
-        auto total = line.lengths[line.count - 1u];
-        for (auto j = 1u; j < line.count; j++) {
-            auto a = line.points[j - 1u];
-            auto b = line.points[j];
-            auto length = line.lengths[j] - line.lengths[j - 1u];
-            part.center.x += (a.x + b.x) * 0.5 * length / total;
-            part.center.y += (a.y + b.y) * 0.5 * length / total;
-            part.center.z += (a.z + b.z) * 0.5 * length / total;
-            if (line.closed) part.area += a.x * b.y - b.x * a.y;
-        }
-        if (line.closed && std::fabs(part.area) > 1.0e-12) {
-            part.center.x = part.center.y = 0.0;
-            for (auto j = 1u; j < line.count; j++) {
-                auto a = line.points[j - 1u];
-                auto b = line.points[j];
-                auto cross = a.x * b.y - b.x * a.y;
-                part.center.x += (a.x + b.x) * cross / (3.0 * part.area);
-                part.center.y += (a.y + b.y) * cross / (3.0 * part.area);
-            }
-        }
-        part.measure = line.closed ? std::fabs(part.area) : total;
-        part.position = _point(object->model, {static_cast<float>(part.center.x),
-                              static_cast<float>(part.center.y), static_cast<float>(part.center.z)});
-        for (auto j = 0u; j < line.count; j++) {
-            auto point = line.points[j];
-            auto p = _point(object->model, {static_cast<float>(point.x), static_cast<float>(point.y),
-                                          static_cast<float>(point.z)});
-            low = {std::fmin(low.x, p.x), std::fmin(low.y, p.y), std::fmin(low.z, p.z)};
-            high = {std::fmax(high.x, p.x), std::fmax(high.y, p.y), std::fmax(high.z, p.z)};
-        }
-    }
-    for (auto i = 0u; i < count; i++) {
-        auto& p = pieces[i].position;
-        p = {high.x > low.x ? (p.x - low.x) / (high.x - low.x) : 0.5,
-             high.y > low.y ? (p.y - low.y) / (high.y - low.y) : 0.5,
-             high.z > low.z ? (p.z - low.z) / (high.z - low.z) : 0.5};
-    }
-    return Result::Success;
-}
-
-static Result _pieceMorph(const Animation& animation, MorphShape& shape)
-{
-    auto source = animation.target;
-    auto target = animation.related;
-    auto sourceCount = _morphPieceCount(source);
-    auto targetCount = _morphPieceCount(target);
-    auto capacity = std::max(sourceCount, targetCount);
-    if (!capacity) return Result::InvalidArguments;
-    if (capacity > MAX_ANIMATION_GROUP) return Result::InsufficientCondition;
-    auto from = new (std::nothrow) MorphComponent[sourceCount];
-    auto to = new (std::nothrow) MorphComponent[targetCount];
-    auto parts = new (std::nothrow) MorphShape[capacity];
-    auto order = new (std::nothrow) uint32_t[sourceCount];
-    auto growth = new (std::nothrow) int8_t[capacity];
-    auto result = Result::OutOfMemory;
-    auto kept = 0u;
-    if (from && to && parts && order && growth) {
-        result = _morphComponents(source, from, sourceCount);
-        if (result == Result::Success) result = _morphComponents(target, to, targetCount);
-    }
-    auto pair = [&](MorphComponent* a, MorphComponent* b) {
-        if (result != Result::Success) return;
-        growth[kept] = !a ? 1 : !b ? -1 : 0;
-        auto& part = parts[kept++];
-        if (a && b) {
-            auto ac = a->outline.closed;
-            auto bc = b->outline.closed;
-            // Closed to open pairs keep the closing segment as an ordinary segment.
-            a->outline.closed = b->outline.closed = ac && bc;
-            auto direction = ac && bc && a->area && b->area ? (a->area * b->area < 0.0 ? 1 : 0) : -1;
-            result = _resampleMorph(a->outline, source->model, b->outline, target->model, part, direction);
-            a->outline.closed = ac;
-            b->outline.closed = bc;
-        } else {
-            auto own = a ? a : b;
-            auto& line = own->outline;
-            part.count = line.count - (line.closed ? 1u : 0u);
-            part.closed = line.closed;
-            part.from = new (std::nothrow) Vec3[part.count];
-            part.to = new (std::nothrow) Vec3[part.count];
-            if (!part.from || !part.to) result = Result::OutOfMemory;
-            for (auto i = 0u; i < part.count && result == Result::Success; i++) {
-                if (!_narrow(a ? line.points[i] : own->center, part.from[i])
-                    || !_narrow(b ? line.points[i] : own->center, part.to[i])) result = Result::InvalidArguments;
-            }
-        }
-        if (a) a->used = true;
-        if (b) b->used = true;
-        if (result == Result::Success) {
-            if (part.count > MAX_MORPH_POINTS - shape.count) result = Result::InsufficientCondition;
-            else shape.count += part.count;
-        }
-    };
-    for (auto i = 0u; i < animation.pairCount && result == Result::Success; i++)
-        pair(from + animation.pairs[2u * i], to + animation.pairs[2u * i + 1u]);
-    if (result == Result::Success) {
-        for (auto i = 0u; i < sourceCount; i++) order[i] = i;
-        std::sort(order, order + sourceCount, [&](uint32_t a, uint32_t b) {
-            if (from[a].outline.closed != from[b].outline.closed) return from[a].outline.closed;
-            if (from[a].measure != from[b].measure) return from[a].measure > from[b].measure;
-            return a < b;
-        });
-        for (auto pass = 0u; pass < 2u; pass++) {
-            for (auto i = 0u; i < sourceCount; i++) {
-                auto& own = from[order[i]];
-                if (own.used) continue;
-                auto best = targetCount;
-                auto distance = std::numeric_limits<double>::infinity();
-                auto size = std::numeric_limits<double>::infinity();
-                for (auto j = 0u; j < targetCount; j++) {
-                    if (to[j].used) continue;
-                    auto matching = own.outline.closed == to[j].outline.closed;
-                    if (!pass && !matching) continue;
-                    auto preferred = best < targetCount && own.outline.closed == to[best].outline.closed;
-                    auto d = _distance(own.position, to[j].position);
-                    auto m = std::fabs(own.measure - to[j].measure);
-                    if (best == targetCount || (matching && !preferred)
-                        || (matching == preferred && (d < distance || (d == distance && m < size)))) {
-                        best = j;
-                        distance = d;
-                        size = m;
-                    }
-                }
-                if (best < targetCount || pass) pair(&own, best < targetCount ? to + best : nullptr);
-            }
-        }
-        for (auto i = 0u; i < targetCount; i++) if (!to[i].used) pair(nullptr, to + i);
-    }
-    if (result == Result::Success) {
-        shape.from = new (std::nothrow) Vec3[shape.count];
-        shape.to = new (std::nothrow) Vec3[shape.count];
-        shape.ends = new (std::nothrow) uint32_t[kept];
-        shape.growth = new (std::nothrow) int8_t[kept];
-        if (!shape.from || !shape.to || !shape.ends || !shape.growth) result = Result::OutOfMemory;
-        else {
-            auto offset = 0u;
-            for (auto closed = 1; closed >= 0; closed--) {
-                for (auto i = 0u; i < kept; i++) {
-                    auto& part = parts[i];
-                    if (part.closed != static_cast<bool>(closed)) continue;
-                    std::memcpy(shape.from + offset, part.from, part.count * sizeof(Vec3));
-                    std::memcpy(shape.to + offset, part.to, part.count * sizeof(Vec3));
-                    offset += part.count;
-                    shape.growth[shape.pieces] = growth[i];
-                    shape.ends[shape.pieces++] = offset;
-                    if (closed) shape.closedPieces++;
-                }
-            }
-        }
-    }
-    for (auto i = 0u; i < kept; i++) _freeMorph(parts[i]);
-    delete[] from;
-    delete[] to;
-    delete[] parts;
-    delete[] order;
-    delete[] growth;
-    return result;
-}
-
-static bool _morphPairs(const Animation& animation)
-{
-    if (!animation.pairs && !animation.pairCount) return true;
-    if (!animation.pairs || !animation.pairCount || animation.target->type() == Type::SurfaceMesh) return false;
-    auto from = _morphPieceCount(animation.target);
-    auto to = _morphPieceCount(animation.related);
-    if (animation.pairCount > std::min(from, to)) return false;
-    for (auto i = 0u; i < animation.pairCount; i++) {
-        auto a = animation.pairs[2u * i];
-        auto b = animation.pairs[2u * i + 1u];
-        if (a >= from || b >= to) return false;
-        for (auto j = 0u; j < i; j++)
-            if (a == animation.pairs[2u * j] || b == animation.pairs[2u * j + 1u]) return false;
-    }
-    return true;
-}
-
 Result Scene::Impl::pair(const Animation& animation, uint32_t& index) noexcept
 {
     auto& impl = *this;
@@ -3156,7 +2105,7 @@ Result Scene::Impl::pair(const Animation& animation, uint32_t& index) noexcept
     MorphShape shape;
     auto multi = animation.target->type() != Type::SurfaceMesh
                  && (_morphPieceCount(animation.target) != 1u || _morphPieceCount(animation.related) != 1u);
-    auto result = multi ? _pieceMorph(animation, shape) : _pairMorph(animation.target, animation.related, shape);
+    auto result = multi ? pairMorphPieces(animation, shape) : pairMorph(animation.target, animation.related, shape);
     // The sampled colors of a surface count against the points a scene may morph, three colors
     // to the room of a point.
     auto weight = shape.count;
@@ -3415,16 +2364,6 @@ static void _release(SavedState& save)
     save = {};
 }
 
-// Frees a warp and the points it holds.
-static void _release(WarpShape* warp)
-{
-    if (!warp) return;
-    delete[] warp->from;
-    delete[] warp->to;
-    delete[] warp->runs;
-    delete warp;
-}
-
 Scene::Impl::~Impl()
 {
     for (auto i = 0u; i < objectCnt; i++) {
@@ -3455,7 +2394,7 @@ Scene::Impl::~Impl()
     for (auto i = 0u; i < morphCnt; i++) _freeMorph(morphs[i]);
     delete[] morphs;
     for (auto i = 0u; i < warpCnt; i++)
-        _release(warps[i]);
+        delete warps[i];
     delete[] warps;
     for (auto i = 0u; i < geometryCnt; i++)
         _freeGeometry(geometries[i]);
@@ -4670,6 +3609,7 @@ Scene* Scene::gen(const Config& config) noexcept
 {
     if (!valid(config)) return nullptr;
     auto scene = new (std::nothrow) Scene(config);
+    // Instance methods rely on the fully initialized state published here.
     if (!scene || scene->pImpl) return scene;
     delete scene;
     return nullptr;
@@ -4677,7 +3617,7 @@ Scene* Scene::gen(const Config& config) noexcept
 
 Result Scene::theme(const Theme& theme) noexcept
 {
-    if (!pImpl || !_valid(theme)) return Result::InvalidArguments;
+    if (!_valid(theme)) return Result::InvalidArguments;
     if (pImpl->owner || pImpl->objectCnt || pImpl->viewportCnt || pImpl->sequence
         || pImpl->definitionsSealed) {
         return Result::InsufficientCondition;
@@ -4764,43 +3704,8 @@ static bool _transformable(const Object* object)
     return object && object->type() != Type::Connector && _connectorTransform(object, object);
 }
 
-// The shortest decimal that a float reads as, in double precision: the time or duration a script
-// wrote, such as 0.3 for the float nearest 0.3, which lies 1.2e-8 above it. Times reckoned from
-// such decimals are the floats nearest the decimal sums. Added up as floats instead, a wait of
-// 0.5 and twenty-nine of 0.3 end three ulps past 9.2, so the frame at 9.2 samples before them
-// and shows what starts there a frame late. Values beyond the range of times keep their own.
-static double _decimal(float value)
-{
-    static constexpr double POWERS[] = {1.0e0, 1.0e1, 1.0e2, 1.0e3, 1.0e4, 1.0e5, 1.0e6, 1.0e7,
-                                        1.0e8, 1.0e9, 1.0e10, 1.0e11, 1.0e12, 1.0e13, 1.0e14};
-    auto magnitude = std::fabs(static_cast<double>(value));
-    if (!(magnitude >= 1.0e-6 && magnitude < 1.0e7)) return value;
-    auto exponent = static_cast<int>(std::floor(std::log10(magnitude)));
-    for (auto digits = 1; digits <= 9; digits++) {
-        auto places = digits - 1 - exponent;
-        auto decimal = places >= 0 ? std::nearbyint(magnitude * POWERS[places]) / POWERS[places]
-                                   : std::nearbyint(magnitude / POWERS[-places]) * POWERS[-places];
-        if (static_cast<float>(decimal) == static_cast<float>(magnitude)) return value < 0.0f ? -decimal : decimal;
-    }
-    return value;
-}
-
-// When item index of a call at cursor begins and ends, each item lasting duration and beginning
-// lag of a duration after the one before. Every call reckons its items and the cursor after it
-// from the same decimals, so its last item ends where the cursor goes and the first begins at it.
-static float _begin(float cursor, float duration, float lag, uint32_t index)
-{
-    return static_cast<float>(_decimal(cursor) + _decimal(duration) * _decimal(lag) * index);
-}
-
-static float _end(float cursor, float duration, float lag, uint32_t index)
-{
-    return static_cast<float>(_decimal(cursor) + _decimal(duration) * (1.0 + _decimal(lag) * index));
-}
-
 Result Scene::attach(Object* object, Object* parent) noexcept
 {
-    if (!pImpl) return Result::InvalidArguments;
     pImpl->diagnostic = nullptr;
     if (!object || object->objOwner || object->objParent) return pImpl->fail(Result::InvalidArguments, ADD_OWNED);
     if (pImpl->owner) return pImpl->fail(Result::InsufficientCondition, SCENE_MOUNTED);
@@ -5455,7 +4360,6 @@ Object* Scene::Impl::replica(const Object* source, const VisualState& state, Obj
 Result Scene::clone(Object* source, Object*& output, const CloneOptions& options) noexcept
 {
     output = nullptr;
-    if (!pImpl) return Result::InvalidArguments;
     pImpl->diagnostic = nullptr;
     auto& impl = *pImpl;
     if (impl.owner) return impl.fail(Result::InsufficientCondition, SCENE_MOUNTED);
@@ -5842,7 +4746,6 @@ Result Scene::reserve(Text* text, const char* sample) noexcept
 Result Scene::measure(const Text* text, const char* sample, TextExtent& output) noexcept
 {
     output = {};
-    if (!pImpl) return Result::InvalidArguments;
     pImpl->diagnostic = nullptr;
     if (!sample || !valid(text)) return pImpl->fail(Result::InvalidArguments, MEASURE_TEXT);
     // The font and size attach() gives a text that sets none of its own.
@@ -5872,7 +4775,6 @@ Result Scene::measure(const Text* text, const char* sample, TextExtent& output) 
 
 Result Scene::update(Object* object) noexcept
 {
-    if (!pImpl) return Result::InvalidArguments;
     pImpl->diagnostic = nullptr;
     auto entry = object ? pImpl->entry(object) : nullptr;
     if (!entry || object->objOwner != this) return pImpl->fail(Result::InvalidArguments, TARGET_FOREIGN);
@@ -5964,7 +4866,7 @@ uint32_t Scene::depth(const Scene* scene) noexcept
         if (child >= MAX_VIEWPORT_DEPTH) return child;
         if (child + 1u > currentDepth) currentDepth = child + 1u;
     }
-    if (scene->pImpl && scene->pImpl->sequence) {
+    if (scene->pImpl->sequence) {
         auto sequence = scene->pImpl->sequence;
         for (auto i = 0u; i < sequence->count; i++) {
             auto child = depth(sequence->stages[i].scene);
@@ -5977,9 +4879,8 @@ uint32_t Scene::depth(const Scene* scene) noexcept
 
 Result Scene::viewport(Scene* scene, const Viewport& viewport) noexcept
 {
-    if (!pImpl) return Result::InvalidArguments;
     pImpl->diagnostic = nullptr;
-    if (!scene || !scene->pImpl || scene == this || scene->pImpl->owner) {
+    if (!scene || scene == this || scene->pImpl->owner) {
         return pImpl->fail(Result::InvalidArguments, VIEWPORT_SCENE);
     }
     if (!_valid(viewport)) return pImpl->fail(Result::InvalidArguments, VIEWPORT_RECT);
@@ -6003,7 +4904,6 @@ Result Scene::viewport(Scene* scene, const Viewport& viewport) noexcept
 
 Result Scene::remove(Object* object) noexcept
 {
-    if (!pImpl) return Result::InvalidArguments;
     pImpl->diagnostic = nullptr;
     if (!object) return pImpl->fail(Result::InvalidArguments, TARGET_FOREIGN);
     if (pImpl->owner) return pImpl->fail(Result::InsufficientCondition, SCENE_MOUNTED);
@@ -6030,9 +4930,6 @@ static AnimCurve _legacyCurve(Easing easing) noexcept
     return AnimCurve::preset(static_cast<AnimCurvePreset>(easing));
 }
 
-static bool _timeline(float cursor, float duration, float lag, uint32_t count,
-                      float& nextCursor) noexcept;
-
 Result Scene::transition(Scene* const* scenes, uint32_t count, const Viewport& viewport,
                          float duration, float hold, Easing easing) noexcept
 {
@@ -6056,7 +4953,6 @@ Result Scene::transition(Scene* const* scenes, uint32_t count, const Viewport& v
                          float duration, const float* holds, uint32_t holdCount, const AnimCurve& curve,
                          const TransitionStyle* styles, uint32_t styleCount, bool live) noexcept
 {
-    if (!pImpl) return Result::InvalidArguments;
     pImpl->diagnostic = nullptr;
     if (!scenes || count < 2u || count > MAX_VIEWPORTS) return pImpl->fail(Result::InvalidArguments, TRANSITION_SCENES);
     if (!_valid(viewport)) return pImpl->fail(Result::InvalidArguments, VIEWPORT_RECT);
@@ -6075,7 +4971,7 @@ Result Scene::transition(Scene* const* scenes, uint32_t count, const Viewport& v
     if (pImpl->sequence) return pImpl->fail(Result::InsufficientCondition, TRANSITION_TWICE);
     for (auto i = 0u; i < count; i++) {
         auto scene = scenes[i];
-        if (!scene || !scene->pImpl || scene == this || scene->pImpl->owner
+        if (!scene || scene == this || scene->pImpl->owner
             || !valid(scene->pImpl->cfg) || depth(scene) >= MAX_VIEWPORT_DEPTH) {
             return Result::InvalidArguments;
         }
@@ -6269,23 +5165,6 @@ Result Scene::play(const Animation& animation, float duration, Easing easing) no
 Result Scene::play(const Animation& animation, float duration, const AnimCurve& curve) noexcept
 {
     return play(&animation, 1, duration, curve, 0.0f);
-}
-
-static bool _timeline(float cursor, float duration, float lag, uint32_t count,
-                      float& nextCursor) noexcept
-{
-    // As _end() reckons the last item, so that it ends where the cursor goes.
-    auto span = _decimal(duration) * (1.0 + _decimal(lag) * (count - 1u));
-    auto next = _decimal(cursor) + span;
-    if (!std::isfinite(span) || next > std::numeric_limits<float>::max()) return false;
-    nextCursor = static_cast<float>(next);
-    if (nextCursor <= cursor) return false;
-    for (auto i = 0u; i < count; i++) {
-        auto begin = _begin(cursor, duration, lag, i);
-        auto end = _end(cursor, duration, lag, i);
-        if (!std::isfinite(begin) || !std::isfinite(end) || end <= begin) return false;
-    }
-    return true;
 }
 
 static bool _effectModel(const Object* object, const Mat4& model, float scale,
@@ -6498,7 +5377,6 @@ Result Scene::fadeTransform(Object* source, Object* target, float duration,
 Result Scene::fadeTransform(Object* source, Object* target, float duration,
                             const AnimCurve& curve) noexcept
 {
-    if (!pImpl) return Result::InvalidArguments;
     pImpl->diagnostic = nullptr;
     if (!source || !target || source == target || _inside(source, target) || _inside(target, source)) {
         return pImpl->fail(Result::InvalidArguments, FADE_PAIR);
@@ -6521,73 +5399,11 @@ Result Scene::fadeTransform(Object* source, Object* target, float duration,
     return remove(source);
 }
 
-// One piece of a match, with the clip it plays.
-struct MatchPiece
-{
-    Object* object = nullptr;
-    ObjectEntry* entry = nullptr;
-    // The index of the paired piece, or UINT32_MAX.
-    uint32_t partner = UINT32_MAX;
-    // An unpaired piece cross-fading at the same authored anchor.
-    uint32_t contact = UINT32_MAX;
-    float contactBegin = 0.0f;
-    float contactEnd = 0.0f;
-    // Paired texts that read the same, and paired shapes of one kind, travel as one piece;
-    // other pairs cross-fade.
-    bool same = false;
-    // One of the pieces after the first that pair with one piece of the other object: it fades
-    // in from that piece's place and look, or out into them, while the first travels as one
-    // with it.
-    bool extra = false;
-    // For a diff: pieces share a key only when they are texts that read the same.
-    uint32_t key = 0;
-    VisualState from;
-    VisualState to;
-    uint32_t channels = 0;
-    Mat4 pathSpace;
-};
-
 struct MatchPieces
 {
     MatchPiece* data = nullptr;
     ~MatchPieces() { delete[] data; }
 };
-
-// A line of a diff: one child of source or target, as the pieces [begin, end) below it.
-struct MatchLine
-{
-    uint32_t begin = 0;
-    uint32_t end = 0;
-    // Lines share a key only when they read the same.
-    uint32_t key = 0;
-    // The line of the other object it pairs with, or UINT32_MAX.
-    uint32_t partner = UINT32_MAX;
-    // The pair is in the common subsequence, so the texts between such pairs pair by order.
-    bool kept = false;
-};
-
-struct MatchLines
-{
-    MatchLine* data = nullptr;
-    ~MatchLines() { delete[] data; }
-};
-
-struct MatchBuffer
-{
-    uint32_t* data = nullptr;
-    ~MatchBuffer() { delete[] data; }
-};
-
-// Groups open into their children at any depth; every other object is one piece.
-static uint32_t _pieces(Object* object, MatchPiece* output, uint32_t count = 0u)
-{
-    if (object->type() != Type::Group) {
-        if (output) output[count].object = object;
-        return count + 1u;
-    }
-    for (auto i = 0u; i < object->childCount(); i++) count = _pieces(object->childAt(i), output, count);
-    return count;
-}
 
 static uint32_t _piece(const MatchPiece* pieces, uint32_t begin, uint32_t end, const Object* object)
 {
@@ -6595,14 +5411,6 @@ static uint32_t _piece(const MatchPiece* pieces, uint32_t begin, uint32_t end, c
         if (pieces[i].object == object) return i;
     }
     return UINT32_MAX;
-}
-
-static bool _sameText(const Object* first, const Object* second)
-{
-    if (first->type() != Type::Text || second->type() != Type::Text) return false;
-    auto a = static_cast<const Text*>(first)->text();
-    auto b = static_cast<const Text*>(second)->text();
-    return a && b && !strcmp(a, b);
 }
 
 // Two circles or two rectangles, so that one can become the other through its size, corner,
@@ -6652,328 +5460,6 @@ static bool _moved(const Object* object, const Vector64& by, Mat4& output)
     return _affine(output);
 }
 
-// The size of a table of indices by hash that count entries leave at most half full.
-static uint32_t _slots(uint32_t count)
-{
-    auto size = 2u;
-    while (size < 2u * count) size <<= 1u;
-    return size;
-}
-
-// Gives each text the index of the first piece that reads the same as its key, and every other
-// piece its own index, so that pieces share a key only when they are texts that read the same.
-static bool _textKeys(MatchPiece* pieces, uint32_t count)
-{
-    auto size = _slots(count);
-    MatchBuffer slots{new (std::nothrow) uint32_t[size]};
-    if (!slots.data) return false;
-    for (auto i = 0u; i < size; i++) slots.data[i] = UINT32_MAX;
-    for (auto i = 0u; i < count; i++) {
-        pieces[i].key = i;
-        if (pieces[i].object->type() != Type::Text) continue;
-        auto text = static_cast<const Text*>(pieces[i].object)->text();
-        if (!text) continue;
-        auto hash = uint64_t{14695981039346656037ull};
-        _hash(hash, text, strlen(text));
-        for (auto slot = static_cast<uint32_t>(hash) & (size - 1u);; slot = (slot + 1u) & (size - 1u)) {
-            auto other = slots.data[slot];
-            if (other == UINT32_MAX) {
-                slots.data[slot] = i;
-                break;
-            }
-            if (_sameText(pieces[other].object, pieces[i].object)) {
-                pieces[i].key = other;
-                break;
-            }
-        }
-    }
-    return true;
-}
-
-// The next text of a line from piece at on, or the line's end.
-static uint32_t _nextText(const MatchPiece* pieces, const MatchLine& line, uint32_t at)
-{
-    while (at < line.end && pieces[at].object->type() != Type::Text) at++;
-    return at;
-}
-
-// Two lines read the same when their texts, in order, read the same; other pieces do not count.
-static bool _sameLine(const MatchPiece* pieces, const MatchLine& first, const MatchLine& second)
-{
-    auto i = _nextText(pieces, first, first.begin);
-    auto j = _nextText(pieces, second, second.begin);
-    for (; i < first.end && j < second.end; i = _nextText(pieces, first, i + 1u), j = _nextText(pieces, second, j + 1u)) {
-        if (pieces[i].key != pieces[j].key) return false;
-    }
-    return i == first.end && j == second.end;
-}
-
-// Gives each line the index of the first line that reads the same as its key.
-static bool _lineKeys(MatchLine* lines, uint32_t count, const MatchPiece* pieces)
-{
-    auto size = _slots(count);
-    MatchBuffer slots{new (std::nothrow) uint32_t[size]};
-    if (!slots.data) return false;
-    for (auto i = 0u; i < size; i++) slots.data[i] = UINT32_MAX;
-    for (auto i = 0u; i < count; i++) {
-        auto hash = uint64_t{14695981039346656037ull};
-        for (auto at = _nextText(pieces, lines[i], lines[i].begin); at < lines[i].end;
-             at = _nextText(pieces, lines[i], at + 1u)) {
-            _hash(hash, pieces[at].key);
-        }
-        lines[i].key = i;
-        for (auto slot = static_cast<uint32_t>(hash) & (size - 1u);; slot = (slot + 1u) & (size - 1u)) {
-            auto other = slots.data[slot];
-            if (other == UINT32_MAX) {
-                slots.data[slot] = i;
-                break;
-            }
-            if (_sameLine(pieces, lines[other], lines[i])) {
-                lines[i].key = other;
-                break;
-            }
-        }
-    }
-    return true;
-}
-
-// Pairs a longest common subsequence of the keys a[aBegin, aEnd) and b[bBegin, bEnd): match[i]
-// becomes the index of b that a[i] pairs with, and stays as it was for the rest. Hirschberg's
-// split keeps memory to two rows of lengths, forward and backward, one longer than b each.
-static void _common(const uint32_t* a, uint32_t aBegin, uint32_t aEnd, const uint32_t* b, uint32_t bBegin,
-                    uint32_t bEnd, uint32_t* match, uint32_t* forward, uint32_t* backward)
-{
-    while (aBegin < aEnd && bBegin < bEnd && a[aBegin] == b[bBegin]) match[aBegin++] = bBegin++;
-    while (aBegin < aEnd && bBegin < bEnd && a[aEnd - 1u] == b[bEnd - 1u]) match[--aEnd] = --bEnd;
-    if (aBegin == aEnd || bBegin == bEnd) return;
-    if (aEnd - aBegin == 1u) {
-        for (auto j = bBegin; j < bEnd; j++) {
-            if (a[aBegin] == b[j]) {
-                match[aBegin] = j;
-                break;
-            }
-        }
-        return;
-    }
-    // forward[j] counts the longest common subsequence of a[aBegin, middle) and
-    // b[bBegin, bBegin + j), and backward[j] that of a[middle, aEnd) and b[bBegin + j, bEnd).
-    auto middle = aBegin + (aEnd - aBegin) / 2u;
-    auto width = bEnd - bBegin;
-    for (auto j = 0u; j <= width; j++) forward[j] = backward[j] = 0u;
-    for (auto i = aBegin; i < middle; i++) {
-        auto corner = 0u;
-        for (auto j = 1u; j <= width; j++) {
-            auto above = forward[j];
-            if (a[i] == b[bBegin + j - 1u]) forward[j] = corner + 1u;
-            else if (forward[j - 1u] > above) forward[j] = forward[j - 1u];
-            corner = above;
-        }
-    }
-    for (auto i = aEnd; i-- > middle;) {
-        auto corner = 0u;
-        for (auto j = width; j-- > 0u;) {
-            auto below = backward[j];
-            if (a[i] == b[bBegin + j]) backward[j] = corner + 1u;
-            else if (backward[j + 1u] > below) backward[j] = backward[j + 1u];
-            corner = below;
-        }
-    }
-    auto split = 0u;
-    for (auto j = 1u; j <= width; j++) {
-        if (forward[j] + backward[j] > forward[split] + backward[split]) split = j;
-    }
-    _common(a, aBegin, middle, b, bBegin, bBegin + split, match, forward, backward);
-    _common(a, middle, aEnd, b, bBegin + split, bEnd, match, forward, backward);
-}
-
-static void _pair(MatchPiece* pieces, uint32_t first, uint32_t second)
-{
-    pieces[first].partner = second;
-    pieces[second].partner = first;
-    pieces[first].same = pieces[second].same = true;
-}
-
-// Pairs two lines that read the same, text by text, passing over texts already paired.
-static void _pairLines(MatchPiece* pieces, MatchLine* lines, uint32_t first, uint32_t second)
-{
-    auto& from = lines[first];
-    auto& to = lines[second];
-    from.partner = second;
-    to.partner = first;
-    auto i = _nextText(pieces, from, from.begin);
-    auto j = _nextText(pieces, to, to.begin);
-    for (; i < from.end && j < to.end; i = _nextText(pieces, from, i + 1u), j = _nextText(pieces, to, j + 1u)) {
-        if (pieces[i].partner == UINT32_MAX && pieces[j].partner == UINT32_MAX) _pair(pieces, i, j);
-    }
-}
-
-// The scratch rows of a diff, each as long as the most lines or pieces of its object.
-struct MatchRows
-{
-    uint32_t* a;
-    uint32_t* aPiece;
-    uint32_t* match;
-    uint32_t* b;
-    uint32_t* bPiece;
-    uint32_t* forward;
-    uint32_t* backward;
-};
-
-// Pairs the unpaired texts of the source pieces [aBegin, aEnd) and the target pieces
-// [bBegin, bEnd) by the longest common subsequence of their strings.
-static void _pairTexts(MatchPiece* pieces, uint32_t aBegin, uint32_t aEnd, uint32_t bBegin, uint32_t bEnd,
-                       const MatchRows& rows)
-{
-    auto n = 0u;
-    for (auto i = aBegin; i < aEnd; i++) {
-        if (pieces[i].partner != UINT32_MAX || pieces[i].object->type() != Type::Text) continue;
-        rows.a[n] = pieces[i].key;
-        rows.aPiece[n] = i;
-        rows.match[n++] = UINT32_MAX;
-    }
-    auto m = 0u;
-    for (auto j = bBegin; j < bEnd; j++) {
-        if (pieces[j].partner != UINT32_MAX || pieces[j].object->type() != Type::Text) continue;
-        rows.b[m] = pieces[j].key;
-        rows.bPiece[m++] = j;
-    }
-    if (!n || !m) return;
-    _common(rows.a, 0u, n, rows.b, 0u, m, rows.match, rows.forward, rows.backward);
-    for (auto i = 0u; i < n; i++) {
-        if (rows.match[i] != UINT32_MAX) _pair(pieces, rows.aPiece[i], rows.bPiece[rows.match[i]]);
-    }
-}
-
-// Pairs the texts of source and target as a diff of lines does; see MatchOptions::diff.
-static Result _diff(const Object* source, const Object* target, MatchPiece* pieces, uint32_t sourceCount,
-                    uint32_t total)
-{
-    auto sourceLines = source->type() == Type::Group ? source->childCount() : 1u;
-    auto targetLines = target->type() == Type::Group ? target->childCount() : 1u;
-    if (sourceLines > MAX_ANIMATION_GROUP || targetLines > MAX_ANIMATION_GROUP) return Result::InvalidArguments;
-    auto lineCount = sourceLines + targetLines;
-    auto targetCount = total - sourceCount;
-    auto height = sourceLines > sourceCount ? sourceLines : sourceCount;
-    auto width = targetLines > targetCount ? targetLines : targetCount;
-    MatchLines lines{new (std::nothrow) MatchLine[lineCount ? lineCount : 1u]};
-    MatchBuffer buffer{new (std::nothrow) uint32_t[3u * height + 4u * width + 2u]};
-    if (!lines.data || !buffer.data || !_textKeys(pieces, total)) return Result::OutOfMemory;
-    MatchRows rows;
-    rows.a = buffer.data;
-    rows.aPiece = rows.a + height;
-    rows.match = rows.aPiece + height;
-    rows.b = rows.match + height;
-    rows.bPiece = rows.b + width;
-    rows.forward = rows.bPiece + width;
-    rows.backward = rows.forward + width + 1u;
-
-    // A child is a line; an object that is not a group is one line of itself.
-    auto at = 0u;
-    for (auto i = 0u; i < sourceLines; i++) {
-        lines.data[i].begin = at;
-        at = source->type() == Type::Group ? _pieces(source->childAt(i), nullptr, at) : at + 1u;
-        lines.data[i].end = at;
-    }
-    at = sourceCount;
-    for (auto i = 0u; i < targetLines; i++) {
-        lines.data[sourceLines + i].begin = at;
-        at = target->type() == Type::Group ? _pieces(target->childAt(i), nullptr, at) : at + 1u;
-        lines.data[sourceLines + i].end = at;
-    }
-    if (!_lineKeys(lines.data, lineCount, pieces)) return Result::OutOfMemory;
-
-    // Lines that read the same and keep their order pair first.
-    for (auto i = 0u; i < sourceLines; i++) {
-        rows.a[i] = lines.data[i].key;
-        rows.match[i] = UINT32_MAX;
-    }
-    for (auto j = 0u; j < targetLines; j++) rows.b[j] = lines.data[sourceLines + j].key;
-    _common(rows.a, 0u, sourceLines, rows.b, 0u, targetLines, rows.match, rows.forward, rows.backward);
-    for (auto i = 0u; i < sourceLines; i++) {
-        if (rows.match[i] == UINT32_MAX) continue;
-        _pairLines(pieces, lines.data, i, sourceLines + rows.match[i]);
-        lines.data[i].kept = true;
-    }
-
-    // Each other line of target that reads as a line of source left over moved from there.
-    for (auto j = sourceLines; j < lineCount; j++) {
-        auto& line = lines.data[j];
-        if (line.partner != UINT32_MAX || _nextText(pieces, line, line.begin) == line.end) continue;
-        for (auto i = 0u; i < sourceLines; i++) {
-            if (lines.data[i].partner == UINT32_MAX && lines.data[i].key == line.key) {
-                _pairLines(pieces, lines.data, i, j);
-                break;
-            }
-        }
-    }
-
-    // Between two kept lines, the texts left pair by their strings in order, so that a line
-    // that changed keeps the words it shares with the line that replaced it.
-    auto sourceAt = [&](uint32_t line) { return line < sourceLines ? lines.data[line].begin : sourceCount; };
-    auto targetAt = [&](uint32_t line) { return line < targetLines ? lines.data[sourceLines + line].begin : total; };
-    for (auto i = 0u, j = 0u;;) {
-        auto next = i;
-        while (next < sourceLines && !lines.data[next].kept) next++;
-        auto partner = next < sourceLines ? lines.data[next].partner - sourceLines : targetLines;
-        _pairTexts(pieces, sourceAt(i), sourceAt(next), targetAt(j), targetAt(partner), rows);
-        if (next == sourceLines) break;
-        i = next + 1u;
-        j = partner + 1u;
-    }
-    return Result::Success;
-}
-
-// Pairs remaining circles/rectangles in order, splitting unequal counts into even runs.
-// The first shape is primary; others are extras. False on allocation failure.
-static bool _pairShapes(MatchPiece* pieces, uint32_t sourceCount, uint32_t total)
-{
-    MatchBuffer buffer;
-    buffer.data = new (std::nothrow) uint32_t[total];
-    if (!buffer.data) return false;
-    const Type kinds[] = {Type::Circle, Type::Rectangle};
-    for (auto kind : kinds) {
-        auto sources = buffer.data;
-        auto sourceShapes = 0u;
-        for (auto i = 0u; i < sourceCount; i++) {
-            if (pieces[i].partner == UINT32_MAX && pieces[i].object->type() == kind && !warped(pieces[i].object)) {
-                sources[sourceShapes++] = i;
-            }
-        }
-        auto targets = buffer.data + sourceShapes;
-        auto targetShapes = 0u;
-        for (auto i = sourceCount; i < total; i++) {
-            if (pieces[i].partner == UINT32_MAX && pieces[i].object->type() == kind && !warped(pieces[i].object)) {
-                targets[targetShapes++] = i;
-            }
-        }
-        if (!sourceShapes || !targetShapes) continue;
-        // Each shape of the side with more pairs with the shape of the other side whose share
-        // of the order its place falls in.
-        auto split = sourceShapes <= targetShapes;
-        auto few = split ? sources : targets;
-        auto many = split ? targets : sources;
-        auto fewCount = split ? sourceShapes : targetShapes;
-        auto manyCount = split ? targetShapes : sourceShapes;
-        auto previous = UINT32_MAX;
-        for (auto i = 0u; i < manyCount; i++) {
-            auto at = static_cast<uint32_t>(static_cast<uint64_t>(i) * fewCount / manyCount);
-            auto& one = pieces[few[at]];
-            auto& piece = pieces[many[i]];
-            piece.partner = few[at];
-            if (at == previous) {
-                piece.extra = true;
-                continue;
-            }
-            one.partner = many[i];
-            one.same = piece.same = true;
-            previous = at;
-        }
-    }
-    return true;
-}
-
-// The object that holds in the tree of copy the place object holds in the tree of source, or
-// nullptr when object is not in it.
 static Object* _counterpart(Object* source, Object* copy, const Object* object)
 {
     if (object == source) return copy;
@@ -7054,7 +5540,6 @@ static Result _matchCopy(Scene& scene, Impl& impl, Object* source, Object* targe
 Result Scene::matchTransform(Object* source, Object* target, float duration,
                              const AnimCurve& curve, const MatchOptions& options) noexcept
 {
-    if (!pImpl) return Result::InvalidArguments;
     pImpl->diagnostic = nullptr;
     auto& impl = *pImpl;
     if (!source || !target || source == target || _inside(source, target) || _inside(target, source)) {
@@ -7138,7 +5623,7 @@ Result Scene::matchTransform(Object* source, Object* target, float duration,
                                               || _sameShape(pieces[from].object, pieces[to].object);
     }
     if (options.diff) {
-        auto result = _diff(source, target, pieces, sourceCount, total);
+        auto result = diffMatch(source, target, pieces, sourceCount, total);
         if (result != Result::Success) {
             return impl.fail(result, result == Result::OutOfMemory ? SCENE_MEMORY : MATCH_LINES);
         }
@@ -7153,7 +5638,7 @@ Result Scene::matchTransform(Object* source, Object* target, float duration,
             break;
         }
     }
-    if (options.shapes && !_pairShapes(pieces, sourceCount, total)) return impl.fail(Result::OutOfMemory, SCENE_MEMORY);
+    if (options.shapes && !pairShapes(pieces, sourceCount, total)) return impl.fail(Result::OutOfMemory, SCENE_MEMORY);
 
     // A fading piece yields its authored slot to an incoming piece, which may itself arrive
     // from another slot. Exempt that replacement while it fades, without exempting siblings.
@@ -7324,7 +5809,7 @@ Result Scene::matchTransform(Object* source, Object* target, float duration,
 
 bool Scene::handoff(const Object* first, const Object* second, float time) const noexcept
 {
-    if (!pImpl || !first || !second) return false;
+    if (!first || !second) return false;
     for (auto i = 0u; i < pImpl->handoffCnt; i++) {
         auto& handoff = pImpl->handoffs[i];
         if (time < handoff.begin || time > handoff.end) continue;
@@ -7341,7 +5826,7 @@ bool Scene::handoff(const Object* first, const Object* second, float time) const
 
 bool Scene::shows(const Object* object) const noexcept
 {
-    if (!pImpl || !object || object->objOwner != this) return false;
+    if (!object || object->objOwner != this) return false;
     for (auto above = object; above; above = above->objParent) {
         auto entry = pImpl->entry(above);
         if (!entry || (entry->dead >= 0.0f && entry->dead <= entry->born)) return false;
@@ -7363,7 +5848,6 @@ static uint32_t _leaves(Object* object, Object** output, uint32_t count = 0u)
 Result Scene::highlight(Object* target, Object* const* selection, uint32_t count, float dim,
                         float duration, const AnimCurve& curve) noexcept
 {
-    if (!pImpl) return Result::InvalidArguments;
     pImpl->diagnostic = nullptr;
     auto& impl = *pImpl;
     if (impl.owner) return impl.fail(Result::InsufficientCondition, SCENE_MOUNTED);
@@ -7734,7 +6218,6 @@ static Result _ripple(Scene& scene, Impl& impl, Rectangle* ring, const Vec2& siz
 
 Result Scene::emphasize(const Emphasis& emphasis, float duration, const AnimCurve& curve) noexcept
 {
-    if (!pImpl) return Result::InvalidArguments;
     pImpl->diagnostic = nullptr;
     auto& impl = *pImpl;
     if (impl.owner) return impl.fail(Result::InsufficientCondition, SCENE_MOUNTED);
@@ -7883,7 +6366,6 @@ struct ArrangedItem
 Result Scene::arrange(Object* const* items, uint32_t count, const Vec3& direction, float gap,
                       const Vec3& center, float duration, const AnimCurve& curve) noexcept
 {
-    if (!pImpl) return Result::InvalidArguments;
     pImpl->diagnostic = nullptr;
     auto& impl = *pImpl;
     if (impl.owner) return impl.fail(Result::InsufficientCondition, SCENE_MOUNTED);
@@ -8612,7 +7094,6 @@ Result Scene::play(const Animation* animations, uint32_t count, float duration, 
 Result Scene::play(const Animation* animations, uint32_t count, float duration,
                    const AnimCurve& curve, float lag) noexcept
 {
-    if (!pImpl) return Result::InvalidArguments;
     pImpl->diagnostic = nullptr;
     auto& impl = *pImpl;
     if (!animations || !count) return impl.fail(Result::InvalidArguments, PLAY_EMPTY);
@@ -8783,7 +7264,7 @@ Result Scene::play(const Animation* animations, uint32_t count, float duration,
                 if (!related || related == target) return impl.fail(Result::InvalidArguments, MORPH_TARGET);
                 if (auto reason = _unplayable(relatedEntry, related)) return impl.fail(Result::InvalidArguments, reason);
                 if (auto reason = _morphGeometry(target, related)) return impl.fail(Result::NonSupport, reason);
-                if (!_morphPairs(animation)) return impl.fail(Result::InvalidArguments, MORPH_PAIRS);
+                if (!validMorphPairs(animation)) return impl.fail(Result::InvalidArguments, MORPH_PAIRS);
                 if (animation.sourceColors || animation.targetColors || animation.colorSteps
                     || animation.colorCount) {
                     auto surface = target->type() == Type::SurfaceMesh ? static_cast<const SurfaceMesh*>(target)
@@ -9128,7 +7609,6 @@ Result Scene::Impl::reshape(const AnimationTarget* targets, uint32_t count, cons
 Result Scene::play(const AnimationTarget* targets, uint32_t count, float duration,
                    const AnimCurve& curve, float lag) noexcept
 {
-    if (!pImpl) return Result::InvalidArguments;
     pImpl->diagnostic = nullptr;
     auto& impl = *pImpl;
     if (!targets || !count) return impl.fail(Result::InvalidArguments, PLAY_EMPTY);
@@ -9320,7 +7800,6 @@ static void _carry(Impl& impl, Object* object, int64_t moved)
 
 Result Scene::update(const AnimationTarget& target) noexcept
 {
-    if (!pImpl) return Result::InvalidArguments;
     pImpl->diagnostic = nullptr;
     auto& impl = *pImpl;
     auto object = target.target;
@@ -9546,7 +8025,6 @@ Result Scene::save(Object* target) noexcept
 
 Result Scene::save(Object* const* targets, uint32_t count) noexcept
 {
-    if (!pImpl) return Result::InvalidArguments;
     pImpl->diagnostic = nullptr;
     auto& impl = *pImpl;
     if (!targets || !count) return impl.fail(Result::InvalidArguments, SAVE_EMPTY);
@@ -9665,7 +8143,6 @@ Result Scene::restore(Object* target, float duration, const AnimCurve& curve) no
 Result Scene::restore(Object* const* targets, uint32_t count, float duration, const AnimCurve& curve,
                       float lag) noexcept
 {
-    if (!pImpl) return Result::InvalidArguments;
     pImpl->diagnostic = nullptr;
     auto& impl = *pImpl;
     if (!targets || !count) return impl.fail(Result::InvalidArguments, RESTORE_EMPTY);
@@ -9875,413 +8352,6 @@ Result Scene::restore(Object* const* targets, uint32_t count, float duration, co
 }
 
 // Points the warps of one scene keep in all, each before and after: 48 MB at most.
-static constexpr uint32_t MAX_WARP_POINTS = 2097152;
-// The fewest points a warp samples a circle and a rounded corner with, as many as the renderer
-// draws them with.
-static constexpr uint32_t WARP_CIRCLE_POINTS = 64;
-static constexpr uint32_t WARP_CORNER_POINTS = 8;
-// The most numbers a space writes, as the renderer counts them.
-static constexpr uint32_t WARP_SPACE_NUMBERS = 256;
-
-// Points gathered in the local space of one object before a warp cuts and maps them, in runs,
-// growing as they are added. Full is set once they would pass the points a scene keeps, and
-// failed when memory runs out.
-struct WarpDraft
-{
-    Vec3* points = nullptr;
-    WarpRun* runs = nullptr;
-    uint32_t count = 0;
-    uint32_t capacity = 0;
-    uint32_t runCount = 0;
-    uint32_t runCapacity = 0;
-    bool closed = false;
-    bool full = false;
-    bool failed = false;
-
-    ~WarpDraft()
-    {
-        delete[] points;
-        delete[] runs;
-    }
-
-    void add(const Vec3& point)
-    {
-        if (full || failed) return;
-        if (count == capacity) {
-            if (capacity >= MAX_WARP_POINTS) {
-                full = true;
-                return;
-            }
-            auto grown = capacity ? capacity * 2u : 64u;
-            auto copy = new (std::nothrow) Vec3[grown];
-            if (!copy) {
-                failed = true;
-                return;
-            }
-            for (auto i = 0u; i < count; i++)
-                copy[i] = points[i];
-            delete[] points;
-            points = copy;
-            capacity = grown;
-        }
-        points[count++] = point;
-    }
-
-    // Takes the images of a warp, in its runs.
-    void copy(const WarpShape& shape)
-    {
-        auto begin = 0u;
-        for (auto run = 0u; run < shape.runCount; run++) {
-            for (auto i = begin; i < shape.runs[run].end; i++)
-                add(shape.to[i]);
-            end(shape.runs[run].part, shape.runs[run].value);
-            begin = shape.runs[run].end;
-        }
-        closed = shape.closed;
-    }
-
-    // Ends the run of the points added since the previous run ended.
-    void end(WarpPart part, float value = 0.0f)
-    {
-        if (full || failed) return;
-        auto begin = runCount ? runs[runCount - 1u].end : 0u;
-        if (count == begin) return;
-        if (runCount == runCapacity) {
-            auto grown = runCapacity ? runCapacity * 2u : 8u;
-            auto copy = new (std::nothrow) WarpRun[grown];
-            if (!copy) {
-                failed = true;
-                return;
-            }
-            for (auto i = 0u; i < runCount; i++)
-                copy[i] = runs[i];
-            delete[] runs;
-            runs = copy;
-            runCapacity = grown;
-        }
-        runs[runCount++] = {count, part, value};
-    }
-};
-
-static bool _same(const Vec3& first, const Vec3& second)
-{
-    return first.x == second.x && first.y == second.y && first.z == second.z;
-}
-
-// How many points keep each piece of a curve length long at most step, and at least least.
-static uint32_t _samples(double length, float step, uint32_t least)
-{
-    auto count = std::ceil(length / static_cast<double>(step));
-    if (!(count < static_cast<double>(MAX_WARP_POINTS))) return MAX_WARP_POINTS;
-    return count > static_cast<double>(least) ? static_cast<uint32_t>(count) : least;
-}
-
-// The length of the polyline through points once space maps them.
-static double _mappedLength(const Vec3* points, uint32_t count, const Mat4& space)
-{
-    auto length = 0.0;
-    for (auto i = 1u; i < count; i++) {
-        auto a = space * points[i - 1u];
-        auto b = space * points[i];
-        length += std::hypot(static_cast<double>(b.x) - a.x, static_cast<double>(b.y) - a.y,
-                             static_cast<double>(b.z) - a.z);
-    }
-    return length;
-}
-
-// Calls tick with each value along range where a space draws a grid line or writes a number,
-// stepping as the renderer does, until tick returns false.
-template<typename Tick>
-static void _ticks(const Range& range, Tick tick)
-{
-    auto index = 0u;
-    for (auto value = std::ceil(range.min / range.step) * range.step;
-         value <= range.max + range.step * 0.001f && index++ < 4096; value += range.step) {
-        if (std::fabs(value) < range.step * 0.001f) continue;
-        if (!tick(value)) return;
-    }
-}
-
-// The geometry of a space as runs: its grid lines, those of the 3D view, its axes, its ticks, each
-// as its point and one a little along its axis, which tell where the tick stands and which way
-// its axis runs there once warped, and the points where it writes numbers, in the order the
-// renderer draws them.
-static void _gatherSpace(const Space* space, WarpDraft& draft)
-{
-    auto line = [&draft](const Vec3& from, const Vec3& to, WarpPart part) {
-        draft.add(from);
-        draft.add(to);
-        draft.end(part);
-    };
-    auto& x = space->x;
-    auto& y = space->y;
-    auto& z = space->z;
-    _ticks(x, [&](float value) { line({value, y.min, 0.0f}, {value, y.max, 0.0f}, WarpPart::Grid); return true; });
-    _ticks(y, [&](float value) { line({x.min, value, 0.0f}, {x.max, value, 0.0f}, WarpPart::Grid); return true; });
-    _ticks(x, [&](float value) { line({value, 0.0f, z.min}, {value, 0.0f, z.max}, WarpPart::DepthGrid); return true; });
-    _ticks(z, [&](float value) { line({x.min, 0.0f, value}, {x.max, 0.0f, value}, WarpPart::DepthGrid); return true; });
-    _ticks(y, [&](float value) { line({0.0f, value, z.min}, {0.0f, value, z.max}, WarpPart::DepthGrid); return true; });
-    _ticks(z, [&](float value) { line({0.0f, y.min, value}, {0.0f, y.max, value}, WarpPart::DepthGrid); return true; });
-    line({x.min, 0.0f, 0.0f}, {x.max, 0.0f, 0.0f}, WarpPart::AxisX);
-    line({0.0f, y.min, 0.0f}, {0.0f, y.max, 0.0f}, WarpPart::AxisY);
-    line({0.0f, 0.0f, z.min}, {0.0f, 0.0f, z.max}, WarpPart::AxisZ);
-    auto ticks = [&](const Range& range, float step, uint8_t axis, WarpPart part) {
-        spaceTicks(range, step, [&](float value) {
-            auto ahead = value + spaceTickLead(value, step);
-            line(axis == 0u ? Vec3{value, 0.0f, 0.0f} : axis == 1u ? Vec3{0.0f, value, 0.0f} : Vec3{0.0f, 0.0f, value},
-                 axis == 0u ? Vec3{ahead, 0.0f, 0.0f} : axis == 1u ? Vec3{0.0f, ahead, 0.0f} : Vec3{0.0f, 0.0f, ahead},
-                 part);
-            return true;
-        });
-    };
-    ticks(x, space->ticks.x, 0u, WarpPart::TickX);
-    ticks(y, space->ticks.y, 1u, WarpPart::TickY);
-    ticks(z, space->ticks.z, 2u, WarpPart::TickZ);
-    if (!space->numbers) return;
-    auto written = 0u;
-    auto numbers = [&](const Range& range, uint8_t axis, WarpPart part) {
-        _ticks(range, [&](float value) {
-            if (written >= WARP_SPACE_NUMBERS) return false;
-            auto point = Vec3{};
-            if (axis == 0u) point.x = value;
-            else if (axis == 1u) point.y = value;
-            else point.z = value;
-            draft.add(point);
-            draft.end(part, value);
-            written++;
-            return true;
-        });
-    };
-    numbers(x, 0u, WarpPart::NumberX);
-    numbers(y, 1u, WarpPart::NumberY);
-    numbers(z, 2u, WarpPart::NumberZ);
-}
-
-// The geometry of object in its local space, as runs that a warp cuts and maps: outlines and
-// contours, a circle and rounded corners sampled finely enough that no piece of them is longer
-// than step once space maps it, or the one point a warp moves an object by.
-static void _gather(const Object* object, const Mat4& space, float step, WarpDraft& draft)
-{
-    constexpr auto PI2 = 6.28318530717958647692;
-    auto points = [&draft](const Vec3* source, uint32_t count) {
-        for (auto i = 0u; i < count; i++)
-            draft.add(source[i]);
-    };
-    Vec3 point;
-    if (anchor(object, point)) {
-        draft.add(point);
-        draft.end(WarpPart::Outline);
-        return;
-    }
-    switch (object->type()) {
-        case Type::Line:
-        case Type::Arrow:
-        case Type::Vector: {
-            Vec3 ends[2];
-            if (segment(object, nullptr, ends)) {
-                draft.add(ends[0]);
-                draft.add(ends[1]);
-            }
-            break;
-        }
-        case Type::Route: {
-            auto route = static_cast<const DirectedRoute*>(object);
-            points(route->points(), route->count());
-            break;
-        }
-        case Type::Polygon: {
-            auto polygon = static_cast<const Polygon*>(object);
-            points(polygon->points(), polygon->count());
-            draft.closed = true;
-            break;
-        }
-        case Type::Plot: {
-            // A run for each piece, as for each contour of a path.
-            auto plot = static_cast<const Plot*>(object);
-            auto start = 0u;
-            for (auto piece = 0u; piece + 1u < plot->contours(); piece++) {
-                auto finish = plot->contourEnd(piece);
-                points(plot->points() + start, finish - start);
-                draft.end(WarpPart::Outline);
-                start = finish;
-            }
-            points(plot->points() + start, plot->count() - start);
-            break;
-        }
-        case Type::Curve: {
-            auto curve = static_cast<const Curve*>(object);
-            points(curve->points(), curve->count());
-            break;
-        }
-        case Type::Path: {
-            auto path = static_cast<const Path*>(object);
-            auto start = 0u;
-            for (auto contour = 0u; contour < path->contours(); contour++) {
-                auto finish = path->contourEnd(contour);
-                for (auto i = start; i < finish; i++)
-                    draft.add(path->points()[i]);
-                draft.end(WarpPart::Outline);
-                start = finish;
-            }
-            draft.closed = path->closed();
-            break;
-        }
-        case Type::Arc:
-        case Type::Angle: {
-            Vec3 outlinePoints[514];
-            auto arc = arcGeometry(object);
-            auto count = arcOutline(arc, outlinePoints, 514u);
-            points(outlinePoints, count); draft.closed = arc.sector;
-            break;
-        }
-        case Type::Circle: {
-            // The circle itself, not the polygon the renderer draws, so that no corner shows once
-            // a map stretches it.
-            auto circle = static_cast<const Circle*>(object);
-            auto ring = [circle](double turn) {
-                return circle->center + Vec3{static_cast<float>(std::cos(turn * PI2)) * circle->radius,
-                                             static_cast<float>(std::sin(turn * PI2)) * circle->radius, 0.0f};
-            };
-            Vec3 coarse[WARP_CIRCLE_POINTS + 1u];
-            for (auto i = 0u; i <= WARP_CIRCLE_POINTS; i++)
-                coarse[i] = ring(static_cast<double>(i) / WARP_CIRCLE_POINTS);
-            auto count = _samples(_mappedLength(coarse, WARP_CIRCLE_POINTS + 1u, space), step, WARP_CIRCLE_POINTS);
-            for (auto i = 0u; i < count && !draft.full && !draft.failed; i++)
-                draft.add(ring(static_cast<double>(i) / count));
-            draft.closed = true;
-            break;
-        }
-        case Type::Rectangle: {
-            auto rectangle = static_cast<const Rectangle*>(object);
-            auto half = Vec2{rectangle->size.x * 0.5f, rectangle->size.y * 0.5f};
-            auto radius = std::fmin(rectangle->corner, std::fmin(half.x, half.y));
-            auto& center = rectangle->center;
-            draft.closed = true;
-            if (radius <= 0.0f) {
-                draft.add(center + Vec3{-half.x, -half.y, 0.0f});
-                draft.add(center + Vec3{half.x, -half.y, 0.0f});
-                draft.add(center + Vec3{half.x, half.y, 0.0f});
-                draft.add(center + Vec3{-half.x, half.y, 0.0f});
-                break;
-            }
-            // Each corner from where its side ends to where the next side begins, counterclockwise
-            // from the right side, as the renderer goes round.
-            Vec2 corners[4] = {
-                {half.x - radius, half.y - radius},
-                {-half.x + radius, half.y - radius},
-                {-half.x + radius, -half.y + radius},
-                {half.x - radius, -half.y + radius}};
-            for (auto corner = 0u; corner < 4u; corner++) {
-                auto arc = [&](double share) {
-                    auto turn = (corner + share) * 0.25;
-                    return center + Vec3{corners[corner].x + static_cast<float>(std::cos(turn * PI2)) * radius,
-                                         corners[corner].y + static_cast<float>(std::sin(turn * PI2)) * radius, 0.0f};
-                };
-                Vec3 coarse[WARP_CORNER_POINTS + 1u];
-                for (auto i = 0u; i <= WARP_CORNER_POINTS; i++)
-                    coarse[i] = arc(static_cast<double>(i) / WARP_CORNER_POINTS);
-                auto count = _samples(_mappedLength(coarse, WARP_CORNER_POINTS + 1u, space), step, WARP_CORNER_POINTS);
-                for (auto i = 0u; i <= count && !draft.full && !draft.failed; i++)
-                    draft.add(arc(static_cast<double>(i) / count));
-            }
-            break;
-        }
-        case Type::Space: _gatherSpace(static_cast<const Space*>(object), draft); return;
-        default: return;
-    }
-    draft.end(WarpPart::Outline);
-}
-
-// Cuts the straight pieces of draft into pieces at most step long once space maps them into the
-// parent space of the warp's target, then sends every point there through map and its image back:
-// to = inverse * map(space * from). Budget is how many points the scene may still keep. Where map
-// gives no finite image, writes the point it was given into missing.
-static Result _warpShape(const WarpDraft& draft, const Mat4& space, const Mat4& inverse, PointMap map,
-                         void* data, float step, uint32_t budget, WarpShape*& output, Vec3& missing)
-{
-    output = nullptr;
-    auto points = draft.points;
-    auto pieces = [&](uint32_t from, uint32_t to) {
-        auto a = space * points[from];
-        auto b = space * points[to];
-        auto length = std::hypot(static_cast<double>(b.x) - a.x, static_cast<double>(b.y) - a.y,
-                                 static_cast<double>(b.z) - a.z);
-        auto count = std::ceil(length / static_cast<double>(step));
-        return count > 1.0 ? count : 1.0;
-    };
-    // A run is closed when its object is and it is an outline of three or more points.
-    auto closed = [&](uint32_t run, uint32_t begin) {
-        return draft.closed && draft.runs[run].part == WarpPart::Outline && draft.runs[run].end - begin > 2u;
-    };
-    auto total = 0.0;
-    auto begin = 0u;
-    for (auto run = 0u; run < draft.runCount; run++) {
-        auto end = draft.runs[run].end;
-        auto last = begin;
-        total += 1.0;
-        for (auto i = begin + 1u; i < end && total <= budget; i++) {
-            if (_same(points[i], points[last])) continue;
-            total += pieces(last, i);
-            last = i;
-        }
-        if (closed(run, begin) && !_same(points[last], points[begin])) total += pieces(last, begin) - 1.0;
-        if (total > budget) return Result::InsufficientCondition;
-        begin = end;
-    }
-    auto count = static_cast<uint32_t>(total);
-    auto shape = new (std::nothrow) WarpShape;
-    if (!shape) return Result::OutOfMemory;
-    shape->from = new (std::nothrow) Vec3[count];
-    shape->to = new (std::nothrow) Vec3[count];
-    shape->runs = new (std::nothrow) WarpRun[draft.runCount];
-    if (!shape->from || !shape->to || !shape->runs) {
-        _release(shape);
-        return Result::OutOfMemory;
-    }
-    shape->runCount = draft.runCount;
-    shape->closed = draft.closed;
-    auto from = shape->from;
-    auto written = 0u;
-    auto cut = [&](uint32_t a, uint32_t b) {
-        auto n = static_cast<uint32_t>(pieces(a, b));
-        for (auto k = 1u; k < n; k++)
-            from[written++] = points[a] + (points[b] - points[a]) * (static_cast<float>(k) / static_cast<float>(n));
-    };
-    begin = 0u;
-    for (auto run = 0u; run < draft.runCount; run++) {
-        auto end = draft.runs[run].end;
-        auto last = begin;
-        from[written++] = points[begin];
-        for (auto i = begin + 1u; i < end; i++) {
-            if (_same(points[i], points[last])) continue;
-            cut(last, i);
-            from[written++] = points[i];
-            last = i;
-        }
-        if (closed(run, begin) && !_same(points[last], points[begin])) cut(last, begin);
-        shape->runs[run] = draft.runs[run];
-        shape->runs[run].end = written;
-        begin = end;
-    }
-    shape->count = written;
-    for (auto i = 0u; i < written; i++) {
-        auto point = space * from[i];
-        Vec3 image;
-        auto mapped = map(point, image, data) && _finite(image);
-        if (mapped) {
-            shape->to[i] = inverse * image;
-            mapped = _finite(shape->to[i]);
-        }
-        if (!mapped) {
-            missing = point;
-            _release(shape);
-            return Result::InvalidArguments;
-        }
-    }
-    output = shape;
-    return Result::Success;
-}
-
 bool Scene::Impl::growWarps(uint32_t count) noexcept
 {
     if (count <= warpCap - warpCnt) return true;
@@ -10313,7 +8383,6 @@ struct WarpItem
 Result Scene::warp(Object* const* targets, uint32_t count, PointMap map, void* data, float duration,
                    const AnimCurve& curve, float step) noexcept
 {
-    if (!pImpl) return Result::InvalidArguments;
     pImpl->diagnostic = nullptr;
     auto& impl = *pImpl;
     if (impl.owner) return impl.fail(Result::InsufficientCondition, SCENE_MOUNTED);
@@ -10347,7 +8416,7 @@ Result Scene::warp(Object* const* targets, uint32_t count, PointMap map, void* d
     if (!items) return impl.fail(Result::OutOfMemory, SCENE_MEMORY);
     auto release = [&items, &total]() {
         for (auto i = 0u; i < total; i++)
-            _release(items[i].shape);
+            delete items[i].shape;
         delete[] items;
     };
     auto used = 0u;
@@ -10411,7 +8480,7 @@ Result Scene::warp(Object* const* targets, uint32_t count, PointMap map, void* d
                     break;
                 }
             }
-            _gather(item.object, item.space, step, draft);
+            draft.gather(item.object, item.space, step);
         }
         if (draft.failed) {
             release();
@@ -10422,8 +8491,8 @@ Result Scene::warp(Object* const* targets, uint32_t count, PointMap map, void* d
             return impl.fail(Result::InsufficientCondition, WARP_LIMIT);
         }
         Vec3 missing;
-        auto budget = MAX_WARP_POINTS - impl.warpPoints - points;
-        auto result = _warpShape(draft, item.space, item.inverse, map, data, step, budget, item.shape, missing);
+        auto budget = WarpDraft::PointLimit - impl.warpPoints - points;
+        auto result = draft.map(item.space, item.inverse, map, data, step, budget, item.shape, missing);
         if (impl.objectCnt != objects || impl.clipCnt != clips || impl.cursor != begin) {
             release();
             return impl.fail(Result::InsufficientCondition, WARP_CHANGED);
@@ -10478,7 +8547,6 @@ Result Scene::warp(Object* const* targets, uint32_t count, PointMap map, void* d
 
 Result Scene::runtime(const RuntimeModifier* modifier) noexcept
 {
-    if (!pImpl) return Result::InvalidArguments;
     if (!modifier) {
         for (auto i = 0u; i < pImpl->runtimeModifierCnt; i++) {
             pImpl->runtimeModifiers[i] = {};
@@ -10501,7 +8569,7 @@ Result Scene::runtime(const RuntimeModifier* modifier) noexcept
 
 Result Scene::runtimeAdd(const RuntimeModifier* modifier) noexcept
 {
-    if (!pImpl || !modifier || !modifier->data
+    if (!modifier || !modifier->data
         || (!modifier->object && !modifier->fill && !modifier->camera && !modifier->input)) {
         return Result::InvalidArguments;
     }
@@ -10531,7 +8599,7 @@ Result Scene::runtimeAdd(const RuntimeModifier* modifier) noexcept
 
 Result Scene::runtimeRemove(void* data) noexcept
 {
-    if (!pImpl || !data) return Result::InvalidArguments;
+    if (!data) return Result::InvalidArguments;
     for (auto i = 0u; i < pImpl->runtimeModifierCnt; i++) {
         if (pImpl->runtimeModifiers[i].data != data) continue;
         for (auto j = i + 1u; j < pImpl->runtimeModifierCnt; j++) {
@@ -10545,7 +8613,7 @@ Result Scene::runtimeRemove(void* data) noexcept
 
 Result Scene::camera(const CameraInput& input) noexcept
 {
-    if (!pImpl || pImpl->cfg.cameraMode != CameraMode::Interactive) {
+    if (pImpl->cfg.cameraMode != CameraMode::Interactive) {
         return Result::InsufficientCondition;
     }
     if (static_cast<uint8_t>(input.action) > static_cast<uint8_t>(CameraAction::View3D)
@@ -10572,7 +8640,6 @@ Result Scene::look(const Camera& camera, CameraView view, float duration, Easing
 Result Scene::look(const Camera& camera, CameraView view, float duration,
                    const AnimCurve& curve) noexcept
 {
-    if (!pImpl) return Result::InsufficientCondition;
     pImpl->diagnostic = nullptr;
     if (pImpl->cfg.cameraMode != CameraMode::Fixed) return pImpl->fail(Result::InsufficientCondition, CAMERA_MODE);
     if (pImpl->owner) return pImpl->fail(Result::InsufficientCondition, SCENE_MOUNTED);
@@ -10653,7 +8720,6 @@ Result Scene::orbit(float angle, const Vec3& axis, float duration, Easing easing
 
 Result Scene::orbit(float angle, const Vec3& axis, float duration, const AnimCurve& curve) noexcept
 {
-    if (!pImpl) return Result::InsufficientCondition;
     pImpl->diagnostic = nullptr;
     if (pImpl->cfg.cameraMode != CameraMode::Fixed) return pImpl->fail(Result::InsufficientCondition, CAMERA_MODE);
     if (pImpl->owner) return pImpl->fail(Result::InsufficientCondition, SCENE_MOUNTED);
@@ -10719,7 +8785,6 @@ Result Scene::Impl::orbit(const CameraTrack& track, float angle, const Vec3& axi
 
 Result Scene::view(const SceneView& view, uint32_t* index) noexcept
 {
-    if (!pImpl) return Result::InvalidArguments;
     pImpl->diagnostic = nullptr;
     if (pImpl->owner) return pImpl->fail(Result::InsufficientCondition, SCENE_MOUNTED);
     if (!_valid(view.viewport)) return pImpl->fail(Result::InvalidArguments, VIEW_RECT);
@@ -10766,7 +8831,6 @@ Result Scene::view(const SceneView& view, uint32_t* index) noexcept
 Result Scene::look(uint32_t view, const Camera& camera, CameraView cameraView, float duration,
                    const AnimCurve& curve) noexcept
 {
-    if (!pImpl) return Result::InsufficientCondition;
     pImpl->diagnostic = nullptr;
     if (view >= pImpl->viewCnt) return pImpl->fail(Result::InvalidArguments, VIEW_INDEX);
     if (pImpl->owner) return pImpl->fail(Result::InsufficientCondition, SCENE_MOUNTED);
@@ -10777,7 +8841,6 @@ Result Scene::look(uint32_t view, const Camera& camera, CameraView cameraView, f
 Result Scene::orbit(uint32_t view, float angle, const Vec3& axis, float duration,
                     const AnimCurve& curve) noexcept
 {
-    if (!pImpl) return Result::InsufficientCondition;
     pImpl->diagnostic = nullptr;
     if (view >= pImpl->viewCnt) return pImpl->fail(Result::InvalidArguments, VIEW_INDEX);
     if (pImpl->owner) return pImpl->fail(Result::InsufficientCondition, SCENE_MOUNTED);
@@ -10787,7 +8850,6 @@ Result Scene::orbit(uint32_t view, float angle, const Vec3& axis, float duration
 
 Result Scene::fade(uint32_t view, float opacity, float duration, const AnimCurve& curve) noexcept
 {
-    if (!pImpl) return Result::InsufficientCondition;
     pImpl->diagnostic = nullptr;
     if (view >= pImpl->viewCnt) return pImpl->fail(Result::InvalidArguments, VIEW_INDEX);
     if (pImpl->owner) return pImpl->fail(Result::InsufficientCondition, SCENE_MOUNTED);
@@ -10834,12 +8896,12 @@ Result Scene::fade(uint32_t view, float opacity, float duration, const AnimCurve
 
 uint32_t Scene::viewCount() const noexcept
 {
-    return pImpl ? pImpl->viewCnt : 0u;
+    return pImpl->viewCnt;
 }
 
 bool Scene::viewAt(uint32_t index, SceneView& view) const noexcept
 {
-    if (!pImpl || index >= pImpl->viewCnt) return false;
+    if (index >= pImpl->viewCnt) return false;
     auto& entry = *pImpl->views[index];
     view = entry.settings;
     view.camera = entry.camera;
@@ -10940,119 +9002,9 @@ Result Scene::Impl::frame(uint32_t index, float time, ViewFrame& frame) const no
     return Result::Success;
 }
 
-Result Scene::wait(float duration) noexcept
-{
-    if (!pImpl) return Result::InvalidArguments;
-    pImpl->diagnostic = nullptr;
-    if (!std::isfinite(duration) || duration < 0.0f) return pImpl->fail(Result::InvalidArguments, WAIT_DURATION);
-    if (pImpl->owner) return pImpl->fail(Result::InsufficientCondition, SCENE_MOUNTED);
-    auto nextCursor = pImpl->cursor;
-    if (duration > 0.0f && !_timeline(pImpl->cursor, duration, 0.0f, 1u, nextCursor)) {
-        return pImpl->fail(Result::InvalidArguments, TIMELINE_RANGE);
-    }
-    pImpl->advance(nextCursor);
-    pImpl->definitionsSealed = true;
-    return Result::Success;
-}
-
-float Scene::cursor() const noexcept
-{
-    return pImpl ? pImpl->cursor : 0.0f;
-}
-
-Result Scene::seek(float time) noexcept
-{
-    if (!pImpl) return Result::InvalidArguments;
-    pImpl->diagnostic = nullptr;
-    if (!std::isfinite(time) || time < 0.0f) return pImpl->fail(Result::InvalidArguments, SEEK_TIME);
-    if (pImpl->owner) return pImpl->fail(Result::InsufficientCondition, SCENE_MOUNTED);
-    if (time == pImpl->cursor) return Result::Success;
-    pImpl->advance(time);
-    pImpl->definitionsSealed = true;
-    return Result::Success;
-}
-
-Result Scene::mark(const char* name) noexcept
-{
-    if (!pImpl) return Result::InvalidArguments;
-    pImpl->diagnostic = nullptr;
-    if (!name || !name[0]) return pImpl->fail(Result::InvalidArguments, "a marker needs a name");
-    if (pImpl->owner) return pImpl->fail(Result::InsufficientCondition, SCENE_MOUNTED);
-    auto size = std::strlen(name);
-    if (size > MAX_MARKER_NAME) return pImpl->fail(Result::InvalidArguments, "marker names are limited to 128 bytes");
-    for (auto i = 0u; i < pImpl->markerCnt; i++) {
-        if (std::strcmp(pImpl->markers[i].name, name) == 0) {
-            return pImpl->fail(Result::InvalidArguments, "a marker with this name already exists");
-        }
-    }
-    if (pImpl->markerCnt >= MAX_MARKERS) return pImpl->fail(Result::InsufficientCondition, "a scene holds at most 256 markers");
-    if (!pImpl->growMarkers()) return Result::OutOfMemory;
-    auto copy = _duplicate(name);
-    if (!copy) return Result::OutOfMemory;
-    auto& marker = pImpl->markers[pImpl->markerCnt++];
-    marker.name = copy;
-    marker.time = pImpl->cursor;
-    return Result::Success;
-}
-
-bool Scene::marker(const char* name, float& time) const noexcept
-{
-    if (!pImpl || !name) return false;
-    for (auto i = 0u; i < pImpl->markerCnt; i++) {
-        if (std::strcmp(pImpl->markers[i].name, name) != 0) continue;
-        time = pImpl->markers[i].time;
-        return true;
-    }
-    return false;
-}
-
-uint32_t Scene::markerCount() const noexcept
-{
-    return pImpl ? pImpl->markerCnt : 0u;
-}
-
-uint32_t Scene::clipCount() const noexcept
-{
-    return pImpl ? pImpl->clipCnt : 0u;
-}
-
-uint64_t Scene::sampleWork() const noexcept
-{
-    if (!pImpl) return 0u;
-    auto work = pImpl->work;
-    for (auto i = 0u; i < pImpl->viewportCnt; i++) work += pImpl->viewports[i].scene->sampleWork();
-    if (auto sequence = pImpl->sequence) {
-        for (auto i = 0u; i < sequence->count; i++) work += sequence->stages[i].scene->sampleWork();
-    }
-    return work;
-}
-
-const char* Scene::markerAt(uint32_t index, float& time) const noexcept
-{
-    if (!pImpl || index >= pImpl->markerCnt) return nullptr;
-    time = pImpl->markers[index].time;
-    return pImpl->markers[index].name;
-}
-
-const char* Scene::diagnostic() const noexcept
-{
-    return pImpl ? pImpl->diagnostic : nullptr;
-}
-
-float Scene::duration() const noexcept
-{
-    if (!pImpl) return 0.0f;
-    auto value = pImpl->extent > pImpl->cursor ? pImpl->extent : pImpl->cursor;
-    for (auto i = 0u; i < pImpl->viewportCnt; i++) {
-        auto duration = pImpl->viewports[i].scene->duration();
-        if (duration > value) value = duration;
-    }
-    return value;
-}
-
 CameraView Scene::view(float time) const noexcept
 {
-    if (!pImpl || !std::isfinite(time) || time < 0.0f) return CameraView::TwoD;
+    if (!std::isfinite(time) || time < 0.0f) return CameraView::TwoD;
     Camera camera;
     CameraView view;
     if (pImpl->sample(time, camera, view) != Result::Success) return CameraView::TwoD;
@@ -11062,7 +9014,7 @@ CameraView Scene::view(float time) const noexcept
 uint32_t Scene::text(const Text* text, float time, char* output, uint32_t capacity) const noexcept
 {
     if (output && capacity) output[0] = '\0';
-    auto entry = pImpl && text && std::isfinite(time) ? pImpl->entry(text) : nullptr;
+    auto entry = text && std::isfinite(time) ? pImpl->entry(text) : nullptr;
     VisualState state;
     if (!entry || !pImpl->sample(*entry, time, state)) return 0u;
     const char* value;
@@ -11077,24 +9029,24 @@ uint32_t Scene::text(const Text* text, float time, char* output, uint32_t capaci
 
 uint32_t Scene::count() const noexcept
 {
-    return pImpl ? pImpl->objectCnt : 0;
+    return pImpl->objectCnt;
 }
 
 Object* Scene::object(uint32_t id) const noexcept
 {
-    if (!pImpl || !id || id > pImpl->objectCnt) return nullptr;
+    if (!id || id > pImpl->objectCnt) return nullptr;
     return pImpl->objects[id - 1u].object;
 }
 
 Object* Scene::objectAt(uint32_t index) const noexcept
 {
-    if (!pImpl || index >= pImpl->objectCnt) return nullptr;
+    if (index >= pImpl->objectCnt) return nullptr;
     return pImpl->objects[index].object;
 }
 
 Object* Scene::object(const char* tag) const noexcept
 {
-    if (!pImpl || !tag) return nullptr;
+    if (!tag) return nullptr;
     for (auto i = 0u; i < pImpl->objectCnt; i++) {
         auto value = pImpl->objects[i].object->tag();
         if (value && std::strcmp(value, tag) == 0) return pImpl->objects[i].object;
@@ -11104,30 +9056,30 @@ Object* Scene::object(const char* tag) const noexcept
 
 uint32_t Scene::viewportCount() const noexcept
 {
-    return pImpl ? pImpl->viewportCnt : 0;
+    return pImpl->viewportCnt;
 }
 
 Scene* Scene::sceneAt(uint32_t index) const noexcept
 {
-    if (!pImpl || index >= pImpl->viewportCnt) return nullptr;
+    if (index >= pImpl->viewportCnt) return nullptr;
     return pImpl->viewports[index].scene;
 }
 
 bool Scene::viewportAt(uint32_t index, Viewport& viewport) const noexcept
 {
-    if (!pImpl || index >= pImpl->viewportCnt) return false;
+    if (index >= pImpl->viewportCnt) return false;
     viewport = pImpl->viewports[index].viewport;
     return true;
 }
 
 uint32_t Scene::transitionCount() const noexcept
 {
-    return pImpl && pImpl->sequence ? pImpl->sequence->count : 0u;
+    return pImpl->sequence ? pImpl->sequence->count : 0u;
 }
 
 Scene* Scene::transitionAt(uint32_t index) const noexcept
 {
-    if (!pImpl || !pImpl->sequence || index >= pImpl->sequence->count) return nullptr;
+    if (!pImpl->sequence || index >= pImpl->sequence->count) return nullptr;
     return pImpl->sequence->stages[index].scene;
 }
 

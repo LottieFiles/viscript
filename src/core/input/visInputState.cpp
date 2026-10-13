@@ -3,6 +3,7 @@
 #include <new>
 
 #include "vis_input.h"
+#include "../common/visFinite.h"
 
 namespace vis::input
 {
@@ -17,11 +18,6 @@ enum struct Source : uint8_t
     Key = 0,
     Pointer
 };
-
-static bool _finite(const Vec2& value) noexcept
-{
-    return std::isfinite(value.x) && std::isfinite(value.y);
-}
 
 static bool _key(Key key) noexcept
 {

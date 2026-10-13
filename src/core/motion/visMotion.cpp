@@ -3,6 +3,7 @@
 #include <new>
 
 #include "vis_motion.h"
+#include "../common/visFinite.h"
 #include "../common/visRetarget.h"
 #include "../scene/visScene.h"
 
@@ -13,20 +14,6 @@ namespace
 {
 
 uint8_t RuntimeKey = 0u;
-
-static bool _finite(const Vec3& value) noexcept
-{
-    return std::isfinite(value.x) && std::isfinite(value.y)
-        && std::isfinite(value.z);
-}
-
-static bool _finite(const Mat4& value) noexcept
-{
-    for (auto component : value.e) {
-        if (!std::isfinite(component)) return false;
-    }
-    return true;
-}
 
 static bool _alphanumeric(char value) noexcept
 {

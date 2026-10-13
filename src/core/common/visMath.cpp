@@ -3,22 +3,13 @@
 #include <limits>
 
 #include "vis.h"
+#include "visFinite.h"
 
 namespace vis
 {
 
 static constexpr auto _epsilon = 1.0e-6f;
 static constexpr auto _pi = 3.14159265358979323846f;
-
-static bool _finite(const Vec2& value) noexcept
-{
-    return std::isfinite(value.x) && std::isfinite(value.y);
-}
-
-static bool _finite(const Vec3& value) noexcept
-{
-    return std::isfinite(value.x) && std::isfinite(value.y) && std::isfinite(value.z);
-}
 
 static float _narrow(double value) noexcept
 {

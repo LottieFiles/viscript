@@ -25,7 +25,7 @@ for (const file of files.filter((f) => f.endsWith(".md"))) {
 }
 
 const bound = new Set();
-for (const file of walk(join(root, "src/core")).filter((f) => f.endsWith(".cpp"))) {
+for (const file of walk(join(root, "src/core")).filter((f) => /\.(cpp|h)$/.test(f))) {
     const text = readFileSync(file, "utf8");
     for (const [, name] of text.matchAll(/\{"([a-z_0-9]+)",\s*_/g)) bound.add(name);
     for (const [, name] of text.matchAll(/function methods\.([a-z_0-9]+)\(/g)) bound.add(name);

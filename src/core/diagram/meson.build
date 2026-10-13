@@ -1,5 +1,7 @@
 vis_diagram_sources = files(
     'visDiagram.cpp',
+    'visDiagramRoute.cpp',
+    'visDiagramLayout.cpp',
     'visDiagramAudit.cpp',
 )
 vis_diagram_dependencies = []

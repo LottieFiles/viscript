@@ -109,6 +109,13 @@ struct WarpShape
     uint32_t runCount = 0;
     bool closed = false;
 
+    ~WarpShape()
+    {
+        delete[] from;
+        delete[] to;
+        delete[] runs;
+    }
+
     // Point i at progress, which may run past 0 and 1 as a curve overshoots.
     Vec3 at(uint32_t i, float progress) const noexcept
     {

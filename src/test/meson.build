@@ -3,6 +3,37 @@ lua_inc = include_directories('../core/lua')
 font_arg = '-DVIS_TEST_FONT="' + (meson.project_source_root() / 'src/examples/assets/Pretendard.ttf') + '"'
 mono_font_arg = '-DVIS_TEST_MONO_FONT="' + (meson.project_source_root() / 'src/examples/assets/JetBrainsMono.ttf') + '"'
 expect_lua = lua_enabled ? ['-DVIS_EXPECT_LUA'] : []
+scene_test_sources = files(
+    'testScene.cpp',
+    'testSceneAnimations.cpp',
+    'testSceneClone.cpp',
+    'testSceneContours.cpp',
+    'testSceneLayers.cpp',
+    'testSceneLayout.cpp',
+    'testSceneMorph.cpp',
+    'testSceneSampling.cpp',
+    'testSceneShapes.cpp',
+    'testSceneSpace.cpp',
+    'testSceneStyle.cpp',
+    'testSceneSurface.cpp',
+    'testSceneText.cpp',
+    'testSceneTimeline.cpp',
+    'testSceneTransitions.cpp',
+)
+lua_test_sources = files(
+    'testLua.cpp',
+    'testLuaAnimations.cpp',
+    'testLuaCamera.cpp',
+    'testLuaCode.cpp',
+    'testLuaCopies.cpp',
+    'testLuaLayout.cpp',
+    'testLuaPlots.cpp',
+    'testLuaSampling.cpp',
+    'testLuaStyle.cpp',
+    'testLuaText.cpp',
+    'testLuaTrackers.cpp',
+    'testLuaTransitions.cpp',
+)
 
 # Optional extra dependencies/arguments that several tests share.
 renderer_args = (cpu_enabled ? ['-DVIS_EXPECT_CPU'] : []) + (gl_enabled ? ['-DVIS_EXPECT_GL'] : [])
@@ -50,7 +81,8 @@ endif
 # Software-renderer tests.
 cpp_tests += [
     {
-        'name': 'sw-scene', 'exe': 'testScene', 'when': cpu_enabled and native,
+        'name': 'sw-scene', 'exe': 'testScene', 'src': scene_test_sources,
+        'when': cpu_enabled and native,
         'args': vis_args + (gl_enabled ? ['-DVIS_EXPECT_GL'] : []) + [font_arg],
     },
     {'name': 'composite', 'exe': 'testComposite', 'when': cpu_enabled and native},
@@ -118,7 +150,10 @@ if lua_enabled
             'name': 'lua-extension', 'exe': 'testLuaExtension', 'when': true, 'inc': [lua_inc],
             'args': cpu_enabled and native ? ['-DVIS_EXPECT_CPU', font_arg] : [],
         },
-        {'name': 'lua-scene', 'exe': 'testLua', 'when': cpu_enabled and native, 'args': [font_arg]},
+        {
+            'name': 'lua-scene', 'exe': 'testLua', 'src': lua_test_sources,
+            'when': cpu_enabled and native, 'args': [font_arg],
+        },
         {'name': 'c-api', 'exe': 'testCapi', 'when': cpu_enabled and native},
         {
             'name': 'retained', 'exe': 'testRetained', 'when': cpu_enabled and native,

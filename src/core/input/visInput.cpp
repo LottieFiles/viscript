@@ -2,6 +2,7 @@
 #include <new>
 
 #include "vis_input.h"
+#include "../common/visFinite.h"
 #include "../common/visRetarget.h"
 
 namespace vis::input
@@ -23,24 +24,6 @@ static float _clamp(float value, float minimum, float maximum) noexcept
 static float _clamp01(float value) noexcept
 {
     return _clamp(value, 0.0f, 1.0f);
-}
-
-static bool _finite(const Vec2& value) noexcept
-{
-    return std::isfinite(value.x) && std::isfinite(value.y);
-}
-
-static bool _finite(const Vec3& value) noexcept
-{
-    return std::isfinite(value.x) && std::isfinite(value.y) && std::isfinite(value.z);
-}
-
-static bool _finite(const Mat4& value) noexcept
-{
-    for (auto component : value.e) {
-        if (!std::isfinite(component)) return false;
-    }
-    return true;
 }
 
 static bool _valid(const BBox& bounds) noexcept

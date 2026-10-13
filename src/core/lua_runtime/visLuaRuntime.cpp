@@ -9,6 +9,7 @@ extern "C" {
 }
 
 #include "vis_lua_runtime.h"
+#include "../common/visFinite.h"
 #include "../lua/visLuaExtension.h"
 #include "visLuaRuntimeExtension.h"
 #if defined(VIS_INPUT)
@@ -24,20 +25,6 @@ namespace
 constexpr auto RuntimeMetatable = "vis.lua_runtime.Runtime";
 constexpr auto InstructionLimit = 1000000;
 uint8_t RuntimeKey = 0u;
-
-static bool _finite(const Vec3& value) noexcept
-{
-    return std::isfinite(value.x) && std::isfinite(value.y)
-           && std::isfinite(value.z);
-}
-
-static bool _finite(const Mat4& value) noexcept
-{
-    for (auto component : value.e) {
-        if (!std::isfinite(component)) return false;
-    }
-    return true;
-}
 
 static bool _valid(const ObjectState& state) noexcept
 {

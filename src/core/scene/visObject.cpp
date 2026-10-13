@@ -6,21 +6,13 @@
 #include <new>
 
 #include "vis.h"
+#include "../common/visFinite.h"
+#include "../common/visString.h"
 #include "visRendererBackend.h"
 #include "visScene.h"
 
 namespace vis
 {
-
-static char* _copy(const char* text)
-{
-    if (!text) return nullptr;
-    auto size = std::strlen(text) + 1;
-    auto copy = new (std::nothrow) char[size];
-    if (!copy) return nullptr;
-    std::memcpy(copy, text, size);
-    return copy;
-}
 
 static constexpr uint32_t MAX_OBJECT_DEPTH = 64;
 
@@ -162,7 +154,7 @@ Object* Object::childAt(uint32_t index) const noexcept
 Object& Object::tag(const char* value) noexcept
 {
     if (objOwner) return *this;
-    auto copy = _copy(value);
+    auto copy = _duplicate(value);
     if (value && !copy) return *this;
     delete[] objTag;
     objTag = copy;
@@ -195,11 +187,6 @@ Object& Object::strokeWidth(float width) noexcept
     style.width = width < 0.0f ? 0.0f : width;
     objWidthAuthored = true;
     return *this;
-}
-
-static bool _finite(const Vec3& value)
-{
-    return std::isfinite(value.x) && std::isfinite(value.y) && std::isfinite(value.z);
 }
 
 static bool _same(const Color& a, const Color& b)
@@ -520,7 +507,7 @@ Point* Point::gen(const Vec3& point) noexcept
     return new (std::nothrow) Point(point);
 }
 
-Text::Text(const char* text, const Vec3& point) noexcept : Object(Type::Text), point(point), objText(_copy(text))
+Text::Text(const char* text, const Vec3& point) noexcept : Object(Type::Text), point(point), objText(_duplicate(text))
 {
     style.fill = style.stroke;
     style.stroke.a = 0;
@@ -585,7 +572,7 @@ uint32_t Text::texts(const char** output, uint32_t capacity) const noexcept
 Result Text::text(const char* value) noexcept
 {
     if (!value) return Result::InvalidArguments;
-    auto copy = _copy(value);
+    auto copy = _duplicate(value);
     if (!copy) return Result::OutOfMemory;
     auto previous = objText;
     auto counted = objCounting;
@@ -628,8 +615,8 @@ Result Text::count(float value, const NumberFormat& format, const char* prefix, 
     if (prefixLength + suffixLength > UINT32_MAX - NUMBER_ROOM - 1u) return Result::InvalidArguments;
     auto capacity = static_cast<uint32_t>(prefixLength + suffixLength + NUMBER_ROOM + 1u);
     auto text = new (std::nothrow) char[capacity];
-    auto prefixCopy = prefixLength ? _copy(prefix) : nullptr;
-    auto suffixCopy = suffixLength ? _copy(suffix) : nullptr;
+    auto prefixCopy = prefixLength ? _duplicate(prefix) : nullptr;
+    auto suffixCopy = suffixLength ? _duplicate(suffix) : nullptr;
     if (!text || (prefixLength && !prefixCopy) || (suffixLength && !suffixCopy)) {
         delete[] text;
         delete[] prefixCopy;
@@ -733,7 +720,7 @@ const char* Text::font() const noexcept
 Result Text::font(const char* value) noexcept
 {
     if (owned()) return Result::InsufficientCondition;
-    auto copy = _copy(value);
+    auto copy = _duplicate(value);
     if (value && !copy) return Result::OutOfMemory;
     delete[] objFont;
     objFont = copy;
@@ -1554,7 +1541,7 @@ Picture* Picture::gen(const Asset* asset, const Vec3& center, float width) noexc
     if (asset->encoded() && asset->encodedSize() && asset->mime()) {
         object->objEncodedSize = asset->encodedSize();
         object->objEncoded = new (std::nothrow) uint8_t[object->objEncodedSize];
-        object->objMime = _copy(asset->mime());
+        object->objMime = _duplicate(asset->mime());
         if (object->objEncoded && object->objMime) {
             std::memcpy(object->objEncoded, asset->encoded(), object->objEncodedSize);
             return object;

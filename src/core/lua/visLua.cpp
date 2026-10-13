@@ -18,6 +18,9 @@ extern "C" {
 #include "vis.h"
 #include "visCode.h"
 #include "visLuaExtension.h"
+#include "visLuaApi.h"
+#include "visLuaValues.h"
+#include "visLuaStyle.h"
 #include "visScene.h"
 
 namespace vis
@@ -26,7 +29,6 @@ namespace vis
 // Budgets cover every live draft in one load. Retained tracker states charge geometry
 // and 512 bytes/clip; pending samples flush without reducing their total cost.
 // Frame sampling preserves cadence and fails on exhaustion instead of resampling.
-static constexpr size_t LUA_MEMORY_LIMIT = 64u * 1024u * 1024u;
 static constexpr size_t LUA_NATIVE_MEMORY_LIMIT = 64u * 1024u * 1024u;
 static constexpr int LUA_INSTRUCTION_LIMIT = 5000000;
 static constexpr uint32_t LUA_OBJECT_LIMIT = 4096;
@@ -37,7 +39,6 @@ static constexpr uint32_t LUA_PATH_SAMPLE_LIMIT = 1024;
 // The clips a frame may read to place every object, as Scene::sampleWork() counts them.
 static constexpr uint64_t LUA_SAMPLE_WORK_LIMIT = 4000000;
 static constexpr size_t LUA_TEXT_LIMIT = 1024u * 1024u;
-static constexpr size_t LUA_PATH_LIMIT = 4096;
 static constexpr size_t LUA_ID_LIMIT = 256;
 static constexpr uint32_t LUA_PIXEL_LIMIT = 67108864;
 static constexpr uint32_t LUA_VIEWPORT_LIMIT = 64;
@@ -52,25 +53,6 @@ static constexpr size_t LUA_TRANSITION_CHARGE = 64u;
 static constexpr size_t LUA_VIEW_CHARGE = 512u;
 static constexpr size_t LUA_CLIP_CHARGE = 512u;
 static constexpr size_t LUA_SAVE_CHARGE = 512u;
-static constexpr const char* SCENE_METATABLE = "vis.Scene";
-static constexpr const char* VIEW_METATABLE = "vis.View";
-static constexpr const char* OBJECT_METATABLE = "vis.Object";
-static constexpr const char* SPACE_METATABLE = "vis.Space";
-static constexpr const char* GROUP_METATABLE = "vis.Group";
-// Registry table of the handles given out for attached objects, keyed by Object, with weak values.
-static constexpr const char* HANDLE_REGISTRY = "vis.handles";
-// Registry table of the sources of code blocks, keyed by scene with weak keys: for each scene a
-// table of {text, options} keyed by the block's Object, which search and edit read.
-static constexpr const char* CODE_REGISTRY = "vis.code";
-// Registry table of what plots keep of their cuts, keyed by scene with weak keys: for each scene a
-// LuaPlotRecord keyed by the plot's Object, which the states that give the plot fn or points read.
-static constexpr const char* PLOT_REGISTRY = "vis.plots";
-// The tracker prelude's flush, which plays the segments of the tracks that wait for it.
-static constexpr const char* TRACKER_FLUSH = "vis.tracker.flush";
-// Registry table of the makers modules give spans parts: the keys that mark the parts in the
-// order the modules added them, from 1, and each key's maker under the key.
-static constexpr const char* SPAN_PART_REGISTRY = "vis.spanParts";
-
 class NumericLocale
 {
 public:
@@ -256,396 +238,6 @@ static void _message(char* error, uint32_t size, const char* message)
     error[length] = '\0';
 }
 
-static float _number(lua_State* lua, int index, const char* name)
-{
-    auto value = luaL_checknumber(lua, index);
-    if (!std::isfinite(value) || value < -FLT_MAX || value > FLT_MAX) {
-        luaL_error(lua, "%s must be a finite number", name);
-    }
-    return static_cast<float>(value);
-}
-
-static float _fieldNumber(lua_State* lua, int index, const char* name, float fallback)
-{
-    index = lua_absindex(lua, index);
-    lua_getfield(lua, index, name);
-    if (lua_isnil(lua, -1)) {
-        lua_pop(lua, 1);
-        return fallback;
-    }
-    auto value = _number(lua, -1, name);
-    lua_pop(lua, 1);
-    return value;
-}
-
-static bool _fieldBool(lua_State* lua, int index, const char* name, bool fallback)
-{
-    index = lua_absindex(lua, index);
-    lua_getfield(lua, index, name);
-    if (lua_isnil(lua, -1)) {
-        lua_pop(lua, 1);
-        return fallback;
-    }
-    if (!lua_isboolean(lua, -1)) luaL_error(lua, "%s must be a boolean", name);
-    auto value = static_cast<bool>(lua_toboolean(lua, -1));
-    lua_pop(lua, 1);
-    return value;
-}
-
-static lua_Integer _integer(lua_State* lua, int index, const char* name)
-{
-    if (!lua_isinteger(lua, index)) luaL_error(lua, "%s must be an integer", name);
-    return lua_tointeger(lua, index);
-}
-
-static lua_Integer _fieldInteger(lua_State* lua, int index, const char* name, lua_Integer fallback)
-{
-    index = lua_absindex(lua, index);
-    lua_getfield(lua, index, name);
-    if (lua_isnil(lua, -1)) {
-        lua_pop(lua, 1);
-        return fallback;
-    }
-    auto value = _integer(lua, -1, name);
-    lua_pop(lua, 1);
-    return value;
-}
-
-static bool _has(lua_State* lua, int index, const char* name)
-{
-    index = lua_absindex(lua, index);
-    lua_getfield(lua, index, name);
-    auto found = !lua_isnil(lua, -1);
-    lua_pop(lua, 1);
-    return found;
-}
-
-static float _component(lua_State* lua, int index, const char* key, int item)
-{
-    index = lua_absindex(lua, index);
-    if (key) lua_getfield(lua, index, key);
-    else lua_rawgeti(lua, index, item);
-    auto value = _number(lua, -1, key ? key : "vector component");
-    lua_pop(lua, 1);
-    return value;
-}
-
-static Vec2 _vec2(lua_State* lua, int index, const char* name)
-{
-    luaL_checktype(lua, index, LUA_TTABLE);
-    index = lua_absindex(lua, index);
-    auto keyed = _has(lua, index, "x") || _has(lua, index, "y") || _has(lua, index, "z");
-    if (keyed) {
-        if (!_has(lua, index, "x") || !_has(lua, index, "y") || _has(lua, index, "z")) {
-            luaL_error(lua, "%s must be a 2D vector with x and y", name);
-        }
-        return {_component(lua, index, "x", 0), _component(lua, index, "y", 0)};
-    }
-    if (lua_rawlen(lua, index) != 2) luaL_error(lua, "%s must contain exactly 2 numbers", name);
-    return {_component(lua, index, nullptr, 1), _component(lua, index, nullptr, 2)};
-}
-
-static Vec3 _world(lua_State* lua, int index, const char* name)
-{
-    luaL_checktype(lua, index, LUA_TTABLE);
-    index = lua_absindex(lua, index);
-    auto keyed = _has(lua, index, "x") || _has(lua, index, "y") || _has(lua, index, "z");
-    if (keyed) {
-        if (!_has(lua, index, "x") || !_has(lua, index, "y")) {
-            luaL_error(lua, "%s must contain x and y, with optional z", name);
-        }
-        auto z = _has(lua, index, "z") ? _component(lua, index, "z", 0) : 0.0f;
-        return {_component(lua, index, "x", 0), _component(lua, index, "y", 0), z};
-    }
-    auto size = lua_rawlen(lua, index);
-    if (size != 2 && size != 3) luaL_error(lua, "%s must contain 2 or 3 numbers", name);
-    return {_component(lua, index, nullptr, 1), _component(lua, index, nullptr, 2),
-            size == 3 ? _component(lua, index, nullptr, 3) : 0.0f};
-}
-
-static Vec2 _fieldVec2(lua_State* lua, int index, const char* name, const Vec2& fallback)
-{
-    index = lua_absindex(lua, index);
-    lua_getfield(lua, index, name);
-    if (lua_isnil(lua, -1)) {
-        lua_pop(lua, 1);
-        return fallback;
-    }
-    auto value = _vec2(lua, -1, name);
-    lua_pop(lua, 1);
-    return value;
-}
-
-static Vec3 _fieldWorld(lua_State* lua, int index, const char* name)
-{
-    index = lua_absindex(lua, index);
-    lua_getfield(lua, index, name);
-    if (lua_isnil(lua, -1)) luaL_error(lua, "missing field '%s'", name);
-    auto value = _world(lua, -1, name);
-    lua_pop(lua, 1);
-    return value;
-}
-
-static Vec3 _fieldWorld(lua_State* lua, int index, const char* name, const Vec3& fallback)
-{
-    index = lua_absindex(lua, index);
-    lua_getfield(lua, index, name);
-    if (lua_isnil(lua, -1)) {
-        lua_pop(lua, 1);
-        return fallback;
-    }
-    auto value = _world(lua, -1, name);
-    lua_pop(lua, 1);
-    return value;
-}
-
-static Range _range(lua_State* lua, int index, const char* name)
-{
-    luaL_checktype(lua, index, LUA_TTABLE);
-    index = lua_absindex(lua, index);
-    Range range;
-    auto keyed = _has(lua, index, "min") || _has(lua, index, "max") || _has(lua, index, "step");
-    if (keyed) {
-        if (!_has(lua, index, "min") || !_has(lua, index, "max") || !_has(lua, index, "step")) {
-            luaL_error(lua, "%s must have min, max and step", name);
-        }
-        range.min = _component(lua, index, "min", 0);
-        range.max = _component(lua, index, "max", 0);
-        range.step = _component(lua, index, "step", 0);
-    } else {
-        if (lua_rawlen(lua, index) != 3) luaL_error(lua, "%s must contain min, max and step", name);
-        range.min = _component(lua, index, nullptr, 1);
-        range.max = _component(lua, index, nullptr, 2);
-        range.step = _component(lua, index, nullptr, 3);
-    }
-    if (range.min > range.max || range.step <= 0.0f) luaL_error(lua, "%s is invalid", name);
-    return range;
-}
-
-static Range _fieldRange(lua_State* lua, int index, const char* name, const Range& fallback)
-{
-    index = lua_absindex(lua, index);
-    lua_getfield(lua, index, name);
-    if (lua_isnil(lua, -1)) {
-        lua_pop(lua, 1);
-        return fallback;
-    }
-    auto value = _range(lua, -1, name);
-    lua_pop(lua, 1);
-    return value;
-}
-
-static CellRegion _region(lua_State* lua, int index, const char* name)
-{
-    luaL_checktype(lua, index, LUA_TTABLE);
-    index = lua_absindex(lua, index);
-    auto keyed = _has(lua, index, "x") || _has(lua, index, "y") || _has(lua, index, "width") || _has(lua, index, "height");
-    lua_Integer values[4];
-    if (keyed) {
-        const char* fields[] = {"x", "y", "width", "height"};
-        for (auto i = 0u; i < 4u; i++) {
-            if (!_has(lua, index, fields[i])) luaL_error(lua, "%s requires x, y, width and height", name);
-            values[i] = _fieldInteger(lua, index, fields[i], 0);
-        }
-    } else {
-        if (lua_rawlen(lua, index) != 4u) luaL_error(lua, "%s must contain x, y, width and height", name);
-        for (auto i = 0u; i < 4u; i++) {
-            lua_rawgeti(lua, index, i + 1u);
-            values[i] = _integer(lua, -1, name);
-            lua_pop(lua, 1);
-        }
-    }
-    for (auto value : values) {
-        if (value < 0 || value > UINT32_MAX) luaL_error(lua, "%s values must be unsigned 32-bit integers", name);
-    }
-    return {static_cast<uint32_t>(values[0]), static_cast<uint32_t>(values[1]),
-            static_cast<uint32_t>(values[2]), static_cast<uint32_t>(values[3])};
-}
-
-static CellRegion _fieldRegion(lua_State* lua, int index, const char* name)
-{
-    index = lua_absindex(lua, index);
-    lua_getfield(lua, index, name);
-    if (lua_isnil(lua, -1)) {
-        lua_pop(lua, 1);
-        return {};
-    }
-    auto value = _region(lua, -1, name);
-    lua_pop(lua, 1);
-    return value;
-}
-
-static void _size(lua_State* lua, int index, uint32_t& columns, uint32_t& rows)
-{
-    luaL_checktype(lua, index, LUA_TTABLE);
-    if (lua_rawlen(lua, index) != 2u) luaL_error(lua, "size must contain columns and rows");
-    lua_rawgeti(lua, index, 1);
-    auto width = _integer(lua, -1, "columns");
-    lua_pop(lua, 1);
-    lua_rawgeti(lua, index, 2);
-    auto height = _integer(lua, -1, "rows");
-    lua_pop(lua, 1);
-    if (width <= 0 || width > UINT32_MAX || height <= 0 || height > UINT32_MAX || height > 16384 / width) {
-        luaL_error(lua, "size must contain 1 to 16384 cells");
-    }
-    columns = static_cast<uint32_t>(width);
-    rows = static_cast<uint32_t>(height);
-}
-
-static void _matrix(lua_State* lua, int index, float* values, uint32_t count, const char* name)
-{
-    luaL_checktype(lua, index, LUA_TTABLE);
-    index = lua_absindex(lua, index);
-    if (lua_rawlen(lua, index) != count) luaL_error(lua, "%s must contain exactly %u numbers", name, count);
-    for (auto i = 0u; i < count; i++) {
-        lua_rawgeti(lua, index, i + 1);
-        values[i] = _number(lua, -1, name);
-        lua_pop(lua, 1);
-    }
-}
-
-static const char* _fieldString(lua_State* lua, int index, const char* name, size_t* size = nullptr)
-{
-    index = lua_absindex(lua, index);
-    lua_getfield(lua, index, name);
-    if (lua_isnil(lua, -1)) luaL_error(lua, "missing field '%s'", name);
-    size_t length;
-    auto value = luaL_checklstring(lua, -1, &length);
-    if (std::strlen(value) != length) luaL_error(lua, "field '%s' cannot contain zero bytes", name);
-    if (size) *size = length;
-    return value;
-}
-
-static const char* _fieldOptionalString(lua_State* lua, int index, const char* name, const char* fallback)
-{
-    index = lua_absindex(lua, index);
-    lua_getfield(lua, index, name);
-    if (lua_isnil(lua, -1)) {
-        lua_pop(lua, 1);
-        lua_pushstring(lua, fallback);
-        return lua_tostring(lua, -1);
-    }
-    size_t length;
-    auto value = luaL_checklstring(lua, -1, &length);
-    if (std::strlen(value) != length) luaL_error(lua, "field '%s' cannot contain zero bytes", name);
-    return value;
-}
-
-static bool _option(const char* name, std::initializer_list<const char*> fields, bool style)
-{
-    if (style) {
-        static constexpr const char* shared[] = {
-            "id", "color", "stroke", "fill", "gradient", "width", "radius", "dash",
-            "dash_offset", "opacity", "progress", "layer", "isolate", "mask", "blend", "blur", "shadow"};
-        for (auto field : shared) {
-            if (std::strcmp(name, field) == 0) return true;
-        }
-    }
-    for (auto field : fields) {
-        if (std::strcmp(name, field) == 0) return true;
-    }
-    return false;
-}
-
-static void _options(lua_State* lua, int index, std::initializer_list<const char*> fields,
-                     bool style = true)
-{
-    index = lua_absindex(lua, index);
-    lua_pushnil(lua);
-    while (lua_next(lua, index)) {
-        if (lua_type(lua, -2) != LUA_TSTRING) luaL_error(lua, "option names must be strings");
-        auto name = lua_tostring(lua, -2);
-        if (!_option(name, fields, style)) luaL_error(lua, "unknown option '%s'", name);
-        lua_pop(lua, 1);
-    }
-}
-
-static bool _hex(const char* value, size_t size)
-{
-    if (size && *value == '#') {
-        value++;
-        size--;
-    }
-    if (size != 3 && size != 4 && size != 6 && size != 8) return false;
-    for (auto i = 0u; i < size; i++) {
-        auto c = value[i];
-        if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'))) return false;
-    }
-    return true;
-}
-
-static bool _themeColorRole(const char* value, size_t size, ThemeColorRole& role)
-{
-    struct Entry { const char* name; ThemeColorRole role; };
-    static constexpr Entry entries[] = {
-        {"background", ThemeColorRole::Background},
-        {"foreground", ThemeColorRole::Foreground},
-        {"muted", ThemeColorRole::Muted},
-        {"accent", ThemeColorRole::Accent},
-        {"secondary", ThemeColorRole::Secondary},
-        {"success", ThemeColorRole::Success},
-        {"warning", ThemeColorRole::Warning},
-        {"danger", ThemeColorRole::Danger},
-        {"info", ThemeColorRole::Info},
-        {"surface", ThemeColorRole::Surface},
-        {"border", ThemeColorRole::Border},
-        {"result", ThemeColorRole::Result},
-        {"focus", ThemeColorRole::Focus},
-    };
-    for (const auto& entry : entries) {
-        if (std::strlen(entry.name) == size && std::memcmp(value, entry.name, size) == 0) {
-            role = entry.role;
-            return true;
-        }
-    }
-    return false;
-}
-
-static Color _color(lua_State* lua, int index, const char* name, const Theme* theme = nullptr)
-{
-    size_t size;
-    auto value = luaL_checklstring(lua, index, &size);
-    if (_hex(value, size)) return Color::hex(value);
-    ThemeColorRole role;
-    if (theme && std::strlen(value) == size && _themeColorRole(value, size, role)) {
-        return theme->color(role);
-    }
-    luaL_error(lua, "%s must be a hex color or Theme color role", name);
-    return {};
-}
-
-static bool _fieldColor(lua_State* lua, int index, const char* name, Color& color,
-                        const Theme* theme = nullptr)
-{
-    index = lua_absindex(lua, index);
-    lua_getfield(lua, index, name);
-    if (lua_isnil(lua, -1)) {
-        lua_pop(lua, 1);
-        return false;
-    }
-    color = _color(lua, -1, name, theme);
-    lua_pop(lua, 1);
-    return true;
-}
-
-static Vec3* _points(lua_State* lua, int index, uint32_t minimum, uint32_t& count)
-{
-    luaL_checktype(lua, index, LUA_TTABLE);
-    index = lua_absindex(lua, index);
-    auto size = lua_rawlen(lua, index);
-    if (size < minimum) luaL_error(lua, "points must contain at least %u vectors", minimum);
-    if (size > UINT32_MAX || size > LUA_MEMORY_LIMIT / sizeof(Vec3)) luaL_error(lua, "points array is too large");
-    count = static_cast<uint32_t>(size);
-    auto points = static_cast<Vec3*>(lua_newuserdatauv(lua, sizeof(Vec3) * size, 0));
-    for (auto i = 0u; i < count; i++) {
-        lua_rawgeti(lua, index, i + 1);
-        auto point = _world(lua, -1, "point");
-        new (points + i) Vec3(point);
-        lua_pop(lua, 1);
-    }
-    return points;
-}
-
 // The scene at index 1 for a call that only moves or reads the authoring time, or that a
 // track makes itself: the tracks that wait to play stay waiting.
 static LuaScene* _sceneQuiet(lua_State* lua)
@@ -793,195 +385,6 @@ static LuaObject* _knownHandle(lua_State* lua, LuaScene* scene, int sceneIndex, 
     auto handle = _objectHandle(lua, scene, sceneIndex, object, false);
     _remember(lua, -1);
     return handle;
-}
-
-static bool _gradientShape(Type type)
-{
-    return type != Type::Space && type != Type::Text && type != Type::Picture
-           && type != Type::Cell && type != Type::Group;
-}
-
-static GradientType _gradientType(lua_State* lua, int index)
-{
-    lua_getfield(lua, index, "type");
-    if (lua_type(lua, -1) != LUA_TSTRING) {
-        luaL_error(lua, "gradient.type must be \"linear\", \"radial\" or \"conic\"");
-    }
-    auto name = lua_tostring(lua, -1);
-    auto type = GradientType::None;
-    if (std::strcmp(name, "linear") == 0) type = GradientType::Linear;
-    else if (std::strcmp(name, "radial") == 0) type = GradientType::Radial;
-    else if (std::strcmp(name, "conic") == 0) type = GradientType::Conic;
-    else luaL_error(lua, "gradient.type must be \"linear\", \"radial\" or \"conic\", got '%s'", name);
-    lua_pop(lua, 1);
-    return type;
-}
-
-static void _gradientStops(lua_State* lua, int index, Gradient& gradient, const Theme* theme)
-{
-    lua_getfield(lua, index, "stops");
-    if (lua_isnil(lua, -1)) {
-        lua_pop(lua, 1);
-        return;
-    }
-    if (!lua_istable(lua, -1)) luaL_error(lua, "gradient.stops must be an array of colors or {offset, color} pairs");
-    auto stops = lua_absindex(lua, -1);
-    auto count = lua_rawlen(lua, stops);
-    lua_pushnil(lua);
-    while (lua_next(lua, stops)) {
-        if (!lua_isinteger(lua, -2) || lua_tointeger(lua, -2) < 1
-            || static_cast<size_t>(lua_tointeger(lua, -2)) > count) {
-            luaL_error(lua, "gradient.stops must be a sequence");
-        }
-        lua_pop(lua, 1);
-    }
-    if (count < 2 || count > Gradient::StopLimit) {
-        luaL_error(lua, "gradient.stops must contain 2 to %d stops", static_cast<int>(Gradient::StopLimit));
-    }
-    auto previous = 0.0f;
-    for (auto i = 1u; i <= count; i++) {
-        auto& stop = gradient.stops[i - 1u];
-        lua_rawgeti(lua, stops, static_cast<lua_Integer>(i));
-        if (lua_type(lua, -1) == LUA_TSTRING) {
-            stop.offset = static_cast<float>(i - 1u) / static_cast<float>(count - 1u);
-            stop.color = _color(lua, -1, "gradient stop color", theme);
-        } else if (lua_istable(lua, -1)) {
-            auto pair = lua_absindex(lua, -1);
-            if (lua_rawlen(lua, pair) != 2) {
-                luaL_error(lua, "gradient stop %d must be a color or {offset, color}", static_cast<int>(i));
-            }
-            lua_rawgeti(lua, pair, 1);
-            stop.offset = _number(lua, -1, "gradient stop offset");
-            lua_pop(lua, 1);
-            lua_rawgeti(lua, pair, 2);
-            stop.color = _color(lua, -1, "gradient stop color", theme);
-            lua_pop(lua, 1);
-            if (stop.offset < 0.0f || stop.offset > 1.0f) {
-                luaL_error(lua, "gradient stop %d offset must be within 0..1", static_cast<int>(i));
-            }
-            if (stop.offset < previous) {
-                luaL_error(lua, "gradient stop offsets must be non-decreasing");
-            }
-        } else {
-            luaL_error(lua, "gradient stop %d must be a color or {offset, color}", static_cast<int>(i));
-        }
-        previous = stop.offset;
-        lua_pop(lua, 1);
-    }
-    gradient.stopCount = static_cast<uint8_t>(count);
-    lua_pop(lua, 1);
-}
-
-static Gradient _gradient(lua_State* lua, int index, const Theme* theme)
-{
-    index = lua_absindex(lua, index);
-    Gradient gradient;
-    gradient.type = _gradientType(lua, index);
-    const char* allowed[6] = {"type", "stops", nullptr, nullptr, nullptr, nullptr};
-    switch (gradient.type) {
-        case GradientType::Linear: allowed[2] = "from"; allowed[3] = "to"; break;
-        case GradientType::Radial:
-            allowed[2] = "center"; allowed[3] = "radius";
-            allowed[4] = "focal"; allowed[5] = "focal_radius";
-            break;
-        default: allowed[2] = "center"; allowed[3] = "angle"; break;
-    }
-    lua_pushnil(lua);
-    while (lua_next(lua, index)) {
-        if (lua_type(lua, -2) != LUA_TSTRING) luaL_error(lua, "gradient option names must be strings");
-        auto name = lua_tostring(lua, -2);
-        auto known = false;
-        for (auto field : allowed) {
-            if (field && std::strcmp(name, field) == 0) known = true;
-        }
-        if (!known) {
-            static constexpr const char* geometry[] = {"from", "to", "center", "radius",
-                                                       "focal", "focal_radius", "angle"};
-            for (auto field : geometry) {
-                if (std::strcmp(name, field) == 0) {
-                    luaL_error(lua, "gradient option '%s' is not valid for a %s gradient", name,
-                               gradient.type == GradientType::Linear ? "linear"
-                               : gradient.type == GradientType::Radial ? "radial" : "conic");
-                }
-            }
-            luaL_error(lua, "unknown gradient option '%s'", name);
-        }
-        lua_pop(lua, 1);
-    }
-    _gradientStops(lua, index, gradient, theme);
-    if (gradient.type == GradientType::Linear) {
-        auto from = _has(lua, index, "from");
-        if (from != _has(lua, index, "to")) luaL_error(lua, "linear gradient needs both from and to");
-        if (from) {
-            gradient.from = _fieldWorld(lua, index, "from");
-            gradient.to = _fieldWorld(lua, index, "to");
-            gradient.line = true;
-        }
-    } else {
-        if (_has(lua, index, "center")) {
-            gradient.center = _fieldWorld(lua, index, "center");
-            gradient.centered = true;
-        }
-    }
-    if (gradient.type == GradientType::Radial) {
-        if (_has(lua, index, "radius")) {
-            gradient.radius = _fieldNumber(lua, index, "radius", 0.0f);
-            if (gradient.radius <= 0.0f) luaL_error(lua, "gradient.radius must be positive");
-            gradient.sized = true;
-        }
-        if (_has(lua, index, "focal")) {
-            gradient.focal = _fieldWorld(lua, index, "focal");
-            gradient.focused = true;
-        }
-        gradient.focalRadius = _fieldNumber(lua, index, "focal_radius", 0.0f);
-        if (gradient.focalRadius < 0.0f) luaL_error(lua, "gradient.focal_radius cannot be negative");
-    }
-    if (gradient.type == GradientType::Conic) {
-        gradient.angle = _fieldNumber(lua, index, "angle", 0.0f);
-    }
-    return gradient;
-}
-
-static float _blur(lua_State* lua, int index, const char* name)
-{
-    auto blur = _number(lua, index, name);
-    if (blur < 0.0f || blur > 256.0f) luaL_error(lua, "%s must be between 0 and 256 pixels", name);
-    return blur;
-}
-
-// Reads {color = ..., offset = {x, y}, blur = sigma} at index; omitted fields keep base.
-static Shadow _shadow(lua_State* lua, int index, const Theme* theme, Shadow base)
-{
-    index = lua_absindex(lua, index);
-    if (!lua_istable(lua, index)) luaL_error(lua, "shadow must be a table with color, offset and blur");
-    _options(lua, index, {"color", "offset", "blur"}, false);
-    Color color;
-    if (_fieldColor(lua, index, "color", color, theme)) base.color = color;
-    lua_getfield(lua, index, "offset");
-    if (!lua_isnil(lua, -1)) base.offset = _vec2(lua, -1, "shadow offset");
-    lua_pop(lua, 1);
-    lua_getfield(lua, index, "blur");
-    if (!lua_isnil(lua, -1)) base.blur = _blur(lua, -1, "shadow blur");
-    lua_pop(lua, 1);
-    return base;
-}
-
-static BlendMode _blendMode(lua_State* lua, int index)
-{
-    static constexpr const char* names[] = {
-        "normal", "multiply", "screen", "overlay", "darken", "lighten", "color_dodge", "color_burn", "hard_light",
-        "soft_light", "difference", "exclusion", "hue", "saturation", "color", "luminosity", "add"};
-    static_assert(sizeof(names) / sizeof(names[0]) == static_cast<size_t>(BlendMode::Add) + 1u,
-                  "a name for every blend mode");
-    if (lua_type(lua, index) != LUA_TSTRING) luaL_error(lua, "blend must be a string");
-    auto name = lua_tostring(lua, index);
-    for (auto i = 0u; i < sizeof(names) / sizeof(names[0]); i++) {
-        if (std::strcmp(name, names[i]) == 0) return static_cast<BlendMode>(i);
-    }
-    luaL_error(lua, "blend must be 'normal', 'multiply', 'screen', 'overlay', 'darken', 'lighten', 'color_dodge', "
-                    "'color_burn', 'hard_light', 'soft_light', 'difference', 'exclusion', 'hue', 'saturation', "
-                    "'color', 'luminosity' or 'add'");
-    return BlendMode::Normal;
 }
 
 // The id of the options at index, which no object of scene has yet, or nullptr. An id is left on
@@ -1606,46 +1009,6 @@ static int _point(lua_State* lua)
     return _add(lua, space, owner, Point::gen(point), 2, "point");
 }
 
-static void _text(lua_State* lua, int index, Text* object)
-{
-    if (!object) return;
-    lua_getfield(lua, index, "size");
-    auto sized = !lua_isnil(lua, -1);
-    lua_pop(lua, 1);
-    object->size = _fieldNumber(lua, index, "size", object->size);
-    object->align = _fieldVec2(lua, index, "align", object->align);
-    auto role = _fieldOptionalString(lua, index, "role", "text");
-    if (std::strcmp(role, "h1") == 0) object->role = TextRole::H1;
-    else if (std::strcmp(role, "h2") == 0) object->role = TextRole::H2;
-    else if (std::strcmp(role, "h3") == 0) object->role = TextRole::H3;
-    else if (std::strcmp(role, "text") == 0) object->role = TextRole::Text;
-    else if (std::strcmp(role, "code") == 0) object->role = TextRole::Code;
-    else luaL_error(lua, "text role must be 'h1', 'h2', 'h3', 'text' or 'code'");
-    lua_pop(lua, 1);
-    auto orientation = _fieldOptionalString(lua, index, "orientation", "billboard");
-    if (std::strcmp(orientation, "billboard") == 0) {
-        object->orientation = TextOrientation::Billboard;
-    } else if (std::strcmp(orientation, "plane") == 0) {
-        object->orientation = TextOrientation::Plane;
-    } else {
-        luaL_error(lua, "text orientation must be 'billboard' or 'plane'");
-    }
-    lua_pop(lua, 1);
-    if (sized && object->size <= 0.0f) luaL_error(lua, "size must be positive");
-    object->tabular = _fieldBool(lua, index, "tabular", object->tabular);
-    object->slant = _fieldNumber(lua, index, "slant", object->slant);
-    if (std::fabs(object->slant) > 1.0f) luaL_error(lua, "slant must be from -1 to 1");
-    lua_getfield(lua, index, "font");
-    if (!lua_isnil(lua, -1)) {
-        size_t size;
-        auto font = luaL_checklstring(lua, -1, &size);
-        if (std::strlen(font) != size) luaL_error(lua, "font cannot contain zero bytes");
-        if (size > LUA_PATH_LIMIT) luaL_error(lua, "font name exceeds the 4096-byte limit");
-        if (object->font(font) != Result::Success) luaL_error(lua, "out of memory while copying font");
-    }
-    lua_pop(lua, 1);
-}
-
 // Measures a text in world units as the scene sets it, or stops the script with the reason.
 static TextExtent _measured(lua_State* lua, Scene* scene, const Text* text)
 {
@@ -1971,22 +1334,10 @@ static Text* _spanText(lua_State* lua, LuaScene* box, int row, int part, const c
         if (text->size <= 0.0f) luaL_error(lua, "size must be positive");
     }
     lua_pop(lua, 1);
-    if (_spanField(lua, row, part, "font") != LUA_TNIL) {
-        size_t size;
-        auto font = luaL_checklstring(lua, -1, &size);
-        if (std::strlen(font) != size) luaL_error(lua, "font cannot contain zero bytes");
-        if (size > LUA_PATH_LIMIT) luaL_error(lua, "font name exceeds the 4096-byte limit");
-        if (text->font(font) != Result::Success) luaL_error(lua, "out of memory while copying font");
-    }
+    if (_spanField(lua, row, part, "font") != LUA_TNIL) _textFont(lua, -1, text);
     lua_pop(lua, 1);
     if (_spanField(lua, row, part, "role") != LUA_TNIL) {
-        auto role = luaL_checkstring(lua, -1);
-        if (std::strcmp(role, "h1") == 0) text->role = TextRole::H1;
-        else if (std::strcmp(role, "h2") == 0) text->role = TextRole::H2;
-        else if (std::strcmp(role, "h3") == 0) text->role = TextRole::H3;
-        else if (std::strcmp(role, "text") == 0) text->role = TextRole::Text;
-        else if (std::strcmp(role, "code") == 0) text->role = TextRole::Code;
-        else luaL_error(lua, "text role must be 'h1', 'h2', 'h3', 'text' or 'code'");
+        text->role = _textRole(lua, luaL_checkstring(lua, -1));
     }
     lua_pop(lua, 1);
     return text;
@@ -2111,12 +1462,12 @@ static int _spans(lua_State* lua)
     auto point = _fieldWorld(lua, 2, "point", {});
     auto align = _fieldVec2(lua, 2, "align", {0.5f, 0.5f});
     auto wrap = _fieldNumber(lua, 2, "wrap", 0.0f);
-    if (!std::isfinite(wrap) || wrap < 0.0f) return luaL_error(lua, "wrap must be a non-negative width");
+    if (wrap < 0.0f) return luaL_error(lua, "wrap must be a non-negative width");
     // Without leading, each line takes the height its texts and boxes need, as before.
     auto leading = 0.0f;
     if (lua_getfield(lua, 2, "leading") != LUA_TNIL) {
         leading = _number(lua, -1, "leading");
-        if (!std::isfinite(leading) || leading <= 0.0f) {
+        if (leading <= 0.0f) {
             return luaL_error(lua, "leading must be a positive multiple of the line height");
         }
     }
@@ -2130,11 +1481,7 @@ static int _spans(lua_State* lua)
     else if (std::strcmp(splitName, "letters") == 0) split = LuaSplit::Letters;
     else if (std::strcmp(splitName, "none") != 0) return luaL_error(lua, "split must be 'none', 'words' or 'letters'");
     lua_pop(lua, 1);
-    auto orientation = TextOrientation::Billboard;
-    auto orientationName = _fieldOptionalString(lua, 2, "orientation", "billboard");
-    if (std::strcmp(orientationName, "plane") == 0) orientation = TextOrientation::Plane;
-    else if (std::strcmp(orientationName, "billboard") != 0) return luaL_error(lua, "text orientation must be 'billboard' or 'plane'");
-    lua_pop(lua, 1);
+    auto orientation = _textOrientation(lua, 2);
 
     // The blank a space leaves, and the line a blank line takes, in the row's own style.
     lua_createtable(lua, 1, 0);
@@ -2574,7 +1921,7 @@ static int _codeBlock(lua_State* lua, const Mat4& model)
     auto pitch = 0.0f;
     if (lua_getfield(lua, 2, "pitch") != LUA_TNIL) {
         pitch = _number(lua, -1, "pitch");
-        if (!std::isfinite(pitch) || pitch <= 0.0f) {
+        if (pitch <= 0.0f) {
             return luaL_error(lua, "pitch must be a positive distance in world units");
         }
         if (lua_getfield(lua, 2, "leading") != LUA_TNIL) {
@@ -2584,14 +1931,10 @@ static int _codeBlock(lua_State* lua, const Mat4& model)
     }
     lua_pop(lua, 1);
     auto leading = _fieldNumber(lua, 2, "leading", 1.0f);
-    if (!std::isfinite(leading) || leading <= 0.0f) {
+    if (leading <= 0.0f) {
         return luaL_error(lua, "leading must be a positive multiple of the line height");
     }
-    auto orientation = TextOrientation::Billboard;
-    auto orientationName = _fieldOptionalString(lua, 2, "orientation", "billboard");
-    if (std::strcmp(orientationName, "plane") == 0) orientation = TextOrientation::Plane;
-    else if (std::strcmp(orientationName, "billboard") != 0) return luaL_error(lua, "text orientation must be 'billboard' or 'plane'");
-    lua_pop(lua, 1);
+    auto orientation = _textOrientation(lua, 2);
     _codePalette(lua, scene->theme());
     auto palette = lua_gettop(lua);
 
@@ -3227,16 +2570,6 @@ static int _gridDecimals(lua_State* lua, int index)
     return static_cast<int>(decimals);
 }
 
-static TextOrientation _gridOrientation(lua_State* lua, int index)
-{
-    auto name = _fieldOptionalString(lua, index, "orientation", "billboard");
-    auto orientation = TextOrientation::Billboard;
-    if (std::strcmp(name, "plane") == 0) orientation = TextOrientation::Plane;
-    else if (std::strcmp(name, "billboard") != 0) luaL_error(lua, "text orientation must be 'billboard' or 'plane'");
-    lua_pop(lua, 1);
-    return orientation;
-}
-
 // The theme's style of a text role.
 static const TextTheme& _roleTheme(const Theme& theme, TextRole role)
 {
@@ -3286,7 +2619,7 @@ static int _matrixGen(lua_State* lua)
     }
     lua_pop(lua, 1);
     auto decimals = _gridDecimals(lua, 2);
-    auto orientation = _gridOrientation(lua, 2);
+    auto orientation = _textOrientation(lua, 2);
     auto justify = static_cast<LuaJustify*>(lua_newuserdatauv(lua, sizeof(LuaJustify) * columns, 0));
     _justify(lua, 2, "matrix", justify, columns);
 
@@ -3559,7 +2892,7 @@ static int _tableGen(lua_State* lua)
     }
     lua_pop(lua, 1);
     auto decimals = _gridDecimals(lua, 2);
-    auto orientation = _gridOrientation(lua, 2);
+    auto orientation = _textOrientation(lua, 2);
     auto justify = static_cast<LuaJustify*>(lua_newuserdatauv(lua, sizeof(LuaJustify) * columns, 0));
     _justify(lua, 2, "table", justify, columns);
     auto layer = _fieldInteger(lua, 2, "layer", 0);
@@ -4781,7 +4114,7 @@ static void _plotKeep(lua_State* lua, const LuaPlotCut& cut, const Range* range,
     record->endRoom = endRoom;
     record->sampleRoom = std::max(sampleRoom, cut.samples.count);
     record->copied = copied;
-    if (cut.breakCount) std::memcpy(record + 1, cut.breaks, sizeof(double) * cut.breakCount);
+    if (cut.breakCount) std::memcpy(static_cast<void*>(record + 1), cut.breaks, sizeof(double) * cut.breakCount);
 }
 
 // Records what cut cuts with, and range when fn is sampled over one, for the plot it made, of the
@@ -8597,7 +7930,7 @@ static int _warp(lua_State* lua)
         luaL_checktype(lua, 6, LUA_TTABLE);
         _options(lua, 6, {"step"}, false);
         step = _fieldNumber(lua, 6, "step", step);
-        if (!(step > 0.0f) || !std::isfinite(step)) return luaL_error(lua, "warp step must be a positive length");
+        if (!(step > 0.0f)) return luaL_error(lua, "warp step must be a positive length");
     }
     if (count > LUA_GROUP_LIMIT) return luaL_error(lua, "animation group limit exceeded");
     if (sampled) _warpSamples(lua, 3, samples);
@@ -10113,7 +9446,7 @@ static void _plotCopies(lua_State* lua, int map, const LuaScene* box)
             auto plot = static_cast<const Plot*>(copy);
             auto record = new (lua_newuserdatauv(lua, sizeof(LuaPlotRecord) + sizeof(double) * kept->breakCount, 0))
                 LuaPlotRecord(*kept);
-            if (kept->breakCount) std::memcpy(record + 1, kept + 1, sizeof(double) * kept->breakCount);
+            if (kept->breakCount) std::memcpy(static_cast<void*>(record + 1), kept + 1, sizeof(double) * kept->breakCount);
             record->room = plot->count();
             record->endRoom = plot->contours() > 1u ? plot->contours() : 0u;
             record->sampleRoom = plot->samples().count;
@@ -11256,7 +10589,7 @@ static int _sceneGen(lua_State* lua)
     return 1;
 }
 
-static const luaL_Reg SCENE_METHODS[] = {
+static const luaL_Reg FACTORY_METHODS[] = {
     {"group", _groupGen},
     {"space", _spaceGen},
     {"point", _point},
@@ -11289,6 +10622,9 @@ static const luaL_Reg SCENE_METHODS[] = {
     {"number", _numberText},
     {"matrix", _matrixGen},
     {"table", _tableGen},
+    {nullptr, nullptr}};
+
+static const luaL_Reg SCENE_METHODS[] = {
     {"picture", _picture},
     {"cell", _cell},
     {"connector", _connector},
@@ -11350,38 +10686,6 @@ static const luaL_Reg SCENE_METHODS[] = {
     {nullptr, nullptr}};
 
 static const luaL_Reg OBJECT_METHODS[] = {
-    {"group", _groupGen},
-    {"space", _spaceGen},
-    {"point", _point},
-    {"line", _line},
-    {"arrow", _arrow},
-    {"vector", _vector},
-    {"circle", _circle},
-    {"arc", _arc},
-    {"angle", _angle},
-    {"rectangle", _rectangle},
-    {"brace", _brace},
-    {"polygon", _polygon},
-    {"plot", _plot},
-    {"contour", _contour},
-    {"area", _area},
-    {"riemann", _riemann},
-    {"vector_field", _vectorField},
-    {"stream_lines", _streamLines},
-    {"route", _route},
-    {"path", _path},
-    {"union", _union},
-    {"intersection", _intersection},
-    {"difference", _difference},
-    {"exclusion", _exclusion},
-    {"curve", _curve},
-    {"surface", _surface},
-    {"text", _textWorld},
-    {"spans", _spans},
-    {"code", _code},
-    {"number", _numberText},
-    {"matrix", _matrixGen},
-    {"table", _tableGen},
     {"label", _label},
     {"picture", _picture},
     {"cell", _cell},
@@ -11418,786 +10722,14 @@ static const luaL_Reg VIEW_METHODS[] = {
     {"fade", _viewFade},
     {nullptr, nullptr}};
 
-static void _library(lua_State* lua, const char* name, lua_CFunction open)
-{
-    luaL_requiref(lua, name, open, 1);
-    lua_pop(lua, 1);
-}
-
-static int _toString(lua_State* lua)
-{
-    switch (lua_type(lua, 1)) {
-        case LUA_TNIL: lua_pushliteral(lua, "nil"); break;
-        case LUA_TBOOLEAN: lua_pushstring(lua, lua_toboolean(lua, 1) ? "true" : "false"); break;
-        case LUA_TNUMBER:
-        case LUA_TSTRING: luaL_tolstring(lua, 1, nullptr); break;
-        default: return luaL_error(lua, "tostring accepts only nil, booleans, numbers and strings");
-    }
-    return 1;
-}
-
-static int _format(lua_State* lua)
-{
-    size_t size;
-    auto format = luaL_checklstring(lua, 1, &size);
-    static constexpr auto conversions = "cdiuoxXaAfFeEgGpsq";
-    for (auto i = 0u; i < size; i++) {
-        if (format[i] != '%') continue;
-        if (++i < size && format[i] == '%') continue;
-        while (i < size && !std::strchr(conversions, format[i]))
-            i++;
-        if (i < size && format[i] == 'p') return luaL_error(lua, "string.format %%p is unavailable");
-    }
-    auto count = lua_gettop(lua);
-    for (auto i = 2; i <= count; i++) {
-        auto type = lua_type(lua, i);
-        if (type != LUA_TNIL && type != LUA_TBOOLEAN && type != LUA_TNUMBER && type != LUA_TSTRING) {
-            return luaL_argerror(lua, i, "format values must be nil, booleans, numbers or strings");
-        }
-    }
-    return detail::luaCallWrapped(lua, lua_upvalueindex(1));
-}
-
-// vis.merge(a, b, ...): a new table with the fields of every table argument, later tables
-// winning; nil arguments are skipped. Nested tables are shared, not copied.
-static int _merge(lua_State* lua)
-{
-    auto count = lua_gettop(lua);
-    for (auto i = 1; i <= count; i++) {
-        if (!lua_isnil(lua, i) && !lua_istable(lua, i)) {
-            return luaL_error(lua, "merge accepts only tables and nil, got %s for argument %d", luaL_typename(lua, i), i);
-        }
-    }
-    lua_newtable(lua);
-    for (auto i = 1; i <= count; i++) {
-        if (lua_isnil(lua, i)) continue;
-        lua_pushnil(lua);
-        while (lua_next(lua, i)) {
-            lua_pushvalue(lua, -2);
-            lua_insert(lua, -2);
-            lua_rawset(lua, -4);
-        }
-    }
-    return 1;
-}
-
-struct LuaKey
-{
-    lua_Integer integer;
-    lua_Number number;
-    const char* string;
-    size_t size;
-    bool isInteger;
-};
-
-static bool _keyBefore(const LuaKey& a, const LuaKey& b)
-{
-    if (!a.string != !b.string) return !a.string;
-    if (a.string) {
-        auto common = std::min(a.size, b.size);
-        auto order = std::memcmp(a.string, b.string, common);
-        return order ? order < 0 : a.size < b.size;
-    }
-    if (a.isInteger && b.isInteger) return a.integer < b.integer;
-    return a.number < b.number;
-}
-
-// vis.keys(t): the keys of t in an order that never changes between runs, which pairs and
-// next cannot promise: numbers ascending, then strings in byte order.
-static int _keys(lua_State* lua)
-{
-    luaL_checktype(lua, 1, LUA_TTABLE);
-    lua_settop(lua, 1);
-    lua_Integer count = 0;
-    lua_pushnil(lua);
-    while (lua_next(lua, 1)) {
-        lua_pop(lua, 1);
-        auto type = lua_type(lua, -1);
-        if (type != LUA_TNUMBER && type != LUA_TSTRING) {
-            return luaL_error(lua, "keys orders only number and string keys, got a %s key", luaL_typename(lua, -1));
-        }
-        count++;
-    }
-    if (static_cast<lua_Unsigned>(count) > LUA_MEMORY_LIMIT / sizeof(LuaKey)) return luaL_error(lua, "table has too many keys");
-    auto keys = static_cast<LuaKey*>(lua_newuserdatauv(lua, sizeof(LuaKey) * static_cast<size_t>(count), 0));
-    auto size = 0u;
-    lua_pushnil(lua);
-    while (lua_next(lua, 1)) {
-        lua_pop(lua, 1);
-        auto& key = keys[size++];
-        key.isInteger = lua_isinteger(lua, -1);
-        key.integer = key.isInteger ? lua_tointeger(lua, -1) : 0;
-        key.number = lua_type(lua, -1) == LUA_TNUMBER ? lua_tonumber(lua, -1) : 0.0;
-        // The table keeps its string keys alive while the result is built.
-        key.string = lua_type(lua, -1) == LUA_TSTRING ? lua_tolstring(lua, -1, &key.size) : nullptr;
-    }
-    std::sort(keys, keys + size, _keyBefore);
-    lua_createtable(lua, static_cast<int>(size), 0);
-    for (auto i = 0u; i < size; i++) {
-        auto& key = keys[i];
-        if (key.string) lua_pushlstring(lua, key.string, key.size);
-        else if (key.isInteger) lua_pushinteger(lua, key.integer);
-        else lua_pushnumber(lua, key.number);
-        lua_rawseti(lua, -2, static_cast<lua_Integer>(i) + 1);
-    }
-    return 1;
-}
-
-// Value trackers: an animated number that bound objects follow. Construction samples
-// every binding along the eased value and schedules short linear segments, so the
-// timeline stays deterministic and renderers never call back into Lua. The segments of a
-// track wait until a scene call that adds or reads clips, or the end of the script, so a
-// later track of other trackers that overlaps it on a binding can merge with it.
-static constexpr const char* TRACKER_PRELUDE = R"lua(
-local methods, ease, settle, fps, unknown, where, pend = ...
-local type, error, ipairs, select, unpack, pcall = type, error, ipairs, select, table.unpack, pcall
-local tonumber = tonumber
-local sort = table.sort
-local ceil, min, max, abs = math.ceil, math.min, math.max, math.abs
-local sub, byte, format = string.sub, string.byte, string.format
-local KEYS = {"transform", "opacity", "stroke", "fill", "progress", "dash_offset", "tail", "tip",
-              "width", "radius", "size", "corner", "buff", "gradient", "blur", "shadow", "value",
-              "points", "from", "to", "origin", "control1", "control2", "fn", "x_range", "y_range",
-              "discontinuities", "center", "vertex", "start", "angle", "level", "values"}
--- Times closer than this are one moment, so windows that share no more do not overlap.
-local EPSILON = 1e-4
--- Samples that may wait to play; a track that would keep more plays them all at once.
-local PENDING_LIMIT = 32768
-local trackers = {}   -- tracker table -> {scene, value, windows}
-local bindings = {}   -- scene -> list of bindings
-local bound = {}      -- object -> binding
-local pending = {}    -- tracks whose segments wait to play, in the order they were authored
-local waiting = 0     -- samples the pending tracks keep
-local authored = 0    -- tracks authored so far, which orders the tracks a binding merges
-local current         -- the track whose segments play, which a failure names
-
-local function record(tracker, level)
-    local entry = trackers[tracker]
-    if not entry then error("expected a tracker from scene:tracker", level + 1) end
-    return entry
-end
-
--- The message of a failure raised in this chunk without its "tracker:<line>: " position, and
--- whether it had one.
-local function strip(message)
-    if type(message) == "string" and sub(message, 1, 8) == "tracker:" then
-        local i = 9
-        while (byte(message, i) or 0) >= 48 and (byte(message, i) or 0) <= 57 do i = i + 1 end
-        if i > 9 and sub(message, i, i + 1) == ": " then return sub(message, i + 2), true end
-    end
-    return message, false
-end
-
--- Calls fn, a C function, for the method the author called at level, as error counts levels:
--- a failure names the author's call, as the failure of a scene method written in C does,
--- rather than a line of this chunk.
-local function call(level, fn, ...)
-    local ok, result = pcall(fn, ...)
-    if not ok then error((strip(result)), level + 1) end
-    return result
-end
-
--- Whether v reads as a component of a bound shift the way descriptor reads it: absent, or a
--- number or a string Lua converts to one.
-local function component(v)
-    return not v or tonumber(v) ~= nil
-end
-
-local function evaluate(binding, args, level)
-    local state = binding.fn(unpack(args, 1, #binding.trackers))
-    if type(state) ~= "table" then error("a bound function must return a state table", level + 1) end
-    local key = unknown(state)
-    if key then error("a bound state cannot set '" .. key .. "'", level + 1) end
-    local shift = state.shift
-    if shift ~= nil and state.transform ~= nil then
-        error("a bound state cannot contain both shift and transform", level + 1)
-    end
-    -- Checked here, so a bad shift fails at the author's call rather than in descriptor.
-    if shift ~= nil and (type(shift) ~= "table" or not component(shift[1]) or not component(shift[2])
-                         or not component(shift[3])) then
-        error("a bound shift must be a table of numbers", level + 1)
-    end
-    return state
-end
-
-local function sample(binding, level)
-    local args = {}
-    for i, tracker in ipairs(binding.trackers) do args[i] = trackers[tracker].value end
-    -- Not a tail call, which would drop this level from the levels an error counts.
-    local state = evaluate(binding, args, level + 1)
-    return state
-end
-
--- Shift is relative to the object's state at bind time; segments carry the delta from the
--- shift the segment before gave, so deltas are taken in the order the segments play.
-local function descriptor(binding, state)
-    local out = {target = binding.object}
-    for _, key in ipairs(KEYS) do out[key] = state[key] end
-    if state.shift ~= nil then
-        local s, last = state.shift, binding.shift
-        local x, y, z = s[1] or 0, s[2] or 0, s[3] or 0
-        out.shift = {x - last[1], y - last[2], z - last[3]}
-        binding.shift = {x, y, z}
-    end
-    return out
-end
-
-local function overlaps(start, finish, window)
-    return start < window.finish - EPSILON and window.start < finish - EPSILON
-end
-
-local function includes(list, item)
-    for _, value in ipairs(list) do
-        if value == item then return true end
-    end
-    return false
-end
-
-local function shared(first, second)
-    for _, value in ipairs(first) do
-        if includes(second, value) then return true end
-    end
-    return false
-end
-
--- The step of a track whose time is within EPSILON of time, or nil.
-local function stepAt(track, time)
-    local low, high = 0, track.steps
-    while low < high do
-        local middle = (low + high) // 2
-        if track.bounds[middle] < time - EPSILON then low = middle + 1 else high = middle end
-    end
-    if abs(track.bounds[low] - time) <= EPSILON then return low end
-    return nil
-end
-
--- The value a tracker has at time among the tracks of a merged binding: the value of the
--- track that moves it then, at its own samples exactly; else the end of the last track that
--- moved it before; else the start of the first that moves it after; else the value it had
--- when the first of those tracks was authored.
-local function valueAt(group, tracker, time)
-    local before, after
-    for _, track in ipairs(group.tracks) do
-        for _, move in ipairs(track.moves) do
-            if move.tracker == tracker then
-                if time >= track.start - EPSILON and time <= track.finish + EPSILON then
-                    local step = stepAt(track, time)
-                    if step then return step == 0 and move.from or move.values[step] end
-                    local progress = max(0, min(1, (time - track.start) / (track.finish - track.start)))
-                    return move.from + (move.to - move.from) * ease(track.curve, progress)
-                elseif track.finish < time then
-                    if not before or track.finish > before.finish then
-                        before = {finish = track.finish, value = move.to}
-                    end
-                elseif not after or track.start < after.start then
-                    after = {start = track.start, value = move.from}
-                end
-            end
-        end
-    end
-    if before then return before.value end
-    if after then return after.value end
-    return group.tracks[1].snapshot[tracker]
-end
-
--- Plays one binding through the tracks that overlap on it: a segment between each pair of
--- neighboring sample times of all of them, at the values every tracker has then.
-local function playGroup(group)
-    local binding, tracks = group.binding, group.tracks
-    sort(tracks, function(a, b) return a.order < b.order end)
-    current = tracks[#tracks]
-    local marks = {}
-    for _, track in ipairs(tracks) do
-        for step = 0, track.steps do marks[#marks + 1] = {time = track.bounds[step], track = track, step = step} end
-    end
-    sort(marks, function(a, b)
-        if a.time ~= b.time then return a.time < b.time end
-        return a.track.order < b.track.order
-    end)
-    local kept = {marks[1]}
-    for i = 2, #marks do
-        if marks[i].time > kept[#kept].time + EPSILON then kept[#kept + 1] = marks[i] end
-    end
-    local scene = tracks[1].scene
-    for i = 2, #kept do
-        local from, to = kept[i - 1], kept[i]
-        local args = {}
-        for j, tracker in ipairs(binding.trackers) do args[j] = valueAt(group, tracker, to.time) end
-        local state = evaluate(binding, args, 1)
-        local duration = to.time - from.time
-        scene:seek(from.time)
-        scene:play({descriptor(binding, state)}, duration, "linear")
-    end
-end
-
--- Plays the segments of the pending tracks in the order they were authored, each where its
--- track left room for it, and returns every scene to its authoring time.
-local function run()
-    local list = pending
-    pending, waiting = {}, 0
-    local resume, scenes = {}, {}
-    for _, track in ipairs(list) do
-        current = track
-        local scene = track.scene
-        if resume[scene] == nil then
-            resume[scene] = scene:time()
-            scenes[#scenes + 1] = scene
-        end
-        for _, binding in ipairs(track.affected) do
-            local group = track.groups[binding]
-            if group and not group.played then
-                group.played = true
-                playGroup(group)
-            end
-        end
-        current = track
-        for step = 1, track.steps do
-            local batch = {}
-            for i, binding in ipairs(track.affected) do
-                local state = track.states[step][i]
-                if state and not track.groups[binding] then batch[#batch + 1] = descriptor(binding, state) end
-            end
-            if #batch > 0 then
-                scene:seek(track.bounds[step - 1])
-                scene:play(batch, track.bounds[step] - track.bounds[step - 1], "linear")
-            end
-        end
-        for _, binding in ipairs(track.affected) do
-            local windows = binding.windows
-            windows[#windows + 1] = {start = track.start, finish = track.finish, place = track.place}
-        end
-    end
-    for _, scene in ipairs(scenes) do scene:seek(resume[scene]) end
-end
-
-local function flush()
-    if #pending == 0 then return end
-    local ok, message = pcall(run)
-    if not ok then
-        local stripped, inside = strip(message)
-        if inside and current then message = current.where .. stripped end
-        error(message, 0)
-    end
-end
-
-function methods.tracker(scene, value)
-    if type(value) ~= "number" or value ~= value or value == math.huge or value == -math.huge then
-        error("tracker value must be a finite number", 2)
-    end
-    local tracker = {}
-    trackers[tracker] = {scene = scene, value = value, windows = {}}
-    tracker.get = function() return trackers[tracker].value end
-    return tracker
-end
-
-function methods.bind(scene, object, source, fn)
-    if type(fn) ~= "function" then error("bind requires a function", 2) end
-    local list = trackers[source] and {source} or source
-    if type(list) ~= "table" or #list == 0 then error("bind requires a tracker or an array of trackers", 2) end
-    for _, tracker in ipairs(list) do
-        if record(tracker, 2).scene ~= scene then error("tracker belongs to another scene", 2) end
-    end
-    if bound[object] then error("an object can follow only one binding", 2) end
-    local binding = {object = object, trackers = list, fn = fn, shift = {0, 0, 0}, windows = {}}
-    local state = sample(binding, 2)
-    local first = descriptor(binding, state)
-    settle(scene, first)
-    bound[object] = binding
-    bindings[scene] = bindings[scene] or {}
-    local all = bindings[scene]
-    all[#all + 1] = binding
-    return object
-end
-
--- scene:track(tracker, value, duration, curve) or scene:track({{tracker, value}, ...}, duration, curve)
--- moves the trackers now, samples the bound functions once a frame and leaves room on the
--- timeline; the segments play at the next scene call that adds or reads clips, or when the
--- script ends. Until then a later track that overlaps this one on a binding of other trackers
--- merges with it, and the binding shows the values of all of them at every sample.
-function methods.track(scene, first, ...)
-    local moves, duration, curve
-    if trackers[first] then
-        moves = {{first, (...)}}
-        duration, curve = select(2, ...)
-    else
-        if type(first) ~= "table" or #first == 0 then error("track requires a tracker or an array of {tracker, value}", 2) end
-        moves = first
-        duration, curve = ...
-    end
-    if type(duration) ~= "number" or not (duration > 0) or duration == math.huge then
-        error("track duration must be a positive finite number", 2)
-    end
-    -- An unknown curve, or a scene that can no longer be authored, fails at the author's call.
-    local kind = type(curve)
-    if kind ~= "nil" and kind ~= "string" and kind ~= "number" and kind ~= "table" then
-        error("animation curve must be a preset name or a table", 2)
-    end
-    call(2, ease, curve, 1)
-    local rate = call(2, fps, scene)
-    local moving, moved = {}, {}
-    for i, move in ipairs(moves) do
-        if type(move) ~= "table" then error("track requires a tracker or an array of {tracker, value}", 2) end
-        local entry = record(move[1], 2)
-        if entry.scene ~= scene then error("tracker belongs to another scene", 2) end
-        local target = move[2]
-        if type(target) ~= "number" or target ~= target or target == math.huge or target == -math.huge then
-            error("track target must be a finite number", 2)
-        end
-        moving[i] = {tracker = move[1], entry = entry, from = entry.value, to = target, values = {}}
-        moved[move[1]] = true
-    end
-    local affected = {}
-    for _, binding in ipairs(bindings[scene] or {}) do
-        for _, tracker in ipairs(binding.trackers) do
-            if moved[tracker] then affected[#affected + 1] = binding break end
-        end
-    end
-    local steps = max(1, ceil(duration * rate - 1e-6))
-    if #affected == 0 then
-        for _, move in ipairs(moving) do move.entry.value = move.to end
-        call(2, scene.wait, scene, duration)
-        return scene
-    end
-    local start = call(2, scene.time, scene)
-    local finish = start + duration
-    local here = where(2)
-    local place = sub(here, -2) == ": " and sub(here, 1, -3) or here
-    for _, move in ipairs(moving) do
-        for _, window in ipairs(move.entry.windows) do
-            if overlaps(start, finish, window) and shared(window.affected, affected) then
-                error(format("this track and the track at %s move the same tracker at once, until %.2f s; "
-                    .. "a tracker has one value at a time", window.place, window.finish), 2)
-            end
-        end
-    end
-    for _, binding in ipairs(affected) do
-        for _, window in ipairs(binding.windows) do
-            if overlaps(start, finish, window) then
-                error(format("this track overlaps the track at %s, whose segments have already played on "
-                    .. "the same object; author tracks that overlap with only wait, seek, at, parallel, "
-                    .. "mark, bind and factories between them", window.place), 2)
-            end
-        end
-    end
-    authored = authored + 1
-    local track = {scene = scene, where = here, place = place, order = authored, start = start,
-                   steps = steps, curve = curve, bounds = {[0] = start},
-                   moves = moving, affected = affected, states = {}, snapshot = {}, groups = {}}
-    for _, binding in ipairs(affected) do
-        for _, tracker in ipairs(binding.trackers) do track.snapshot[tracker] = trackers[tracker].value end
-        local group
-        for _, other in ipairs(pending) do
-            if other.scene == scene and overlaps(start, finish, other) and includes(other.affected, binding) then
-                local joined = other.groups[binding]
-                if not joined then
-                    joined = {binding = binding, tracks = {other}}
-                    other.groups[binding] = joined
-                end
-                if not group then
-                    group = joined
-                elseif joined ~= group then
-                    for _, member in ipairs(joined.tracks) do
-                        group.tracks[#group.tracks + 1] = member
-                        member.groups[binding] = group
-                    end
-                end
-            end
-        end
-        if group then
-            group.tracks[#group.tracks + 1] = track
-            track.groups[binding] = group
-        end
-    end
-    for step = 1, steps do
-        local u = ease(curve, step / steps)
-        for _, move in ipairs(moving) do
-            move.entry.value = step == steps and move.to or move.from + (move.to - move.from) * u
-            move.values[step] = move.entry.value
-        end
-        local states = {}
-        for i, binding in ipairs(affected) do
-            if not track.groups[binding] then states[i] = sample(binding, 2) end
-        end
-        track.states[step] = states
-        call(2, scene.seek, scene, start + duration * (step / steps))
-        track.bounds[step] = scene:time()
-    end
-    track.finish = track.bounds[steps]
-    for _, move in ipairs(moving) do
-        local windows = move.entry.windows
-        windows[#windows + 1] = {start = start, finish = track.finish, place = place, affected = affected}
-    end
-    pending[#pending + 1] = track
-    waiting = waiting + steps * #affected
-    if waiting > PENDING_LIMIT then flush() else pend() end
-    return scene
-end
-
-return flush
-)lua";
-
-struct LuaAbsent
-{
-    // The table the name is missing from: "" for globals, or a library name.
-    const char* library;
-    const char* name;
-    const char* reason;
-};
-
-static constexpr auto ABSENT_ORDER =
-    "its order can change between runs; use ipairs for arrays or vis.keys for other tables";
-static constexpr auto ABSENT_CONSOLE =
-    "a scene script has no console; stop with error(...) to see a value, or read the scene with viscript inspect";
-static constexpr auto ABSENT_FILE = "a scene script is one file; define shared helpers as local functions in it";
-static constexpr auto ABSENT_ERROR = "an error stops the script so that it is reported with its line";
-static constexpr auto ABSENT_META = "metatables are reserved for viscript handles; use vis.merge to fill in defaults";
-static constexpr auto ABSENT_SYSTEM = "scene scripts cannot reach files, the clock or the system";
-static constexpr auto ABSENT_PATTERN =
-    "patterns can run without bound; use string.sub, string.byte and plain comparisons";
-
-// Construction scripts exclude filesystem/system access, dynamic code, console output,
-// protected calls, metatable changes, unordered iteration and pattern matching.
-// Missing reserved APIs report their reason; use ordered keys and plain string operations.
-static constexpr LuaAbsent ABSENT[] = {
-    {"", "pairs", ABSENT_ORDER},
-    {"", "next", ABSENT_ORDER},
-    {"", "print", ABSENT_CONSOLE},
-    {"", "warn", ABSENT_CONSOLE},
-    {"", "require", ABSENT_FILE},
-    {"", "dofile", ABSENT_FILE},
-    {"", "loadfile", ABSENT_FILE},
-    {"", "load", "scripts cannot compile code while they run"},
-    {"", "pcall", ABSENT_ERROR},
-    {"", "xpcall", ABSENT_ERROR},
-    {"", "collectgarbage", "the host manages memory"},
-    {"", "getmetatable", ABSENT_META},
-    {"", "setmetatable", ABSENT_META},
-    {"", "io", ABSENT_SYSTEM},
-    {"", "os", ABSENT_SYSTEM},
-    {"", "package", ABSENT_SYSTEM},
-    {"", "debug", ABSENT_SYSTEM},
-    {LUA_STRLIBNAME, "find", ABSENT_PATTERN},
-    {LUA_STRLIBNAME, "match", ABSENT_PATTERN},
-    {LUA_STRLIBNAME, "gmatch", ABSENT_PATTERN},
-    {LUA_STRLIBNAME, "gsub", ABSENT_PATTERN},
-};
-
-// The __index of the global, string and math tables. A name the sandbox leaves out raises an
-// error that says why, where a plain nil would end in "attempt to call a nil value"; any other
-// missing name is still nil.
-static int _absent(lua_State* lua)
-{
-    if (lua_type(lua, 2) != LUA_TSTRING) return 0;
-    auto library = lua_tostring(lua, lua_upvalueindex(1));
-    auto name = lua_tostring(lua, 2);
-    for (auto& absent : ABSENT) {
-        if (std::strcmp(absent.library, library) != 0 || std::strcmp(absent.name, name) != 0) continue;
-        if (*library) return luaL_error(lua, "%s.%s is not available in viscript scripts: %s", library, name, absent.reason);
-        return luaL_error(lua, "%s is not available in viscript scripts: %s", name, absent.reason);
-    }
-    return 0;
-}
-
-// The factories an optional module adds to the scene and object handles. Until the module
-// adds one, as in a build without it, calling it stops the script with the build option.
-struct LuaModuleMethod
-{
-    const char* name;
-    const char* module;
-};
-
-static constexpr LuaModuleMethod MODULE_METHODS[] = {
-    {"tex", "tex"},
-};
-
-static int _moduleMethod(lua_State* lua)
-{
-    auto name = lua_tostring(lua, lua_upvalueindex(1));
-    auto module = lua_tostring(lua, lua_upvalueindex(2));
-    return luaL_error(lua, "%s needs the %s module: build viscript with -Dmodules=%s", name, module, module);
-}
-
-// Removes the absent names of library from the table on top of the stack and guards it.
-static void _guard(lua_State* lua, const char* library)
-{
-    for (auto& absent : ABSENT) {
-        if (std::strcmp(absent.library, library) != 0) continue;
-        lua_pushnil(lua);
-        lua_setfield(lua, -2, absent.name);
-    }
-    lua_createtable(lua, 0, 2);
-    lua_pushstring(lua, library);
-    lua_pushcclosure(lua, _absent, 1);
-    lua_setfield(lua, -2, "__index");
-    lua_pushliteral(lua, "protected");
-    lua_setfield(lua, -2, "__metatable");
-    lua_setmetatable(lua, -2);
-}
-
-// math.randomseed(x [, y]) starts math.random over from the seed of the integers x and y, 0 by
-// default, as Lua's own does, so a scene picks its numbers and every platform draws the same
-// ones. Without a seed Lua's would read the clock, so a call must give one.
-static int _randomSeed(lua_State* lua)
-{
-    if (lua_isnoneornil(lua, 1)) {
-        return luaL_error(lua, "math.randomseed needs a seed, such as math.randomseed(42), so that every "
-                               "render of a scene matches");
-    }
-    auto first = luaL_checkinteger(lua, 1);
-    auto second = luaL_optinteger(lua, 2, 0);
-    lua_pushvalue(lua, lua_upvalueindex(1));
-    lua_pushinteger(lua, first);
-    lua_pushinteger(lua, second);
-    lua_call(lua, 2, 2);
-    return 2;
-}
-
 static int _open(lua_State* lua)
 {
-    lua_newtable(lua);
-    lua_createtable(lua, 0, 1);
-    lua_pushliteral(lua, "v");
-    lua_setfield(lua, -2, "__mode");
-    lua_setmetatable(lua, -2);
-    lua_setfield(lua, LUA_REGISTRYINDEX, HANDLE_REGISTRY);
-    lua_newtable(lua);
-    lua_createtable(lua, 0, 1);
-    lua_pushliteral(lua, "k");
-    lua_setfield(lua, -2, "__mode");
-    lua_setmetatable(lua, -2);
-    lua_setfield(lua, LUA_REGISTRYINDEX, CODE_REGISTRY);
-    lua_newtable(lua);
-    lua_createtable(lua, 0, 1);
-    lua_pushliteral(lua, "k");
-    lua_setfield(lua, -2, "__mode");
-    lua_setmetatable(lua, -2);
-    lua_setfield(lua, LUA_REGISTRYINDEX, PLOT_REGISTRY);
-    lua_newtable(lua);
-    lua_setfield(lua, LUA_REGISTRYINDEX, SPAN_PART_REGISTRY);
-
-    _library(lua, LUA_GNAME, luaopen_base);
-    _library(lua, LUA_TABLIBNAME, luaopen_table);
-    _library(lua, LUA_STRLIBNAME, luaopen_string);
-    _library(lua, LUA_MATHLIBNAME, luaopen_math);
-    _library(lua, LUA_UTF8LIBNAME, luaopen_utf8);
-
-    // math.random starts from the seed 0 in every run, and math.randomseed takes only a seed.
-    lua_getglobal(lua, LUA_MATHLIBNAME);
-    lua_getfield(lua, -1, "randomseed");
-    lua_pushvalue(lua, -1);
-    lua_pushinteger(lua, 0);
-    lua_call(lua, 1, 0);
-    lua_pushcclosure(lua, _randomSeed, 1);
-    lua_setfield(lua, -2, "randomseed");
-    _guard(lua, LUA_MATHLIBNAME);
-    lua_pop(lua, 1);
-
-    lua_pushcfunction(lua, _toString);
-    lua_setglobal(lua, "tostring");
-    lua_getglobal(lua, LUA_STRLIBNAME);
-    lua_getfield(lua, -1, "format");
-    lua_pushcclosure(lua, _format, 1);
-    lua_setfield(lua, -2, "format");
-    _guard(lua, LUA_STRLIBNAME);
-    lua_pop(lua, 1);
-
-    luaL_newmetatable(lua, OBJECT_METATABLE);
-    lua_pushcfunction(lua, _objectGc);
-    lua_setfield(lua, -2, "__gc");
-    lua_pushliteral(lua, "protected");
-    lua_setfield(lua, -2, "__metatable");
-    lua_newtable(lua);
-    luaL_setfuncs(lua, OBJECT_METHODS, 0);
-    lua_setfield(lua, -2, "__index");
-    lua_pop(lua, 1);
-
-    luaL_newmetatable(lua, SPACE_METATABLE);
-    lua_pushcfunction(lua, _objectGc);
-    lua_setfield(lua, -2, "__gc");
-    lua_pushliteral(lua, "vis.Space");
-    lua_setfield(lua, -2, "__name");
-    lua_pushliteral(lua, "protected");
-    lua_setfield(lua, -2, "__metatable");
-    lua_newtable(lua);
-    luaL_setfuncs(lua, OBJECT_METHODS, 0);
-    luaL_setfuncs(lua, SPACE_METHODS, 0);
-    lua_setfield(lua, -2, "__index");
-    lua_pop(lua, 1);
-
-    luaL_newmetatable(lua, GROUP_METATABLE);
-    lua_pushcfunction(lua, _objectGc);
-    lua_setfield(lua, -2, "__gc");
-    lua_pushliteral(lua, "vis.Group");
-    lua_setfield(lua, -2, "__name");
-    lua_pushliteral(lua, "protected");
-    lua_setfield(lua, -2, "__metatable");
-    lua_newtable(lua);
-    luaL_setfuncs(lua, OBJECT_METHODS, 0);
-    luaL_setfuncs(lua, GROUP_METHODS, 0);
-    lua_setfield(lua, -2, "__index");
-    lua_pop(lua, 1);
-
-    luaL_newmetatable(lua, SCENE_METATABLE);
-    lua_pushcfunction(lua, _sceneGc);
-    lua_setfield(lua, -2, "__gc");
-    lua_pushliteral(lua, "vis.Scene");
-    lua_setfield(lua, -2, "__name");
-    lua_pushliteral(lua, "protected");
-    lua_setfield(lua, -2, "__metatable");
-    lua_newtable(lua);
-    luaL_setfuncs(lua, SCENE_METHODS, 0);
-    lua_setfield(lua, -2, "__index");
-    lua_pop(lua, 1);
-
-    luaL_newmetatable(lua, VIEW_METATABLE);
-    lua_pushliteral(lua, "vis.View");
-    lua_setfield(lua, -2, "__name");
-    lua_pushliteral(lua, "protected");
-    lua_setfield(lua, -2, "__metatable");
-    lua_newtable(lua);
-    luaL_setfuncs(lua, VIEW_METHODS, 0);
-    lua_setfield(lua, -2, "__index");
-    lua_pop(lua, 1);
-
-    for (auto& method : MODULE_METHODS) {
-        for (auto handle : {detail::LuaHandle::Scene, detail::LuaHandle::Object}) {
-            lua_pushstring(lua, method.name);
-            lua_pushstring(lua, method.module);
-            lua_pushcclosure(lua, _moduleMethod, 2);
-            detail::luaSetMethod(lua, handle, method.name);
-        }
-    }
-
-    lua_newtable(lua);
-    lua_pushcfunction(lua, _sceneGen);
-    lua_setfield(lua, -2, "scene");
-    lua_pushcfunction(lua, _springResponse);
-    lua_setfield(lua, -2, "spring_response");
-    lua_pushcfunction(lua, _merge);
-    lua_setfield(lua, -2, "merge");
-    lua_pushcfunction(lua, _keys);
-    lua_setfield(lua, -2, "keys");
-    lua_setglobal(lua, "vis");
-
-    if (luaL_loadbuffer(lua, TRACKER_PRELUDE, std::strlen(TRACKER_PRELUDE), "=tracker") != LUA_OK) {
-        return lua_error(lua);
-    }
-    luaL_getmetatable(lua, SCENE_METATABLE);
-    lua_getfield(lua, -1, "__index");
-    lua_remove(lua, -2);
-    lua_pushcfunction(lua, _trackerEase);
-    lua_pushcfunction(lua, _trackerSettle);
-    lua_pushcfunction(lua, _trackerFps);
-    lua_pushcfunction(lua, _trackerUnknown);
-    lua_pushcfunction(lua, _trackerWhere);
-    lua_pushcfunction(lua, _trackerPending);
-    lua_call(lua, 7, 1);
-    lua_setfield(lua, LUA_REGISTRYINDEX, TRACKER_FLUSH);
-    // Last, so the preludes above read globals without the guard.
-    lua_pushglobaltable(lua);
-    _guard(lua, "");
-    lua_pop(lua, 1);
-    return 0;
+    static const detail::LuaApi api = {
+        FACTORY_METHODS, SCENE_METHODS, OBJECT_METHODS, GROUP_METHODS, SPACE_METHODS, VIEW_METHODS,
+        _sceneGc, _objectGc, _sceneGen, _springResponse,
+        _trackerEase, _trackerSettle, _trackerFps, _trackerUnknown, _trackerWhere, _trackerPending,
+    };
+    return detail::luaOpenApi(lua, api);
 }
 
 bool detail::luaAuthoring(lua_State* lua) noexcept

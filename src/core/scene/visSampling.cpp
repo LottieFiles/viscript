@@ -45,22 +45,6 @@ float Range::stepAt(uint32_t index) const noexcept
     return _stepAt(*this, index, steps());
 }
 
-// Adds to group the rectangle over left to right that stands on y = 0 and is as tall as height.
-static Result _riemannBar(Group* group, float left, float right, float height)
-{
-    auto width = static_cast<float>(static_cast<double>(right) - left);
-    // A step too narrow for its ends to differ as floats has nothing to draw.
-    if (!(width > 0.0f) || !std::isfinite(width)) return Result::InvalidArguments;
-    // A height of zero leaves a flat rectangle, so that every step keeps its place.
-    auto size = std::fmax(std::fabs(height), width * 1.0e-6f);
-    auto center = static_cast<float>((static_cast<double>(left) + right) * 0.5);
-    auto bar = Rectangle::gen({center, height * 0.5f, 0.0f}, {width, size});
-    if (!bar) return Result::OutOfMemory;
-    auto result = group->add(bar);
-    if (result != Result::Success) delete bar;
-    return result;
-}
-
 // The rectangles of a Riemann sum over the steps of x, as tall as heights gives them or, when
 // heights is nullptr, as fn where sample reads it.
 static Result _riemann(const Range& x, uint32_t steps, const float* heights, FunctionSampler fn,
@@ -68,6 +52,19 @@ static Result _riemann(const Range& x, uint32_t steps, const float* heights, Fun
 {
     auto group = Group::gen();
     if (!group) return Result::OutOfMemory;
+    auto bar = [group](float left, float right, float height) {
+        auto width = static_cast<float>(static_cast<double>(right) - left);
+        // A step too narrow for its ends to differ as floats has nothing to draw.
+        if (!(width > 0.0f) || !std::isfinite(width)) return Result::InvalidArguments;
+        // A height of zero leaves a flat rectangle, so that every step keeps its place.
+        auto size = std::fmax(std::fabs(height), width * 1.0e-6f);
+        auto center = static_cast<float>((static_cast<double>(left) + right) * 0.5);
+        auto rectangle = Rectangle::gen({center, height * 0.5f, 0.0f}, {width, size});
+        if (!rectangle) return Result::OutOfMemory;
+        auto result = group->add(rectangle);
+        if (result != Result::Success) delete rectangle;
+        return result;
+    };
     // Where in its step a rectangle reads fn, as a share of the step from its left end.
     auto share = sample == RiemannSample::Right ? 1.0f : sample == RiemannSample::Midpoint ? 0.5f : 0.0f;
     auto result = Result::Success;
@@ -78,7 +75,7 @@ static Result _riemann(const Range& x, uint32_t steps, const float* heights, Fun
         if (!heights && (!fn(left + (right - left) * share, height, data) || !std::isfinite(height))) {
             result = Result::InvalidArguments;
         }
-        if (result == Result::Success) result = _riemannBar(group, left, right, height);
+        if (result == Result::Success) result = bar(left, right, height);
     }
     if (result != Result::Success) {
         delete group;
