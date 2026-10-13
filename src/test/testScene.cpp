@@ -1796,8 +1796,8 @@ static void dimensionTransition(SwRenderer* renderer)
     auto interactive = Scene::gen(config);
     CHECK(interactive != nullptr);
     if (interactive) {
-        CHECK(interactive->camera({CameraAction::View3D, {}}) == Result::NonSupport);
-        CHECK(interactive->camera({CameraAction::Orbit, {0.1f, -0.05f}})
+        CHECK(interactive->cameraInput({CameraAction::View3D, {}}) == Result::NonSupport);
+        CHECK(interactive->cameraInput({CameraAction::Orbit, {0.1f, -0.05f}})
               == Result::NonSupport);
         CHECK(interactive->look(spatialCamera, CameraView::ThreeD) == Result::InsufficientCondition);
     }
@@ -1983,12 +1983,12 @@ static void runtimeModifiers(SwRenderer* renderer)
         CHECK(scene->add(object) == Result::Success);
         CHECK(scene->runtime(&modifier) == Result::Success);
         auto invalidAction = CameraInput{static_cast<CameraAction>(255u), {}};
-        CHECK(scene->camera(invalidAction) == Result::InvalidArguments);
-        CHECK(scene->camera({CameraAction::Pan,
+        CHECK(scene->cameraInput(invalidAction) == Result::InvalidArguments);
+        CHECK(scene->cameraInput({CameraAction::Pan,
                              {std::numeric_limits<float>::quiet_NaN(), 0.0f}})
               == Result::InvalidArguments);
         CHECK(probe.inputs == 0u);
-        CHECK(scene->camera({CameraAction::Pan, {0.1f, 0.0f}}) == Result::Success);
+        CHECK(scene->cameraInput({CameraAction::Pan, {0.1f, 0.0f}}) == Result::Success);
         CHECK(probe.inputs == 1u);
 
         Surface surface;
@@ -2035,10 +2035,10 @@ static void runtimeModifiers(SwRenderer* renderer)
         CHECK(renderer->render(scene, 0.0f, surface) == Result::Success);
         CHECK(probe.objects == 1u && secondProbe.objects == 1u);
         CHECK(probe.cameras == 1u && secondProbe.cameras == 1u);
-        CHECK(scene->camera({CameraAction::Pan, {0.1f, 0.0f}}) == Result::Success);
+        CHECK(scene->cameraInput({CameraAction::Pan, {0.1f, 0.0f}}) == Result::Success);
         CHECK(probe.inputs == 1u && secondProbe.inputs == 0u);
         CHECK(scene->runtimeRemove(&probe) == Result::Success);
-        CHECK(scene->camera({CameraAction::Pan, {0.1f, 0.0f}}) == Result::Success);
+        CHECK(scene->cameraInput({CameraAction::Pan, {0.1f, 0.0f}}) == Result::Success);
         CHECK(secondProbe.inputs == 1u);
         CHECK(scene->runtimeRemove(&probe) == Result::InsufficientCondition);
     } else {

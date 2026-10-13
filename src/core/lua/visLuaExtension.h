@@ -3,6 +3,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <initializer_list>
 
 #include "vis.h"
 
@@ -40,6 +41,9 @@ void luaClose(lua_State* lua) noexcept;
 Scene* luaScene(lua_State* lua, int index);
 Object* luaObject(lua_State* lua, Scene* scene, int index);
 AnimCurve luaAnimCurve(lua_State* lua, int index);
+// Expands a named timing table into the existing positional call without changing the table.
+bool luaTiming(lua_State* lua, int index, int options = 0, bool stagger = false,
+               std::initializer_list<const char*> fields = {});
 using LuaObjectTransfer = void (*)(void* data) noexcept;
 // The optional transfer callback runs only after a protected Lua owner exists.
 // It lets a module relinquish a detached builder tree without leaking on Lua OOM

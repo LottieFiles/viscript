@@ -14,6 +14,17 @@ extern "C" {
 namespace vis
 {
 
+static int _trackTiming(lua_State* lua)
+{
+    detail::luaTiming(lua, 1);
+    lua_createtable(lua, 2, 0);
+    lua_pushvalue(lua, 1);
+    lua_rawseti(lua, -2, 1);
+    lua_pushvalue(lua, 2);
+    lua_rawseti(lua, -2, 2);
+    return 1;
+}
+
 static int _toString(lua_State* lua)
 {
     switch (lua_type(lua, 1)) {
@@ -390,7 +401,8 @@ int detail::luaOpenApi(lua_State* lua, const LuaApi& api)
     lua_pushcfunction(lua, api.trackerUnknown);
     lua_pushcfunction(lua, api.trackerWhere);
     lua_pushcfunction(lua, api.trackerPending);
-    lua_call(lua, 7, 1);
+    lua_pushcfunction(lua, _trackTiming);
+    lua_call(lua, 8, 1);
     lua_setfield(lua, LUA_REGISTRYINDEX, TRACKER_FLUSH);
     // Last, so the preludes above read globals without the guard.
     lua_pushglobaltable(lua);

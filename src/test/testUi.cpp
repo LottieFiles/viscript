@@ -859,12 +859,12 @@ static void cameraBindings(SwRenderer* renderer)
     auto interactive = Scene::gen(inputConfig);
     CHECK(interactive != nullptr);
     if (interactive) {
-        CHECK(interactive->camera({CameraAction::View3D, {}}) == Result::NonSupport);
+        CHECK(interactive->cameraInput({CameraAction::View3D, {}}) == Result::NonSupport);
         auto inputPanel = Panel::gen(interactive);
         CHECK(inputPanel != nullptr);
-        CHECK(interactive->camera({CameraAction::View3D, {}}) == Result::Success);
+        CHECK(interactive->cameraInput({CameraAction::View3D, {}}) == Result::Success);
         CHECK(interactive->view(0.0f) == CameraView::ThreeD);
-        CHECK(interactive->camera({CameraAction::Orbit, {0.1f, -0.05f}})
+        CHECK(interactive->cameraInput({CameraAction::Orbit, {0.1f, -0.05f}})
               == Result::Success);
     }
     delete interactive;

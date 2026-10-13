@@ -448,7 +448,7 @@ local music = vis.audio.cue(scene, {
     asset = "music.wav", bus = "music", begin = 0, ["end"] = 4,
     gain = 0.8, loop = true,
 })
-music:gain(0.2, 1, 1, "linear")
+music:gain(0.2, 1, {duration = 1, curve = "linear"})
 return scene
 )";
     Scene* scene = nullptr;

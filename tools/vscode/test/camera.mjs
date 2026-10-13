@@ -20,12 +20,17 @@ return scene
 
 assert.equal(interactive.cameraMode, "interactive");
 assert.equal(interactive.cameraView, "2d");
-assert.equal(interactive.camera("pan", 0.1, -0.1), true);
-assert.equal(interactive.camera("zoom", 0, -0.1), true);
-assert.equal(interactive.camera("view3d"), true);
+assert.equal(interactive.camera, undefined);
+assert.throws(() => interactive.cameraInput("unknown"), TypeError);
+assert.throws(() => interactive.cameraInput("pan", NaN, 0), TypeError);
+assert.equal(interactive.cameraInput("pan", 0.1, -0.1), true);
+assert.equal(interactive.cameraInput("zoom", 0, -0.1), true);
+assert.equal(interactive.cameraInput("view3d"), true);
 assert.equal(interactive.cameraView, "3d");
-assert.equal(interactive.camera("orbit", 0.1, 0.1), true);
-assert.equal(interactive.camera("reset"), true);
+assert.equal(interactive.cameraInput("orbit", 0.1, 0.1), true);
+assert.equal(interactive.cameraInput("view2d"), true);
+assert.equal(interactive.cameraView, "2d");
+assert.equal(interactive.cameraInput("reset"), true);
 if (interactive.input) {
     const baseInput = {
         x: 0,
@@ -58,7 +63,7 @@ interactive.destroy();
 
 const fixed = await createVis("return vis.scene {width = 16, height = 16}", "fixed-camera.lua", {wasmBinary});
 assert.equal(fixed.cameraMode, "fixed");
-assert.equal(fixed.camera("pan", 0.1, 0), false);
+assert.equal(fixed.cameraInput("pan", 0.1, 0), false);
 fixed.destroy();
 
 console.log("interactive camera controls passed");

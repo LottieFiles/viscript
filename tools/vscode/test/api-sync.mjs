@@ -152,7 +152,19 @@ assertConfig("RuntimeConfig", optionNames(runtimeBinding, "_newRuntime"), ["upda
 assertConfig("RuntimeObjectState", optionNames(runtimeBinding, "_objectState"), []);
 assertConfig("RuntimeSoundConfig", optionNames(runtimeBinding, "_sound"), []);
 assertConfig("MotionState", optionNames(motionBinding, "_state"), []);
-assertConfig("MotionTarget", optionNames(motionBinding, "_transitionMany"), ["object", "state"]);
+assertConfig("MotionTarget", optionNames(motionBinding, "_transition"), ["object", "state"]);
+assert.deepEqual(api.methods.MotionController.transition.overloads[0], {
+    parameters: [{name: "targets", type: "MotionTarget[]"}, {name: "duration", type: "number", optional: true}, {name: "curve", type: "Curve", optional: true}],
+    returns: "MotionController",
+});
+assert.deepEqual(api.methods.MotionController.transition.overloads.slice(1).map((overload) => overload.parameters), [
+    [{name: "object", type: "Object"}, {name: "state", type: "string"}, {name: "options", type: "TimingOptions"}],
+    [{name: "targets", type: "MotionTarget[]"}, {name: "options", type: "TimingOptions"}],
+]);
+for (const [name, base] of Object.entries(api.configBases)) {
+    assert.ok(api.configs[name] && api.configs[base], `Unknown timing config inheritance: ${name}`);
+    for (const key of Object.keys(api.configs[base])) assert.ok(api.configs[name][key], `Missing ${name}.${key}`);
+}
 
 const meta = fs.readFileSync(path.join(extensionRoot, "api", "vis.d.lua"), "utf8");
 for (const name of sceneMethods) assert.match(meta, new RegExp(`function Scene:${name}\\(`));
@@ -179,6 +191,7 @@ for (const config of [
 ]) assert.match(meta, new RegExp(`---@class vis\\.${config}`));
 assert.match(meta, /function Library\.motion\(scene\)/);
 for (const name of motionMethods) assert.match(meta, new RegExp(`function MotionController:${name}\\(`));
+assert.match(meta, /---@overload fun\(self: vis\.MotionController, targets: vis\.MotionTarget\[\], duration\?: number, curve\?: vis\.Curve\): vis\.MotionController/);
 for (const config of ["MotionState", "MotionTarget", "MotionCurveRecord", "MotionEvent"]) {
     assert.match(meta, new RegExp(`---@class vis\\.${config}`));
 }

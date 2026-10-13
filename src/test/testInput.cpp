@@ -520,7 +520,7 @@ static void camera()
     auto controller = Controller::gen(scene);
     CHECK(scene && controller);
     if (scene && controller) {
-        CHECK(scene->camera({CameraAction::Pan, {0.1f, 0.0f}}) == Result::Success);
+        CHECK(scene->cameraInput({CameraAction::Pan, {0.1f, 0.0f}}) == Result::Success);
         CHECK(controller->cameraView(CameraView::ThreeD) == Result::Success);
         CHECK(controller->cameraOrbit({0.1f, -0.05f}) == Result::Success);
         CHECK(controller->cameraZoom(-0.1f) == Result::Success);

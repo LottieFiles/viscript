@@ -35,13 +35,13 @@ Scene and Object handles share child factories. The receiver becomes the parent.
 | `group` | `matrix`, `typeset` |
 | `space` | `x`, `y`, `z`, axis/grid style, `ticks`, `labels` |
 | `point` | `point`, pixel `radius` |
-| `line`, `arrow` | `from`, `to`, `buff`; arrow `tail`, `tip` |
-| `vector` | `value`, `origin`, `buff`, `tail`, `tip` |
+| `line`, `arrow` | `from`, `to`, `trim_distance`; arrow `tail`, `tip` |
+| `vector` | `value`, `origin`, `trim_distance`, `tail`, `tip` |
 | `circle` | `center`, world-unit `radius` |
 | `arc` | `center`, `radius`, `start`, `angle`, `sector` |
 | `angle` | `vertex`, `from`, `to`, `radius`, `other`, `right`, `label` |
 | `rectangle` | `center`, `size`, `corner`, or `around`, `padding` |
-| `brace` | `around`, or `from` and `to`; `direction`, `buff`, `depth`, `label`, `gap` |
+| `brace` | `around`, or `from` and `to`; `direction`, `offset`, `depth`, `label`, `gap` |
 | `polygon`, `route` | ordered `points`; route `tail`, `tip` |
 | `path` | move/line/quadratic/cubic/close `commands` |
 | `curve` | `from`, `control1`, `control2`, `to`, `samples` |
@@ -65,7 +65,7 @@ Scene and Object handles share child factories. The receiver becomes the parent.
 
 Style options include `id`, `stroke`, `fill`, `width`, `opacity`, `progress`, `layer`, `gradient`, `dash`, `dash_offset`, `isolate`, `mask`, `blend`, `blur`, and `shadow`. Groups pass their stroke, fill, and width to descendant shapes. `isolate = true` composites a family as one picture. A mask selects another object's alpha or luma, with inverse modes available.
 
-A connector follows sampled endpoint outlines and uses bounds when no closed outline crosses its center ray. `padding` adds world distance beyond each outline. `buff` trims a line, arrow, or vector: one number trims both ends; `{start, finish}` sets separate distances. Arrow and route markers stay solid when their shafts are dashed.
+A connector follows sampled endpoint outlines and uses bounds when no closed outline crosses its center ray. `padding` adds world distance beyond each outline. `trim_distance` trims a line, arrow, or vector: one number trims both ends; `{start, finish}` sets separate distances. Arrow and route markers stay solid when their shafts are dashed.
 
 `object:label{...}` creates a child Text. Set its point, align, and layer explicitly. `scene:bounds(handle_or_list)` returns `left`, `right`, `bottom`, `top`, `width`, `height`, `center`, `min`, and `max` in world units. Use `rectangle{around = handles}` for a frame, or `brace{around = handles, label = "term"}` for an annotation; brace returns both the path and label.
 
@@ -134,13 +134,24 @@ Use `move_to`, `next_to`, `align_to`, `arrange`, and `arrange_grid` for initial 
 
 Most timeline calls take duration and curve, then advance the cursor. `wait` holds, `seek` moves the authoring cursor, `mark` names a time, and `at` authors at a time while restoring the previous cursor. `parallel` starts branches at the same cursor.
 
+Animation calls share a timing table with `duration` and `curve`. Calls that stagger targets also accept `lag`. Reuse the same table across calls:
+
+```lua
+local timing = {duration = 0.6, curve = "ease_in_out"}
+scene:shift(ball, {2, 0}, timing)
+scene:rotate(ball, math.pi / 2, timing)
+scene:create({ball, label}, {duration = 0.6, curve = "smooth", lag = 0.15})
+```
+
+Positional duration and curve calls remain supported.
+
 | Purpose | Calls |
 |---|---|
 | Draw/reveal | `create`, `uncreate`, `fill_reveal`, `draw_border_then_fill`, `write` |
 | Fade/grow | `fade_in`, `fade_out`, `grow_from_center`, `grow_from_edge`, `shrink_to_center` |
 | Emphasize | `indicate`, `wiggle`, `circumscribe`, `passing_flash`, `flash`, `ripple` |
 | Move/style | `shift`, `rotate`, `scale`, `transform`, `move_along`, `fade`, `stroke`, `fill` |
-| Replace | `morph`, `replacement_transform`, `fade_transform`, `match_transform`, `transition` |
+| Replace | `morph`, `fade_transform`, `match_transform`, `transition` |
 | State | `play`, `set`, `save`, `restore`, `clone`, `warp`, `remove` |
 
 `play` accepts one descriptor or a list. Each names `target` and properties such as shift, transform, opacity, colors, points, text, value, and layer. `lag` offsets successive targets. `set` applies a state immediately; `save` and `restore` keep a stack of states per target.
@@ -160,9 +171,9 @@ Text changes interpolate characters. `retype = true` erases to the shared prefix
 
 A curve can be a preset (`"linear"`, `"smooth"`, `"gentle"`, `"ease_in_out"`, and others), a cubic Bézier table, or a preset table with strength and reverse settings. A table such as `{preset = "back", strength = 0.6}` tunes a preset; `{bezier = {x1, y1, x2, y2}, strength = 1}` defines a custom curve.
 
-`morph` resamples outlines and hands ownership to the target. Multi-piece paths pair automatically; explicit one-based contour `pairs` override selected matches. `{copy = true}` preserves the source. `clone` snapshots an object's current family, with an optional parent, ID, style, and world shift.
+`morph` resamples outlines to turn the source into the target. Multi-piece paths pair automatically; explicit one-based contour `pairs` override selected matches. `{copy = true}` preserves the source. `clone` snapshots an object's current family, with an optional parent, ID, style, and world shift.
 
-`fade_transform` replaces an identity by cross-fading; `transition` cross-fades without consuming handles. `match_transform` carries matching text, TeX, and optional shapes between objects. Options include `pairs`, `strings`, `diff`, `shapes`, `fade`, `lag`, `arc`, `path`, and `copy`. Create the target immediately before a replacement.
+`fade_transform` cross-fades source into target; `transition` cross-fades without consuming handles. `match_transform` carries matching text, TeX, and optional shapes between objects. Options include `pairs`, `strings`, `diff`, `shapes`, `fade`, `lag`, `arc`, `path`, and `copy`.
 
 `warp` maps authored points in each target's parent space. It subdivides straight segments using `step` before bending them. Geometry stays warped after the animation, so later bounds, cloning, and motion paths use its new outline.
 

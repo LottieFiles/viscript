@@ -2,6 +2,8 @@ import {
     createVis,
     vis,
     type AnimCurve,
+    type AnimationOptions,
+    type TimingOptions,
     type AudioCueHandle,
     type AnimationSpec,
     type BBox,
@@ -170,14 +172,14 @@ const morphSource = definition.polygon({points: [[-1, -1], [1, -1], [0, 1]]});
 const morphTarget = definition.polygon({points: [[-1, 0], [1, -1], [1, 1]]});
 definition.morph(morphSource, morphTarget, 0.8, "ease_in_out");
 const morphReplacement = definition.polygon({points: [[-1, -1], [1, 0], [-1, 1]]});
-definition.replacementTransform(morphTarget, morphReplacement, 0.8, "ease_in_out");
+definition.morph(morphTarget, morphReplacement, 0.8, "ease_in_out");
 const fadeTarget = definition.text({text: "result", point: [0, 0]});
 definition.fadeTransform(morphReplacement, fadeTarget, 0.25, "gentle");
 const batchSource = definition.plot({points: [[-1, 0], [0, 1], [1, 0]]});
 const batchTarget = definition.plot({points: [[-1, 0], [0, -1], [1, 0]]});
 definition.morph([batchSource], [batchTarget], 0.8, "ease_in_out", 0.1);
 definition.morph(batchSource, batchTarget, 1, "linear", {pairs: [[1, 1]], copy: true});
-definition.replacementTransform([batchSource], [batchTarget], 0.8, "smooth", {lag: 0.1, copy: true});
+definition.morph([batchSource], [batchTarget], 0.8, "smooth", {lag: 0.1, copy: true});
 // @ts-expect-error copy is a boolean.
 definition.morph(morphSource, morphTarget, 0.8, "smooth", {copy: 1});
 definition.transform(arrow, matrix, 1.2, "ease_in_out").wait(0.2);
@@ -199,7 +201,20 @@ const rectangle: ObjectHandle = group.rectangle(rectangleOptions);
 const label = rectangle.label({text: "node", point: [-1, 0]});
 const sibling = group.circle({center: [1, 0], radius: 0.5});
 const connector = group.connector(rectangle, sibling, {padding: 0.1, tail: 8, tip: 12, stroke: "#e9c46a"});
-const [brace, braceLabel] = group.brace({around: [rectangle, sibling], buff: 0.1, label: "nodes", size: 0.3});
+const [brace, braceLabel] = group.brace({around: [rectangle, sibling], offset: 0.1, label: "nodes", size: 0.3});
+const trimmedLine = definition.line({from: [0, 0], to: [4, 0], trimDistance: [0.5, 1]});
+definition.arrow({from: [0, 0], to: [4, 0], trimDistance: 0.5});
+definition.vector({value: [4, 0], trimDistance: [1, 0.5]});
+definition.set({target: trimmedLine, trimDistance: 0.25});
+definition.play({target: trimmedLine, trimDistance: [0.5, 0.25]}, {duration: 1});
+// @ts-expect-error Endpoint distances are a number or a pair.
+definition.line({from: [0, 0], to: [4, 0], trimDistance: [1, 2, 3]});
+// @ts-expect-error Endpoint trimming uses trimDistance.
+definition.line({from: [0, 0], to: [4, 0], buff: 1});
+// @ts-expect-error Brace spacing uses offset.
+group.brace({around: rectangle, buff: 1});
+// @ts-expect-error Animation endpoint trimming uses trimDistance.
+definition.play({target: trimmedLine, buff: 1});
 const bracing: readonly ObjectHandle[] = [brace, braceLabel];
 group.brace({from: [-1, 0], to: [1, 0], direction: [0, 1], depth: 0.2, gap: 0.1, label: sibling});
 const [, noLabel] = definition.brace({around: rectangle, direction: "left", fill: "#e9c46a", role: "code"});
@@ -567,8 +582,9 @@ definition.clone(rectangle, {size: [1, 1]});
 definition.orbit(Math.PI, {about: [0, 0, 0]});
 definition.focus(rectangle, {padding: 0.3, duration: 0.8, curve: backCurve});
 definition.focus([rectangle, sibling]).focus(null, {duration: 0.5}).focus();
-// @ts-expect-error focus takes curve, not easing.
 definition.focus(rectangle, {easing: "linear"});
+// @ts-expect-error All timing options take one curve spelling at a time.
+definition.focus(rectangle, {easing: "linear", curve: "smooth"});
 // @ts-expect-error padding is a share of the span.
 definition.focus(rectangle, {padding: "wide"});
 definition.look({target: rectangle, height: 3}, 1, "linear");
@@ -729,6 +745,12 @@ async function preview(canvas: HTMLCanvasElement)
 {
     const scene = await createVis(definition, "typed-scene.ts", {renderEngine: "cpu"});
     const renderEngine: RenderEngine = scene.renderEngine;
+    const cameraHandled: boolean = scene.cameraInput("pan", 0.1, 0);
+    void cameraHandled;
+    // @ts-expect-error Runtime camera input accepts defined actions.
+    scene.cameraInput("move");
+    // @ts-expect-error Camera input uses the explicit runtime method name.
+    scene.camera("pan", 0.1, 0);
     const loops: boolean = scene.loop;
     const bounds: BBox = scene.bounds("nodes", 0);
     const overlaps: boolean = scene.intersects("nodes", "target", 0, 4);
@@ -773,3 +795,21 @@ vis.springResponse(1, {displacement: 200});
 vis.springResponse(1, {...physicalSpring, mass: "1"});
 // @ts-expect-error Observation duration belongs to the timeline.
 vis.springResponse(1, {...physicalSpring, duration: 8});
+
+const timing: TimingOptions = {duration: 0.4, curve: "linear"};
+const stagger: AnimationOptions = {...timing, lag: 0.25};
+definition.create([rectangle, sibling], stagger).write(rectangle, {...stagger, direction: "reverse"});
+definition.shift(rectangle, [0, 1], timing).fade(rectangle, 0.3, timing);
+definition.play({target: rectangle, opacity: 0.5}, stagger).restore(rectangle, stagger);
+definition.morph(rectangle, sibling, {...stagger, copy: true});
+definition.matchTransform(rectangle, sibling, {...stagger, copy: true});
+definition.arrange([rectangle, sibling], {...timing, gap: 0.5});
+definition.look({target: rectangle}, timing);
+inset.look({target: rectangle}, timing).fade(0.5, timing);
+music.gain(0.5, 0, timing);
+// @ts-expect-error Simple timing does not stagger one shift.
+definition.shift(rectangle, [0, 1], {duration: 1, lag: 0.2});
+// @ts-expect-error Timing options take one curve spelling at a time.
+definition.create(rectangle, {curve: "linear", easing: "smooth"});
+// @ts-expect-error Named timing goes in the options form, not a positional options tail.
+definition.morph(rectangle, sibling, 1, "linear", {duration: 0.5});

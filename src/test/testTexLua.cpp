@@ -383,7 +383,7 @@ return s
 }
 
 // A brace under a term of a formula reaches from the ink of its first glyph to the ink of its
-// last, buff below the lowest, and its label's ink stands gap below its tip.
+// last, offset below the lowest, and its label's ink stands gap below its tip.
 static void _bracing(SwRenderer* renderer)
 {
     static constexpr char source[] = R"lua(
@@ -391,7 +391,7 @@ local s = vis.scene {width = 800, height = 400, camera = {mode = "fixed", view =
 s:tex {tex = [[x = \frac{-b \pm \sqrt{b^2 - 4ac}}{2a}]], point = {0, 60}, size = 40, id = "eq"}
 local term = {}
 for i = 9, 14 do term[#term + 1] = s:find("eq/" .. i) end
-s:brace {around = term, buff = 8, gap = 3, label = "discriminant", id = "brace"}
+s:brace {around = term, offset = 8, gap = 3, label = "discriminant", id = "brace"}
 return s
 )lua";
     auto scene = _load(source, "tex-brace.lua");

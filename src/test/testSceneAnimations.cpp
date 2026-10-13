@@ -1548,7 +1548,7 @@ void morphAnimations(SwRenderer* renderer)
         auto targetResult = scene->add(target);
         CHECK(sourceResult == Result::Success && targetResult == Result::Success);
         if (sourceResult == Result::Success && targetResult == Result::Success) {
-            CHECK(scene->play(Animation::replacementTransform(source, target), 1.0f,
+            CHECK(scene->play(Animation::morph(source, target), 1.0f,
                               Easing::Linear) == Result::Success);
             CHECK(near(scene->duration(), 1.0f));
             auto targetModel = target->model;

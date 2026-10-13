@@ -162,7 +162,6 @@ export interface SceneTransitionStyleOptions {
 /** A style name, or the style with its options. */
 export type SceneTransitionStyle = SceneTransitionStyleName | SceneTransitionStyleOptions;
 interface SceneTransitionBaseOptions extends SceneTransitionStyleOptions {
-    duration?: number;
     /** Seconds fully shown: one value for all stages, or one per stage. */
     hold?: number | readonly number[];
     /** Play each stage from the start of its incoming transition; false shows final frames. */
@@ -171,9 +170,7 @@ interface SceneTransitionBaseOptions extends SceneTransitionStyleOptions {
     /** One style for each transition, in order, instead of `style`. */
     styles?: readonly SceneTransitionStyle[];
 }
-export type SceneTransitionOptions = SceneTransitionBaseOptions & (
-    {easing?: AnimCurve; curve?: never} | {easing?: never; curve: AnimCurve}
-);
+export type SceneTransitionOptions = SceneTransitionBaseOptions & TimingOptions;
 
 /** A color stop: a bare color (evenly spaced) or an `[offset, color]` pair with offset in 0..1. */
 export type GradientStop = Color | readonly [number, Color];
@@ -244,8 +241,9 @@ export interface GroupOptions extends Omit<Style, "color" | "gradient" | "radius
     /** The texts below the group, at any depth, read as one block of text to the layout audit. */
     typeset?: boolean;
 }
-/** Finite non-negative local buff trims both ends, or [start, end]. A fully trimmed segment is empty. */
-export interface LineOptions extends Style {from: WorldVector; to: WorldVector; buff?: number | [number, number]}
+/** Object-local distances applied before transforms and drawing progress: one number for both
+ * ends, or [start, end]. Values must be finite and nonnegative; a consumed segment is empty. */
+export interface LineOptions extends Style {from: WorldVector; to: WorldVector; trimDistance?: number | [number, number]}
 export interface ArrowOptions extends LineOptions {tail?: number; tip?: number}
 export interface PointOptions extends Style {point: WorldVector}
 export interface TextOptions extends Style {
@@ -456,7 +454,8 @@ export type CodeEdit =
     {remove: CodeLines} |
     {append: string} |
     {prepend: string};
-export interface VectorOptions extends Style {value: WorldVector; origin?: WorldVector; buff?: number | [number, number]; tail?: number; tip?: number}
+/** trimDistance uses the same object-local endpoint distances as LineOptions. */
+export interface VectorOptions extends Style {value: WorldVector; origin?: WorldVector; trimDistance?: number | [number, number]; tail?: number; tip?: number}
 export interface SpaceOptions extends Style {
     x?: Range;
     y?: Range;
@@ -546,7 +545,8 @@ export interface RectangleOptions extends Style {
     /** Space added on every side of around: one number, or [x, y]. Defaults to 0.1. */
     padding?: number | Vec2;
 }
-/** Snapshot filled brace. Buff, depth, and gap default to 0.25, 0.4, and 0.2 text ems in world units. */
+/** Snapshot brace in its joining parent's coordinates. Offset, depth and gap default to 0.25,
+ * 0.4 and 0.2 times the configured text size, converted at the authored camera for billboard text. */
 export interface BraceOptions extends Style {
     /** Objects whose bounds, where the brace joins, it lies beside, on their side facing direction. */
     around?: Handle | readonly Handle[];
@@ -556,8 +556,8 @@ export interface BraceOptions extends Style {
     to?: WorldVector;
     /** Where the brace lies from what it spans, and its tip points: "down" by default for around. */
     direction?: "down" | "up" | "left" | "right" | Vec2;
-    /** Space between what the brace spans and the brace. */
-    buff?: number;
+    /** Nonnegative parent-space distance from the spanned bounds or segment to the brace. */
+    offset?: number;
     /** How far the tip stands out from the ends of the brace. */
     depth?: number;
     /** Set gap off the tip: a string as a text named `<id>/label`, or a handle in the same group moved
@@ -881,6 +881,7 @@ declare const audioCueHandle: unique symbol;
 export interface AudioCueHandle {
     readonly [audioCueHandle]: true;
     gain(value: number, begin: number, duration?: number, curve?: AnimCurve): this;
+    gain(value: number, begin: number, options: TimingOptions): this;
 }
 
 export interface ViewOptions {
@@ -905,11 +906,13 @@ declare const viewHandle: unique symbol;
 export interface ViewHandle {
     readonly [viewHandle]: true;
     look(camera: CameraTarget, duration?: number, curve?: AnimCurve): this;
+    look(camera: CameraTarget, options: TimingOptions): this;
     orbit(radians: number, options?: OrbitOptions): this;
     /** Frame the targets in the view's rectangle with its 2D camera; no target returns to the camera the view opened with. */
     focus(target?: Handle | readonly Handle[] | null, options?: FocusOptions): this;
     /** Fade the whole view; the fades of one view follow one another. */
     fade(opacity: number, duration?: number, curve?: AnimCurve): this;
+    fade(opacity: number, options: TimingOptions): this;
 }
 
 interface FadeEffectOptions {
@@ -917,18 +920,14 @@ interface FadeEffectOptions {
     scale?: number;
     duration?: number;
 }
-export type FadeOptions = FadeEffectOptions & (
-    {easing?: AnimCurve; curve?: never} | {easing?: never; curve: AnimCurve}
-);
+export type FadeOptions = FadeEffectOptions & TimingOptions;
 
 interface IndicateEffectOptions {
     color?: Color;
     scale?: number;
     duration?: number;
 }
-export type IndicateOptions = IndicateEffectOptions & (
-    {easing?: AnimCurve; curve?: never} | {easing?: never; curve: AnimCurve}
-);
+export type IndicateOptions = IndicateEffectOptions & TimingOptions;
 
 interface WiggleEffectOptions {
     /** Peak growth about the bounds center; 1.1 by default. */
@@ -940,9 +939,7 @@ interface WiggleEffectOptions {
     /** Seconds; 2 by default. */
     duration?: number;
 }
-export type WiggleOptions = WiggleEffectOptions & (
-    {easing?: AnimCurve; curve?: never} | {easing?: never; curve: AnimCurve}
-);
+export type WiggleOptions = WiggleEffectOptions & TimingOptions;
 
 interface CircumscribeEffectOptions {
     /** The frame; an ellipse passes through the corners of the padded bounds. */
@@ -958,9 +955,7 @@ interface CircumscribeEffectOptions {
     /** Seconds; 1 by default. */
     duration?: number;
 }
-export type CircumscribeOptions = CircumscribeEffectOptions & (
-    {easing?: AnimCurve; curve?: never} | {easing?: never; curve: AnimCurve}
-);
+export type CircumscribeOptions = CircumscribeEffectOptions & TimingOptions;
 
 interface PassingFlashEffectOptions {
     /** Defaults to the theme's focus color. */
@@ -972,9 +967,7 @@ interface PassingFlashEffectOptions {
     /** Seconds; 1 by default. */
     duration?: number;
 }
-export type PassingFlashOptions = PassingFlashEffectOptions & (
-    {easing?: AnimCurve; curve?: never} | {easing?: never; curve: AnimCurve}
-);
+export type PassingFlashOptions = PassingFlashEffectOptions & TimingOptions;
 
 interface FlashEffectOptions {
     /** Defaults to the theme's focus color. */
@@ -990,9 +983,7 @@ interface FlashEffectOptions {
     /** Seconds; 1 by default. */
     duration?: number;
 }
-export type FlashOptions = FlashEffectOptions & (
-    {easing?: AnimCurve; curve?: never} | {easing?: never; curve: AnimCurve}
-);
+export type FlashOptions = FlashEffectOptions & TimingOptions;
 
 interface RippleEffectOptions {
     /** Defaults to the theme's focus color. */
@@ -1007,9 +998,7 @@ interface RippleEffectOptions {
     duration?: number;
 }
 /** The curve eases the growth, "snappy" by default; the fade runs evenly. */
-export type RippleOptions = RippleEffectOptions & (
-    {easing?: AnimCurve; curve?: never} | {easing?: never; curve: AnimCurve}
-);
+export type RippleOptions = RippleEffectOptions & TimingOptions;
 
 interface AnimationProperties {
     shift: WorldVector;
@@ -1035,8 +1024,9 @@ interface AnimationProperties {
     size: number | Vec2;
     /** A rectangle's corner radius, at most half its shorter side. */
     corner: number;
-    /** Non-negative local distances trimmed from the ends of a line, arrow or vector. */
-    buff: number | [number, number];
+    /** Finite nonnegative object-local endpoint distances for a line, arrow or vector:
+     * one number for both ends, or [start, end]. Warped geometry keeps its existing trim. */
+    trimDistance: number | [number, number];
     /** An end-stop color, or a gradient with the shape's type, stop count and explicit geometry. */
     gradient: Color | GradientOptions;
     /** Gaussian blur sigma in screen pixels, 0 to 256. */
@@ -1121,44 +1111,48 @@ export type BoundState = Partial<Omit<AnimationProperties, "shift" | "transform"
 );
 
 type CurveChoice = {easing?: AnimCurve; curve?: never} | {easing?: never; curve: AnimCurve};
+interface TimingFields {
+    /** Seconds. Omitted values keep the operation's default; restore also accepts zero. */
+    duration?: number;
+}
+export type TimingOptions = TimingFields & CurveChoice;
+export type AnimationOptions = TimingOptions & {
+    /** Each later target starts duration * lag seconds after the previous one. Non-negative. */
+    lag?: number;
+};
+export type RevealOptions = AnimationOptions & {direction?: CreateDirection};
 export type PivotAnchor = "center" | "left" | "right" | "top" | "bottom" |
     "top_left" | "top_right" | "bottom_left" | "bottom_right";
 interface PivotMotionOptions {
     about?: PivotAnchor | WorldVector | Handle;
     shift?: WorldVector;
     arc?: number;
-    duration?: number;
     lag?: number;
 }
-export type RotateOptions = PivotMotionOptions & {axis?: WorldVector} & CurveChoice;
-export type ScaleOptions = PivotMotionOptions & CurveChoice;
+export type RotateOptions = PivotMotionOptions & {axis?: WorldVector} & AnimationOptions;
+export type ScaleOptions = PivotMotionOptions & AnimationOptions;
 /** The axis defaults to the camera's up direction. */
-export type OrbitOptions = {axis?: WorldVector; duration?: number} & CurveChoice;
-export interface FocusOptions {
+export type OrbitOptions = {axis?: WorldVector} & TimingOptions;
+export type FocusOptions = TimingOptions & {
     /** The share of the targets' span left free on each side, 0.15 by default. */
     padding?: number;
-    /** Seconds; 1 by default. */
-    duration?: number;
-    curve?: AnimCurve;
-}
+};
 export type MoveAlongOptions = {
     from?: number;
     to?: number;
     orient?: boolean;
-    duration?: number;
-    lag?: number;
-} & CurveChoice;
+} & AnimationOptions;
 
-export interface ArrangeOptions {
+export type ArrangeOptions = TimingOptions & {
     /** The way the row runs, [1, 0] by default. */
     direction?: WorldVector;
     /** World units between neighbors, 0.25 by default. */
     gap?: number;
     /** Where the middle of the row lands in the items' parent, its origin by default. */
     center?: WorldVector;
-}
+};
 
-export interface MatchOptions {
+export type MatchOptions = AnimationOptions & {
     /**
      * Snapshot outline guide: add its arc-length detour from its endpoint chord to each pair.
      * Keeps individual endpoints and spacing; at most 2048 samples, no live connectors or nonzero arc.
@@ -1166,8 +1160,6 @@ export interface MatchOptions {
     path?: Handle;
     /** Central angle in radians of the arc each traveling piece follows. */
     arc?: number;
-    /** Delays each later piece of either object, as lag does in play. */
-    lag?: number;
     /**
      * Further pairs of pieces. A pair of circles, or of rectangles, travels as one shape; other
      * pieces that are not texts reading the same cross-fade while they travel.
@@ -1196,42 +1188,40 @@ export interface MatchOptions {
     fade?: number;
     /** Match a snapshot copy and preserve the source. Explicit pairs still name source pieces. */
     copy?: boolean;
-}
+};
 
-export interface MorphOptions {
+export type MorphOptions = AnimationOptions & {
     /** Explicit one-based source and target contour indices; remaining pieces pair automatically. */
     pairs?: readonly (readonly [number, number])[];
-    /** Delays each later pair, as lag does in play. */
-    lag?: number;
     /**
      * Morph a copy of each source, made beside it now as clone() makes one, and leave the source
      * in place; one source may then give a copy to several targets.
      */
     copy?: boolean;
-}
+};
 
-export interface EditOptions extends Pick<MatchOptions, "arc" | "lag" | "fade"> {
+export type EditOptions = AnimationOptions & Pick<MatchOptions, "arc" | "fade"> & {
     /** The new block's id; by default the block's id with the first free .2, .3 and so on. */
     id?: string;
-}
+};
 
 export type HighlightOptions = {
     /** The opacity of everything outside the selection, 0.25 by default. */
     dim?: number;
     /** Seconds; 0.5 by default. */
     duration?: number;
-} & CurveChoice;
+} & TimingOptions;
 
 /** Mapping grid in each target's parent space. It must cover all target points and hold at most 65536 samples.
  * Spline interpolation is exact for maps quadratic in x and y. */
-export interface WarpOptions {
+export type WarpOptions = TimingOptions & {
     /** The columns of samples, from min every step until one reaches max. */
     x_range: Range;
     /** The rows of samples, from min every step until one reaches max. */
     y_range: Range;
     /** The longest straight piece mapped without cutting it first, in the parent space of each target; 0.05 by default. */
     step?: number;
-}
+};
 
 export interface SceneBuilder extends ObjectFactory {}
 /** Definitions share Lua budgets: 4096 objects, 65536 clips, 1000000 points, 64 MiB native memory.
@@ -1248,15 +1238,23 @@ export class SceneBuilder {
      * module plays the scene without sound. */
     sound(options: SoundOptions): AudioCueHandle;
     create(target: Handle | readonly Handle[], duration?: number, curve?: AnimCurve, lag?: number, direction?: CreateDirection): this;
+    create(target: Handle | readonly Handle[], options: RevealOptions): this;
     uncreate(target: Handle | readonly Handle[], duration?: number, curve?: AnimCurve, lag?: number, direction?: CreateDirection): this;
+    uncreate(target: Handle | readonly Handle[], options: RevealOptions): this;
     fillReveal(target: Handle | readonly Handle[], duration?: number, curve?: AnimCurve, lag?: number): this;
+    fillReveal(target: Handle | readonly Handle[], options: AnimationOptions): this;
     drawBorderThenFill(target: Handle | readonly Handle[], duration?: number, curve?: AnimCurve, lag?: number, direction?: CreateDirection): this;
+    drawBorderThenFill(target: Handle | readonly Handle[], options: RevealOptions): this;
     write(target: Handle | readonly Handle[], duration?: number, curve?: AnimCurve, lag?: number, direction?: CreateDirection): this;
+    write(target: Handle | readonly Handle[], options: RevealOptions): this;
     fadeIn(target: Handle, options?: FadeOptions): this;
     fadeOut(target: Handle, options?: FadeOptions): this;
     growFromCenter(target: Handle, duration?: number, curve?: AnimCurve): this;
+    growFromCenter(target: Handle, options: TimingOptions): this;
     growFromEdge(target: Handle, edge: GrowthEdge, duration?: number, curve?: AnimCurve): this;
+    growFromEdge(target: Handle, edge: GrowthEdge, options: TimingOptions): this;
     shrinkToCenter(target: Handle, duration?: number, curve?: AnimCurve): this;
+    shrinkToCenter(target: Handle, options: TimingOptions): this;
     /** An array of handles, such as the tokens a search finds, indicates at once. */
     indicate(target: Handle | readonly Handle[], options?: IndicateOptions): this;
     /** Grows the target a little while it turns back and forth, then leaves it as it was. */
@@ -1269,18 +1267,29 @@ export class SceneBuilder {
     flash(target: Handle | readonly [number, number] | readonly [number, number, number], options?: FlashOptions): this;
     /** A ring around the target grows outward while it fades away. */
     ripple(target: Handle, options?: RippleOptions): this;
-    morph(source: Handle | readonly Handle[], target: Handle | readonly Handle[], duration?: number, curve?: AnimCurve, lag?: number | MorphOptions): this;
-    replacementTransform(source: Handle | readonly Handle[], target: Handle | readonly Handle[], duration?: number, curve?: AnimCurve, lag?: number | MorphOptions): this;
+    /** Source draws the interpolated shape until target takes over at completion.
+     * Source then leaves the timeline; copy preserves it by morphing a sampled copy. */
+    morph(source: Handle | readonly Handle[], target: Handle | readonly Handle[], duration?: number, curve?: AnimCurve, lag?: number | Omit<MorphOptions, keyof TimingOptions>): this;
+    morph(source: Handle | readonly Handle[], target: Handle | readonly Handle[], options: MorphOptions): this;
+    /** Cross-fades disjoint families and removes source from the timeline at completion.
+     * Attach target at the cursor without clips; source clips must finish by the fade's end.
+     * Objects remain Scene-owned and can still be sampled at earlier times. */
     fadeTransform(source: Handle, target: Handle, duration?: number, curve?: AnimCurve): this;
-    matchTransform(source: Handle, target: Handle, duration?: number, curve?: AnimCurve, options?: MatchOptions): this;
+    fadeTransform(source: Handle, target: Handle, options: TimingOptions): this;
+    /** Carries matching pieces into a newly attached target. Source must be at rest unless
+     * copy snapshots it. Completion removes source or its temporary copy from the timeline. */
+    matchTransform(source: Handle, target: Handle, duration?: number, curve?: AnimCurve, options?: Omit<MatchOptions, keyof TimingOptions>): this;
+    matchTransform(source: Handle, target: Handle, options: MatchOptions): this;
     /**
      * The code block that block's text becomes after the edits, applied in order, in block's look,
      * place and parent; block turns into it as matchTransform with diff does.
      */
     edit(block: GroupHandle, edits: CodeEdit | readonly CodeEdit[], duration?: number, curve?: AnimCurve,
-        options?: EditOptions): GroupHandle;
+        options?: Omit<EditOptions, keyof TimingOptions>): GroupHandle;
+    edit(block: GroupHandle, edits: CodeEdit | readonly CodeEdit[], options: EditOptions): GroupHandle;
     /** Lays a group's children, or sibling handles in order, one after another; an item added now grows in. */
-    arrange(items: GroupHandle | readonly Handle[], duration?: number, curve?: AnimCurve, options?: ArrangeOptions): this;
+    arrange(items: GroupHandle | readonly Handle[], duration?: number, curve?: AnimCurve, options?: Omit<ArrangeOptions, keyof TimingOptions>): this;
+    arrange(items: GroupHandle | readonly Handle[], options: ArrangeOptions): this;
     /** Children first to last of target, counting from 1, stay at full opacity and the rest of target dims. */
     highlight(target: Handle, first: number, last: number, options?: HighlightOptions): this;
     highlight(target: Handle, first: number, options?: HighlightOptions): this;
@@ -1289,6 +1298,7 @@ export class SceneBuilder {
     /** Brings everything below target back to full opacity. */
     highlight(target: Handle, options?: HighlightOptions): this;
     shift(target: Handle, by: WorldVector, duration?: number, curve?: AnimCurve): this;
+    shift(target: Handle, by: WorldVector, options: TimingOptions): this;
     rotate(target: Handle | readonly Handle[], radians: number, options?: RotateOptions): this;
     scale(target: Handle | readonly Handle[], factor: number | WorldVector, options?: ScaleOptions): this;
     /** Follows a copied outline, or a connector's live trimmed ends. Connector dependencies must not form a cycle. */
@@ -1301,27 +1311,35 @@ export class SceneBuilder {
     warp(target: Handle | readonly Handle[], fn: (x: number, y: number) => readonly [number, number],
         options: WarpOptions): this;
     warp(target: Handle | readonly Handle[], fn: (x: number, y: number) => readonly [number, number],
-        duration: number, curve: AnimCurve | undefined, options: WarpOptions): this;
+        duration: number, curve: AnimCurve | undefined, options: Omit<WarpOptions, keyof TimingOptions>): this;
     transform(target: Handle, matrix: Mat4, duration?: number, curve?: AnimCurve): this;
+    transform(target: Handle, matrix: Mat4, options: TimingOptions): this;
     fade(target: Handle, opacity: number, duration?: number, curve?: AnimCurve): this;
+    fade(target: Handle, opacity: number, options: TimingOptions): this;
     transition(from: Handle | readonly Handle[], to: Handle | readonly Handle[], duration?: number, curve?: AnimCurve): this;
+    transition(from: Handle | readonly Handle[], to: Handle | readonly Handle[], options: TimingOptions): this;
     stroke(target: Handle, color: Color, duration?: number, curve?: AnimCurve): this;
+    stroke(target: Handle, color: Color, options: TimingOptions): this;
     fill(target: Handle, color: Color, duration?: number, curve?: AnimCurve): this;
+    fill(target: Handle, color: Color, options: TimingOptions): this;
     play(specification: AnimationSpec | readonly AnimationSpec[], duration?: number, curve?: AnimCurve, lag?: number): this;
+    play(specification: AnimationSpec | readonly AnimationSpec[], options: AnimationOptions): this;
     /** Applies the values at once: as the starting state before the timeline starts, at the cursor afterwards. */
     set(specification: SetSpec | readonly SetSpec[]): this;
     /**
      * Records the state each target shows now, with the objects below it: transform, opacity,
      * colors, gradient, sizes, layer, a text's string and a number's value. Each target keeps a
-     * stack, so saves nest. Adds no time.
+     * stack, so saves nest. Active text/geometry changes save their destinations. Adds no time.
      */
     save(target: Handle | readonly Handle[]): this;
     /**
      * Takes the newest saved state of each target and brings the target and the objects below it
      * back to it: over duration seconds, each later target lag of the duration later, or at once
-     * when duration is 0, the default.
+     * when duration is 0, the default. Removed descendants stay removed; restores do not undo
+     * warps or switch plain/counting text modes.
      */
     restore(target: Handle | readonly Handle[], duration?: number, curve?: AnimCurve, lag?: number): this;
+    restore(target: Handle | readonly Handle[], options: AnimationOptions): this;
     /** A number for objects to follow, starting at value. */
     tracker(value: number): Tracker;
     /** Bind one object to tracker values and apply its initial state immediately.
@@ -1333,16 +1351,20 @@ export class SceneBuilder {
      * Clips are flushed by animation calls, clone, warp, view, and view-camera calls; tracks cannot
      * merge after a flush. A call exceeding 65536 target segments fails before sampling. */
     track(tracker: Tracker, value: number, duration: number, curve?: AnimCurve): this;
+    track(tracker: Tracker, value: number, options: TimingOptions): this;
     /** Moves several trackers at once, each to its value. */
     track(moves: readonly (readonly [Tracker, number])[], duration: number, curve?: AnimCurve): this;
+    track(moves: readonly (readonly [Tracker, number])[], options: TimingOptions): this;
     /** Move the camera; omitted fields keep their value, and a target of handles centers the camera on them. */
     look(camera: CameraTarget, duration?: number, curve?: AnimCurve): this;
+    look(camera: CameraTarget, options: TimingOptions): this;
     /** Circle a 3D camera about its target by any angle; 2 * Math.PI is one full turn. */
     orbit(radians: number, options?: OrbitOptions): this;
     /** Frame target bounds with a 2D camera. A target in a 3D camera is rejected.
      * Omit the target to restore the opening camera from either view. */
     focus(target?: Handle | readonly Handle[] | null, options?: FocusOptions): this;
     wait(duration?: number): this;
+    /** Ends the family's visibility at the cursor; earlier samples retain it under Scene ownership. */
     remove(target: Handle): this;
     /** The handle created with this id, or null. */
     find(id: string): ObjectHandle | null;

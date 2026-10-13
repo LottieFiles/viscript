@@ -209,7 +209,7 @@ enum : uint32_t
     CHANNEL_LAYER = 1u << 20u,
     // The points that define a shape (see AnimationTarget::geometry).
     CHANNEL_GEOMETRY = 1u << 21u,
-    CHANNEL_BUFF = 1u << 22u,
+    CHANNEL_TRIM_DISTANCE = 1u << 22u,
     CHANNEL_ARC_START = 1u << 23u,
     CHANNEL_ARC_ANGLE = 1u << 24u,
     CHANNEL_COUNT = 25u,
@@ -297,7 +297,7 @@ struct VisualState
     // and a text's size in size.x. Other objects leave them zero.
     Vec2 size;
     float corner = 0.0f;
-    Vec2 buff;
+    Vec2 trimDistance;
     float arcStart = 0.0f;
     float arcAngle = 0.0f;
     // The layer effects of the object itself; groups pass them to no one.

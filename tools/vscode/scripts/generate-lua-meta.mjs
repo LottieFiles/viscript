@@ -23,12 +23,14 @@ const output = [
 ];
 
 for (const [name, fields] of Object.entries(api.configs)) {
-    const base = name !== "SceneConfig" && name !== "ObjectConfig" && name.endsWith("Config") && api.factories
+    const parent = api.configBases?.[name];
+    const base = parent ? `: vis.${parent}` : name !== "SceneConfig" && name !== "ObjectConfig" && name.endsWith("Config") && api.factories
         && Object.values(api.factories).some((factory) => factory.config === name)
         ? ": vis.ObjectConfig"
         : "";
     output.push(`---@class vis.${name}${base}`);
     for (const [fieldName, field] of Object.entries(fields)) {
+        if (parent && JSON.stringify(api.configs[parent][fieldName]) === JSON.stringify(field)) continue;
         output.push(`---@field ${fieldName}${field.required ? "" : "?"} ${qualify(field.type)} ${field.description}`);
     }
     output.push("");
@@ -90,6 +92,13 @@ function emitMethods(lines, owner, methods) {
 
 function emitCallable(lines, owner, name, callable, method) {
     lines.push(`---${callable.description}`);
+    for (const overload of callable.overloads ?? []) {
+        const parameters = [
+            ...(method ? [`self: vis.${owner}`] : []),
+            ...overload.parameters.map((parameter) => `${parameter.name}${parameter.optional ? "?" : ""}: ${qualify(parameter.type)}`),
+        ].join(", ");
+        lines.push(`---@overload fun(${parameters})${overload.returns ? `: ${qualify(overload.returns)}` : ""}`);
+    }
     for (const parameter of callable.parameters) {
         lines.push(`---@param ${parameter.name}${parameter.optional ? "?" : ""} ${qualify(parameter.type)}`);
     }

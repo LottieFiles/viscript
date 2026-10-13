@@ -40,7 +40,7 @@ SceneBuilder and Object handles share factories. Each receiver becomes the new o
 
 Styles include fill, stroke, width, opacity, progress, layer, gradient, dashes, masks, blend, blur, and shadow. `isolate: true` composites a family together. Group fill, stroke, and width pass to child shapes. `object.label(options)` returns a child Text; supply its placement and layer.
 
-Connectors follow sampled endpoint outlines, with bounds as a fallback. `scene.connector(a, b, {padding})` adds distance beyond the outlines. Lines, arrows, and vectors use `buff` to trim both ends, or `[start, finish]` for separate distances. Route markers remain solid over a dashed shaft.
+Connectors follow sampled endpoint outlines, with bounds as a fallback. `scene.connector(a, b, {padding})` adds distance beyond the outlines. Lines, arrows, and vectors use `trimDistance` to trim both ends, or `[start, finish]` for separate distances. Route markers remain solid over a dashed shaft.
 
 `rectangle({around: handles, padding})` frames objects. `brace({around: term, label: "term"})` returns `[brace, label]`. Arcs use radians and support a filled sector; angle marks can carry text or TeX labels at their bisector.
 
@@ -102,13 +102,23 @@ const nextListing = definition.edit(listing, {replace: "total", with: "sum", mat
 
 The builder uses camelCase versions of the Lua timeline calls. Most calls advance the authoring cursor; `at` authors at an absolute time or mark and then restores it. `parallel` starts branches together.
 
+Animation options share `TimingOptions` (`duration`, `curve`), extended by `AnimationOptions` with `lag` for staggered calls. Effect-specific options build on these types:
+
+```js
+const timing = {duration: 0.6, curve: "ease_in_out"};
+definition.shift(vector, [1, 0], timing).rotate(vector, Math.PI / 2, timing);
+definition.create([vector, label], {...timing, lag: 0.15});
+```
+
+Positional duration and curve calls remain supported.
+
 | Purpose | Calls |
 |---|---|
 | Draw | `create`, `uncreate`, `fillReveal`, `drawBorderThenFill`, `write` |
 | Fade/grow | `fadeIn`, `fadeOut`, `growFromCenter`, `growFromEdge`, `shrinkToCenter` |
 | Emphasis | `indicate`, `wiggle`, `circumscribe`, `passingFlash`, `flash`, `ripple` |
 | Movement/style | `shift`, `rotate`, `scale`, `transform`, `moveAlong`, `fade`, `stroke`, `fill` |
-| Replacement | `morph`, `replacementTransform`, `fadeTransform`, `matchTransform`, `transition` |
+| Replacement | `morph`, `fadeTransform`, `matchTransform`, `transition` |
 | State | `play`, `set`, `save`, `restore`, `clone`, `warp`, `remove` |
 
 `play` accepts property descriptors with a target; `set` applies them immediately. `shift` is relative and `transform` is absolute. `arc` bends movement, `lag` offsets successive targets, and `retype` erases text to its shared prefix before typing the new suffix. `save`/`restore` keep target state stacks.
@@ -121,7 +131,7 @@ definition.parallel(
 );
 ```
 
-`morph` resamples outlines and transfers ownership to the target; contour `pairs` override automatic matching. `{copy: true}` preserves the source. `clone` snapshots a family at the current time. `fadeTransform` replaces an identity; `transition` cross-fades without consuming it. `matchTransform` carries matching text, TeX, and optional shapes, with arc or path detours and independent unmatched fades. Create a replacement target immediately before the call.
+`morph` resamples outlines to turn source into target; contour `pairs` override automatic matching. `{copy: true}` preserves the source. `clone` snapshots a family at the current time. `fadeTransform` cross-fades source into target; `transition` cross-fades without consuming it. `matchTransform` carries matching text, TeX, and optional shapes, with arc or path detours and independent unmatched fades.
 
 `warp` samples a plane mapping over explicit ranges, with `step` controlling initial subdivision. The scene retains the resulting geometry:
 

@@ -142,7 +142,7 @@ local function direction_panel(background, index, title, direction, color)
     }
 
     panel:wait(0.35)
-    panel:create(path, 1.20, "linear", 0, direction)
+    panel:create(path, {duration = 1.20, curve = "linear", direction = direction})
     panel:wait(0.35)
     panel:uncreate(path, 1.00, "linear", 0, direction)
     panel:wait(0.55)
@@ -371,7 +371,7 @@ local replacementTarget = replacement:polygon {
     width = 4,
     id = "replacement-target",
 }
-replacement:replacement_transform(replacementSource, replacementTarget, 1.20, "ease_in_out")
+replacement:morph(replacementSource, replacementTarget, 1.20, "ease_in_out")
 replacement:wait(0.35)
 replacement:indicate(replacementTarget, {
     color = p.gold,

@@ -2,7 +2,8 @@ import * as fs from "node:fs";
 import * as vscode from "vscode";
 
 type Parameter = {name: string; type: string; optional?: boolean};
-type Callable = {description: string; parameters: Parameter[]; returns?: string};
+type Signature = {parameters: Parameter[]; returns?: string};
+type Callable = Signature & {description: string; overloads?: Signature[]};
 type Factory = {config: string; returns: string; description: string};
 type Field = {type: string; description: string; required?: boolean};
 type Namespace = {type: string; description: string; functions: Record<string, Callable>};
@@ -114,13 +115,19 @@ function signatureHelp(api: Api, document: vscode.TextDocument, position: vscode
         ? `${call[1]}:${call[3]}`
         : `vis.${call[2] ? `${call[2]}.` : ""}${call[3]}`;
     const result = new vscode.SignatureHelp();
-    const signature = new vscode.SignatureInformation(callableLabel(label, callable), new vscode.MarkdownString(callable.description));
-    signature.parameters = callable.parameters.map((parameter) => new vscode.ParameterInformation(
-        `${parameter.name}${parameter.optional ? "?" : ""}: ${parameter.type}`,
-    ));
-    result.signatures = [signature];
-    result.activeSignature = 0;
-    result.activeParameter = Math.min(commaCount(call[4]), Math.max(0, signature.parameters.length - 1));
+    const signatures = [callable, ...(callable.overloads ?? [])];
+    result.signatures = signatures.map((overload) => {
+        const signature = new vscode.SignatureInformation(callableLabel(label, overload), new vscode.MarkdownString(callable.description));
+        signature.parameters = overload.parameters.map((parameter) => new vscode.ParameterInformation(
+            `${parameter.name}${parameter.optional ? "?" : ""}: ${parameter.type}`,
+        ));
+        return signature;
+    });
+    const argument = commaCount(call[4]);
+    const named = unmatchedBraces(call[4]).length
+        ? signatures.findIndex((signature) => api.configs[signature.parameters[argument]?.type]) : -1;
+    result.activeSignature = Math.max(0, named);
+    result.activeParameter = Math.min(argument, Math.max(0, result.signatures[result.activeSignature].parameters.length - 1));
     return result;
 }
 
@@ -232,16 +239,16 @@ function tableContext(api: Api, source: string): {config: string; source: string
     for (let index = 0; index < braces.length; index++) {
         const open = braces[index];
         const prefix = source.slice(0, open);
-        const method = new RegExp(`(${IDENTIFIER}):(${IDENTIFIER})\\s*\\(?\\s*$`).exec(prefix);
+        const method = new RegExp(`(${IDENTIFIER}):(${IDENTIFIER})\\s*(?:\\(([^()]*)|\\s*)$`).exec(prefix);
         if (/vis\.scene\s*\(?\s*$/.test(prefix)) {
             config = "SceneConfig";
         } else if (method) {
             const owner = inferVariables(api, prefix.slice(0, method.index)).get(method[1]);
             const callable = owner ? lookupMethod(api, owner, method[2]) : undefined;
-            const parameter = callable?.parameters[0]?.type;
-            config = parameter && api.configs[parameter]
-                ? parameter
-                : api.factories[method[2]]?.config;
+            const argument = commaCount(method[3] ?? "");
+            const signatures = callable ? [callable, ...(callable.overloads ?? [])] : [];
+            config = signatures.map((signature) => signature.parameters[argument]?.type)
+                .find((type) => type && api.configs[type]) ?? api.factories[method[2]]?.config;
         } else if (config) {
             const fieldName = /([A-Za-z_][A-Za-z0-9_]*)\s*=\s*$/.exec(prefix)?.[1];
             const type = fieldName ? configFields(api, config)[fieldName]?.type : undefined;
@@ -285,14 +292,16 @@ function factoryCallable(factory: Factory): Callable {
     return {description: factory.description, parameters: [{name: "config", type: factory.config, optional: true}], returns: factory.returns};
 }
 
-function callableLabel(name: string, callable: Callable): string {
+function callableLabel(name: string, callable: Signature): string {
     const parameters = callable.parameters.map((parameter) => `${parameter.name}${parameter.optional ? "?" : ""}: ${parameter.type}`).join(", ");
     return `${name}(${parameters})${callable.returns ? `: ${callable.returns}` : ""}`;
 }
 
 function callableMarkdown(name: string, callable: Callable): vscode.MarkdownString {
     const markdown = new vscode.MarkdownString();
-    markdown.appendCodeblock(callableLabel(name, callable), "lua");
+    for (const overload of [callable, ...(callable.overloads ?? [])]) {
+        markdown.appendCodeblock(callableLabel(name, overload), "lua");
+    }
     markdown.appendMarkdown(callable.description);
     return markdown;
 }

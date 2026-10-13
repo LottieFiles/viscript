@@ -38,7 +38,7 @@ try {
     assert.equal(typeof runtime.advanceRuntime === "function", expectedLuaRuntime);
     assert.equal(runtime.retainedLua, false);
     assert.equal(runtime.runtimeTime, 0);
-    assert.equal(runtime.camera("pan", 0.01, 0), expectedUi || expectedInput);
+    assert.equal(runtime.cameraInput("pan", 0.01, 0), expectedUi || expectedInput);
     assert.doesNotThrow(() => runtime.render(0));
 } finally {
     runtime.destroy();

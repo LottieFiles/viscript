@@ -1310,7 +1310,7 @@ function syncCamera() {
 function moveCamera(action, x = 0, y = 0, redraw = true) {
     if (!runtime || busy) return false;
     try {
-        if (!runtime.camera(action, x, y)) {
+        if (!runtime.cameraInput(action, x, y)) {
             setStatus("FIXED CAMERA", "ready");
             return false;
         }

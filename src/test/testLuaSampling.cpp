@@ -1244,7 +1244,7 @@ for k = 0, 9 do
     points[#points + 1] = {r * math.cos(a), r * math.sin(a)}
 end
 local star = s:polygon {id = "star", points = points}
-s:replacement_transform(square, star, 1)
+s:morph(square, star, 1)
 local line = s:line {id = "line", from = {-2, -2}, to = {2, -2}}
 local graph = s:plot {id = "graph", points = {{2, -1}, {0, -1.5}, {-2, -1}}}
 s:morph(line, graph, 1)

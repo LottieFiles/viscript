@@ -397,14 +397,14 @@ local v3 = s:edit(v2, {
     {replace = {1, 2}, with = "local n, sum = 10, 0"},
     {prepend = "-- squares"},
     {insert = "  -- add", after = 3},
-}, 2, "linear", {fade = 0.5})
+}, {duration = 2, curve = "linear", fade = 0.5})
 if v3 ~= s:find("sum.3") then error("an edit counts on from the id it edits") end
 local v4 = s:edit(v3, {{remove = {4, 4}}, {remove = " * i"}, {replace = "sum", with = "total", match = "last"}},
                   0.5, "smooth", {id = "final"})
 if v4 ~= s:find("final") then error("an edit takes a given id") end
 -- A block without an id at the root makes one without an id there too.
 local bare = s:code {text = "x = 1", point = {0, -2}}
-local edited = s:edit(bare, {replace = "1", with = "2"}, 0.5)
+local edited = s:edit(bare, {replace = "1", with = "2"}, {duration = 0.5})
 if edited:search("2")[1] ~= edited:children()[1]:children()[3] then error("a bare edit") end
 return s
 )lua";

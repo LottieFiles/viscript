@@ -601,7 +601,7 @@ export async function createVis(source, name = "scene.lua", moduleOptions = {}) 
         });
     })() : undefined;
 
-    const camera = (action, x = 0, y = 0) => {
+    const cameraInput = (action, x = 0, y = 0) => {
         assertAlive();
         const code = CAMERA_ACTIONS[action];
         if (code === undefined) throw new TypeError(`Unknown camera action '${action}'`);
@@ -993,7 +993,7 @@ export async function createVis(source, name = "scene.lua", moduleOptions = {}) 
         font,
         asset,
         ...(audio ? {audio} : {}),
-        camera,
+        cameraInput,
         ...(input ? {input} : {}),
         ...(hasInputState ? {
             beginInputFrame,

@@ -229,7 +229,7 @@ local handoffSeed = scene:polygon {
     layer = 7,
     id = "morph-fade-seed",
 }
-scene:replacement_transform(handoffCopy, handoffSeed, 0.58, "ease_in_out")
+scene:morph(handoffCopy, handoffSeed, 0.58, "ease_in_out")
 local handoffText = scene:text {
     text = "normal vector",
     point = { -1.50, 1.25 },
@@ -260,7 +260,7 @@ local bullet = scene:polygon {
     layer = 4,
     id = "vector-bullet-morph-proxy",
 }
-scene:replacement_transform(vectorCopy, bullet, 0.62, { preset = "back", strength = 0.45 })
+scene:morph(vectorCopy, bullet, 0.62, { preset = "back", strength = 0.45 })
 local bulletCircle = scene:circle {
     center = { -2.18, -0.16 },
     radius = 0.12,
@@ -337,7 +337,7 @@ local cursor = scene:polygon {
     layer = 8,
     id = "text-cursor",
 }
-scene:replacement_transform(pointCopy, cursor, 0.58, { preset = "snappy", strength = 0.86 })
+scene:morph(pointCopy, cursor, 0.58, { preset = "snappy", strength = 0.86 })
 
 local prefixData = {
     { "dot(", 0.947 },

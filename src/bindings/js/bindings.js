@@ -37,7 +37,7 @@ const PLAY_PROPERTIES = [
     "radius",
     "size",
     "corner",
-    "buff",
+    "trimDistance",
     "gradient",
     "blur",
     "shadow",
@@ -102,7 +102,7 @@ const TRACKER_KEYS = [
     "radius",
     "size",
     "corner",
-    "buff",
+    "trimDistance",
     "gradient",
     "blur",
     "shadow",
@@ -131,7 +131,7 @@ const TRACKER_EPSILON = 1e-4;
 const TRACKER_PENDING_LIMIT = 32768;
 const ROTATE_OPTIONS = ["about", "axis", "shift", "arc", "duration", "easing", "curve", "lag"];
 const ORBIT_OPTIONS = ["axis", "duration", "easing", "curve"];
-const FOCUS_OPTIONS = ["padding", "duration", "curve"];
+const FOCUS_OPTIONS = ["padding", "duration", "easing", "curve"];
 const VIEW_OPTIONS = ["camera", "optical", "background", "opacity", "layer", "hide", "follow"];
 // Cap repeated rendering of the same scene through inset views.
 const VIEW_LIMIT = 8;
@@ -970,15 +970,39 @@ function _curveEase(value) {
     };
 }
 
+function _timingValues(options, fallback = 1, zero = false, name = "Timing") {
+    if (Object.hasOwn(options, "easing") && Object.hasOwn(options, "curve")) {
+        throw new TypeError("Timing options must use either easing or curve, not both");
+    }
+    const duration = options.duration === undefined ? fallback : options.duration;
+    const curve = options.curve ?? options.easing ?? "smooth";
+    const lag = options.lag === undefined ? 0 : options.lag;
+    if (!Number.isFinite(duration) || (zero ? duration < 0 : duration <= 0)) {
+        throw new RangeError(`${name} duration must be a finite ${zero ? "non-negative" : "positive"} number of seconds`);
+    }
+    if (!Number.isFinite(lag) || lag < 0) throw new RangeError("Lag must be finite and non-negative");
+    _curveValue(curve);
+    return {duration, curve, lag};
+}
+
+function _timing(options, fallback = 1, stagger = false, zero = false, fields = [], name = "Timing") {
+    if (!options || (Object.getPrototypeOf(options) !== Object.prototype && Object.getPrototypeOf(options) !== null)) {
+        throw new TypeError(`${name} options must be a plain object`);
+    }
+    const unknown = Object.keys(options).find((key) =>
+        !["duration", "curve", "easing"].includes(key) && !(stagger && key === "lag") && !fields.includes(key));
+    if (unknown) throw new TypeError(`Unknown ${name} option: ${unknown}`);
+    return {..._timingValues(options, fallback, zero, name),
+        options: Object.fromEntries(fields.filter((key) => Object.hasOwn(options, key)).map((key) => [key, options[key]]))};
+}
+
 function _effectOptions(value, defaults, name, minimumScale) {
     if (!value || (Object.getPrototypeOf(value) !== Object.prototype && Object.getPrototypeOf(value) !== null)) {
         throw new TypeError(`${name} options must be a plain object`);
     }
     const unknown = Object.keys(value).filter((key) => !Object.hasOwn(defaults, key) && key !== "curve");
     if (unknown.length) throw new TypeError(`Unknown ${name} option: ${unknown[0]}`);
-    if (Object.hasOwn(value, "easing") && Object.hasOwn(value, "curve")) {
-        throw new TypeError(`${name} options must use either easing or curve, not both`);
-    }
+    _timingValues(value, defaults.duration, false, name);
     const options = { ...defaults, ...value };
     if (Object.hasOwn(value, "curve")) delete options.easing;
     if (Object.hasOwn(defaults, "scale") && (!Number.isFinite(options.scale) || options.scale <= minimumScale)) {
@@ -1116,6 +1140,10 @@ export class AudioCueHandle {
     }
 
     gain(value, begin, duration = 1, curve = "smooth") {
+        if (typeof duration === "object") {
+            if (arguments.length > 3) throw new TypeError("Timing options cannot be combined with positional arguments");
+            ({duration, curve} = _timing(duration));
+        }
         this.owner._assertQuiet();
         if (!Number.isFinite(value) || value < 0 || value > 4) {
             throw new RangeError("Audio gain must be finite and between 0 and 4");
@@ -1143,6 +1171,7 @@ export class ViewHandle {
     }
 
     look(camera, duration = 1, easing = "smooth") {
+        if (typeof duration === "object" && arguments.length > 2) throw new TypeError("Timing options cannot be combined with positional arguments");
         this.owner._look(this.name, camera, duration, easing);
         return this;
     }
@@ -1160,6 +1189,10 @@ export class ViewHandle {
 
     // Fades the whole view; the fades of a view follow one another.
     fade(opacity, duration = 1, easing = "smooth") {
+        if (typeof duration === "object") {
+            if (arguments.length > 2) throw new TypeError("Timing options cannot be combined with positional arguments");
+            ({duration, curve: easing} = _timing(duration));
+        }
         this.owner._assertMutable();
         if (!Number.isFinite(opacity) || opacity < 0 || opacity > 1) {
             throw new RangeError("View opacity must be between 0 and 1");
@@ -3216,7 +3249,8 @@ export class SceneBuilder {
     _options(options) {
         const styled = _styleOptions(options);
         if (!styled || typeof styled !== "object"
-            || (!Object.hasOwn(styled, "mask") && !Object.hasOwn(styled, "around") && !Object.hasOwn(styled, "of"))) {
+            || (!Object.hasOwn(styled, "mask") && !Object.hasOwn(styled, "around") && !Object.hasOwn(styled, "of")
+                && !Object.hasOwn(styled, "trimDistance"))) {
             return _lua(styled);
         }
         return `{${Object.keys(styled)
@@ -3242,7 +3276,7 @@ export class SceneBuilder {
             }
             return `["of"]={${value.map((item) => this._handle(item)).join(",")}}`;
         }
-        if (key !== "mask") return `[${_string(key)}]=${_lua(value)}`;
+        if (key !== "mask") return `[${_string(key === "trimDistance" ? "trim_distance" : key)}]=${_lua(value)}`;
         if (value instanceof Handle) return `["mask"]=${this._handle(value)}`;
         if (!value || (Object.getPrototypeOf(value) !== Object.prototype && Object.getPrototypeOf(value) !== null)) {
             throw new TypeError("Mask must be a handle or {target, mode}");
@@ -3275,6 +3309,10 @@ export class SceneBuilder {
     }
 
     create(target, duration = 1, easing = "smooth", lag = 0, direction) {
+        if (typeof duration === "object") {
+            if (arguments.length > 2) throw new TypeError("Timing options cannot be combined with positional arguments");
+            ({duration, curve: easing, lag, options: {direction}} = _timing(duration, 1, true, false, ["direction"]));
+        }
         if (direction === undefined) return this._animate("create", target, [duration, easing, lag]);
         this._assertMutable();
         _direction(direction);
@@ -3282,16 +3320,28 @@ export class SceneBuilder {
     }
 
     uncreate(target, duration = 1, easing = "smooth", lag = 0, direction = "forward") {
+        if (typeof duration === "object") {
+            if (arguments.length > 2) throw new TypeError("Timing options cannot be combined with positional arguments");
+            ({duration, curve: easing, lag, options: {direction = "forward"}} = _timing(duration, 1, true, false, ["direction"]));
+        }
         this._assertMutable();
         _direction(direction);
         return this._animate("uncreate", target, [duration, easing, lag, direction]);
     }
 
     fillReveal(target, duration = 1, easing = "smooth", lag = 0) {
+        if (typeof duration === "object") {
+            if (arguments.length > 2) throw new TypeError("Timing options cannot be combined with positional arguments");
+            ({duration, curve: easing, lag} = _timing(duration, 1, true));
+        }
         return this._animate("fill_reveal", target, [duration, easing, lag]);
     }
 
     drawBorderThenFill(target, duration = 1, easing = "smooth", lag = 0, direction) {
+        if (typeof duration === "object") {
+            if (arguments.length > 2) throw new TypeError("Timing options cannot be combined with positional arguments");
+            ({duration, curve: easing, lag, options: {direction}} = _timing(duration, 1, true, false, ["direction"]));
+        }
         if (direction === undefined) {
             return this._animate("draw_border_then_fill", target, [duration, easing, lag]);
         }
@@ -3301,6 +3351,10 @@ export class SceneBuilder {
     }
 
     write(target, duration = 1, easing = "smooth", lag = 0, direction) {
+        if (typeof duration === "object") {
+            if (arguments.length > 2) throw new TypeError("Timing options cannot be combined with positional arguments");
+            ({duration, curve: easing, lag, options: {direction}} = _timing(duration, 1, true, false, ["direction"]));
+        }
         if (direction === undefined) return this._animate("write", target, [duration, easing, lag]);
         this._assertMutable();
         _direction(direction);
@@ -3324,16 +3378,28 @@ export class SceneBuilder {
     }
 
     growFromCenter(target, duration = 1, easing = "smooth") {
+        if (typeof duration === "object") {
+            if (arguments.length > 2) throw new TypeError("Timing options cannot be combined with positional arguments");
+            ({duration, curve: easing} = _timing(duration));
+        }
         return this._animate("grow_from_center", target, [duration, easing]);
     }
 
     growFromEdge(target, edge, duration = 1, easing = "smooth") {
+        if (typeof duration === "object") {
+            if (arguments.length > 3) throw new TypeError("Timing options cannot be combined with positional arguments");
+            ({duration, curve: easing} = _timing(duration));
+        }
         this._assertMutable();
         _growthEdge(edge);
         return this._animate("grow_from_edge", target, [edge, duration, easing]);
     }
 
     shrinkToCenter(target, duration = 1, easing = "smooth") {
+        if (typeof duration === "object") {
+            if (arguments.length > 2) throw new TypeError("Timing options cannot be combined with positional arguments");
+            ({duration, curve: easing} = _timing(duration));
+        }
         return this._animate("shrink_to_center", target, [duration, easing]);
     }
 
@@ -3397,7 +3463,11 @@ export class SceneBuilder {
         return this._effect("ripple", target, options, RIPPLE_OPTIONS, "Ripple", 0);
     }
 
-    _morph(method, source, target, duration, easing, lag) {
+    morph(source, target, duration = 1, easing = "smooth", lag) {
+        if (typeof duration === "object") {
+            if (arguments.length > 3) throw new TypeError("Timing options cannot be combined with positional arguments");
+            ({duration, curve: easing, options: lag} = _timing(duration, 1, true, false, ["lag", "copy", "pairs"]));
+        }
         this._assertMutable();
         const sourceArray = Array.isArray(source);
         const targetArray = Array.isArray(target);
@@ -3464,20 +3534,16 @@ export class SceneBuilder {
         const durationValue = _lua(duration);
         const easingValue = _lua(easing);
         SCENE_STATES.get(this).lines.push(
-            (scene) => `${scene}:${method}(${sourceName},${targetName},${durationValue},${easingValue}${lagValue})`,
+            (scene) => `${scene}:morph(${sourceName},${targetName},${durationValue},${easingValue}${lagValue})`,
         );
         return this;
     }
 
-    morph(source, target, duration = 1, easing = "smooth", lag) {
-        return this._morph("morph", source, target, duration, easing, lag);
-    }
-
-    replacementTransform(source, target, duration = 1, easing = "smooth", lag) {
-        return this._morph("replacement_transform", source, target, duration, easing, lag);
-    }
-
     fadeTransform(source, target, duration = 1, easing = "smooth") {
+        if (typeof duration === "object") {
+            if (arguments.length > 3) throw new TypeError("Timing options cannot be combined with positional arguments");
+            ({duration, curve: easing} = _timing(duration));
+        }
         this._assertMutable();
         const sourceName = this._handle(source);
         const targetName = this._handle(target);
@@ -3491,12 +3557,20 @@ export class SceneBuilder {
     }
 
     shift(target, by, duration = 1, easing = "smooth") {
+        if (typeof duration === "object") {
+            if (arguments.length > 3) throw new TypeError("Timing options cannot be combined with positional arguments");
+            ({duration, curve: easing} = _timing(duration));
+        }
         this._assertTransformable(target);
         return this._animate("shift", target, [by, duration, easing]);
     }
 
     // Serializes rotate, scale, and moveAlong options; an `about` handle names its local.
     matchTransform(source, target, duration = 1, easing = "smooth", options = {}) {
+        if (typeof duration === "object") {
+            if (arguments.length > 3) throw new TypeError("Timing options cannot be combined with positional arguments");
+            ({duration, curve: easing, options} = _timing(duration, 1, true, false, MATCH_OPTIONS));
+        }
         this._assertMutable();
         const sourceName = this._handle(source);
         const targetName = this._handle(target);
@@ -3565,6 +3639,10 @@ export class SceneBuilder {
     // block keeps the look, place and parent of block and takes options.id or the id of block
     // with the first free .2, .3 and so on.
     edit(block, edits, duration = 1, easing = "smooth", options = {}) {
+        if (typeof duration === "object") {
+            if (arguments.length > 3) throw new TypeError("Timing options cannot be combined with positional arguments");
+            ({duration, curve: easing, options} = _timing(duration, 1, true, false, EDIT_OPTIONS));
+        }
         this._assertMutable();
         const blockName = this._handle(block);
         const code = CODE_BLOCKS.get(block);
@@ -3619,6 +3697,10 @@ export class SceneBuilder {
     // Lays items, a group's children or an array of sibling handles in order, one after
     // another over duration, as Lua arrange does; an item added at the cursor grows in.
     arrange(items, duration = 1, easing = "smooth", options = {}) {
+        if (typeof duration === "object") {
+            if (arguments.length > 2) throw new TypeError("Timing options cannot be combined with positional arguments");
+            ({duration, curve: easing, options} = _timing(duration, 1, false, false, ARRANGE_OPTIONS));
+        }
         this._assertMutable();
         let itemsValue;
         if (items instanceof GroupHandle) {
@@ -3704,9 +3786,7 @@ export class SceneBuilder {
         }
         const unknown = Object.keys(options).filter((key) => !allowed.includes(key));
         if (unknown.length) throw new TypeError(`Unknown ${name} option: ${unknown[0]}`);
-        if (Object.hasOwn(options, "easing") && Object.hasOwn(options, "curve")) {
-            throw new TypeError(`${name} options must use either easing or curve, not both`);
-        }
+        _timingValues(options, 1, false, name);
         if (options.arc !== undefined && !(Number.isFinite(options.arc) && Math.abs(options.arc) < 2 * Math.PI)) {
             throw new RangeError(`${name} arc must be a finite angle between -2*pi and 2*pi radians`);
         }
@@ -3777,9 +3857,7 @@ export class SceneBuilder {
             if (arguments.length > 3) {
                 throw new TypeError("Warp takes (target, fn, options) or (target, fn, duration, curve, options)");
             }
-            options = duration;
-            duration = 1;
-            easing = "smooth";
+            ({duration, curve: easing, options} = _timing(duration, 1, false, false, WARP_OPTIONS, "Warp"));
         }
         const targetName = this._target(target);
         if (typeof fn !== "function") throw new TypeError("Warp fn must be a function of x and y that returns [x, y]");
@@ -3818,15 +3896,27 @@ export class SceneBuilder {
     }
 
     transform(target, matrix, duration = 1, easing = "smooth") {
+        if (typeof duration === "object") {
+            if (arguments.length > 3) throw new TypeError("Timing options cannot be combined with positional arguments");
+            ({duration, curve: easing} = _timing(duration));
+        }
         this._assertTransformable(target);
         return this._animate("transform", target, [matrix, duration, easing]);
     }
 
     fade(target, opacity, duration = 1, easing = "smooth") {
+        if (typeof duration === "object") {
+            if (arguments.length > 3) throw new TypeError("Timing options cannot be combined with positional arguments");
+            ({duration, curve: easing} = _timing(duration));
+        }
         return this._animate("fade", target, [opacity, duration, easing]);
     }
 
     transition(from, to, duration = 1, easing = "smooth") {
+        if (typeof duration === "object") {
+            if (arguments.length > 3) throw new TypeError("Timing options cannot be combined with positional arguments");
+            ({duration, curve: easing} = _timing(duration));
+        }
         this._assertMutable();
         const fromName = this._target(from);
         const toName = this._target(to);
@@ -3839,14 +3929,26 @@ export class SceneBuilder {
     }
 
     stroke(target, color, duration = 1, easing = "smooth") {
+        if (typeof duration === "object") {
+            if (arguments.length > 3) throw new TypeError("Timing options cannot be combined with positional arguments");
+            ({duration, curve: easing} = _timing(duration));
+        }
         return this._animate("stroke", target, [color, duration, easing]);
     }
 
     fill(target, color, duration = 1, easing = "smooth") {
+        if (typeof duration === "object") {
+            if (arguments.length > 3) throw new TypeError("Timing options cannot be combined with positional arguments");
+            ({duration, curve: easing} = _timing(duration));
+        }
         return this._animate("fill", target, [color, duration, easing]);
     }
 
     play(specification, duration = 1, easing = "smooth", lag = 0) {
+        if (typeof duration === "object") {
+            if (arguments.length > 2) throw new TypeError("Timing options cannot be combined with positional arguments");
+            ({duration, curve: easing, lag} = _timing(duration, 1, true));
+        }
         const timing = SCENE_TRACKERS.get(this);
         const { anchor, time } = timing.clock;
         this._assertMutable();
@@ -3887,6 +3989,10 @@ export class SceneBuilder {
     // Brings each target back to the newest state save recorded for it: over duration seconds,
     // each later target lag of the duration later, or at once without a duration.
     restore(target, duration = 0, easing = "smooth", lag = 0) {
+        if (typeof duration === "object") {
+            if (arguments.length > 2) throw new TypeError("Timing options cannot be combined with positional arguments");
+            ({duration, curve: easing, lag} = _timing(duration, 0, true, true));
+        }
         this._assertMutable();
         const targetName = this._target(target);
         if (!(Number.isFinite(duration) && duration >= 0)) {
@@ -3960,6 +4066,10 @@ export class SceneBuilder {
             }
             moves = first;
             [duration, curve] = rest;
+        }
+        if (typeof duration === "object") {
+            if (curve !== undefined) throw new TypeError("Timing options cannot be combined with positional arguments");
+            ({duration, curve} = _timing(duration));
         }
         if (typeof duration !== "number" || !(duration > 0) || duration === Infinity) {
             throw new RangeError("Track duration must be a positive finite number");
@@ -4152,7 +4262,7 @@ export class SceneBuilder {
             const values = properties.flatMap((key) => {
                 if (graph?.has(key)) return graph.get(key) ? [graph.get(key)] : [];
                 const value = key === "gradient" ? _gradient(descriptor[key]) : descriptor[key];
-                return [`${key}=${_lua(value)}`];
+                return [`${key === "trimDistance" ? "trim_distance" : key}=${_lua(value)}`];
             });
             return `{target=${targetName},${values.join(",")}}`;
         });
@@ -4275,11 +4385,13 @@ export class SceneBuilder {
     // Moves the camera; a target that is a handle or an array of handles aims it at the center of
     // their authored bounds, as focus frames them, and the eye keeps its offset.
     look(camera, duration = 1, easing = "smooth") {
+        if (typeof duration === "object" && arguments.length > 2) throw new TypeError("Timing options cannot be combined with positional arguments");
         return this._look(null, camera, duration, easing);
     }
 
     // The camera calls below move the scene's camera, or with a receiver the view of that name.
     _look(receiver, camera, duration, easing) {
+        if (typeof duration === "object") ({duration, curve: easing} = _timing(duration));
         this._assertMutable();
         const cameraValue = this._camera(camera);
         const durationValue = _lua(duration);
@@ -4321,14 +4433,10 @@ export class SceneBuilder {
         } else if (target !== null) {
             targetName = this._handle(target);
         }
-        const { padding, duration, curve } = options && typeof options === "object" ? options : {};
+        const { padding } = options && typeof options === "object" ? options : {};
         if (padding !== undefined && !(Number.isFinite(padding) && padding >= 0)) {
             throw new RangeError("Focus padding must be a non-negative number");
         }
-        if (duration !== undefined && !(Number.isFinite(duration) && duration > 0)) {
-            throw new RangeError("Focus duration must be a positive number");
-        }
-        if (curve !== undefined) _curveValue(curve);
         const value = this._motionOptions(options, FOCUS_OPTIONS, "Focus");
         SCENE_STATES.get(this).lines.push((scene) => `${receiver ?? scene}:focus(${targetName},${value})`);
         return this;

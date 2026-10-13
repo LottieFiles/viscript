@@ -283,42 +283,53 @@ void _trimmedSegments(SwRenderer* renderer)
     static constexpr auto source = R"lua(
 local s = vis.scene {width = 200, height = 100, fps = 10,
   camera = {mode = "fixed", view = "2d", height = 10}}
-local l = s:line {from = {-4, 0}, to = {4, 0}, buff = {1, 2}, width = 2, id = "line"}
-local a = s:arrow {from = {-4, 2}, to = {4, 2}, buff = 1, id = "arrow"}
-local v = s:vector {origin = {-4, -2}, value = {8, 0}, buff = {2, 1}, id = "vector"}
-s:set {target = v, buff = 1}
+local l = s:line {from = {-4, 0}, to = {4, 0}, trim_distance = {1, 2}, width = 2, id = "line"}
+local a = s:arrow {from = {-4, 2}, to = {4, 2}, trim_distance = 1, id = "arrow"}
+local v = s:vector {origin = {-4, -2}, value = {8, 0}, trim_distance = {2, 1}, id = "vector"}
+s:set {target = v, trim_distance = 1}
 local x = s:tracker(0)
-s:bind(l, x, function(t) return {to = {4, 6 * t}, buff = {1 + t, 2 - t}} end)
+s:bind(l, x, function(t) return {to = {4, 6 * t}, trim_distance = {1 + t, 2 - t}} end)
 s:track(x, 1, 1, "linear")
 return s
 )lua";
     Scene* scene = nullptr;
     char error[512] = {};
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "buff.lua", &scene, error, sizeof(error))
+    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "trim-distance.lua", &scene, error, sizeof(error))
           == Result::Success);
-    if (!scene) std::fprintf(stderr, "buff.lua: %s\n", error);
+    if (!scene) std::fprintf(stderr, "trim-distance.lua: %s\n", error);
     if (scene) {
         auto line = static_cast<Line*>(scene->object("line"));
         auto arrow = static_cast<Arrow*>(scene->object("arrow"));
         auto vector = static_cast<Vector*>(scene->object("vector"));
         CHECK(line && arrow && vector);
         if (line && arrow && vector) {
-            CHECK(_near(line->buff.x, 2.0f) && _near(line->buff.y, 1.0f));
-            CHECK(_near(arrow->buff.x, 1.0f) && _near(vector->buff.y, 1.0f));
+            CHECK(_near(line->trimDistance.x, 2.0f) && _near(line->trimDistance.y, 1.0f));
+            CHECK(_near(arrow->trimDistance.x, 1.0f) && _near(vector->trimDistance.y, 1.0f));
             BBox bounds;
             CHECK(renderer->bounds(scene, line, 0.5f, bounds) == Result::Success);
             CHECK(_near(bounds.x, 59.0f + 120.0f / std::sqrt(73.0f)));
         }
     }
     delete scene;
-    _scriptError("local s = vis.scene {} s:line {from = {0, 0}, to = {1, 0}, buff = -1} return s",
-                 "buff cannot be negative");
-    _scriptError("local s = vis.scene {} s:arrow {from = {0, 0}, to = {1, 0}, buff = {0, -1}} return s",
-                 "buff cannot be negative");
-    _scriptError("local s = vis.scene {} s:vector {value = {1, 0}, buff = {1}} return s",
-                 "buff must be a number or {start, end}");
-    _scriptError("local s = vis.scene {} s:line {from = {0, 0}, to = {1, 0}, buff = '1'} return s",
-                 "buff must be a number or {start, end}");
-    _scriptError("local s = vis.scene {} local c = s:circle {radius = 1} s:play({target = c, buff = 1}, 1) return s",
-                 "buff needs a line, arrow or vector and non-negative distances");
+    _scriptError("local s = vis.scene {} s:line {from = {0, 0}, to = {1, 0}, trim_distance = -1} return s",
+                 "trim_distance cannot be negative");
+    _scriptError("local s = vis.scene {} s:arrow {from = {0, 0}, to = {1, 0}, trim_distance = {0, -1}} return s",
+                 "trim_distance cannot be negative");
+    _scriptError("local s = vis.scene {} s:vector {value = {1, 0}, trim_distance = {1}} return s",
+                 "trim_distance must be a number or {start, end}");
+    _scriptError("local s = vis.scene {} s:line {from = {0, 0}, to = {1, 0}, trim_distance = '1'} return s",
+                 "trim_distance must be a number or {start, end}");
+    _scriptError("local s = vis.scene {} local c = s:circle {radius = 1} s:play({target = c, trim_distance = 1}, 1) return s",
+                 "trim distance needs a line, arrow or vector and non-negative distances");
+    _scriptError("local s = vis.scene {} s:line {from = {0, 0}, to = {1, 0}, buff = 1} return s",
+                 "unknown option 'buff'");
+    _scriptError("local s = vis.scene {} s:arrow {from = {0, 0}, to = {1, 0}, buff = 1} return s",
+                 "unknown option 'buff'");
+    _scriptError("local s = vis.scene {} s:vector {value = {1, 0}, buff = 1} return s", "unknown option 'buff'");
+    _scriptError("local s = vis.scene {} s:rectangle {size = {1, 1}, buff = 1} return s", "unknown option 'buff'");
+    _scriptError("local s = vis.scene {} local l = s:line {from = {0, 0}, to = {1, 0}} "
+                 "s:play({target = l, buff = 1}, 1) return s", "unknown option 'buff'");
+    _scriptError("local s = vis.scene {} local l = s:line {from = {0, 0}, to = {1, 0}} "
+                 "local t = s:tracker(0) s:bind(l, t, function(v) return {buff = v} end) return s",
+                 "a bound state cannot set 'buff'");
 }

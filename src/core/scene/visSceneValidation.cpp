@@ -74,11 +74,11 @@ bool valid(const Object* object) noexcept
     switch (object->type()) {
         case Type::Line: {
             auto value = static_cast<const Line*>(object);
-            return _finite(value->buff) && value->buff.x >= 0.0f && value->buff.y >= 0.0f && _finite(value->from) && _finite(value->to);
+            return _finite(value->trimDistance) && value->trimDistance.x >= 0.0f && value->trimDistance.y >= 0.0f && _finite(value->from) && _finite(value->to);
         }
         case Type::Arrow: {
             auto value = static_cast<const Arrow*>(object);
-            return _finite(value->buff) && value->buff.x >= 0.0f && value->buff.y >= 0.0f && _finite(value->from) && _finite(value->to) && std::isfinite(value->tail) && value->tail >= 0.0f && std::isfinite(value->tip) && value->tip >= 0.0f;
+            return _finite(value->trimDistance) && value->trimDistance.x >= 0.0f && value->trimDistance.y >= 0.0f && _finite(value->from) && _finite(value->to) && std::isfinite(value->tail) && value->tail >= 0.0f && std::isfinite(value->tip) && value->tip >= 0.0f;
         }
         case Type::Point: return _finite(static_cast<const Point*>(object)->point);
         case Type::Text: {
@@ -95,7 +95,7 @@ bool valid(const Object* object) noexcept
         }
         case Type::Vector: {
             auto value = static_cast<const Vector*>(object);
-            return _finite(value->buff) && value->buff.x >= 0.0f && value->buff.y >= 0.0f && _finite(value->value) && _finite(value->origin) && std::isfinite(value->tail) && value->tail >= 0.0f && std::isfinite(value->tip) && value->tip >= 0.0f;
+            return _finite(value->trimDistance) && value->trimDistance.x >= 0.0f && value->trimDistance.y >= 0.0f && _finite(value->value) && _finite(value->origin) && std::isfinite(value->tail) && value->tail >= 0.0f && std::isfinite(value->tip) && value->tip >= 0.0f;
         }
         case Type::Space: {
             auto value = static_cast<const Space*>(object);

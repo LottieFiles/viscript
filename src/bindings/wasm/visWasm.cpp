@@ -1064,7 +1064,7 @@ extern "C" VIS_KEEPALIVE VisResult vis_camera(VisEngine handle, VisCameraAction 
         case VIS_CAMERA_SET_3D: result = engine->panel->cameraView(vis::CameraView::ThreeD); break;
     }
 #else
-    auto result = engine->scene->camera({static_cast<vis::CameraAction>(action), {x, y}});
+    auto result = engine->scene->cameraInput({static_cast<vis::CameraAction>(action), {x, y}});
 #endif
     if (result != vis::Result::Success) return _error(engine, result);
     engine->rendered = false;

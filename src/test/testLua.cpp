@@ -780,7 +780,7 @@ local a = vis.scene {}
 local b = vis.scene {}
 local source = a:plot {points = {{0, 0}, {1, 1}}}
 local target = b:plot {points = {{0, 0}, {1, -1}}}
-a:replacement_transform(source, target)
+a:morph(source, target)
 return a
 )lua",
            "replacement-foreign-target.lua");

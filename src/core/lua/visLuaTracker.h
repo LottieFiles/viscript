@@ -10,14 +10,14 @@ namespace vis
 // track wait until a scene call that adds or reads clips, or the end of the script, so a
 // later track of other trackers that overlaps it on a binding can merge with it.
 static constexpr const char* TRACKER_PRELUDE = R"lua(
-local methods, ease, settle, fps, unknown, where, pend = ...
+local methods, ease, settle, fps, unknown, where, pend, timing = ...
 local type, error, ipairs, select, unpack, pcall = type, error, ipairs, select, table.unpack, pcall
 local tonumber = tonumber
 local sort = table.sort
 local ceil, min, max, abs = math.ceil, math.min, math.max, math.abs
 local sub, byte, format = string.sub, string.byte, string.format
 local KEYS = {"transform", "opacity", "stroke", "fill", "progress", "dash_offset", "tail", "tip",
-              "width", "radius", "size", "corner", "buff", "gradient", "blur", "shadow", "value",
+              "width", "radius", "size", "corner", "trim_distance", "gradient", "blur", "shadow", "value",
               "points", "from", "to", "origin", "control1", "control2", "fn", "x_range", "y_range",
               "discontinuities", "center", "vertex", "start", "angle", "level", "values"}
 -- Times closer than this are one moment, so windows that share no more do not overlap.
@@ -284,6 +284,12 @@ function methods.track(scene, first, ...)
         if type(first) ~= "table" or #first == 0 then error("track requires a tracker or an array of {tracker, value}", 2) end
         moves = first
         duration, curve = ...
+    end
+    if type(duration) == "table" then
+        if curve ~= nil then error("timing options cannot be combined with positional arguments", 2) end
+        local values = call(2, timing, duration)
+        duration, curve = values[1], values[2]
+        if duration == nil then duration = 1 end
     end
     if type(duration) ~= "number" or not (duration > 0) or duration == math.huge then
         error("track duration must be a positive finite number", 2)

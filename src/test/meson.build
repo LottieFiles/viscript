@@ -86,6 +86,7 @@ cpp_tests += [
         'args': vis_args + (gl_enabled ? ['-DVIS_EXPECT_GL'] : []) + [font_arg],
     },
     {'name': 'composite', 'exe': 'testComposite', 'when': cpu_enabled and native},
+    {'name': 'timing-options', 'exe': 'testTimingOptions', 'when': cpu_enabled and native, 'args': expect_lua},
     {'name': 'ui', 'exe': 'testUi', 'when': cpu_enabled and ui_enabled, 'deps': ui_deps},
     {
         'name': 'input', 'exe': 'testInput', 'when': cpu_enabled and input_enabled,

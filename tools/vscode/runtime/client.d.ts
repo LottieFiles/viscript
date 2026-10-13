@@ -317,8 +317,8 @@ export interface VisScene {
     font(name: string, data: Uint8Array | ArrayBuffer, mime?: string): void;
     /** Register before loading an asset-dependent scene. WASM resolves bytes through the host, not a filesystem. */
     asset(name: string, data: Uint8Array | ArrayBuffer, mime: string): void;
-    /** Returns false when the Scene is fixed or neither optional interactive module is present. */
-    camera(action: "pan" | "orbit" | "zoom" | "reset" | "view2d" | "view3d", x?: number, y?: number): boolean;
+    /** Applies interactive camera input. Returns false for fixed scenes or when UI and Input are absent. */
+    cameraInput(action: "pan" | "orbit" | "zoom" | "reset" | "view2d" | "view3d", x?: number, y?: number): boolean;
     /** Available when UI or Input is compiled. UI consumes control events before Input receives unhandled events. */
     input?(event: VisInputEvent): VisInputResult;
     /** Starts one host/game frame and clears transient input edges, pointer delta, and wheel delta. */

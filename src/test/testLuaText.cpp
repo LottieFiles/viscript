@@ -838,7 +838,7 @@ return s
     delete scene;
 }
 
-// A brace lies along the side of what it spans that faces its direction, buff off it, its ends
+// A brace lies along the side of what it spans that faces its direction, offset off it, its ends
 // where that side ends and its tip depth out; it is set with its text, so its sizes follow the
 // text's size, and a label stands gap off its tip, a string as the ink of a text, a handle by
 // its bounds.
@@ -855,13 +855,13 @@ local dot = s:circle {id = "dot", center = {0, 50}, radius = 30}
 local under, none = s:brace {around = dot, id = "under", size = 20}
 if none ~= nil then error("a brace without a label returns it alone") end
 if not sides(s:bounds(under), -30, 30, 7, 15) then error("under") end
-if not sides(s:bounds(s:brace {around = dot, direction = "right", buff = 2, depth = 6}), 32, 38, 20, 80) then
+if not sides(s:bounds(s:brace {around = dot, direction = "right", offset = 2, depth = 6}), 32, 38, 20, 80) then
     error("right")
 end
-if not sides(s:bounds(s:brace {around = dot, direction = "up", buff = 0, depth = 3}), -30, 30, 80, 83) then
+if not sides(s:bounds(s:brace {around = dot, direction = "up", offset = 0, depth = 3}), -30, 30, 80, 83) then
     error("up")
 end
-if not sides(s:bounds(s:brace {around = dot, direction = {-2, 0}, buff = 1, depth = 4}), -35, -31, 20, 80) then
+if not sides(s:bounds(s:brace {around = dot, direction = {-2, 0}, offset = 1, depth = 4}), -35, -31, 20, 80) then
     error("left")
 end
 -- A label string stands gap off the tip by its ink, its middle on the tip.
@@ -871,25 +871,25 @@ if not (near(l.bottom, o.top + 4) and near(l.left + l.right, 0)) then error("lab
 if s:find("over/label") ~= label then error("label id") end
 -- A label handle moves there by its bounds, and comes back as the second value.
 local note = s:text {text = "r", point = {100, 100}, measure = true, size = 20}
-local _, moved = s:brace {around = dot, direction = "left", label = note, gap = 3, depth = 6, buff = 2}
+local _, moved = s:brace {around = dot, direction = "left", label = note, gap = 3, depth = 6, offset = 2}
 if moved ~= note then error("label handle") end
 local n = s:bounds(note)
 if not (near(n.right, -41) and near(n.bottom + n.top, 100)) then error("label place") end
 -- Between two points, below a segment drawn left to right unless a direction says otherwise.
-if not sides(s:bounds(s:brace {from = {-100, -100}, to = {100, -100}, buff = 0, depth = 10}), -100, 100, -110, -100) then
+if not sides(s:bounds(s:brace {from = {-100, -100}, to = {100, -100}, offset = 0, depth = 10}), -100, 100, -110, -100) then
     error("segment")
 end
-if not sides(s:bounds(s:brace {from = {-100, -100}, to = {100, -100}, direction = {1, 1}, buff = 2, depth = 10}),
+if not sides(s:bounds(s:brace {from = {-100, -100}, to = {100, -100}, direction = {1, 1}, offset = 2, depth = 10}),
              -100, 100, -98, -88) then
     error("segment side")
 end
 -- A slanted brace meets the corner of a square: its ends lie on the line through the corner.
-local b = s:bounds(s:brace {around = s:rectangle {center = {0, -50}, size = {20, 20}}, direction = {1, 1}, buff = 0, depth = 4})
+local b = s:bounds(s:brace {around = s:rectangle {center = {0, -50}, size = {20, 20}}, direction = {1, 1}, offset = 0, depth = 4})
 if not (near(b.left, 0) and near(b.bottom, -50)) then error("slanted") end
 -- In a group, in the group's units.
 local holder = s:group {matrix = {2, 0, 0, 0, 0, 2, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}}
 local inner = holder:rectangle {center = {0, -100}, size = {10, 4}}
-if not sides(s:bounds(holder:brace {around = inner, buff = 1, depth = 2}), -10, 10, -210, -206) then error("group") end
+if not sides(s:bounds(holder:brace {around = inner, offset = 1, depth = 2}), -10, 10, -210, -206) then error("group") end
 return s
 )lua";
     char error[512] = {};
@@ -936,8 +936,9 @@ return s
     fails("s:brace{around=c, direction=3}", direction);
     fails("s:brace{around=c, label=5}", "brace label must be a string or a handle");
     fails("s:brace{around=c, depth=0}", "brace depth must be positive");
-    fails("s:brace{around=c, buff=-1}", "brace buff and gap must be zero or more");
-    fails("s:brace{around=c, gap=-1}", "brace buff and gap must be zero or more");
+    fails("s:brace{around=c, offset=-1}", "brace offset and gap must be zero or more");
+    fails("s:brace{around=c, buff=1}", "unknown option 'buff'");
+    fails("s:brace{around=c, gap=-1}", "brace offset and gap must be zero or more");
     fails("s:brace{around=c, align={0,0}}", "unknown option 'align'");
     fails("s:brace{around={}}", "around must be a handle or a list of handles");
     fails("s:brace{around={c, 1}}", "around must be a handle or a list of handles");

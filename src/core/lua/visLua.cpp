@@ -939,26 +939,26 @@ static int _objectGc(lua_State* lua)
     return 0;
 }
 
-static Vec2 _buff(lua_State* lua, int index)
+static Vec2 _trimDistance(lua_State* lua, int index)
 {
     Vec2 value;
-    lua_getfield(lua, index, "buff");
+    lua_getfield(lua, index, "trim_distance");
     if (lua_type(lua, -1) == LUA_TNUMBER) {
-        value.x = value.y = _number(lua, -1, "buff");
+        value.x = value.y = _number(lua, -1, "trim_distance");
     } else if (lua_istable(lua, -1)) {
-        if (lua_rawlen(lua, -1) != 2u) luaL_error(lua, "buff must be a number or {start, end}");
+        if (lua_rawlen(lua, -1) != 2u) luaL_error(lua, "trim_distance must be a number or {start, end}");
         for (auto i = 1; i <= 2; i++) {
             lua_rawgeti(lua, -1, i);
-            auto distance = _number(lua, -1, "buff");
+            auto distance = _number(lua, -1, "trim_distance");
             if (i == 1) value.x = distance;
             else value.y = distance;
             lua_pop(lua, 1);
         }
     } else if (!lua_isnil(lua, -1)) {
-        luaL_error(lua, "buff must be a number or {start, end}");
+        luaL_error(lua, "trim_distance must be a number or {start, end}");
     }
     lua_pop(lua, 1);
-    if (value.x < 0.0f || value.y < 0.0f) luaL_error(lua, "buff cannot be negative");
+    if (value.x < 0.0f || value.y < 0.0f) luaL_error(lua, "trim_distance cannot be negative");
     return value;
 }
 
@@ -966,14 +966,14 @@ static int _line(lua_State* lua)
 {
     auto space = _space(lua);
     luaL_checktype(lua, 2, LUA_TTABLE);
-    _options(lua, 2, {"from", "to", "buff"});
+    _options(lua, 2, {"from", "to", "trim_distance"});
     auto from = _fieldWorld(lua, 2, "from");
     auto to = _fieldWorld(lua, 2, "to");
     auto owner = _owner(lua, space.scene);
-    auto buff = _buff(lua, 2);
+    auto trimDistance = _trimDistance(lua, 2);
     auto object = Line::gen(from, to);
     owner->object = object;
-    if (object) object->buff = buff;
+    if (object) object->trimDistance = trimDistance;
     return _add(lua, space, owner, object, 2, "line");
 }
 
@@ -981,18 +981,18 @@ static int _arrow(lua_State* lua)
 {
     auto space = _space(lua);
     luaL_checktype(lua, 2, LUA_TTABLE);
-    _options(lua, 2, {"from", "to", "tail", "tip", "buff"});
+    _options(lua, 2, {"from", "to", "tail", "tip", "trim_distance"});
     auto from = _fieldWorld(lua, 2, "from");
     auto to = _fieldWorld(lua, 2, "to");
     auto tail = _fieldNumber(lua, 2, "tail", 0.0f);
     auto tip = _fieldNumber(lua, 2, "tip", 16.0f);
     if (tail < 0.0f || tip < 0.0f) return luaL_error(lua, "tail and tip must be non-negative");
-    auto buff = _buff(lua, 2);
+    auto trimDistance = _trimDistance(lua, 2);
     auto owner = _owner(lua, space.scene);
     auto object = Arrow::gen(from, to);
     owner->object = object;
     if (object) {
-        object->buff = buff;
+        object->trimDistance = trimDistance;
         object->tail = tail;
         object->tip = tip;
     }
@@ -3092,18 +3092,18 @@ static int _vector(lua_State* lua)
 {
     auto space = _space(lua);
     luaL_checktype(lua, 2, LUA_TTABLE);
-    _options(lua, 2, {"value", "origin", "tail", "tip", "buff"});
+    _options(lua, 2, {"value", "origin", "tail", "tip", "trim_distance"});
     auto value = _fieldWorld(lua, 2, "value");
     auto origin = _fieldWorld(lua, 2, "origin", {});
     auto tail = _fieldNumber(lua, 2, "tail", 0.0f);
     auto tip = _fieldNumber(lua, 2, "tip", 16.0f);
     if (tail < 0.0f || tip < 0.0f) return luaL_error(lua, "tail and tip must be non-negative");
-    auto buff = _buff(lua, 2);
+    auto trimDistance = _trimDistance(lua, 2);
     auto owner = _owner(lua, space.scene);
     auto object = Vector::gen(value, origin);
     owner->object = object;
     if (object) {
-        object->buff = buff;
+        object->trimDistance = trimDistance;
         object->tail = tail;
         object->tip = tip;
     }
@@ -3464,7 +3464,7 @@ static int _rectangle(lua_State* lua)
 {
     auto space = _space(lua);
     luaL_checktype(lua, 2, LUA_TTABLE);
-    _options(lua, 2, {"center", "size", "corner", "buff", "around", "padding"});
+    _options(lua, 2, {"center", "size", "corner", "around", "padding"});
     auto center = _fieldWorld(lua, 2, "center", {});
     auto size = _fieldVec2(lua, 2, "size", {1.0f, 1.0f});
     auto corner = _fieldNumber(lua, 2, "corner", 0.0f);
@@ -6216,14 +6216,59 @@ static AnimCurve _fieldCurve(lua_State* lua, int index, const char* name)
     return curve;
 }
 
-static AnimCurve _fieldEffectCurve(lua_State* lua, int index)
+static const char* _curveField(lua_State* lua, int index)
 {
     auto hasEasing = _has(lua, index, "easing");
     auto hasCurve = _has(lua, index, "curve");
     if (hasEasing && hasCurve) luaL_error(lua, "use either 'easing' or 'curve', not both");
-    if (hasCurve) return _fieldCurve(lua, index, "curve");
-    if (hasEasing) return _fieldCurve(lua, index, "easing");
-    return AnimCurve::preset(AnimCurvePreset::Smooth);
+    return hasEasing ? "easing" : "curve";
+}
+
+static AnimCurve _fieldEffectCurve(lua_State* lua, int index)
+{
+    return _fieldCurve(lua, index, _curveField(lua, index));
+}
+
+bool detail::luaTiming(lua_State* lua, int index, int options, bool stagger,
+                       std::initializer_list<const char*> fields)
+{
+    if (!lua_istable(lua, index)) return false;
+    for (auto i = index + 1; i <= lua_gettop(lua); i++) {
+        if (!lua_isnil(lua, i)) luaL_error(lua, "timing options cannot be combined with positional arguments");
+    }
+    lua_pushnil(lua);
+    while (lua_next(lua, index)) {
+        if (lua_type(lua, -2) != LUA_TSTRING) luaL_error(lua, "option names must be strings");
+        auto name = lua_tostring(lua, -2);
+        if (!_option(name, {"duration", "curve", "easing"}, false)
+            && !(stagger && std::strcmp(name, "lag") == 0) && !_option(name, fields, false)) {
+            luaL_error(lua, "unknown option '%s'", name);
+        }
+        lua_pop(lua, 1);
+    }
+    auto curve = _curveField(lua, index);
+    auto last = std::max(index + (stagger ? 2 : 1), options);
+    lua_settop(lua, last);
+    lua_pushvalue(lua, index);
+    auto table = lua_gettop(lua);
+    lua_getfield(lua, table, "duration");
+    lua_replace(lua, index);
+    lua_getfield(lua, table, curve);
+    lua_replace(lua, index + 1);
+    if (stagger && options != index + 2) {
+        lua_getfield(lua, table, "lag");
+        lua_replace(lua, index + 2);
+    }
+    if (options) {
+        lua_newtable(lua);
+        for (auto field : fields) {
+            lua_getfield(lua, table, field);
+            lua_setfield(lua, -2, field);
+        }
+        lua_replace(lua, options);
+    }
+    lua_pop(lua, 1);
+    return true;
 }
 
 static float _duration(lua_State* lua, int index, float fallback, bool zero = false)
@@ -6480,7 +6525,7 @@ static int _brace(lua_State* lua)
 {
     auto space = _space(lua);
     luaL_checktype(lua, 2, LUA_TTABLE);
-    _options(lua, 2, {"around", "from", "to", "direction", "buff", "depth", "label", "gap", "size", "font", "role",
+    _options(lua, 2, {"around", "from", "to", "direction", "offset", "depth", "label", "gap", "size", "font", "role",
                       "orientation"});
     lua_settop(lua, 2);
     auto box = space.scene;
@@ -6503,10 +6548,10 @@ static int _brace(lua_State* lua)
     _text(lua, 2, text);
     auto size = text->size > 0.0f ? text->size : _roleTheme(scene->theme(), text->role).size;
     auto em = text->orientation == TextOrientation::Plane ? size : size * _pixelWorld(scene->config());
-    auto buff = _fieldNumber(lua, 2, "buff", 0.25f * em);
+    auto offset = _fieldNumber(lua, 2, "offset", 0.25f * em);
     auto depth = _fieldNumber(lua, 2, "depth", 0.4f * em);
     auto gap = _fieldNumber(lua, 2, "gap", 0.2f * em);
-    if (buff < 0.0f || gap < 0.0f) return luaL_error(lua, "brace buff and gap must be zero or more");
+    if (offset < 0.0f || gap < 0.0f) return luaL_error(lua, "brace offset and gap must be zero or more");
     if (!(depth > 0.0f)) return luaL_error(lua, "brace depth must be positive");
 
     LuaBraceFrame frame;
@@ -6547,7 +6592,7 @@ static int _brace(lua_State* lua)
         lua_pop(lua, 1);
         if (!reach.defined) return luaL_error(lua, "around needs objects with bounds, such as texts set with measure = true");
         frame.width = reach.high - reach.low;
-        frame.start = frame.across * reach.low + frame.out * (reach.out + buff)
+        frame.start = frame.across * reach.low + frame.out * (reach.out + offset)
                       + Vec3{0.0f, 0.0f, 0.5f * (reach.front + reach.back)};
     } else if (from || to) {
         if (!from || !to) return luaL_error(lua, "brace needs both from and to");
@@ -6564,7 +6609,7 @@ static int _brace(lua_State* lua)
         auto length = out.length();
         if (!(length > 1.0e-4f)) return luaL_error(lua, "brace direction must not run along from and to");
         frame.out = out / length;
-        frame.start = start + frame.out * buff;
+        frame.start = start + frame.out * offset;
     } else {
         return luaL_error(lua, "brace needs around, or from and to");
     }
@@ -7037,7 +7082,7 @@ static AnimationTarget _animationTarget(lua_State* lua, LuaScene* box, int index
     index = lua_absindex(lua, index);
     _options(lua, index,
              {"target", "shift", "transform", "arc", "opacity", "stroke", "fill",
-              "dash_offset", "tail", "tip", "progress", "width", "radius", "size", "corner", "buff",
+              "dash_offset", "tail", "tip", "progress", "width", "radius", "size", "corner", "trim_distance",
               "gradient", "blur", "shadow", "value", "text", "retype", "layer", "points", "from",
               "to", "origin", "control1", "control2", "fn", "x_range", "y_range", "discontinuities", "center", "vertex", "start", "angle", "level", "values"},
              false);
@@ -7108,7 +7153,7 @@ static AnimationTarget _animationTarget(lua_State* lua, LuaScene* box, int index
     if (_has(lua, index, "width")) {
         auto width = _fieldNumber(lua, index, "width", 0.0f);
         if (width < 0.0f) luaL_error(lua, "width cannot be negative");
-        target.width(width);
+        target.strokeWidth(width);
         changed = true;
     }
     if (_has(lua, index, "start")) { target.start(_fieldNumber(lua, index, "start", 0.0f)); changed = true; }
@@ -7134,8 +7179,8 @@ static AnimationTarget _animationTarget(lua_State* lua, LuaScene* box, int index
         luaL_error(lua, "size must be a number for text or {width, height} for a rectangle");
     }
     lua_pop(lua, 1);
-    if (_has(lua, index, "buff")) {
-        target.buff(_buff(lua, index));
+    if (_has(lua, index, "trim_distance")) {
+        target.trimDistance(_trimDistance(lua, index));
         changed = true;
     }
     if (_has(lua, index, "corner")) {
@@ -7212,6 +7257,7 @@ static AnimationTarget _animationTarget(lua_State* lua, LuaScene* box, int index
 
 static int _playTargets(lua_State* lua)
 {
+    detail::luaTiming(lua, 3, 0, true);
     auto box = _scene(lua);
     luaL_checktype(lua, 2, LUA_TTABLE);
     auto duration = _duration(lua, 3, 1.0f);
@@ -7343,6 +7389,7 @@ static int _save(lua_State* lua)
 // seconds, each later target lag of the duration later, or at the cursor without a duration.
 static int _restore(lua_State* lua)
 {
+    detail::luaTiming(lua, 3, 0, true);
     auto box = _scene(lua);
     // The targets are stored above the arguments, so absent ones must read as nil.
     lua_settop(lua, 5);
@@ -7372,6 +7419,11 @@ static Animation _revealAnimation(Object* object, AnimationKind kind,
 
 static int _reveal(lua_State* lua, AnimationKind kind)
 {
+    if (kind == AnimationKind::FillReveal) detail::luaTiming(lua, 3, 0, true);
+    else if (detail::luaTiming(lua, 3, 6, true, {"direction"})) {
+        lua_getfield(lua, 6, "direction");
+        lua_replace(lua, 6);
+    }
     auto box = _scene(lua);
     auto scene = box->scene;
     auto duration = _duration(lua, 3, 1.0f);
@@ -7428,6 +7480,7 @@ static int _write(lua_State* lua)
 
 static int _shift(lua_State* lua)
 {
+    detail::luaTiming(lua, 4);
     auto box = _scene(lua);
     auto scene = box->scene;
     auto object = _object(lua, scene, 2);
@@ -7439,6 +7492,7 @@ static int _shift(lua_State* lua)
 
 static int _transform(lua_State* lua)
 {
+    detail::luaTiming(lua, 4);
     auto box = _scene(lua);
     auto scene = box->scene;
     auto object = _object(lua, scene, 2);
@@ -7448,16 +7502,9 @@ static int _transform(lua_State* lua)
     return _play(lua, box, &animation, 1, _duration(lua, 4, 1.0f), _curve(lua, 5));
 }
 
-struct MotionOptions
+static AnimationOptions _motionOptions(lua_State* lua, int index, std::initializer_list<const char*> fields)
 {
-    float duration = 1.0f;
-    float lag = 0.0f;
-    AnimCurve curve = AnimCurve::preset(AnimCurvePreset::Smooth);
-};
-
-static MotionOptions _motionOptions(lua_State* lua, int index, std::initializer_list<const char*> fields)
-{
-    MotionOptions options;
+    AnimationOptions options;
     if (lua_isnoneornil(lua, index)) return options;
     luaL_checktype(lua, index, LUA_TTABLE);
     _options(lua, index, fields, false);
@@ -7912,6 +7959,7 @@ static bool _warpPoint(const Vec3& point, Vec3& image, void* data) noexcept
 // Accepts a callback or a sampled grid from the JavaScript builder.
 static int _warp(lua_State* lua)
 {
+    detail::luaTiming(lua, 4, 6, false, {"step"});
     auto box = _scene(lua);
     lua_settop(lua, 6);
     auto scene = box->scene;
@@ -7986,6 +8034,7 @@ static int _warp(lua_State* lua)
 
 static int _fade(lua_State* lua)
 {
+    detail::luaTiming(lua, 4);
     auto box = _scene(lua);
     auto scene = box->scene;
     auto object = _object(lua, scene, 2);
@@ -8040,6 +8089,7 @@ static int _fadeOut(lua_State* lua)
 
 static int _growFromCenter(lua_State* lua)
 {
+    detail::luaTiming(lua, 3);
     auto box = _scene(lua);
     auto animation = Animation::growFromCenter(_object(lua, box->scene, 2));
     return _play(lua, box, &animation, 1, _duration(lua, 3, 1.0f), _curve(lua, 4));
@@ -8047,6 +8097,7 @@ static int _growFromCenter(lua_State* lua)
 
 static int _growFromEdge(lua_State* lua)
 {
+    detail::luaTiming(lua, 4);
     auto box = _scene(lua);
     auto animation = Animation::growFromEdge(_object(lua, box->scene, 2),
                                              _growthEdge(lua, 3));
@@ -8055,6 +8106,7 @@ static int _growFromEdge(lua_State* lua)
 
 static int _shrinkToCenter(lua_State* lua)
 {
+    detail::luaTiming(lua, 3);
     auto box = _scene(lua);
     auto animation = Animation::shrinkToCenter(_object(lua, box->scene, 2));
     return _play(lua, box, &animation, 1, _duration(lua, 3, 1.0f), _curve(lua, 4));
@@ -8313,8 +8365,9 @@ static void _morphColors(lua_State* lua, const Theme& theme, Animation& animatio
     animation.colorCount = total;
 }
 
-static int _morphEffect(lua_State* lua, bool replacement)
+static int _morph(lua_State* lua)
 {
+    detail::luaTiming(lua, 4, 6, true, {"lag", "copy", "pairs"});
     auto box = _scene(lua);
     auto sourceArray = lua_istable(lua, 2);
     auto targetArray = lua_istable(lua, 3);
@@ -8366,8 +8419,7 @@ static int _morphEffect(lua_State* lua, bool replacement)
     if (!sourceArray) {
         auto source = _object(lua, box->scene, 2);
         auto target = _object(lua, box->scene, 3);
-        auto animation = replacement ? Animation::replacementTransform(source, target)
-                                     : Animation::morph(source, target);
+        auto animation = Animation::morph(source, target);
         _morphColors(lua, box->scene->theme(), animation);
         animation.copy = copy;
         animation.pairs = pairs;
@@ -8391,8 +8443,7 @@ static int _morphEffect(lua_State* lua, bool replacement)
         lua_rawgeti(lua, 3, i + 1u);
         auto target = _object(lua, box->scene, -1);
         lua_pop(lua, 1);
-        auto animation = replacement ? Animation::replacementTransform(source, target)
-                                     : Animation::morph(source, target);
+        auto animation = Animation::morph(source, target);
         animation.copy = copy;
         animation.pairs = pairs;
         animation.pairCount = pairCount;
@@ -8403,18 +8454,9 @@ static int _morphEffect(lua_State* lua, bool replacement)
     return _play(lua, box, animations, static_cast<uint32_t>(size), duration, curve, lag, copies);
 }
 
-static int _morph(lua_State* lua)
-{
-    return _morphEffect(lua, false);
-}
-
-static int _replacementTransform(lua_State* lua)
-{
-    return _morphEffect(lua, true);
-}
-
 static int _fadeTransform(lua_State* lua)
 {
+    detail::luaTiming(lua, 4);
     auto box = _scene(lua);
     auto source = _object(lua, box->scene, 2);
     auto target = _object(lua, box->scene, 3);
@@ -8453,6 +8495,7 @@ static uint32_t _pieceCount(const Object* object)
 //                       strings = true, diff = false, fade = 1, copy = false})
 static int _matchTransform(lua_State* lua)
 {
+    detail::luaTiming(lua, 4, 6, true, {"arc", "lag", "pairs", "strings", "diff", "shapes", "fade", "copy", "path"});
     auto box = _scene(lua);
     auto scene = box->scene;
     auto source = _object(lua, scene, 2);
@@ -8707,6 +8750,7 @@ static void _codeNextId(lua_State* lua, const Scene* scene, const char* id)
 // diff = true does. The new block joins the parent of block in its transform, at the cursor.
 static int _edit(lua_State* lua)
 {
+    detail::luaTiming(lua, 4, 6, true, {"id", "arc", "lag", "fade"});
     auto box = _scene(lua);
     auto scene = box->scene;
     auto source = _object(lua, scene, 2);
@@ -8880,6 +8924,7 @@ static int _highlight(lua_State* lua)
 // another over duration; an item added at the cursor grows into its place.
 static int _arrangeOver(lua_State* lua)
 {
+    detail::luaTiming(lua, 3, 5, false, {"direction", "gap", "center"});
     auto box = _scene(lua);
     auto scene = box->scene;
     // The items are stored above the arguments, so absent ones must read as nil.
@@ -8965,6 +9010,7 @@ static void _fadeGroup(lua_State* lua, Scene* scene, int index, Animation* anima
 
 static int _transition(lua_State* lua)
 {
+    detail::luaTiming(lua, 4);
     auto box = _scene(lua);
     // The animations are stored above the arguments, so absent ones must read as nil.
     lua_settop(lua, 5);
@@ -8982,6 +9028,7 @@ static int _transition(lua_State* lua)
 
 static int _stroke(lua_State* lua)
 {
+    detail::luaTiming(lua, 4);
     auto box = _scene(lua);
     auto scene = box->scene;
     auto animation = Animation::stroke(_object(lua, scene, 2),
@@ -8991,6 +9038,7 @@ static int _stroke(lua_State* lua)
 
 static int _fill(lua_State* lua)
 {
+    detail::luaTiming(lua, 4);
     auto box = _scene(lua);
     auto scene = box->scene;
     auto animation = Animation::fill(_object(lua, scene, 2),
@@ -9310,6 +9358,7 @@ static void _lookFields(lua_State* lua, LuaScene* box, int index, Camera& camera
 // look(camera, duration = 1, curve = "smooth") on the scene or on one of its views.
 static int _lookCamera(lua_State* lua, const LuaCamera& target)
 {
+    detail::luaTiming(lua, 3);
     auto camera = target.camera;
     auto view = target.cameraView;
     _lookFields(lua, target.box, 2, camera, view);
@@ -10046,7 +10095,7 @@ static int _trackerUnknown(lua_State* lua)
 {
     static constexpr const char* keys[] = {"shift", "transform", "opacity", "stroke", "fill",
                                            "progress", "dash_offset", "tail", "tip", "width",
-                                           "radius", "size", "corner", "buff", "gradient", "blur", "shadow",
+                                           "radius", "size", "corner", "trim_distance", "gradient", "blur", "shadow",
                                            "value", "points", "from", "to", "origin", "control1",
                                            "control2", "fn", "x_range", "y_range", "discontinuities", "center", "vertex", "start", "angle", "level", "values"};
     luaL_checktype(lua, 1, LUA_TTABLE);
@@ -10163,11 +10212,11 @@ static int _focusCamera(lua_State* lua, const LuaCamera& target)
         lua_pushnil(lua);
     } else {
         luaL_checktype(lua, 3, LUA_TTABLE);
-        _options(lua, 3, {"padding", "duration", "curve"}, false);
+        _options(lua, 3, {"padding", "duration", "easing", "curve"}, false);
         padding = _fieldNumber(lua, 3, "padding", padding);
         duration = _fieldNumber(lua, 3, "duration", duration);
         if (!std::isfinite(padding) || padding < 0.0f) return luaL_error(lua, "padding must be a non-negative number");
-        lua_getfield(lua, 3, "curve");
+        lua_getfield(lua, 3, _curveField(lua, 3));
     }
     if (home && (target.cameraView != CameraView::TwoD || openingView != CameraView::TwoD)) {
         // Outside the 2D view the whole opening camera comes back, its view and lens included.
@@ -10297,6 +10346,7 @@ static int _viewOrbit(lua_State* lua)
 // follow one another.
 static int _viewFade(lua_State* lua)
 {
+    detail::luaTiming(lua, 3);
     auto view = _viewHandle(lua);
     auto box = view->scene;
     auto opacity = _number(lua, 2, "opacity");
@@ -10660,7 +10710,6 @@ static const luaL_Reg SCENE_METHODS[] = {
     {"flash", _flash},
     {"ripple", _ripple},
     {"morph", _morph},
-    {"replacement_transform", _replacementTransform},
     {"fade_transform", _fadeTransform},
     {"match_transform", _matchTransform},
     {"edit", _edit},

@@ -17,7 +17,7 @@ Build both formula and geometry from that ledger.
 
 When length, area, angle, projection, or count is evidence, derive its geometry from the algebra. Tiles and strips that complete a square must meet the claimed edges; equal areas must share computed measures; rearranged pieces must preserve total measure. If scale is intentionally illustrative, label that limitation and still preserve the incidence, ownership, and proportional relationships used by the proof. A positive-length area construction may establish a polynomial identity, but cannot literally represent negative solution lengths; state that boundary on screen when it matters. Arbitrary placement is not proof.
 
-Represent expressions as measured `Text` pieces or Groups, such as `spans` rows, or as `tex` formulas when the host has the tex module, each carried term a part of its own; without that module, do not assume LaTeX, `MathTex`, or glyph-level morphing. A carried term keeps its identity and color in the expression itself, not only in a legend. Give a changed expression a new target. Use `fade_transform` for a representation change and `replacement_transform` only when the source may be consumed; reconstruct any proxy needed later.
+Represent expressions as measured `Text` pieces or Groups, such as `spans` rows, or as `tex` formulas when the host has the tex module, each carried term a part of its own; without that module, do not assume LaTeX, `MathTex`, or glyph-level morphing. A carried term keeps its identity and color in the expression itself, not only in a legend. Give a changed expression a new target. Use `fade_transform` for a representation change and `morph` only when the source may be consumed; reconstruct any proxy needed later.
 
 ## Stage the derivation
 

@@ -81,6 +81,26 @@ return scene
 `, "ordinary-motion.lua");
     assert.equal(runtime.retainedLua, false);
     assert(center(runtime.bounds("motion-static", 0)).x > 50);
+
+    runtime.loadLua(`
+local scene = vis.scene {width = 100, height = 50}
+local a = scene:circle {id = "a"}
+local b = scene:circle {id = "b"}
+local motion = vis.motion(scene)
+motion:define(a, "right", {shift = {1, 0}})
+motion:define(b, "up", {shift = {0, 1}})
+motion:transition({{object = a, state = "right"}, {object = b, state = "up"}}, {duration = 1, curve = "linear"})
+assert(motion:event(1).transaction == motion:event(2).transaction)
+motion:advance(0.5)
+assert(math.abs(motion:sample(a).shift[1] - 0.5) < 0.0001)
+assert(math.abs(motion:sample(b).shift[2] - 0.5) < 0.0001)
+local target = scene:rectangle {id = "morphed"}
+scene:morph(a, target, {duration = 1})
+return scene
+`, "batch-motion.lua");
+    assert.equal(runtime.duration, 1);
+    assert.ok(runtime.bounds("morphed", 1).width > 0);
+    assert.equal(runtime.render(1, true).length, 100 * 50 * 4);
 } finally {
     runtime.destroy();
 }

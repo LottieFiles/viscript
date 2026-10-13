@@ -271,7 +271,7 @@ uint64_t fingerprint(const Object* object) noexcept
             auto value = static_cast<const Line*>(object);
             _hash(hash, value->from);
             _hash(hash, value->to);
-            _hash(hash, value->buff);
+            _hash(hash, value->trimDistance);
             break;
         }
         case Type::Arrow: {
@@ -280,7 +280,7 @@ uint64_t fingerprint(const Object* object) noexcept
             _hash(hash, value->to);
             _hash(hash, value->tail);
             _hash(hash, value->tip);
-            _hash(hash, value->buff);
+            _hash(hash, value->trimDistance);
             break;
         }
         case Type::Point: _hash(hash, static_cast<const Point*>(object)->point); break;
@@ -312,7 +312,7 @@ uint64_t fingerprint(const Object* object) noexcept
             _hash(hash, value->origin);
             _hash(hash, value->tail);
             _hash(hash, value->tip);
-            _hash(hash, value->buff);
+            _hash(hash, value->trimDistance);
             break;
         }
         case Type::Space: {
@@ -1103,17 +1103,17 @@ static VisualState _state(const Object* object)
     state.radius = object->style.radius;
     state.dashOffset = object->style.dashOffset;
     switch (object->type()) {
-        case Type::Line: state.buff = static_cast<const Line*>(object)->buff; break;
+        case Type::Line: state.trimDistance = static_cast<const Line*>(object)->trimDistance; break;
         case Type::Arrow: {
             auto directed = static_cast<const Arrow*>(object);
-            state.buff = directed->buff;
+            state.trimDistance = directed->trimDistance;
             state.markerTail = directed->tail;
             state.markerTip = directed->tip;
             break;
         }
         case Type::Vector: {
             auto directed = static_cast<const Vector*>(object);
-            state.buff = directed->buff;
+            state.trimDistance = directed->trimDistance;
             state.markerTail = directed->tail;
             state.markerTip = directed->tip;
             break;
@@ -1212,17 +1212,17 @@ void Scene::Impl::store(Object* object, const VisualState& state) noexcept
     object->style.radius = state.radius;
     object->style.dashOffset = state.dashOffset;
     switch (object->type()) {
-        case Type::Line: static_cast<Line*>(object)->buff = state.buff; break;
+        case Type::Line: static_cast<Line*>(object)->trimDistance = state.trimDistance; break;
         case Type::Arrow: {
             auto directed = static_cast<Arrow*>(object);
-            directed->buff = state.buff;
+            directed->trimDistance = state.trimDistance;
             directed->tail = state.markerTail;
             directed->tip = state.markerTip;
             break;
         }
         case Type::Vector: {
             auto directed = static_cast<Vector*>(object);
-            directed->buff = state.buff;
+            directed->trimDistance = state.trimDistance;
             directed->tail = state.markerTail;
             directed->tip = state.markerTip;
             break;
@@ -1453,7 +1453,7 @@ static VisualState _lerp(const VisualState& from, const VisualState& to, float p
     state.arcStart = static_cast<float>(static_cast<double>(from.arcStart) + (static_cast<double>(to.arcStart) - from.arcStart) * progress);
     state.arcAngle = static_cast<float>(static_cast<double>(from.arcAngle) + (static_cast<double>(to.arcAngle) - from.arcAngle) * progress);
     state.corner = extent(from.corner, to.corner);
-    state.buff = {extent(from.buff.x, to.buff.x), extent(from.buff.y, to.buff.y)};
+    state.trimDistance = {extent(from.trimDistance.x, to.trimDistance.x), extent(from.trimDistance.y, to.trimDistance.y)};
     auto number = [bounded](float a, float b) {
         return static_cast<float>(static_cast<double>(a) + (static_cast<double>(b) - a) * bounded);
     };
@@ -1530,7 +1530,7 @@ static void _apply(VisualState& state, const VisualState& source, uint32_t chann
     if (channels & CHANNEL_ARC_ANGLE) state.arcAngle = source.arcAngle;
     if (channels & CHANNEL_SIZE) state.size = source.size;
     if (channels & CHANNEL_CORNER) state.corner = source.corner;
-    if (channels & CHANNEL_BUFF) state.buff = source.buff;
+    if (channels & CHANNEL_TRIM_DISTANCE) state.trimDistance = source.trimDistance;
     if (channels & CHANNEL_BLUR) state.blur = source.blur;
     if (channels & CHANNEL_SHADOW) state.shadow = source.shadow;
     if (channels & CHANNEL_VALUE) state.value = source.value;
@@ -1580,7 +1580,7 @@ static constexpr auto TIMELINE_FLAT =
 static constexpr const char* CHANNEL_NAMES[] = {
     "transform", "opacity", "stroke color", "fill color", "dash offset", "tail", "tip",
     "drawing progress", "fill progress", "effect scale", "stroke width", "radius", "gradient",
-    "shape", "size", "corner", "blur", "shadow", "counted value", "text", "layer", "geometry", "buff", "arc start", "arc angle"};
+    "shape", "size", "corner", "blur", "shadow", "counted value", "text", "layer", "geometry", "trim distance", "arc start", "arc angle"};
 static_assert(sizeof(CHANNEL_NAMES) / sizeof(CHANNEL_NAMES[0]) == CHANNEL_COUNT, "every channel needs a name");
 
 // Fails a clip of these channels that would begin at time inside an earlier clip of the object,
@@ -3153,11 +3153,6 @@ Animation Animation::morph(Object* source, Object* target) noexcept
     return animation;
 }
 
-Animation Animation::replacementTransform(Object* source, Object* target) noexcept
-{
-    return morph(source, target);
-}
-
 Animation Animation::shift(Object* target, const Vec3& by) noexcept
 {
     if (!target) return {};
@@ -3269,7 +3264,7 @@ static constexpr uint32_t TARGET_VALUE = 1u << 15u;
 static constexpr uint32_t TARGET_TEXT = 1u << 16u;
 static constexpr uint32_t TARGET_LAYER = 1u << 17u;
 static constexpr uint32_t TARGET_GEOMETRY = 1u << 18u;
-static constexpr uint32_t TARGET_BUFF = 1u << 19u;
+static constexpr uint32_t TARGET_TRIM_DISTANCE = 1u << 19u;
 static constexpr uint32_t TARGET_ARC_START = 1u << 20u;
 static constexpr uint32_t TARGET_ARC_ANGLE = 1u << 21u;
 static constexpr uint32_t TARGET_ALL = (1u << 22u) - 1u;
@@ -3296,7 +3291,7 @@ static uint32_t _channels(uint32_t properties, Type type)
     if (properties & TARGET_ARC_ANGLE) channels |= CHANNEL_ARC_ANGLE;
     if (properties & TARGET_SIZE) channels |= CHANNEL_SIZE;
     if (properties & TARGET_CORNER) channels |= CHANNEL_CORNER;
-    if (properties & TARGET_BUFF) channels |= CHANNEL_BUFF;
+    if (properties & TARGET_TRIM_DISTANCE) channels |= CHANNEL_TRIM_DISTANCE;
     if (properties & TARGET_GRADIENT) channels |= CHANNEL_GRADIENT;
     if (properties & TARGET_BLUR) channels |= CHANNEL_BLUR;
     if (properties & TARGET_SHADOW) channels |= CHANNEL_SHADOW;
@@ -3377,7 +3372,7 @@ AnimationTarget AnimationTarget::from(Object* target) noexcept
     state.targetStart = sampled.arcStart; state.targetAngle = sampled.arcAngle;
     state.targetSize = sampled.size;
     state.targetCorner = sampled.corner;
-    state.targetBuff = sampled.buff;
+    state.targetTrimDistance = sampled.trimDistance;
     state.targetGradient = sampled.gradient;
     state.targetGradientEnd = sampled.gradientEnd;
     state.targetValue = sampled.value;
@@ -3448,7 +3443,7 @@ AnimationTarget& AnimationTarget::progress(float value) noexcept
     return *this;
 }
 
-AnimationTarget& AnimationTarget::width(float pixels) noexcept
+AnimationTarget& AnimationTarget::strokeWidth(float pixels) noexcept
 {
     targetWidth = pixels;
     properties |= TARGET_WIDTH;
@@ -3486,15 +3481,15 @@ AnimationTarget& AnimationTarget::size(const Vec2& value) noexcept
     return *this;
 }
 
-AnimationTarget& AnimationTarget::buff(float value) noexcept
+AnimationTarget& AnimationTarget::trimDistance(float value) noexcept
 {
-    return buff(Vec2{value, value});
+    return trimDistance(Vec2{value, value});
 }
 
-AnimationTarget& AnimationTarget::buff(const Vec2& value) noexcept
+AnimationTarget& AnimationTarget::trimDistance(const Vec2& value) noexcept
 {
-    targetBuff = value;
-    properties |= TARGET_BUFF;
+    targetTrimDistance = value;
+    properties |= TARGET_TRIM_DISTANCE;
     return *this;
 }
 
@@ -4103,7 +4098,7 @@ static void _settle(VisualState& state, Type kind)
     state.shadow.blur = std::fmin(std::fmax(state.shadow.blur, 0.0f), EFFECT_SIGMA_LIMIT);
     auto least = kind == Type::Text ? 0.0f : Least;
     state.size = {std::fmax(state.size.x, least), std::fmax(state.size.y, least)};
-    state.buff = {std::fmax(state.buff.x, 0.0f), std::fmax(state.buff.y, 0.0f)};
+    state.trimDistance = {std::fmax(state.trimDistance.x, 0.0f), std::fmax(state.trimDistance.y, 0.0f)};
     state.corner = std::fmin(std::fmax(state.corner, 0.0f), std::fmin(state.size.x, state.size.y) * 0.5f);
 }
 
@@ -6761,13 +6756,13 @@ const char* Scene::Impl::unanimatable(const AnimationTarget& target) noexcept
         || ((properties & TARGET_TIP) && (!std::isfinite(target.targetTip) || target.targetTip < 0.0f))) {
         return VALUE_MARKER_SIZE;
     }
-    if ((properties & TARGET_BUFF)
+    if ((properties & TARGET_TRIM_DISTANCE)
         && ((type != Type::Line && type != Type::Arrow && type != Type::Vector)
-            || !_finite(target.targetBuff) || target.targetBuff.x < 0.0f || target.targetBuff.y < 0.0f)) {
-        return "buff needs a line, arrow or vector and non-negative distances";
+            || !_finite(target.targetTrimDistance) || target.targetTrimDistance.x < 0.0f || target.targetTrimDistance.y < 0.0f)) {
+        return "trim distance needs a line, arrow or vector and non-negative distances";
     }
-    if ((properties & TARGET_BUFF) && warped(object)) {
-        return "a warped shape keeps the outline its warp gave, so buff no longer changes";
+    if ((properties & TARGET_TRIM_DISTANCE) && warped(object)) {
+        return "a warped shape keeps the outline its warp gave, so trim distance no longer changes";
     }
     if (properties & TARGET_GEOMETRY) {
         if (!geometric(object)) return VALUE_GEOMETRY;
@@ -6825,7 +6820,7 @@ VisualState Scene::Impl::targeted(const AnimationTarget& target, const VisualSta
     if (properties & TARGET_ARC_ANGLE) to.arcAngle = target.targetAngle;
     if (properties & TARGET_SIZE) to.size = target.targetSize;
     if (properties & TARGET_CORNER) to.corner = target.targetCorner;
-    if (properties & TARGET_BUFF) to.buff = target.targetBuff;
+    if (properties & TARGET_TRIM_DISTANCE) to.trimDistance = target.targetTrimDistance;
     if (properties & TARGET_GRADIENT) {
         to.gradient = target.targetGradient;
         to.gradientEnd = target.targetGradientEnd;
@@ -8105,7 +8100,7 @@ static uint32_t _changed(const VisualState& saved, const VisualState& rest)
     if (!(saved.gradient == rest.gradient) || !_equal(saved.gradientEnd, rest.gradientEnd)) channels |= CHANNEL_GRADIENT;
     if (saved.size.x != rest.size.x || saved.size.y != rest.size.y) channels |= CHANNEL_SIZE;
     if (saved.corner != rest.corner) channels |= CHANNEL_CORNER;
-    if (saved.buff.x != rest.buff.x || saved.buff.y != rest.buff.y) channels |= CHANNEL_BUFF;
+    if (saved.trimDistance.x != rest.trimDistance.x || saved.trimDistance.y != rest.trimDistance.y) channels |= CHANNEL_TRIM_DISTANCE;
     if (saved.blur != rest.blur) channels |= CHANNEL_BLUR;
     if (!_equal(saved.shadow.color, rest.shadow.color) || saved.shadow.offset.x != rest.shadow.offset.x
         || saved.shadow.offset.y != rest.shadow.offset.y || saved.shadow.blur != rest.shadow.blur) {
@@ -8439,7 +8434,7 @@ Result Scene::warp(Object* const* targets, uint32_t count, PointMap map, void* d
             item.channels = CHANNEL_MORPH;
             if (type == Type::Circle || type == Type::Rectangle) item.channels |= CHANNEL_SIZE | CHANNEL_CORNER;
             if (type == Type::Arc || type == Type::Angle) item.channels |= CHANNEL_SIZE | CHANNEL_ARC_START | CHANNEL_ARC_ANGLE;
-            if (type == Type::Line || type == Type::Arrow || type == Type::Vector) item.channels |= CHANNEL_BUFF;
+            if (type == Type::Line || type == Type::Arrow || type == Type::Vector) item.channels |= CHANNEL_TRIM_DISTANCE;
             if (geometric(object)) item.channels |= CHANNEL_GEOMETRY;
             if (begin < _channelEnd(*entry, item.channels)) return _overlap(impl, *entry, item.channels, begin);
             if (!_inverse(space, item.inverse)) return impl.fail(Result::InsufficientCondition, WARP_SPACE);
@@ -8611,7 +8606,7 @@ Result Scene::runtimeRemove(void* data) noexcept
     return Result::InsufficientCondition;
 }
 
-Result Scene::camera(const CameraInput& input) noexcept
+Result Scene::cameraInput(const CameraInput& input) noexcept
 {
     if (pImpl->cfg.cameraMode != CameraMode::Interactive) {
         return Result::InsufficientCondition;

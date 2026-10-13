@@ -183,22 +183,19 @@ static int _define(lua_State* lua)
 
 static int _transition(lua_State* lua)
 {
+    detail::luaTiming(lua, lua_istable(lua, 2) ? 3 : 4);
     auto controller = _controller(lua);
-    auto object = detail::luaObject(lua, controller->scene(), 2);
-    auto name = _text(lua, 3, "motion state name");
-    return _result(lua,
-                   controller->transition(object, name, _duration(lua, 4, 0.2f), _curve(lua, 5)),
-                   "transition");
-}
-
-static int _transitionMany(lua_State* lua)
-{
-    auto controller = _controller(lua);
-    luaL_checktype(lua, 2, LUA_TTABLE);
+    if (!lua_istable(lua, 2)) {
+        auto object = detail::luaObject(lua, controller->scene(), 2);
+        auto name = _text(lua, 3, "motion state name");
+        return _result(lua,
+                       controller->transition(object, name, _duration(lua, 4, 0.2f), _curve(lua, 5)),
+                       "transition");
+    }
     auto count = lua_rawlen(lua, 2);
     if (!count || count > Controller::ObjectLimit) {
-        return luaL_error(lua, "motion targets must contain 1 to %u entries",
-                          Controller::ObjectLimit);
+        return luaL_error(lua, "motion targets must contain 1 to %d entries",
+                          static_cast<int>(Controller::ObjectLimit));
     }
     // A state given as a number turns into a string that only the stack holds, so the states
     // wait in a table of their own until the controller has read them. The table is stored above
@@ -414,7 +411,6 @@ static int _open(lua_State* lua, void* data)
     static const luaL_Reg methods[] = {
         {"define", _define},
         {"transition", _transition},
-        {"transition_many", _transitionMany},
         {"advance", _advance},
         {"sample", _sample},
         {"time", _time},

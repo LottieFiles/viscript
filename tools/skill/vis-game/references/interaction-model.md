@@ -90,10 +90,11 @@ local motion = vis.motion(scene)
 motion:define(card, "card.idle", {})
 motion:define(card, "card.correct", {shift = {0, 0.12}, scale = {1.08, 1.08}})
 motion:transition(card, "card.correct", 0.18, "smooth")
+motion:transition({{object = card, state = "card.correct"}}, 0.18, "smooth")
 motion:advance(1 / 60)
 local visible = motion:sample(card)
 ```
 
-Motion uses its own clock. Define states during construction, capture the handle in retained decisions, and call `advance(dt)` once per simulation step when the clocks should share a cadence. `transition_many` applies a batch atomically. `event_count`, `event`, and `clear_events` expose acknowledgements.
+Motion uses its own clock. Define states during construction, capture the handle in retained decisions, and call `advance(dt)` once per simulation step when the clocks should share a cadence. Pass one object and state, or an array of `{object, state}` entries, to `transition`. A batch applies atomically. `event_count`, `event`, and `clear_events` expose acknowledgements.
 
 See [review.md](review.md) for retained runtime setup and interaction checks.

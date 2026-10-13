@@ -634,12 +634,12 @@ void instantUpdates(SwRenderer* renderer)
 
     // Before the timeline starts the values become the starting state, without clips.
     CHECK(scene->update(AnimationTarget::from(circle).fill(red).radius(1.0f)) == Result::Success);
-    CHECK(scene->update(AnimationTarget::from(group).width(6.0f)) == Result::Success);
+    CHECK(scene->update(AnimationTarget::from(group).strokeWidth(6.0f)) == Result::Success);
     CHECK(scene->clipCount() == 0u);
     CHECK(near(circle->radius, 1.0f) && same(circle->style.fill, red) && near(heir->style.width, 6.0f));
     // A failed update leaves the object as it was.
     heir->style.fill = blue;
-    CHECK(scene->update(AnimationTarget::from(group).width(2.0f)) == Result::InvalidArguments);
+    CHECK(scene->update(AnimationTarget::from(group).strokeWidth(2.0f)) == Result::InvalidArguments);
     CHECK(_says(scene, "takes its color from the group was edited directly"));
     CHECK(near(group->style.width, 6.0f) && near(heir->style.width, 6.0f));
     CHECK(scene->update(heir) == Result::Success);

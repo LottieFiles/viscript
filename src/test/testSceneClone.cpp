@@ -324,7 +324,7 @@ void clonedLinks(SwRenderer* renderer)
     auto from = Polygon::gen(corners, 3u);
     auto to = Polygon::gen(others, 3u);
     CHECK(from && to && scene->add(from) == Result::Success && scene->add(to) == Result::Success);
-    CHECK(scene->play(Animation::replacementTransform(from, to), 1.0f) == Result::Success);
+    CHECK(scene->play(Animation::morph(from, to), 1.0f) == Result::Success);
     CHECK(scene->seek(0.5f) == Result::Success);
     CHECK(scene->clone(from, copy) == Result::InsufficientCondition && _says(scene, "middle of a morph"));
     CHECK(scene->seek(1.0f) == Result::Success);

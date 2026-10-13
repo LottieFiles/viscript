@@ -52,25 +52,30 @@ assert.match(lua, /return scene\n$/);
 
 const trimmed = vis.scene({ width: 200, height: 100, fps: 10,
     camera: { mode: "fixed", view: "2d", height: 10 } });
-const trimmedLine = trimmed.line({ from: [-4, 0], to: [4, 0], buff: [1, 2] });
-trimmed.arrow({ from: [-4, 2], to: [4, 2], buff: 1, tail: 5, tip: 8 });
-trimmed.vector({ origin: [-4, -2], value: [8, 0], buff: [2, 1] });
+const trimmedLine = trimmed.line({ from: [-4, 0], to: [4, 0], trimDistance: [1, 2] });
+trimmed.arrow({ from: [-4, 2], to: [4, 2], trimDistance: 1, tail: 5, tip: 8 });
+trimmed.vector({ origin: [-4, -2], value: [8, 0], trimDistance: [2, 1] });
 const trimmedX = trimmed.tracker(0);
-trimmed.bind(trimmedLine, trimmedX, (t) => ({ to: [4, 6 * t], buff: [1 + t, 2 - t] }));
+trimmed.bind(trimmedLine, trimmedX, (t) => ({ to: [4, 6 * t], trimDistance: [1 + t, 2 - t] }));
 trimmed.track(trimmedX, 1, 1, "linear");
-trimmed.play({ target: trimmedLine, buff: 0.5 }, 1, "linear");
-assert.match(compileScene(trimmed), /\["buff"\]=\{1,2\}/);
-assert.match(compileScene(trimmed), /buff=0.5/);
+trimmed.play({ target: trimmedLine, trimDistance: 0.5 }, 1, "linear");
+assert.match(compileScene(trimmed), /\["trim_distance"\]=\{1,2\}/);
+assert.match(compileScene(trimmed), /trim_distance=0.5/);
+assert.throws(() => trimmed.play({target: trimmedLine, buff: 1}), /Unknown animation property: buff/);
+const invalidTrim = vis.scene();
+const invalidTrimLine = invalidTrim.line({from: [0, 0], to: [1, 0]});
+assert.throws(() => invalidTrim.bind(invalidTrimLine, invalidTrim.tracker(0), (t) => ({buff: t})),
+    /A bound state cannot set 'buff'/);
 const trimmedScript = `
 local s = vis.scene {width = 200, height = 100, fps = 10,
   camera = {mode = "fixed", view = "2d", height = 10}}
-local l = s:line {from = {-4, 0}, to = {4, 0}, buff = {1, 2}}
-s:arrow {from = {-4, 2}, to = {4, 2}, buff = 1, tail = 5, tip = 8}
-s:vector {origin = {-4, -2}, value = {8, 0}, buff = {2, 1}}
+local l = s:line {from = {-4, 0}, to = {4, 0}, trim_distance = {1, 2}}
+s:arrow {from = {-4, 2}, to = {4, 2}, trim_distance = 1, tail = 5, tip = 8}
+s:vector {origin = {-4, -2}, value = {8, 0}, trim_distance = {2, 1}}
 local x = s:tracker(0)
-s:bind(l, x, function(t) return {to = {4, 6 * t}, buff = {1 + t, 2 - t}} end)
+s:bind(l, x, function(t) return {to = {4, 6 * t}, trim_distance = {1 + t, 2 - t}} end)
 s:track(x, 1, 1, "linear")
-s:play({target = l, buff = 0.5}, 1, "linear")
+s:play({target = l, trim_distance = 0.5}, 1, "linear")
 return s
 `;
 
@@ -389,7 +394,7 @@ const effectReplacement = effects.polygon({
         [0.6, 1],
     ],
 });
-effects.replacementTransform(effectTarget, effectReplacement, 0.9, "ease_out");
+effects.morph(effectTarget, effectReplacement, 0.9, "ease_out");
 const effectLabel = effects.text({id: "effect-label", text: "result", point: [0, 0]});
 effects.fadeTransform(effectReplacement, effectLabel, 0.25, "gentle");
 const batchMorph = vis.scene();
@@ -532,7 +537,7 @@ assert.match(
     /scene:indicate\(objects\[2\],\{\["color"\]="focus",\["duration"\]=1,\["easing"\]="smooth",\["scale"\]=1\.2\}\)/,
 );
 assert.match(effectsLua, /scene:morph\(objects\[1\],objects\[3\],0\.8,"ease_in_out"\)/);
-assert.match(effectsLua, /scene:replacement_transform\(objects\[3\],objects\[4\],0\.9,"ease_out"\)/);
+assert.match(effectsLua, /scene:morph\(objects\[3\],objects\[4\],0\.9,"ease_out"\)/);
 assert.match(effectsLua, /scene:fade_transform\(objects\[4\],objects\[5\],0\.25,"gentle"\)/);
 assert.match(effectsLua, /scene:shift\(objects\[2\],\{1,0\},0\.8,\{\["preset"\]="back",\["strength"\]=1\.4\}\)/);
 assert.match(effectsLua, /scene:shift\(objects\[2\],\{-1,0\},0\.8,\{\["preset"\]="back",\["reverse"\]=true,\["strength"\]=1\.4\}\)/);
@@ -626,7 +631,7 @@ assert.throws(
     ),
     /distinct across all pairs/,
 );
-assert.throws(() => invalidEffects.replacementTransform(invalidEffectForeign, invalidEffectTarget), /same scene/);
+assert.throws(() => invalidEffects.morph(invalidEffectForeign, invalidEffectTarget), /same scene/);
 assert.throws(() => invalidEffects.fadeTransform(invalidEffectSource, invalidEffectSource), /distinct handles/);
 assert.throws(() => invalidEffects.fadeTransform(invalidEffectSource, invalidEffectForeign), /same scene/);
 assert.equal(compileScene(invalidEffects), invalidEffectsBefore);
@@ -695,6 +700,78 @@ assert.match(
     emphasisLua,
     /scene:ripple\(objects\[1\],\{\["color"\]="focus",\["duration"\]=1,\["easing"\]="snappy",\["padding"\]=0,\["size"\]=0\.6,\["width"\]=3\}\)/,
 );
+
+// Named timing compiles to the same timeline as positional calls and leaves shared options intact.
+const sharedTiming = Object.freeze({duration: 0.4, curve: "linear"});
+const sharedStagger = Object.freeze({...sharedTiming, lag: 0.25});
+const namedTimingCalls = [
+    (s, a, b, named) => s.create([a, b], ...(named ? [sharedStagger] : [0.4, "linear", 0.25])),
+    (s, a, b, named) => s.uncreate([a, b], ...(named ? [sharedStagger] : [0.4, "linear", 0.25])),
+    (s, a, b, named) => s.fillReveal([a, b], ...(named ? [sharedStagger] : [0.4, "linear", 0.25])),
+    (s, a, b, named) => s.drawBorderThenFill([a, b], ...(named ? [sharedStagger] : [0.4, "linear", 0.25])),
+    (s, a, b, named) => s.write([a, b], ...(named ? [sharedStagger] : [0.4, "linear", 0.25])),
+    (s, a, b, named) => s.growFromCenter(a, ...(named ? [sharedTiming] : [0.4, "linear"])),
+    (s, a, b, named) => s.growFromEdge(a, "left", ...(named ? [sharedTiming] : [0.4, "linear"])),
+    (s, a, b, named) => s.shrinkToCenter(a, ...(named ? [sharedTiming] : [0.4, "linear"])),
+    (s, a, b, named) => s.shift(a, [0, 1], ...(named ? [sharedTiming] : [0.4, "linear"])),
+    (s, a, b, named) => s.fade(a, 0.3, ...(named ? [sharedTiming] : [0.4, "linear"])),
+    (s, a, b, named) => s.stroke(a, "accent", ...(named ? [sharedTiming] : [0.4, "linear"])),
+    (s, a, b, named) => s.fill(a, "accent", ...(named ? [sharedTiming] : [0.4, "linear"])),
+    (s, a, b, named) => s.fadeTransform(a, b, ...(named ? [sharedTiming] : [0.4, "linear"])),
+    (s, a, b, named) => s.morph(a, b, ...(named ? [{...sharedStagger, copy: true}] : [0.4, "linear", {lag: 0.25, copy: true}])),
+    (s, a, b, named) => s.matchTransform(a, b, ...(named ? [{...sharedStagger, copy: true}] : [0.4, "linear", {lag: 0.25, copy: true}])),
+    (s, a, b, named) => s.arrange([a, b], ...(named ? [{...sharedTiming, gap: 0.5}] : [0.4, "linear", {gap: 0.5}])),
+    (s, a, b, named) => s.play([{target: a, shift: [0, 1]}, {target: b, opacity: 0.3}],
+        ...(named ? [sharedStagger] : [0.4, "linear", 0.25])),
+    (s, a, b, named) => s.save(a).shift(a, [0, 1]).restore(a, ...(named ? [sharedStagger] : [0.4, "linear", 0.25])),
+    (s, a, b, named) => s.look({target: [1, 0], height: 4}, ...(named ? [sharedTiming] : [0.4, "linear"])),
+    (s, a, b, named) => {
+        const t = s.tracker(0);
+        s.bind(a, t, (x) => ({shift: [x, 0]}));
+        s.track(t, 1, ...(named ? [sharedTiming] : [0.4, "linear"]));
+    },
+    (s, a, b, named) => {
+        const t = s.tracker(0);
+        s.bind(a, t, (x) => ({shift: [x, 0]}));
+        s.track([[t, 1]], ...(named ? [sharedTiming] : [0.4, "linear"]));
+    },
+    (s, a, b, named) => {
+        const v = s.view({x: 0.5, y: 0, width: 0.5, height: 0.5});
+        v.look({target: [1, 0]}, ...(named ? [sharedTiming] : [0.4, "linear"]));
+        v.fade(0.3, ...(named ? [sharedTiming] : [0.4, "linear"]));
+    },
+    (s, a, b, named) => {
+        const block = s.code({text: "x = 1", id: "code"});
+        s.edit(block, {replace: "1", with: "2"}, ...(named
+            ? [{...sharedTiming, fade: 0.5}] : [0.4, "linear", {fade: 0.5}]));
+    },
+    (s, a, b, named) => s.sound({asset: "tone.wav", begin: 0, end: 1}).gain(0.3, 0,
+        ...(named ? [sharedTiming] : [0.4, "linear"])),
+    (s, a, b, named) => s.warp(a, (x, y) => [x + 0.2, y], ...(named
+        ? [{...sharedTiming, x_range: [-2, 2, 1], y_range: [-2, 2, 1]}]
+        : [0.4, "linear", {x_range: [-2, 2, 1], y_range: [-2, 2, 1]}])),
+];
+for (const author of namedTimingCalls) {
+    const source = (named) => {
+        const s = vis.scene({width: 96, height: 64});
+        const a = s.rectangle({id: "a", center: [-1, 0], size: [1, 1]});
+        const b = s.rectangle({id: "b", center: [1, 0], size: [1, 1]});
+        author(s, a, b, named);
+        return compileScene(s);
+    };
+    assert.equal(source(true), source(false), author.toString());
+}
+const timingValidation = vis.scene();
+const timingTarget = timingValidation.rectangle({});
+const timingBefore = compileScene(timingValidation);
+for (const options of [{duration: 0}, {duration: -1}, {duration: Infinity}, {curve: "unknown"},
+    {curve: "linear", easing: "smooth"}, {lag: 0.25}, {seconds: 1}]) {
+    assert.throws(() => timingValidation.shift(timingTarget, [0, 1], options));
+}
+assert.throws(() => timingValidation.create(timingTarget, {lag: -0.1}), /Lag/);
+assert.throws(() => timingValidation.shift(timingTarget, [0, 1], sharedTiming, "linear"), /positional arguments/);
+assert.throws(() => timingValidation.look({target: [0, 0]}, sharedTiming, "linear"), /positional arguments/);
+assert.equal(compileScene(timingValidation), timingBefore);
 
 // warp calls fn at every sample of x_range and y_range, each running on until it reaches its
 // max, and hands Lua the images row by row from the bottom left, each number in the fewest
@@ -2276,13 +2353,13 @@ assert.match(framingLua, /scene:focus\(nil,\{\}\)/);
 assert.throws(() => framing.focus([]), /Focus targets must be a handle or a non-empty array of handles/);
 assert.throws(() => framing.focus(vis.scene().circle({ radius: 1 })), /handles from the same scene/);
 assert.throws(() => framing.focus([near, "far"]), /handles from the same scene/);
-assert.throws(() => framing.focus(near, { easing: "linear" }), /Unknown Focus option: easing/);
+assert.throws(() => framing.focus(near, { easing: "linear", curve: "smooth" }), /either easing or curve/);
 assert.throws(() => framing.focus(near, null), /Focus options must be a plain object/);
 for (const padding of [-0.1, Infinity, "1"]) {
     assert.throws(() => framing.focus(near, { padding }), /Focus padding must be a non-negative number/);
 }
 for (const duration of [0, -1, Number.NaN]) {
-    assert.throws(() => framing.focus(near, { duration }), /Focus duration must be a positive number/);
+    assert.throws(() => framing.focus(near, { duration }), /Focus duration must be a finite positive number/);
 }
 assert.throws(() => framing.focus(near, { curve: "wobble" }), /Unknown animation curve preset: wobble/);
 assert.equal(compileScene(framing), framingLua);
@@ -2440,7 +2517,7 @@ for (const duration of [0, -1, Number.NaN]) {
 assert.throws(() => lens.fade(0.5, 1, "wobble"), /Unknown animation curve preset: wobble/);
 assert.throws(() => lens.orbit(0), /non-zero/);
 assert.throws(() => lens.focus([]), /Focus targets must be a handle or a non-empty array of handles/);
-assert.throws(() => lens.focus(speck, { easing: "linear" }), /Unknown Focus option: easing/);
+assert.throws(() => lens.focus(speck, { easing: "linear", curve: "smooth" }), /either easing or curve/);
 assert.throws(() => lens.look({ target: stranger }), /handles from the same scene/);
 assert.equal(compileScene(magnified), magnifiedLua);
 const crowded = vis.scene();
@@ -3244,7 +3321,7 @@ copying.morph(copySquare, copyDisc, 1, "linear", { copy: true });
 const copyLeft = copying.circle({ radius: 0.25 });
 const copyRight = copying.circle({ radius: 0.25 });
 // With copy, one source may give a copy to several targets.
-copying.replacementTransform([copySquare, copySquare], [copyLeft, copyRight], 1, "smooth", { lag: 0.5, copy: true });
+copying.morph([copySquare, copySquare], [copyLeft, copyRight], 1, "smooth", { lag: 0.5, copy: true });
 const copyFrom = copying.group();
 copyFrom.circle({ radius: 0.5 });
 copying.wait(1);
@@ -3253,7 +3330,7 @@ copyTo.circle({ radius: 0.5 });
 copying.matchTransform(copyFrom, copyTo, 1, "smooth", { copy: true, shapes: true });
 const copyingLua = compileScene(copying);
 assert.match(copyingLua, /scene:morph\(objects\[1\],objects\[2\],1,"linear",\{\["copy"\]=true\}\)/);
-assert.match(copyingLua, /scene:replacement_transform\(\{objects\[1\],objects\[1\]\},\{objects\[3\],objects\[4\]\},1,"smooth",\{\["copy"\]=true,\["lag"\]=0\.5\}\)/);
+assert.match(copyingLua, /scene:morph\(\{objects\[1\],objects\[1\]\},\{objects\[3\],objects\[4\]\},1,"smooth",\{\["copy"\]=true,\["lag"\]=0\.5\}\)/);
 assert.match(copyingLua, /scene:match_transform\(objects\[5\],objects\[7\],1,"smooth",\{\["shapes"\]=true,\["copy"\]=true\}\)/);
 const copyingBefore = compileScene(copying);
 assert.throws(() => copying.morph(copySquare, copyDisc, 1, "smooth", { copy: 1 }), /Morph copy must be a boolean/);
@@ -3329,7 +3406,7 @@ const pieceTo = pieceMorph.path({ commands: [
     { type: "move", to: [1, 2] }, { type: "line", to: [2, 2] },
 ], id: "first" });
 const pieceLast = pieceMorph.plot({ points: [[-2, -2], [-1, -2], [NaN, 0], [1, -2], [2, -2]], id: "second" });
-pieceMorph.replacementTransform([pieceFrom, pieceFrom], [pieceTo, pieceLast], 1, "linear",
+pieceMorph.morph([pieceFrom, pieceFrom], [pieceTo, pieceLast], 1, "linear",
     { copy: true, lag: 0.25, pairs: [[1, 2]] });
 const pieceMorphLua = compileScene(pieceMorph);
 assert.match(pieceMorphLua, /\["pairs"\]=\{\{1,2\}\}/);
@@ -3347,7 +3424,7 @@ local a = s:plot {points={{-2,0},{-1,0},{0/0,0},{1,0},{2,0}},id="source"}
 local b = s:path {commands={{type="move",to={-2,2}},{type="line",to={-1,2}},
     {type="move",to={1,2}},{type="line",to={2,2}}},id="first"}
 local c = s:plot {points={{-2,-2},{-1,-2},{0/0,0},{1,-2},{2,-2}},id="second"}
-s:replacement_transform({a,a},{b,c},1,"linear",{copy=true,lag=0.25,pairs={{1,2}}})
+s:morph({a,a},{b,c},1,"linear",{copy=true,lag=0.25,pairs={{1,2}}})
 return s
 `;
 
@@ -3395,7 +3472,7 @@ assert.match(typesetLua, /scene:match_transform\(objects\[3\],objects\[10\],1,"s
 // tip: the text the script makes of a string, named after the brace, or the handle given.
 const bracing = vis.scene({ width: 400, height: 300, camera: { view: "2d", height: 300 } });
 const discriminant = bracing.text({ id: "term", text: "b^2 - 4ac", point: [0, 40], size: 32, measure: true });
-const [underBrace, underLabel] = bracing.brace({ id: "under", around: discriminant, buff: 6, label: "discriminant" });
+const [underBrace, underLabel] = bracing.brace({ id: "under", around: discriminant, offset: 6, label: "discriminant" });
 const braceNote = bracing.text({ id: "note", text: "x", point: [0, 0], measure: true });
 const [sideBrace, sideLabel] = bracing.brace({ around: [discriminant], direction: "right", label: braceNote, gap: 4 });
 const braceHolder = bracing.group({ id: "holder" });
@@ -3418,7 +3495,7 @@ assert.throws(() => bracing.brace({ around: discriminant, label: typeset.find("e
 const bracingLua = compileScene(bracing);
 assert.match(
     bracingLua,
-    /objects\[2\],objects\[3\] = scene:brace \{\["around"\]=objects\[1\],\["buff"\]=6,\["id"\]="under",\["label"\]="discriminant"\}/,
+    /objects\[2\],objects\[3\] = scene:brace \{\["around"\]=objects\[1\],\["id"\]="under",\["label"\]="discriminant",\["offset"\]=6\}/,
 );
 assert.match(
     bracingLua,

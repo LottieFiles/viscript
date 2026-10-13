@@ -307,6 +307,19 @@ struct AnimCurve
     bool valid() const noexcept;
 };
 
+struct TimingOptions
+{
+    // Seconds; positive for animations, or zero for immediate restore and Motion transitions.
+    float duration = 1.0f;
+    AnimCurve curve;
+};
+
+struct AnimationOptions : TimingOptions
+{
+    // Each later target starts duration * lag seconds after the previous one; finite and non-negative.
+    float lag = 0.0f;
+};
+
 struct Vec3
 {
     float x = 0.0f;
@@ -831,6 +844,7 @@ struct Object
     // only an isolated group (see isolate()); AnimationTarget::layer() changes layers over time.
     int32_t layer = 0;
     float opacity = 1.0f;
+    // Fraction revealed in [0, 1]; segments reveal their already-trimmed length.
     float progress = 1.0f;
     // Finite Gaussian sigma in [0, 256] screen pixels, also for shadow.blur.
     // Any authored blur/shadow composites the subtree as one effect layer.
@@ -1096,8 +1110,9 @@ struct Line final : Object
     Vec3 from;
     Vec3 to;
 
-    // Distances trimmed from the start and end in local units; non-negative.
-    Vec2 buff;
+    // Finite nonnegative start/end distances in object-local units, before transforms.
+    // A combined distance at least the segment length leaves no ink, bounds or outline.
+    Vec2 trimDistance;
 
     static Line* gen(const Vec3& from, const Vec3& to) noexcept;
 
@@ -1112,8 +1127,9 @@ struct Arrow final : Object
     float tail = 0.0f;
     float tip = 16.0f;
 
-    // Distances trimmed from the start and end in local units; non-negative.
-    Vec2 buff;
+    // Finite nonnegative start/end distances in object-local units, before transforms.
+    // A combined distance at least the segment length also removes the arrow markers.
+    Vec2 trimDistance;
 
     static Arrow* gen(const Vec3& from, const Vec3& to) noexcept;
 
@@ -1128,8 +1144,9 @@ struct Vector final : Object
     float tail = 0.0f;
     float tip = 16.0f;
 
-    // Distances trimmed from the start and end in local units; non-negative.
-    Vec2 buff;
+    // Finite nonnegative start/end distances in object-local units, before transforms.
+    // A combined distance at least the segment length also removes the arrow markers.
+    Vec2 trimDistance;
 
     static Vector* gen(const Vec3& value, const Vec3& origin = {}) noexcept;
 
@@ -1707,8 +1724,8 @@ struct Animation
     float from = 0.0f;
     float to = 1.0f;
     bool orient = false;
-    // Morph a cursor-state copy beside target, leaving target unchanged. The copy follows
-    // the same morph rules and is removed on completion or failed play; other kinds ignore copy.
+    // Valid only for Morph: morphs a cursor-state copy, preserving the original source.
+    // Completion removes the copy from the timeline; failed play discards it.
     bool copy = false;
     // Morph: explicit piece pairs as alternating zero-based source and target indices,
     // pairCount of each. Each piece pairs once; the remaining pieces pair automatically.
@@ -1745,8 +1762,9 @@ struct Animation
     // extra pieces grow/shrink at their centroid. Keeps corners/winding and even-odd fill.
     // Limits: 4096 pieces/side and 1048576 retained points/scene. Explicit pairs are unique;
     // SurfaceMesh accepts no piece pairs. Disjoint families are required.
+    // Source draws the interpolated shape until target takes over at completion.
+    // Source then leaves the timeline; both objects remain Scene-owned.
     static Animation morph(Object* source, Object* target) noexcept;
-    static Animation replacementTransform(Object* source, Object* target) noexcept;
     static Animation shift(Object* target, const Vec3& by) noexcept;
     static Animation transform(Object* target, const Mat4& model) noexcept;
     static Animation stroke(Object* target, Color color) noexcept;
@@ -1787,7 +1805,7 @@ struct AnimationTarget
     AnimationTarget& tip(float value) noexcept;
     AnimationTarget& progress(float value) noexcept;
     // Stroke width in pixels. On a group it animates the shapes that take their width from it.
-    AnimationTarget& width(float pixels) noexcept;
+    AnimationTarget& strokeWidth(float pixels) noexcept;
     // A circle, arc or angle radius in world units, or a point's radius in pixels.
     AnimationTarget& radius(float value) noexcept;
     // The start direction and signed sweep of an arc, in radians.
@@ -1800,10 +1818,11 @@ struct AnimationTarget
     AnimationTarget& size(const Vec2& value) noexcept;
     // A rectangle's corner radius in world units, at most half its shorter side.
     AnimationTarget& corner(float value) noexcept;
-    // Finite nonnegative local trim distances for lines/arrows/vectors.
-    // Consumed segments have no ink/bounds/outline; a warp freezes trimming.
-    AnimationTarget& buff(float value) noexcept;
-    AnimationTarget& buff(const Vec2& value) noexcept;
+    // Line/Arrow/Vector start/end distances in object-local units, before transforms.
+    // A scalar sets both. Values must be finite and nonnegative; consumed segments are empty.
+    // Warped geometry keeps the trim it had when warped.
+    AnimationTarget& trimDistance(float value) noexcept;
+    AnimationTarget& trimDistance(const Vec2& value) noexcept;
     // The gradient's stops and geometry. It keeps the current gradient's type, stop count and
     // explicit geometry fields, so each stop and point has a place to travel to.
     AnimationTarget& gradient(const Gradient& value) noexcept;
@@ -1857,7 +1876,7 @@ private:
     float targetAngle = 0.0f;
     Vec2 targetSize;
     float targetCorner = 0.0f;
-    Vec2 targetBuff;
+    Vec2 targetTrimDistance;
     Gradient targetGradient;
     Color targetGradientEnd;
     float targetBlur = 0.0f;
@@ -2157,11 +2176,22 @@ struct Scene
                       Easing easing = Easing::Smooth) noexcept;
     Result transition(Scene* const* scenes, uint32_t count, const Viewport& viewport,
                       float duration, float hold, const AnimCurve& curve) noexcept;
+    Result transition(Scene* const* scenes, uint32_t count, const TimingOptions& timing,
+                      const Viewport& viewport = {}, float hold = 0.0f) noexcept
+    {
+        return transition(scenes, count, viewport, timing.duration, hold, timing.curve);
+    }
     // Styles the transitions as well: styleCount is 1 to give every transition the same style,
     // or count - 1 to give each its own in order, and 0 leaves them all to Match.
     Result transition(Scene* const* scenes, uint32_t count, const Viewport& viewport,
                       float duration, float hold, const AnimCurve& curve,
                       const TransitionStyle* styles, uint32_t styleCount, bool live = true) noexcept;
+    Result transition(Scene* const* scenes, uint32_t count, const TimingOptions& timing,
+                      const Viewport& viewport, float hold, const TransitionStyle* styles,
+                      uint32_t styleCount, bool live = true) noexcept
+    {
+        return transition(scenes, count, viewport, timing.duration, hold, timing.curve, styles, styleCount, live);
+    }
     // Holds is one duration for all stages, or count durations in stage order. Live stages
     // start at zero when their incoming transition begins and hold their last frame at the end.
     // With live false, every stage shows its completed frame throughout.
@@ -2169,6 +2199,7 @@ struct Scene
                       float duration, const float* holds, uint32_t holdCount, const AnimCurve& curve,
                       const TransitionStyle* styles = nullptr, uint32_t styleCount = 0u,
                       bool live = true) noexcept;
+    // Ends this subtree's visibility at the cursor. Objects remain Scene-owned for earlier samples.
     Result remove(Object* object) noexcept;
     // Clones cursor-sampled subtree state, including style/composition, without animation clips.
     // Attaches at the cursor and preserves authored fonts/colors, local transform and warped shape.
@@ -2180,18 +2211,32 @@ struct Scene
     // or structural edit. InsufficientCondition: hidden source or active morph/warp.
     // NonSupport: Space, Cell, module group or nested connector-dependent endpoint.
     Result clone(Object* source, Object*& output, const CloneOptions& options = {}) noexcept;
-    // Cross-fades disjoint families in this scene. Target must be born at the cursor
-    // without clips; source must be live and pass play/lifetime checks.
+    // Cross-fades disjoint families and advances the cursor by duration. Source leaves
+    // the timeline at completion; both families remain Scene-owned for earlier samples.
+    // Target must be newly attached at the cursor without clips; source must be live,
+    // and its scheduled clips must finish by the fade's end.
     Result fadeTransform(Object* source, Object* target, float duration = 1.0f,
                          Easing easing = Easing::Smooth) noexcept;
     Result fadeTransform(Object* source, Object* target, float duration,
                          const AnimCurve& curve) noexcept;
+    Result fadeTransform(Object* source, Object* target, const TimingOptions& timing) noexcept
+    {
+        return fadeTransform(source, target, timing.duration, timing.curve);
+    }
     // Matches descendant pieces; equal Text strings pair first, preserving sampled style
     // and placement while traveling. Unpaired source/target pieces fade out/in. Attach target
-    // at the cursor immediately before this call, without clips; source must be at rest.
-    // Removes source at completion unless options.copy preserves it.
+    // at the cursor immediately before this call, without clips.
+    // Source must be at rest unless options.copy snapshots its cursor state.
+    // Completion removes source or its temporary copy from the timeline; Scene ownership stays.
     Result matchTransform(Object* source, Object* target, float duration = 1.0f,
                           const AnimCurve& curve = {}, const MatchOptions& options = {}) noexcept;
+    Result matchTransform(Object* source, Object* target, const AnimationOptions& timing,
+                          const MatchOptions& options = {}) noexcept
+    {
+        auto match = options;
+        match.lag = timing.lag;
+        return matchTransform(source, target, timing.duration, timing.curve, match);
+    }
     // Reports intentional overlap during a match/cross-fade: paired pieces, yielding slots
     // and roots; copies also exempt their originals. Cross-fades exempt both families.
     bool handoff(const Object* first, const Object* second, float time) const noexcept;
@@ -2202,6 +2247,11 @@ struct Scene
     // if none changes, advances the cursor by duration.
     Result highlight(Object* target, Object* const* selection, uint32_t count, float dim = 0.25f,
                      float duration = 0.5f, const AnimCurve& curve = {}) noexcept;
+    Result highlight(Object* target, Object* const* selection, uint32_t count,
+                     const TimingOptions& timing, float dim = 0.25f) noexcept
+    {
+        return highlight(target, selection, count, dim, timing.duration, timing.curve);
+    }
     // Adds temporary root shapes for duration and removes them afterward, advancing the cursor.
     // Snapshots target geometry at the cursor; frames/rings use world xy bounds and passing
     // flash uses its placed outline. Uses the family's highest layer, or zero for a point flash.
@@ -2209,12 +2259,21 @@ struct Scene
     // InvalidArguments: foreign target, invalid values or unavailable geometry.
     Result emphasize(const Emphasis& emphasis, float duration = 1.0f,
                      const AnimCurve& curve = {}) noexcept;
+    Result emphasize(const Emphasis& emphasis, const TimingOptions& timing) noexcept
+    {
+        return emphasize(emphasis, timing.duration, timing.curve);
+    }
     // Animates same-parent items along direction, gap apart, centered in parent space.
     // Newly attached unclipped items grow into place; existing items slide.
     // If no item moves, advances the cursor by duration.
     Result arrange(Object* const* items, uint32_t count, const Vec3& direction = {1.0f, 0.0f, 0.0f},
                    float gap = 0.25f, const Vec3& center = {}, float duration = 1.0f,
                    const AnimCurve& curve = {}) noexcept;
+    Result arrange(Object* const* items, uint32_t count, const TimingOptions& timing,
+                   const Vec3& direction = {1.0f, 0.0f, 0.0f}, float gap = 0.25f, const Vec3& center = {}) noexcept
+    {
+        return arrange(items, count, direction, gap, center, timing.duration, timing.curve);
+    }
     // Maps target subtrees in their parent spaces, sampling map once during construction.
     // Subdivides outlines to step-sized pieces, then interpolates to the mapped geometry.
     // Shapes bend; text/pictures/points move anchors; connectors retain live endpoints;
@@ -2227,6 +2286,11 @@ struct Scene
     // 2097152 retained warp points.
     Result warp(Object* const* targets, uint32_t count, PointMap map, void* data = nullptr,
                 float duration = 1.0f, const AnimCurve& curve = {}, float step = 0.05f) noexcept;
+    Result warp(Object* const* targets, uint32_t count, PointMap map, const TimingOptions& timing,
+                void* data = nullptr, float step = 0.05f) noexcept
+    {
+        return warp(targets, count, map, data, timing.duration, timing.curve, step);
+    }
     // Pushes cursor state for each target subtree, up to 4096 objects/call, without advancing time.
     // Saves transforms, paint/effects, geometry, layer, text and counting value. Nested saves
     // form a stack; active text/geometry changes save their destinations.
@@ -2237,53 +2301,100 @@ struct Scene
     // zero applies immediately. lag delays later targets. No saved state fails atomically.
     // Conflicting active channels fail, except additive translation; layer changes discretely.
     // Added/removed descendants retain their state. An unchanged restore waits for duration.
+    // Does not revive removed descendants, undo warps or switch plain/counting Text modes.
     // Ends layout authoring, as play() does.
     Result restore(Object* target, float duration = 0.0f, const AnimCurve& curve = {}) noexcept;
+    Result restore(Object* target, const TimingOptions& timing) noexcept
+    {
+        return restore(target, timing.duration, timing.curve);
+    }
     Result restore(Object* const* targets, uint32_t count, float duration = 0.0f,
                    const AnimCurve& curve = {}, float lag = 0.0f) noexcept;
+    Result restore(Object* const* targets, uint32_t count, const AnimationOptions& timing) noexcept
+    {
+        return restore(targets, count, timing.duration, timing.curve, timing.lag);
+    }
     // Validates and reserves the whole command atomically; targets are distinct scene objects.
     // Non-model channels require chronological nonoverlap. Model motion may layer with
     // invertible authored models; shift needs no inverse. Times need distinct finite float
     // boundaries. Family birth/removal gates apply; remove waits for active clips.
     Result play(const Animation& animation, float duration = 1.0f, Easing easing = Easing::Smooth) noexcept;
     Result play(const Animation& animation, float duration, const AnimCurve& curve) noexcept;
+    Result play(const Animation& animation, const TimingOptions& timing) noexcept
+    {
+        return play(animation, timing.duration, timing.curve);
+    }
     Result play(const Animation* animations, uint32_t count, float duration, Easing easing = Easing::Smooth, float lag = 0.0f) noexcept;
     Result play(const Animation* animations, uint32_t count, float duration,
                 const AnimCurve& curve, float lag = 0.0f) noexcept;
+    Result play(const Animation* animations, uint32_t count, const AnimationOptions& timing) noexcept
+    {
+        return play(animations, count, timing.duration, timing.curve, timing.lag);
+    }
     Result play(const AnimationTarget& target, float duration = 1.0f, Easing easing = Easing::Smooth) noexcept;
     Result play(const AnimationTarget& target, float duration, const AnimCurve& curve) noexcept;
+    Result play(const AnimationTarget& target, const TimingOptions& timing) noexcept
+    {
+        return play(target, timing.duration, timing.curve);
+    }
     Result play(const AnimationTarget* targets, uint32_t count, float duration,
                 Easing easing = Easing::Smooth, float lag = 0.0f) noexcept;
     Result play(const AnimationTarget* targets, uint32_t count, float duration,
                 const AnimCurve& curve, float lag = 0.0f) noexcept;
+    Result play(const AnimationTarget* targets, uint32_t count, const AnimationOptions& timing) noexcept
+    {
+        return play(targets, count, timing.duration, timing.curve, timing.lag);
+    }
     // runtime(nullptr) clears all modifiers. Add/remove preserve other modules' slots;
     // registered callback/data lifetimes must cover every sample.
     Result runtime(const RuntimeModifier* modifier) noexcept;
     Result runtimeAdd(const RuntimeModifier* modifier) noexcept;
     Result runtimeRemove(void* data) noexcept;
-    Result camera(const CameraInput& input) noexcept;
+    // Applies interactive camera input through registered runtime modifiers.
+    // Fixed mode returns InsufficientCondition; no accepting modifier returns NonSupport.
+    Result cameraInput(const CameraInput& input) noexcept;
     // Validates a float-safe camera envelope with positive rounded clipping planes.
     // 2D rejects orbit; layered return to 2D waits for earlier moves. Turning/projection
-    // cannot layer while earlier motion remains 2D. Fixed mode rejects runtime camera input.
+    // cannot layer while earlier motion remains 2D.
     Result look(const Camera& camera, CameraView view, float duration = 1.0f,
                 Easing easing = Easing::Smooth) noexcept;
     Result look(const Camera& camera, CameraView view, float duration,
                 const AnimCurve& curve) noexcept;
+    Result look(const Camera& camera, CameraView view, const TimingOptions& timing) noexcept
+    {
+        return look(camera, view, timing.duration, timing.curve);
+    }
     // Circles a 3D camera about its target: the eye and the up direction turn by angle
     // radians about axis, counterclockwise seen from the axis tip. Unlike look, which takes
     // the shortest turn, any angle is kept, so 2 * pi circles the target once.
     Result orbit(float angle, const Vec3& axis, float duration = 1.0f,
                  Easing easing = Easing::Smooth) noexcept;
     Result orbit(float angle, const Vec3& axis, float duration, const AnimCurve& curve) noexcept;
+    Result orbit(float angle, const Vec3& axis, const TimingOptions& timing) noexcept
+    {
+        return orbit(angle, axis, timing.duration, timing.curve);
+    }
     // Move the camera of view index as look and orbit move the scene's camera, from the cursor.
     // A move that begins while another move of the same view runs adds its change to it; the
     // cameras of the scene and of each view move on their own.
     Result look(uint32_t view, const Camera& camera, CameraView cameraView, float duration,
                 const AnimCurve& curve) noexcept;
+    Result look(uint32_t view, const Camera& camera, CameraView cameraView, const TimingOptions& timing) noexcept
+    {
+        return look(view, camera, cameraView, timing.duration, timing.curve);
+    }
     Result orbit(uint32_t view, float angle, const Vec3& axis, float duration,
                  const AnimCurve& curve) noexcept;
+    Result orbit(uint32_t view, float angle, const Vec3& axis, const TimingOptions& timing) noexcept
+    {
+        return orbit(view, angle, axis, timing.duration, timing.curve);
+    }
     // Fades the whole of view index to opacity, from 0 to 1, from the cursor.
     Result fade(uint32_t view, float opacity, float duration, const AnimCurve& curve) noexcept;
+    Result fade(uint32_t view, float opacity, const TimingOptions& timing) noexcept
+    {
+        return fade(view, opacity, timing.duration, timing.curve);
+    }
     Result wait(float duration = 1.0f) noexcept;
     // Cursor starts the next play/look/wait/add. seek may move backward for parallel tracks;
     // non-model property clips remain chronological and nonoverlapping. Layered camera moves

@@ -193,7 +193,7 @@ void shapeProperties(SwRenderer* renderer)
     AnimationTarget targets[] = {
         AnimationTarget::from(circle).radius(1.5f),
         AnimationTarget::from(box).size(Vec2{3.0f, 2.0f}).corner(0.5f),
-        AnimationTarget::from(line).width(10.0f),
+        AnimationTarget::from(line).strokeWidth(10.0f),
         AnimationTarget::from(dot).radius(9.0f),
     };
     CHECK(scene->play(targets, 4u, 1.0f, Easing::Linear) == Result::Success);
@@ -237,7 +237,7 @@ void shapeProperties(SwRenderer* renderer)
     CHECK(_says(scene, "half the rectangle's shorter side"));
     CHECK(scene->play(AnimationTarget::from(box).size(Vec2{0.4f, 2.0f}), 1.0f) == Result::InvalidArguments);
     CHECK(_says(scene, "half the rectangle's shorter side"));
-    CHECK(scene->play(AnimationTarget::from(line).width(-1.0f), 1.0f) == Result::InvalidArguments);
+    CHECK(scene->play(AnimationTarget::from(line).strokeWidth(-1.0f), 1.0f) == Result::InvalidArguments);
     CHECK(_says(scene, "stroke width"));
     CHECK(scene->play(AnimationTarget::from(box).gradient(white), 1.0f) == Result::InvalidArguments);
     CHECK(_says(scene, "keep the current gradient's type"));
@@ -310,7 +310,7 @@ void shapeProperties(SwRenderer* renderer)
     AnimationTarget looks[] = {
         AnimationTarget::from(bar).gradient(shifted),
         AnimationTarget::from(ramp).gradient(Color::hex("#00ff00")),
-        AnimationTarget::from(group).width(8.0f),
+        AnimationTarget::from(group).strokeWidth(8.0f),
         AnimationTarget::from(label).size(60.0f),
     };
     CHECK(styled->play(looks, 4u, 1.0f, Easing::Linear) == Result::Success);
@@ -342,7 +342,7 @@ void shapeProperties(SwRenderer* renderer)
     three.stops[2] = {1.0f, white};
     CHECK(styled->play(AnimationTarget::from(bar).gradient(three), 1.0f) == Result::InvalidArguments);
     CHECK(_says(styled, "stop count"));
-    CHECK(styled->play(AnimationTarget::from(label).width(2.0f), 1.0f) == Result::InvalidArguments);
+    CHECK(styled->play(AnimationTarget::from(label).strokeWidth(2.0f), 1.0f) == Result::InvalidArguments);
     CHECK(_says(styled, "no stroke width"));
     CHECK(styled->play(AnimationTarget::from(label).size(Vec2{10.0f, 20.0f}), 1.0f) == Result::InvalidArguments);
     CHECK(_says(styled, "one positive size"));
@@ -371,8 +371,8 @@ void trimmedSegments(SwRenderer* renderer)
         delete vector;
         return;
     }
-    line->buff = {1.0f, 2.0f};
-    arrow->buff = vector->buff = {1.0f, 1.0f};
+    line->trimDistance = {1.0f, 2.0f};
+    arrow->trimDistance = vector->trimDistance = {1.0f, 1.0f};
     Bounds own;
     CHECK(line->bounds(own) && near(own.min.x, -3.0f) && near(own.max.x, 2.0f));
     CHECK(arrow->bounds(own) && near(own.min.x, -3.0f) && near(own.max.x, 3.0f));
@@ -387,7 +387,7 @@ void trimmedSegments(SwRenderer* renderer)
     Vec3 raised[] = {{-4.0f, 0.0f, 0.0f}, {4.0f, 6.0f, 0.0f}};
     CHECK(scene->play(AnimationTarget::from(line).geometry(raised, 2u), 1.0f, Easing::Linear) == Result::Success);
     CHECK(scene->seek(0.0f) == Result::Success);
-    CHECK(scene->play(AnimationTarget::from(line).buff(Vec2{2.0f, 1.0f}), 1.0f, Easing::Linear) == Result::Success);
+    CHECK(scene->play(AnimationTarget::from(line).trimDistance(Vec2{2.0f, 1.0f}), 1.0f, Easing::Linear) == Result::Success);
     BBox box;
     CHECK(renderer->bounds(scene, line, 0.5f, box) == Result::Success);
     auto length = std::sqrt(73.0f);
@@ -399,14 +399,14 @@ void trimmedSegments(SwRenderer* renderer)
     CHECK(scene->clone(line, copy) == Result::Success);
     if (copy) {
         auto twin = static_cast<Line*>(copy);
-        CHECK(near(twin->buff.x, 1.5f) && near(twin->buff.y, 1.5f));
+        CHECK(near(twin->trimDistance.x, 1.5f) && near(twin->trimDistance.y, 1.5f));
         CHECK(near(twin->to.y, 3.0f));
     }
     CHECK(scene->seek(1.0f) == Result::Success);
     CHECK(scene->restore(line, 1.0f, AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
-    CHECK(near(line->buff.x, 1.0f) && near(line->buff.y, 2.0f));
-    CHECK(scene->update(AnimationTarget::from(line).buff(-1.0f)) == Result::InvalidArguments);
-    CHECK(scene->update(AnimationTarget::from(line).buff(20.0f)) == Result::Success);
+    CHECK(near(line->trimDistance.x, 1.0f) && near(line->trimDistance.y, 2.0f));
+    CHECK(scene->update(AnimationTarget::from(line).trimDistance(-1.0f)) == Result::InvalidArguments);
+    CHECK(scene->update(AnimationTarget::from(line).trimDistance(20.0f)) == Result::Success);
     CHECK(!line->bounds(own));
     CHECK(renderer->bounds(scene, line, 2.0f, box) == Result::InsufficientCondition);
     delete scene;
@@ -420,7 +420,7 @@ void trimmedSegments(SwRenderer* renderer)
         CHECK(empty && object);
         if (!empty || !object) { delete empty; delete object; continue; }
         CHECK(empty->add(object) == Result::Success);
-        CHECK(empty->update(AnimationTarget::from(object).buff(kind == 0 ? 1.0f : 3.0f)) == Result::Success);
+        CHECK(empty->update(AnimationTarget::from(object).trimDistance(kind == 0 ? 1.0f : 3.0f)) == Result::Success);
         Surface surface;
         CHECK(renderer->render(empty, 0.0f, surface) == Result::Success);
         auto black = pixel(config.background);
@@ -449,7 +449,7 @@ void zeroLengthArrows(SwRenderer* renderer)
             object->stroke(Color::hex("#ffffff"), 4.0f);
             CHECK(scene->add(object) == Result::Success);
             if (degenerate >= 2)
-                CHECK(scene->update(AnimationTarget::from(object).buff(degenerate == 2 ? 1.0f : 2.0f)) == Result::Success);
+                CHECK(scene->update(AnimationTarget::from(object).trimDistance(degenerate == 2 ? 1.0f : 2.0f)) == Result::Success);
             Surface surface;
             CHECK(renderer->render(scene, 0.0f, surface) == Result::Success);
             CHECK(changed(surface, config.background) == 0u);

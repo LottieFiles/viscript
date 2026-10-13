@@ -113,7 +113,7 @@
 ---@field angle? number Target arc sweep between -2 pi and 2 pi.
 ---@field size? number|vis.Vec2 Target rectangle size, or text size in points (em = 4/3 × size pixels, or world units for plane text).
 ---@field corner? number Target rectangle corner radius.
----@field buff? number|vis.Vec2 Non-negative local distances trimmed from a line, arrow or vector: a number for both ends, or {start, end}. Defaults to zero; a consumed segment has no drawing or bounds.
+---@field trim_distance? number|vis.Vec2 Finite nonnegative object-local endpoint distances for a line, arrow or vector: one number for both ends, or {start, end}. Applied before transforms and drawing progress; omitted keeps the current trim. Consumed segments are empty, and warped geometry keeps its existing trim.
 ---@field gradient? vis.GradientConfig Target gradient stops and geometry.
 ---@field blur? number Target blur sigma in screen pixels.
 ---@field shadow? {color?: vis.Color|vis.ThemeColor, offset?: vis.Vec2, blur?: number} Target shadow; omitted fields keep their value.
@@ -296,21 +296,21 @@
 ---@field radius? number Marker radius in pixels.
 
 ---@class vis.LineConfig: vis.ObjectConfig
----@field buff? number|vis.Vec2 Non-negative local distances trimmed from a line, arrow or vector: a number for both ends, or {start, end}. Defaults to zero; a consumed segment has no drawing or bounds.
+---@field trim_distance? number|vis.Vec2 Finite nonnegative object-local endpoint distances, before transforms and drawing progress: one number for both ends, or {start, end}. Defaults to zero; a consumed segment has no drawing, bounds or outline. Warped geometry keeps its existing trim.
 ---@field from vis.Vec2|vis.Vec3 Start point.
 ---@field to vis.Vec2|vis.Vec3 End point.
 ---@field stroke? vis.Color|vis.ThemeColor Literal or semantic Theme stroke color.
 ---@field width? number Stroke width in pixels.
 
 ---@class vis.ArrowConfig: vis.ObjectConfig
----@field buff? number|vis.Vec2 Non-negative local distances trimmed from a line, arrow or vector: a number for both ends, or {start, end}. Defaults to zero; a consumed segment has no drawing or bounds.
+---@field trim_distance? number|vis.Vec2 Finite nonnegative object-local endpoint distances, before transforms and drawing progress: one number for both ends, or {start, end}. Defaults to zero; a consumed segment has no drawing, bounds or outline. Warped geometry keeps its existing trim.
 ---@field from vis.Vec2|vis.Vec3 Start point.
 ---@field to vis.Vec2|vis.Vec3 End point.
 ---@field tail? number Tail size in pixels.
 ---@field tip? number Tip size in pixels.
 
 ---@class vis.VectorConfig: vis.ObjectConfig
----@field buff? number|vis.Vec2 Non-negative local distances trimmed from a line, arrow or vector: a number for both ends, or {start, end}. Defaults to zero; a consumed segment has no drawing or bounds.
+---@field trim_distance? number|vis.Vec2 Finite nonnegative object-local endpoint distances, before transforms and drawing progress: one number for both ends, or {start, end}. Defaults to zero; a consumed segment has no drawing, bounds or outline. Warped geometry keeps its existing trim.
 ---@field origin? vis.Vec2|vis.Vec3 Vector origin.
 ---@field value vis.Vec2|vis.Vec3 Vector value.
 ---@field tail? number Tail size in pixels.
@@ -360,10 +360,10 @@
 ---@field from? vis.Vec2|vis.Vec3 With to, the ends of a segment the brace spans, in place of around.
 ---@field to? vis.Vec2|vis.Vec3 With from, the other end of the segment the brace spans.
 ---@field direction? "down"|"up"|"left"|"right"|vis.Vec2 Where the tip points: down by default, or for from and to to the right of the way from from to to.
----@field buff? number World units between what the brace spans and its ends (a quarter of the text size by default).
----@field depth? number World units from the ends to the tip (0.4 of the text size by default).
+---@field offset? number Nonnegative parent-space distance from the spanned bounds or segment to the brace; defaults to 0.25 times configured text size, camera-converted for billboard text.
+---@field depth? number Positive parent-space distance from the brace ends to its tip; defaults to 0.4 times configured text size, camera-converted for billboard text.
 ---@field label? string|vis.Object A string set as a text at the tip, its ink gap away, or a handle in the same group moved there by its bounds; returned as the second value.
----@field gap? number World units between the tip and the label (0.2 of the text size by default).
+---@field gap? number Nonnegative parent-space distance from the tip to the label bounds (ink for a string label); defaults to 0.2 times configured text size, camera-converted for billboard text.
 ---@field size? number Size of the text the brace is set with, in points (em = 4/3 × size pixels for billboard text): the label's size, and the size the brace's defaults follow.
 ---@field font? string Registered font or asset name of the label.
 ---@field role? string Theme typography role whose font, size and color the label and the brace take.
@@ -651,11 +651,11 @@
 ---@field hide? vis.Object|vis.Object[] Objects the view leaves out, each with everything below it, up to 256.
 ---@field follow? vis.Object An object whose drawn center the view's camera keeps as its target.
 
----@class vis.SceneTransitionConfig
+---@class vis.SceneTransitionConfig: vis.TimingOptions
 ---@field duration? number Transition duration in seconds.
+---@field curve? vis.Curve Animation curve.
 ---@field hold? number|number[] Seconds fully shown: one non-negative value for all stages or one per stage.
 ---@field live? boolean Play stages from the start of their incoming transition, holding the last frame when finished; true by default. False shows completed frames.
----@field curve? vis.Curve Animation curve.
 ---@field viewport? vis.ViewportConfig Normalized viewport.
 ---@field style? "match"|"fade"|"slide"|"zoom_in"|"zoom_out" How every transition hands one scene over to the next; match by default.
 ---@field from? "left"|"right"|"top"|"bottom" Side a slide pushes the next scene in from; right by default.
@@ -671,41 +671,41 @@
 ---@field area_margin? number Object zoom margin per side as a fraction of its larger normalized geometry side, limited by viewport space. Finite and non-negative; 0.05 by default. Zero uses exact geometry before aspect widening and clamping. Only for object or id areas.
 ---@field match? boolean Let a slide or zoom also carry equal-id objects above both scenes.
 
----@class vis.FadeConfig
----@field shift? vis.Vec2|vis.Vec3 Parent-space offset.
----@field scale? number Relative scale.
+---@class vis.FadeConfig: vis.TimingOptions
 ---@field duration? number Duration in seconds.
 ---@field curve? vis.Curve Animation curve.
+---@field shift? vis.Vec2|vis.Vec3 Parent-space offset.
+---@field scale? number Relative scale.
 
----@class vis.RotateConfig
+---@class vis.RotateConfig: vis.AnimationOptions
+---@field duration? number Duration in seconds.
+---@field curve? vis.Curve Animation curve.
+---@field lag? number Delay of each later target in seconds.
 ---@field about? "center"|"left"|"right"|"top"|"bottom"|"top_left"|"top_right"|"bottom_left"|"bottom_right"|vis.Vec2|vis.Vec3|vis.Object Pivot: an anchor of the target's bounds, a parent-space point, or another object's center.
 ---@field axis? vis.Vec3 Rotation axis.
 ---@field shift? vis.Vec2|vis.Vec3 Parent-space shift in the same clip.
 ---@field arc? number Central angle of the arc the pivot travels.
+
+---@class vis.ScaleConfig: vis.AnimationOptions
 ---@field duration? number Duration in seconds.
 ---@field curve? vis.Curve Animation curve.
 ---@field lag? number Delay of each later target in seconds.
-
----@class vis.ScaleConfig
 ---@field about? "center"|"left"|"right"|"top"|"bottom"|"top_left"|"top_right"|"bottom_left"|"bottom_right"|vis.Vec2|vis.Vec3|vis.Object Pivot: an anchor of the target's bounds, a parent-space point, or another object's center.
 ---@field shift? vis.Vec2|vis.Vec3 Parent-space shift in the same clip.
 ---@field arc? number Central angle of the arc the pivot travels.
+
+---@class vis.MoveAlongConfig: vis.AnimationOptions
 ---@field duration? number Duration in seconds.
 ---@field curve? vis.Curve Animation curve.
 ---@field lag? number Delay of each later target in seconds.
-
----@class vis.MoveAlongConfig
 ---@field from? number Fraction of the outline to start at.
 ---@field to? number Fraction of the outline to end at; below from travels backwards.
 ---@field orient? boolean Turn the target with the path.
----@field duration? number Duration in seconds.
----@field curve? vis.Curve Animation curve.
----@field lag? number Delay of each later target in seconds.
 
----@class vis.AdvectConfig
+---@class vis.AdvectConfig: vis.TimingOptions
 ---@field duration? number Duration in seconds.
----@field speed? number Field time per second; negative runs the flow backward.
 ---@field curve? vis.Curve Curve of the field time; linear by default.
+---@field speed? number Field time per second; negative runs the flow backward.
 
 ---@class vis.WarpConfig
 ---@field step? number Longest straight piece, in the parent space of each target, that the warp maps without cutting it first; 0.05 by default.
@@ -755,10 +755,10 @@
 ---@field lag? number Delay of each later pair in seconds.
 ---@field fade? number Fraction of the duration unmatched parts fade over.
 
----@class vis.HighlightConfig
----@field dim? number Opacity of what is not highlighted.
+---@class vis.HighlightConfig: vis.TimingOptions
 ---@field duration? number Duration in seconds.
 ---@field curve? vis.Curve Animation curve.
+---@field dim? number Opacity of what is not highlighted.
 
 ---@class vis.ArrangeConfig
 ---@field direction? vis.Vec2|vis.Vec3 Direction of the row.
@@ -776,15 +776,15 @@
 ---@field far? number Far clipping plane.
 ---@field projection? "perspective"|"orthographic" 3D projection mode.
 
----@class vis.OrbitConfig
+---@class vis.OrbitConfig: vis.TimingOptions
+---@field duration? number Duration in seconds.
+---@field curve? vis.Curve Animation curve.
 ---@field axis? vis.Vec3 Axis to orbit about; the camera's up by default.
----@field duration? number Duration in seconds.
----@field curve? vis.Curve Animation curve.
 
----@class vis.FocusConfig
----@field padding? number Margin on each side as a fraction of the framed span.
+---@class vis.FocusConfig: vis.TimingOptions
 ---@field duration? number Duration in seconds.
 ---@field curve? vis.Curve Animation curve.
+---@field padding? number Margin on each side as a fraction of the framed span.
 
 ---@class vis.CloneConfig
 ---@field id? string Id of the copy; without one it takes the source's id and :copy, then :copy2 and so on. The ids below the copy follow the copy's.
@@ -807,51 +807,51 @@
 ---@field blur? number Blur sigma in screen pixels, 0 to 256.
 ---@field shadow? {color?: vis.Color|vis.ThemeColor, offset?: vis.Vec2, blur?: number} Shadow beneath the object, offset in screen pixels.
 
----@class vis.IndicateConfig
----@field color? vis.Color|vis.ThemeColor Temporary emphasis color; defaults to the Theme focus role.
----@field scale? number Temporary scale.
+---@class vis.IndicateConfig: vis.TimingOptions
 ---@field duration? number Duration in seconds.
 ---@field curve? vis.Curve Animation curve.
+---@field color? vis.Color|vis.ThemeColor Temporary emphasis color; defaults to the Theme focus role.
+---@field scale? number Temporary scale.
 
----@class vis.CircumscribeConfig
+---@class vis.CircumscribeConfig: vis.TimingOptions
+---@field duration? number Duration in seconds; 1 by default.
+---@field curve? vis.Curve Animation curve.
 ---@field shape? "rectangle"|"ellipse" The frame; an ellipse passes through the corners of the padded bounds. Rectangle by default.
 ---@field color? vis.Color|vis.ThemeColor Frame color; defaults to the Theme focus role.
 ---@field width? number Frame stroke width in pixels, 3 by default; the bright stretch is twice as wide.
 ---@field padding? number World units between the target's bounds and the frame; 0.1 by default.
 ---@field window? number Share of the outline the bright stretch covers, greater than 0 and at most 1; 0.3 by default.
+
+---@class vis.PassingFlashConfig: vis.TimingOptions
 ---@field duration? number Duration in seconds; 1 by default.
 ---@field curve? vis.Curve Animation curve.
-
----@class vis.PassingFlashConfig
 ---@field color? vis.Color|vis.ThemeColor Stretch color; defaults to the Theme focus role.
 ---@field width? number Stretch stroke width in pixels; 6 by default.
 ---@field window? number Share of the outline the bright stretch covers, greater than 0 and at most 1; 0.3 by default.
+
+---@class vis.FlashConfig: vis.TimingOptions
 ---@field duration? number Duration in seconds; 1 by default.
 ---@field curve? vis.Curve Animation curve.
-
----@class vis.FlashConfig
 ---@field color? vis.Color|vis.ThemeColor Line color; defaults to the Theme focus role.
 ---@field width? number Line stroke width in pixels; 3 by default.
 ---@field padding? number World units between the target's bounds, or the point, and where the lines start; 0.1 by default.
 ---@field size? number World length of each line; 0.2 by default.
 ---@field lines? integer How many lines burst out, from 1 to 64; 12 by default.
----@field duration? number Duration in seconds; 1 by default.
----@field curve? vis.Curve Animation curve.
 
----@class vis.RippleConfig
+---@class vis.RippleConfig: vis.TimingOptions
+---@field duration? number Duration in seconds; 1 by default.
+---@field curve? vis.Curve Curve of the growth, snappy by default; the fade runs evenly.
 ---@field color? vis.Color|vis.ThemeColor Ring color; defaults to the Theme focus role.
 ---@field width? number Ring stroke width in pixels; 3 by default.
 ---@field padding? number World units between the target's outline and where the ring starts; 0 by default.
 ---@field size? number World units the ring grows on every side; 0.4 by default.
----@field duration? number Duration in seconds; 1 by default.
----@field curve? vis.Curve Curve of the growth, snappy by default; the fade runs evenly.
 
----@class vis.WiggleConfig
+---@class vis.WiggleConfig: vis.TimingOptions
+---@field duration? number Duration in seconds; 2 by default.
+---@field curve? vis.Curve Animation curve.
 ---@field scale? number Peak growth about the bounds center; 1.1 by default.
 ---@field angle? number Widest turn either way in radians; 0.0628 by default.
 ---@field swings? number How many times the target tips to a side; 6 by default.
----@field duration? number Duration in seconds; 2 by default.
----@field curve? vis.Curve Animation curve.
 
 ---@class vis.RegionConfig
 ---@field x number Logical-pixel left coordinate in the Canvas.
@@ -947,6 +947,47 @@
 ---@field padding? number Gap between cells.
 ---@field duration? number Sampling duration in seconds.
 ---@field fps? number Sampling frame rate.
+
+---@class vis.TimingOptions
+---@field duration? number Seconds; omitted keeps the operation's default.
+---@field curve? vis.Curve Timing curve, smooth by default.
+---@field easing? vis.Curve Alias for curve; supply only one spelling.
+
+---@class vis.AnimationOptions: vis.TimingOptions
+---@field lag? number Each later target starts duration * lag seconds after the previous one.
+
+---@class vis.RevealOptions: vis.AnimationOptions
+---@field direction? vis.CreateDirection Drawing order, forward by default.
+
+---@class vis.MorphOptions: vis.AnimationOptions
+---@field lag? number Delay of each later pair in seconds.
+---@field pairs? number[][] Explicit one-based source and target contour indices; each piece pairs once, and remaining pieces pair automatically. The same indices apply to each object pair in an array call. Surfaces take no pairs.
+---@field copy? boolean Morph a copy of each source made at the cursor and leave the source in place; the copy is removed when the morph ends.
+
+---@class vis.MatchOptions: vis.AnimationOptions
+---@field lag? number Delay of each later pair in seconds.
+---@field path? vis.Object Snapshot outline guide, at most 2048 samples: add its arc-length detour from its endpoint chord to each paired piece while preserving individual endpoints and spacing. No live connectors or nonzero arc.
+---@field arc? number Central angle of the arc matched parts travel.
+---@field pairs? vis.Object[][] Explicit {source_piece, target_piece} pairs.
+---@field strings? boolean Match texts with equal strings, and the pieces of formulas by their TeX; false keeps only the given pairs.
+---@field diff? boolean Match lines and tokens in order, as a diff.
+---@field shapes? boolean Split or merge shapes between counts.
+---@field fade? number Fraction of the duration unmatched parts fade over.
+---@field copy? boolean Match a copy of the source made at the cursor and leave the source in place; the source may be moving, and pairs still name its pieces.
+
+---@class vis.EditOptions: vis.AnimationOptions
+---@field lag? number Delay of each later pair in seconds.
+---@field id? string Id of the new block; by default the block's id with the first free .2, .3, and so on.
+---@field arc? number Central angle of the arc matched parts travel.
+---@field fade? number Fraction of the duration unmatched parts fade over.
+
+---@class vis.ArrangeOptions: vis.TimingOptions
+---@field direction? vis.Vec2|vis.Vec3 Direction of the row.
+---@field gap? number Space between neighbors in world units.
+---@field center? vis.Vec2|vis.Vec3 Point the row centers on in the parent.
+
+---@class vis.WarpOptions: vis.TimingOptions
+---@field step? number Longest straight piece, in the parent space of each target, that the warp maps without cutting it first; 0.05 by default.
 
 ---@class vis.Object
 local Object = {}
@@ -1869,6 +1910,7 @@ function Scene:view(rect, options) end
 function Scene:scene_transition(scenes, config) end
 
 ---Animate one descriptor or an array of descriptors.
+---@overload fun(self: vis.Scene, animations: vis.Animation|vis.Animation[], options: vis.AnimationOptions)
 ---@param animations vis.Animation|vis.Animation[]
 ---@param duration? number
 ---@param curve? vis.Curve
@@ -1879,11 +1921,12 @@ function Scene:play(animations, duration, curve, lag) end
 ---@param animations vis.Animation|vis.Animation[]
 function Scene:set(animations) end
 
----Push each target family's state at the cursor onto its state stack.
+---Push each target family's cursor state without advancing time. Saves nest; active text and geometry changes save their destinations. Warp geometry stays as authored.
 ---@param target vis.Object|vis.Object[]
 function Scene:save(target) end
 
----Restore each target family's newest saved state, immediately or over a duration.
+---Pop each target family's latest saved state and restore it immediately or over duration. Removed descendants stay removed; restores do not undo warps or switch plain/counting text modes.
+---@overload fun(self: vis.Scene, target: vis.Object|vis.Object[], options: vis.AnimationOptions)
 ---@param target vis.Object|vis.Object[]
 ---@param duration? number
 ---@param curve? vis.Curve
@@ -1891,6 +1934,7 @@ function Scene:save(target) end
 function Scene:restore(target, duration, curve, lag) end
 
 ---Reveal targets by drawing their geometry.
+---@overload fun(self: vis.Scene, target: vis.Object|vis.Object[], options: vis.RevealOptions)
 ---@param target vis.Object|vis.Object[]
 ---@param duration? number
 ---@param curve? vis.Curve
@@ -1899,6 +1943,7 @@ function Scene:restore(target, duration, curve, lag) end
 function Scene:create(target, duration, curve, lag, direction) end
 
 ---Hide targets by reversing their drawn geometry.
+---@overload fun(self: vis.Scene, target: vis.Object|vis.Object[], options: vis.RevealOptions)
 ---@param target vis.Object|vis.Object[]
 ---@param duration? number
 ---@param curve? vis.Curve
@@ -1907,6 +1952,7 @@ function Scene:create(target, duration, curve, lag, direction) end
 function Scene:uncreate(target, duration, curve, lag, direction) end
 
 ---Reveal target fills.
+---@overload fun(self: vis.Scene, target: vis.Object|vis.Object[], options: vis.AnimationOptions)
 ---@param target vis.Object|vis.Object[]
 ---@param duration? number
 ---@param curve? vis.Curve
@@ -1914,6 +1960,7 @@ function Scene:uncreate(target, duration, curve, lag, direction) end
 function Scene:fill_reveal(target, duration, curve, lag) end
 
 ---Draw target borders and then reveal their fills.
+---@overload fun(self: vis.Scene, target: vis.Object|vis.Object[], options: vis.RevealOptions)
 ---@param target vis.Object|vis.Object[]
 ---@param duration? number
 ---@param curve? vis.Curve
@@ -1922,6 +1969,7 @@ function Scene:fill_reveal(target, duration, curve, lag) end
 function Scene:draw_border_then_fill(target, duration, curve, lag, direction) end
 
 ---Reveal text or drawable targets in writing order.
+---@overload fun(self: vis.Scene, target: vis.Object|vis.Object[], options: vis.RevealOptions)
 ---@param target vis.Object|vis.Object[]
 ---@param duration? number
 ---@param curve? vis.Curve
@@ -1930,6 +1978,7 @@ function Scene:draw_border_then_fill(target, duration, curve, lag, direction) en
 function Scene:write(target, duration, curve, lag, direction) end
 
 ---Animate targets by a parent-space vector.
+---@overload fun(self: vis.Scene, target: vis.Object, vector: vis.Vec2|vis.Vec3, options: vis.TimingOptions)
 ---@param target vis.Object
 ---@param vector vis.Vec2|vis.Vec3
 ---@param duration? number
@@ -1937,6 +1986,7 @@ function Scene:write(target, duration, curve, lag, direction) end
 function Scene:shift(target, vector, duration, curve) end
 
 ---Animate a target to an absolute local-to-parent matrix.
+---@overload fun(self: vis.Scene, target: vis.Object, matrix: vis.Mat4, options: vis.TimingOptions)
 ---@param target vis.Object
 ---@param matrix vis.Mat4
 ---@param duration? number
@@ -1968,6 +2018,7 @@ function Scene:move_along(target, path, options) end
 function Scene:advect(target, fn, options) end
 
 ---Map target families in each target's parent space, subdividing straight segments first. Evaluate fn during authoring, or supply sampled grid images.
+---@overload fun(self: vis.Scene, target: vis.Object|vis.Object[], fn: vis.WarpSamples|fun(x:number, y:number, z:number):number|vis.Vec2|vis.Vec3, number?, number?, options: vis.WarpOptions)
 ---@param target vis.Object|vis.Object[]
 ---@param fn vis.WarpSamples|fun(x:number, y:number, z:number):number|vis.Vec2|vis.Vec3, number?, number?
 ---@param duration? number
@@ -1976,6 +2027,7 @@ function Scene:advect(target, fn, options) end
 function Scene:warp(target, fn, duration, curve, options) end
 
 ---Animate target opacity.
+---@overload fun(self: vis.Scene, target: vis.Object, opacity: number, options: vis.TimingOptions)
 ---@param target vis.Object
 ---@param opacity number
 ---@param duration? number
@@ -1993,12 +2045,14 @@ function Scene:fade_in(target, options) end
 function Scene:fade_out(target, options) end
 
 ---Reveal a target by growing it from its center.
+---@overload fun(self: vis.Scene, target: vis.Object, options: vis.TimingOptions)
 ---@param target vis.Object
 ---@param duration? number
 ---@param curve? vis.Curve
 function Scene:grow_from_center(target, duration, curve) end
 
 ---Reveal a target by growing one dimension from a fixed geometry-bounds edge.
+---@overload fun(self: vis.Scene, target: vis.Object, edge: "left"|"right"|"bottom"|"top", options: vis.TimingOptions)
 ---@param target vis.Object
 ---@param edge "left"|"right"|"bottom"|"top"
 ---@param duration? number
@@ -2006,6 +2060,7 @@ function Scene:grow_from_center(target, duration, curve) end
 function Scene:grow_from_edge(target, edge, duration, curve) end
 
 ---Hide a target by shrinking it to its center.
+---@overload fun(self: vis.Scene, target: vis.Object, options: vis.TimingOptions)
 ---@param target vis.Object
 ---@param duration? number
 ---@param curve? vis.Curve
@@ -2041,7 +2096,8 @@ function Scene:flash(target, options) end
 ---@param options? vis.RippleConfig
 function Scene:ripple(target, options) end
 
----Morph source pieces and contours into target geometry with deterministic pairing and centroid growth; two surfaces on one grid morph point by point, their colors read again between them; with copy, a copy of the source morphs and the source stays.
+---Morph source geometry into a newly attached target. Source draws the interpolation, then leaves the timeline as target takes over at completion. Both remain Scene-owned; copy preserves source by morphing a cursor-state copy. One-based contour pairs override automatic matching.
+---@overload fun(self: vis.Scene, source: vis.Object|vis.Object[], target: vis.Object|vis.Object[], options: vis.MorphOptions)
 ---@param source vis.Object|vis.Object[]
 ---@param target vis.Object|vis.Object[]
 ---@param duration? number
@@ -2049,22 +2105,16 @@ function Scene:ripple(target, options) end
 ---@param lag? number|vis.MorphConfig
 function Scene:morph(source, target, duration, curve, lag) end
 
----Morph source pieces and contours to target and transfer visual identity; with copy, a copy of the source does and the source stays.
----@param source vis.Object|vis.Object[]
----@param target vis.Object|vis.Object[]
----@param duration? number
----@param curve? vis.Curve
----@param lag? number|vis.MorphConfig
-function Scene:replacement_transform(source, target, duration, curve, lag) end
-
----Cross-fade unrelated object families as one replacement.
+---Cross-fade disjoint families and remove source from the timeline at completion. Both remain Scene-owned for earlier samples. Target must be newly attached at the cursor without clips; source clips must finish by the fade end.
+---@overload fun(self: vis.Scene, source: vis.Object, target: vis.Object, options: vis.TimingOptions)
 ---@param source vis.Object
 ---@param target vis.Object
 ---@param duration? number
 ---@param curve? vis.Curve
 function Scene:fade_transform(source, target, duration, curve) end
 
----Carry the parts a source shares with a newly attached target, by id, string, diff, or shape; between tex formulas, by TeX.
+---Carry matching descendants into a newly attached target, using explicit pairs, strings, diff, shapes or TeX. Source must be at rest unless copy snapshots it. Completion removes source or its temporary copy from the timeline; Scene ownership stays.
+---@overload fun(self: vis.Scene, source: vis.Object, target: vis.Object, options: vis.MatchOptions)
 ---@param source vis.Object
 ---@param target vis.Object
 ---@param duration? number
@@ -2073,6 +2123,7 @@ function Scene:fade_transform(source, target, duration, curve) end
 function Scene:match_transform(source, target, duration, curve, options) end
 
 ---Make the code block that a block's source turns into after edits, applied in order, with the block's look and place, and carry the block into it as a diff.
+---@overload fun(self: vis.Scene, block: vis.Group, edits: vis.CodeEdit|vis.CodeEdit[], options: vis.EditOptions): vis.Group
 ---@param block vis.Group
 ---@param edits vis.CodeEdit|vis.CodeEdit[]
 ---@param duration? number
@@ -2089,6 +2140,7 @@ function Scene:edit(block, edits, duration, curve, options) end
 function Scene:highlight(target, first, last, options) end
 
 ---Animate a Group's children, or a list of handles, into a row or column.
+---@overload fun(self: vis.Scene, targets: vis.Group|vis.Object[], options: vis.ArrangeOptions)
 ---@param targets vis.Group|vis.Object[]
 ---@param duration? number
 ---@param curve? vis.Curve
@@ -2096,6 +2148,7 @@ function Scene:highlight(target, first, last, options) end
 function Scene:arrange(targets, duration, curve, options) end
 
 ---Cross-fade independent outgoing and incoming targets.
+---@overload fun(self: vis.Scene, outgoing: vis.Object, incoming: vis.Object, options: vis.TimingOptions)
 ---@param outgoing vis.Object
 ---@param incoming vis.Object
 ---@param duration? number
@@ -2103,6 +2156,7 @@ function Scene:arrange(targets, duration, curve, options) end
 function Scene:transition(outgoing, incoming, duration, curve) end
 
 ---Animate a target stroke to a literal or semantic Theme color.
+---@overload fun(self: vis.Scene, target: vis.Object, color: vis.Color|vis.ThemeColor, options: vis.TimingOptions)
 ---@param target vis.Object
 ---@param color vis.Color|vis.ThemeColor
 ---@param duration? number
@@ -2110,6 +2164,7 @@ function Scene:transition(outgoing, incoming, duration, curve) end
 function Scene:stroke(target, color, duration, curve) end
 
 ---Animate a target fill to a literal or semantic Theme color.
+---@overload fun(self: vis.Scene, target: vis.Object, color: vis.Color|vis.ThemeColor, options: vis.TimingOptions)
 ---@param target vis.Object
 ---@param color vis.Color|vis.ThemeColor
 ---@param duration? number
@@ -2117,6 +2172,7 @@ function Scene:stroke(target, color, duration, curve) end
 function Scene:fill(target, color, duration, curve) end
 
 ---Animate the scene camera; a target of objects centers it on their bounds.
+---@overload fun(self: vis.Scene, camera: vis.LookConfig, options: vis.TimingOptions)
 ---@param camera vis.LookConfig
 ---@param duration? number
 ---@param curve? vis.Curve
@@ -2159,7 +2215,7 @@ function Scene:time(name) end
 ---@param time number|string
 function Scene:seek(time) end
 
----Remove a target at the current timeline cursor.
+---End the target family's visibility at the cursor. Objects remain Scene-owned and available when sampling earlier times.
 ---@param target vis.Object
 function Scene:remove(target) end
 
@@ -2411,20 +2467,16 @@ local MotionController = {}
 ---@return vis.MotionController
 function MotionController:define(object, name, state) end
 
----Retarget one Object from the currently sampled overlay to a named state.
+---Retarget one Object or atomically retarget an array of Objects to named motion states.
+---@overload fun(self: vis.MotionController, targets: vis.MotionTarget[], duration?: number, curve?: vis.Curve): vis.MotionController
+---@overload fun(self: vis.MotionController, object: vis.Object, state: string, options: vis.TimingOptions): vis.MotionController
+---@overload fun(self: vis.MotionController, targets: vis.MotionTarget[], options: vis.TimingOptions): vis.MotionController
 ---@param object vis.Object
 ---@param state string
 ---@param duration? number
 ---@param curve? vis.Curve
 ---@return vis.MotionController
 function MotionController:transition(object, state, duration, curve) end
-
----Atomically retarget one bounded array of Objects; every accepted target shares one transaction.
----@param targets vis.MotionTarget[]
----@param duration? number
----@param curve? vis.Curve
----@return vis.MotionController
-function MotionController:transition_many(targets, duration, curve) end
 
 ---Advance the independent motion clock by a non-negative elapsed duration.
 ---@param elapsed number
@@ -2466,6 +2518,7 @@ function MotionController:clear_events() end
 local View = {}
 
 ---Animate the view's camera as Scene:look animates the scene's; a target of objects centers it on their bounds.
+---@overload fun(self: vis.View, camera: vis.LookConfig, options: vis.TimingOptions)
 ---@param camera vis.LookConfig
 ---@param duration? number
 ---@param curve? vis.Curve
@@ -2482,6 +2535,7 @@ function View:focus(target, options) end
 function View:orbit(radians, options) end
 
 ---Animate the opacity of the whole view; the fades of one view follow one another.
+---@overload fun(self: vis.View, opacity: number, options: vis.TimingOptions)
 ---@param opacity number
 ---@param duration? number
 ---@param curve? vis.Curve

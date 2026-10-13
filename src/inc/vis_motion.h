@@ -48,10 +48,18 @@ struct Controller final : Group
                       Easing easing = Easing::Smooth) noexcept;
     Result transition(Object* object, const char* state, float duration,
                       const AnimCurve& curve) noexcept;
+    Result transition(Object* object, const char* state, const TimingOptions& timing) noexcept
+    {
+        return transition(object, state, timing.duration, timing.curve);
+    }
     Result transition(const Target* targets, uint32_t count, float duration = 0.2f,
                       Easing easing = Easing::Smooth) noexcept;
     Result transition(const Target* targets, uint32_t count, float duration,
                       const AnimCurve& curve) noexcept;
+    Result transition(const Target* targets, uint32_t count, const TimingOptions& timing) noexcept
+    {
+        return transition(targets, count, timing.duration, timing.curve);
+    }
     // Only advance changes the interaction clock; scene sampling and built-in savers do not.
     Result advance(float elapsed) noexcept;
     Result sample(const Object* object, State& state) const noexcept;

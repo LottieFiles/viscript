@@ -16,7 +16,7 @@ The first frame shows the subject itself, not a title. The last beat holds on th
 ## Make the motion explain
 
 - **Geometry before formulas.** Show the concrete case moving first; name it with a formula or label only after the viewer has seen it.
-- **Transform, don't erase.** One object carries the story: it moves, morphs, recolors, or splits into its next state (`morph`, `replacement_transform`, `transform`, tracker bindings). Do not clear the screen and redraw a new version; avoid `fade_out` followed by a new object for the same idea.
+- **Transform, don't erase.** One object carries the story: it moves, morphs, recolors, or splits into its next state (`morph`, `transform`, tracker bindings). Do not clear the screen and redraw a new version; avoid `fade_out` followed by a new object for the same idea.
 - **Continuous relationships.** When one quantity drives others (a point on a curve, a slope, a sweep angle, a weight), make it a `scene:tracker` and `bind` every dependent to it, then `track` the value. The viewer sees the relation hold at every instant instead of a jump between two snapshots.
 - **Show, don't print.** Encode quantities as length, area, position, angle, thickness, or color intensity. Show only the few numbers the viewer must read, next to what they measure.
 - **Guide attention with opacity.** Focus at 1.0, supporting context near 0.4, background structure near 0.15. Move the focus each beat by fading, not by removing.
@@ -42,7 +42,7 @@ A visual metaphor must keep the relation it claims: incidence, equal area, proje
 |---|---|
 | establish existence | `create`, `write`, `fade_in` |
 | same identity, compatible geometry | `morph` |
-| one object becomes its successor | `replacement_transform` |
+| one object becomes its successor | `morph` |
 | new representation, same meaning | `fade_transform` |
 | a dependent follows a changing value | `tracker` + `bind` + `track` |
 | draw attention without changing state | `indicate`, opacity layering, a temporary `focus` color |

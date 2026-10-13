@@ -165,6 +165,18 @@ Animation calls begin at the Scene cursor and advance it. `wait` adds a pause;
 `at` schedules at an absolute time; `parallel` starts callbacks at the same beat.
 Markers name useful times for host transport and narration.
 
+Animation calls share `{duration, curve}` options. Add `lag` when staggering targets,
+and reuse the table across calls:
+
+```lua
+local timing = {duration = 0.8, curve = "ease_in_out"}
+scene:shift(ball, {2, 0}, timing)
+scene:rotate(ball, math.pi / 2, timing)
+scene:create({ball, arrow}, {duration = 0.8, curve = "smooth", lag = 0.15})
+```
+
+Positional calls remain supported:
+
 ```lua
 scene:parallel(
     function() scene:shift(ball, {4, 0}, 3) end,
@@ -213,7 +225,7 @@ point toward its image.
 
 ## Replacement and matching
 
-`morph` and `replacement_transform` replace the source with aligned target geometry.
+`morph` replaces the source with aligned target geometry.
 Continue the chain using the target handle:
 
 ```lua

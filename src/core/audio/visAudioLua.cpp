@@ -123,6 +123,7 @@ static LuaCue* _cue(lua_State* lua)
 
 static int _gain(lua_State* lua)
 {
+    detail::luaTiming(lua, 4);
     if (!detail::luaAuthoring(lua)) {
         return luaL_error(lua, "audio authoring is unavailable after loading");
     }

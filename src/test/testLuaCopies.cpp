@@ -80,7 +80,7 @@ return s
                  "handle belongs to another scene");
 }
 
-// morph, replacement_transform and match_transform with copy = true transform a copy of the
+// morph and match_transform with copy = true transform a copy of the
 // source and leave the source in place.
 void _copyTransforms(SwRenderer* renderer)
 {
@@ -91,7 +91,7 @@ local disc = s:circle {center = {3, 3}, radius = 1, id = "disc"}
 s:morph(square, disc, 1, "linear", {copy = true})
 local left = s:circle {center = {-3, -3}, radius = 0.5, id = "left"}
 local right = s:circle {center = {3, -3}, radius = 0.5, id = "right"}
-s:replacement_transform({square, disc}, {left, right}, 1, "linear", {lag = 0.5, copy = true})
+s:morph({square, disc}, {left, right}, 1, "linear", {lag = 0.5, copy = true})
 local from = s:group {id = "from"}
 from:circle {center = {-3, -1}, radius = 0.5, id = "from/dot"}
 s:wait(1)
@@ -131,7 +131,7 @@ return s
                  " s:morph(a, b, 1, 'smooth', {copy=1}); return s",
                  "copy must be a boolean");
     _scriptError("local s=vis.scene{}; local a=s:circle{radius=1}; local b=s:circle{radius=2};"
-                 " s:replacement_transform(a, b, 1, 'smooth', {lag=-1}); return s",
+                 " s:morph(a, b, 1, 'smooth', {lag=-1}); return s",
                  "lag cannot be negative");
     _scriptError("local s=vis.scene{}; local a=s:circle{radius=1}; local b=s:circle{radius=2}; s:wait(1);"
                  " s:morph(a, b, 1, 'smooth', {copy=true}); return s",

@@ -83,6 +83,10 @@ struct Soundscape final : Group
                 Easing easing = Easing::Smooth) noexcept;
     Result gain(Cue cue, float value, float begin, float duration,
                 const AnimCurve& curve) noexcept;
+    Result gain(Cue cue, float value, float begin, const TimingOptions& timing) noexcept
+    {
+        return gain(cue, value, begin, timing.duration, timing.curve);
+    }
     uint32_t count() const noexcept;
     bool cueAt(uint32_t index, CueConfig& output) const noexcept;
     Result sample(Cue cue, float time, float& output) const noexcept;

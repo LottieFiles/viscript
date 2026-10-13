@@ -287,7 +287,7 @@ local replacement_target = scene:plot {
     points = {{0.5, -1.3}, {1.2, -2.5}, {1.9, -1.3}},
     stroke = "#7bd88f", id = "replacement-target"
 }
-scene:replacement_transform(replacement_source, replacement_target, 0.2, "ease_in_out")
+scene:morph(replacement_source, replacement_target, 0.2, "ease_in_out")
 scene:indicate(replacement_target, {color = "#ffd166", scale = 1.1, duration = 0.1})
 
 local fade_source = scene:rectangle {
@@ -728,7 +728,7 @@ local s = vis.scene {width = 320, height = 180, camera = {height = 6}}
 local a = s:plot {points = {{-2,0},{-1,0},{0/0,0},{1,0},{2,0}}, id = "source"}
 local b = s:path {commands = {{type="move",to={-2,2}},{type="line",to={-1,2}},{type="move",to={1,2}},{type="line",to={2,2}}}, id = "first"}
 local c = s:plot {points = {{-2,-2},{-1,-2},{0/0,0},{1,-2},{2,-2}}, id = "second"}
-s:replacement_transform({a,a}, {b,c}, 1, "linear", {copy=true, lag=0.25, pairs={{1,2}}})
+s:morph({a,a}, {b,c}, 1, "linear", {copy=true, lag=0.25, pairs={{1,2}}})
 return s
 )lua";
     Scene* scene = nullptr;

@@ -1817,33 +1817,33 @@ bool anchor(const Object* object, Vec3& point) noexcept
 
 bool segment(const Object* object, const VisualState* state, Vec3* ends) noexcept
 {
-    Vec2 buff;
+    Vec2 trimDistance;
     switch (object->type()) {
         case Type::Line: {
             auto line = static_cast<const Line*>(object);
             ends[0] = line->from;
             ends[1] = line->to;
-            buff = line->buff;
+            trimDistance = line->trimDistance;
             break;
         }
         case Type::Arrow: {
             auto arrow = static_cast<const Arrow*>(object);
             ends[0] = arrow->from;
             ends[1] = arrow->to;
-            buff = arrow->buff;
+            trimDistance = arrow->trimDistance;
             break;
         }
         case Type::Vector: {
             auto vector = static_cast<const Vector*>(object);
             ends[0] = vector->origin;
             ends[1] = vector->origin + vector->value;
-            buff = vector->buff;
+            trimDistance = vector->trimDistance;
             break;
         }
         default: return false;
     }
     if (state) {
-        buff = state->buff;
+        trimDistance = state->trimDistance;
         if (state->geometry) {
             Vec3 points[2];
             shapeAt(*state, 2u, points);
@@ -1853,10 +1853,10 @@ bool segment(const Object* object, const VisualState* state, Vec3* ends) noexcep
     }
     auto delta = ends[1] - ends[0];
     auto length = delta.length();
-    if (static_cast<double>(buff.x) + buff.y >= length) return false;
-    if (buff.x == 0.0f && buff.y == 0.0f) return true;
-    ends[0] = ends[0] + delta * (buff.x / length);
-    ends[1] = ends[1] - delta * (buff.y / length);
+    if (static_cast<double>(trimDistance.x) + trimDistance.y >= length) return false;
+    if (trimDistance.x == 0.0f && trimDistance.y == 0.0f) return true;
+    ends[0] = ends[0] + delta * (trimDistance.x / length);
+    ends[1] = ends[1] - delta * (trimDistance.y / length);
     return true;
 }
 
