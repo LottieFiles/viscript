@@ -1,7 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-  <rect width="128" height="128" rx="24" fill="#091116"/>
-  <path d="M18 30h92M18 98h92" stroke="#23343c" stroke-width="4"/>
-  <path d="M23 78c18-42 33 27 50-12 13-30 22-17 32-1" fill="none" stroke="#62e6d2" stroke-width="8" stroke-linecap="round"/>
-  <circle cx="73" cy="66" r="7" fill="#d9ff69"/>
-  <path d="M31 28v72M97 28v72" stroke="#23343c" stroke-width="3"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <rect width="32" height="32" rx="7.5" fill="#14161b"/>
+  <!-- Roman capitals "VI": thick/thin strokes with bracketed serifs -->
+  <g transform="translate(16 16.3) scale(.86) translate(-16.3 -16.3)">
+  <g fill="#ff7a45">
+    <path d="M4 8h7.4v.9H9.9l5.4 12.6 4.6-12.6h-1.5V8h3.9v.9h-1.0L15.1 24.6h-1.1L7.3 8.9H4z"/>
+  </g>
+  <path fill="#f4efe6" d="M23.2 8h5.4v.9h-1.5v14.2h1.5v.9h-5.4v-.9h1.5V8.9h-1.5z"/>
+  </g>
 </svg>

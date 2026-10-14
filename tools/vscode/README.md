@@ -2,6 +2,19 @@
 
 Preview viscript Lua scenes beside their source in Visual Studio Code. The bundled WebAssembly renderer runs locally in a Webview.
 
+## Install
+
+Build the VSIX from the repository and install it:
+
+```sh
+cd tools/vscode
+npm ci
+npm run package                                # vis-preview-<version>.vsix
+code --install-extension vis-preview-*.vsix
+```
+
+Requires VS Code 1.96 or newer.
+
 ## Start
 
 1. Open a Lua file containing `vis.scene`.
@@ -63,7 +76,7 @@ Place the manifest and scenes under the workspace:
 
 Paths are relative to the workspace. Entries with the same `series` appear together in manifest order. Source definitions and related links receive a Preview CodeLens and hover link. A `line` pins repeated symbol names; a focused `range` gives the Inspector an exact excerpt.
 
-The Inspector shows description Markdown under **NOTES**, followed by source links. Each excerpt has **SEE** for native editor navigation, and **Show Lines** expands its context. Editing a linked file refreshes the excerpt. **Document → Lua** opens the scene; **Document → Source** opens its mapped definition.
+The Inspector shows description Markdown under **NOTES**, followed by source links. A newly loaded scene opens **NOTES** and its first link. Each excerpt has **SEE** for native editor navigation, and **Show Lines** expands its context. Editing a linked file refreshes the excerpt. **Document → Lua** opens the scene; **Document → Source** opens its mapped definition.
 
 A related link can show a Git comparison:
 
@@ -103,6 +116,7 @@ Export from the Command Palette with **viscript: Save Current Viewer as PNG/GIF/
 | Command or setting | Purpose |
 |---|---|
 | viscript: Open Viewer | Open or reveal the viewer |
+| viscript: Open Preview to the Side | Preview the active Lua file (editor title icon) |
 | viscript: Refresh Preview | Reload the current scene |
 | viscript: Open Bundled Runtime Folder | Reveal runtime files, fonts, and licenses |
 | viscript: Enable LuaLS Type Definitions | Register generated Lua metadata |

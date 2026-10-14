@@ -82,9 +82,17 @@ class VisualizationProvider implements vscode.CodeLensProvider, vscode.HoverProv
         const found = await this.entriesFor(document);
         if (!found) return [];
         const ranges = await Promise.all(found.matches.map((match) => this.rangeFor(document, match)));
+        // A link over the entry's own definition would put a second lens beside the primary one.
+        const primary = new Map<VisualizationEntry, vscode.Range>();
+        found.matches.forEach((match, index) => {
+            const range = ranges[index];
+            if (!match.relatedLabel && range) primary.set(match.entry, range);
+        });
         return found.matches.flatMap((match, index) => {
             const range = ranges[index];
             if (!range) return [];
+            const anchor = match.relatedLabel ? primary.get(match.entry) : undefined;
+            if (anchor && range.intersection(anchor)) return [];
             const entry = match.entry;
             const reference: VisualizationReference = {workspace: found.workspace.uri.toString(), entry};
             return [new vscode.CodeLens(range, {

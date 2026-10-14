@@ -76,9 +76,10 @@ export function sourceContextKeys(contexts) {
 export function reconcileInspectorOpenState(contexts, previous, activeIndex, preserve) {
     const contextKeys = sourceContextKeys(contexts);
     if (!preserve) {
+        // A new Scene opens with its notes and its active source link, so the explanation is visible.
         const activeKey = contextKeys[resolveActiveSourceIndex(contexts, activeIndex)];
         return {
-            notesOpen: contextKeys.length === 0,
+            notesOpen: true,
             sourceKeys: activeKey === undefined ? [] : [activeKey],
         };
     }

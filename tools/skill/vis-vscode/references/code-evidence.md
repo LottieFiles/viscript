@@ -29,7 +29,7 @@ Drop rows that have no visible causal transition, repeat another row's claim, or
 ## Choose and order ranges
 
 - Each `links` range is the smallest coherent block that holds the local input or governing condition, the decisive operation, and its immediate result or handoff. Split distant stages into separate links instead of one long range.
-- The primary `source`/`symbol` anchors CodeLens but is not listed in the Inspector. When the definition's body is evidence, add it as a ranged link too.
+- The primary `source`/`symbol` anchors CodeLens but is not listed in the Inspector. When the definition's body is evidence, add it as a ranged link too; a link whose range covers the definition shares the definition's CodeLens.
 - Order `links` by the scenario's runtime control or data flow, never by file, declaration, alphabet, or patch order. For concurrent work, order by causal handoff and describe the overlap instead of inventing a total order.
 - Keep one order and one vocabulary across `links`, Inspector labels, on-Canvas anchors, beats, and the description. If the Scene numbers its sections, start the matching `label` with the same identifier. Never invent an identifier only in the manifest.
 

@@ -143,8 +143,12 @@ assert.deepEqual(
     [...referenceKeys].reverse(),
 );
 assert.deepEqual(reconcileInspectorOpenState(contexts, undefined, 1, false), {
-    notesOpen: false,
+    notesOpen: true,
     sourceKeys: [contextKeys[1]],
+});
+assert.deepEqual(reconcileInspectorOpenState(contexts, {notesOpen: false, sourceKeys: []}, 0, false), {
+    notesOpen: true,
+    sourceKeys: [contextKeys[0]],
 });
 assert.deepEqual(reconcileInspectorOpenState([], undefined, -1, false), {
     notesOpen: true,

@@ -25,7 +25,7 @@ These are the only delivery differences from vis-skills:
 
 ## Inspector and navigation
 
-- `NOTES` (the `description`) comes first, then one entry per `links` item in order. The first link starts open, or `NOTES` when there are no links. Any number of entries can stay open.
+- `NOTES` (the `description`) comes first, then one entry per `links` item in order. A newly loaded Scene opens `NOTES` and its first link. Reloading the same Scene, or a Theme change, keeps whatever the reader opened or closed. Any number of entries can stay open.
 - Each source entry shows its path, focused range, an excerpt, and **SEE**. **SEE** reveals the exact range, with a collapsed cursor, in the editor group to the right of the Viewer. On a diff entry, **SEE** opens the native Diff Editor.
 - `SHOW 5 LINES ABOVE` and `SHOW 5 LINES BELOW` extend an excerpt, and **Show Lines** changes the step to 5, 10, or 20.
 - Editing a linked file refreshes open excerpts without recompiling the Scene. A range past the end of the file, a missing file, or an unverified diff shows as unavailable.
