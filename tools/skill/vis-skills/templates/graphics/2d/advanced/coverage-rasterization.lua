@@ -50,17 +50,18 @@ local function mapPoint(matrix, point)
     return {matrix[1] * point[1] + matrix[2] * point[2] + matrix[4], matrix[5] * point[1] + matrix[6] * point[2] + matrix[8]}
 end
 
--- The vector boundary and raster coverage occupy the same pixel coordinate system.
+-- The vector boundary and raster coverage occupy the same pixel coordinate system. The selected pixel and
+-- its magnifier stay in ink; `result` marks the shape, its covered subsamples, and the measured value.
 local grid = scene:space {id = "coverage-grid-space", x = {0, columns - 1, 1}, y = {0, rows - 1, 1}, opacity = 0, matrix = gridMatrix}
 local base = grid:cell {id = "coverage-base", origin = {-0.5, -0.5}, size = {columns, rows}, mode = "padd", padding = 0.05, color = "surface", layer = -5}
 local coverage = grid:cell {id = "coverage-field", origin = {-0.5, -0.5}, size = {columns, rows}, mode = "padd", padding = 0.05, patches = coveragePatches()}
 local boundary = grid:circle {
     id = "coverage-shape-boundary", center = circle.center, radius = circle.radius,
-    fill = "#4fc1ff12", stroke = "result", width = 4, layer = 20,
+    fill = "#4fc1ff12", stroke = "result", width = 2, layer = 20,
 }
 local focus = grid:rectangle {
     id = "coverage-selected-pixel", center = {selected.x, selected.y}, size = {0.94, 0.94},
-    fill = "#00000000", stroke = "focus", width = 4, layer = 30,
+    fill = "#00000000", stroke = "foreground", width = 2, layer = 30,
 }
 
 -- A second Cell expands the exact binary subsamples used by coverageAt.
@@ -78,14 +79,14 @@ for sy = 0, samples - 1 do
     end
 end
 local detailCell = detail:cell {id = "coverage-subsamples", origin = {-0.5, -0.5}, size = {samples, samples}, mode = "padd", padding = 0.08, patches = detailPatches}
-local detailFrame = detail:rectangle {id = "coverage-detail-frame", center = {4.5, 4.5}, size = {10, 10}, fill = "#00000000", stroke = "focus", width = 3, layer = 30}
+local detailFrame = detail:rectangle {id = "coverage-detail-frame", center = {4.5, 4.5}, size = {10, 10}, fill = "#00000000", stroke = "foreground", width = 1.25, layer = 30}
 local sourceTop = mapPoint(gridMatrix, {selected.x + 0.5, selected.y + 0.5})
 local sourceBottom = mapPoint(gridMatrix, {selected.x + 0.5, selected.y - 0.5})
 local targetTop = mapPoint(detailMatrix, {-0.5, 9.5})
 local targetBottom = mapPoint(detailMatrix, {-0.5, -0.5})
 local wedge = {
-    scene:line {id = "coverage-wedge-top", from = sourceTop, to = targetTop, stroke = "focus", width = 2, layer = 10},
-    scene:line {id = "coverage-wedge-bottom", from = sourceBottom, to = targetBottom, stroke = "focus", width = 2, layer = 10},
+    scene:line {id = "coverage-wedge-top", from = sourceTop, to = targetTop, stroke = "muted", width = 1, layer = 10},
+    scene:line {id = "coverage-wedge-bottom", from = sourceBottom, to = targetBottom, stroke = "muted", width = 1, layer = 10},
 }
 local labels = {
     scene:text {id = "coverage-detail-label", text = string.format("%d × %d subsamples", samples, samples), point = {detailCenter[1], 1.38}, role = "code", fill = "muted", align = {0.5, 0.5}, layer = 40},

@@ -1,6 +1,8 @@
 -- Question: which event moves a process between scheduler states, and where does execution repeat?
 -- This is an operational state lifecycle; model guard/choice-heavy branching with explicit choice nodes.
 -- Replace state_specs and transition labels; preserve the Ready -> Running -> Waiting -> Ready cycle.
+-- Look: ink states and transitions; accent marks execution (Running and the dispatch into it), and the
+-- final state is dimmed context (`muted`). The caption above the rule states what the figure shows.
 local scene = vis.scene {
     width = 960, height = 540, fps = 30, loop = false,
     theme = "adaptive_vscode",
@@ -15,26 +17,21 @@ local routes = root:group {id = "process-lifecycle:routes"}
 local routeLabels = root:group {id = "process-lifecycle:route-labels"}
 
 header:text {
-    text = "Process lifecycle", point = {-430, 225}, align = {0, 0.5},
-    role = "h2", fill = "foreground", layer = LAYER.text,
-    id = "process-lifecycle:title",
-}
-header:text {
     text = "Scheduler and I/O events drive the repeating execution cycle",
     point = {-430, 184}, align = {0, 0.5}, role = "code", fill = "muted",
     layer = LAYER.text, id = "process-lifecycle:subtitle",
 }
 header:line {
-    from = {-430, 158}, to = {430, 158}, color = "border", width = 1.5,
+    from = {-430, 158}, to = {430, 158}, color = "border", width = 1,
     layer = LAYER.guide, id = "process-lifecycle:header-rule",
 }
 
 local state_specs = {
     {id = "new", label = "New", detail = "created", center = {-370, 60}, size = {120, 76}},
     {id = "ready", label = "Ready", detail = "run queue", center = {-160, 60}, size = {150, 80}},
-    {id = "running", label = "Running", detail = "on CPU", center = {80, 60}, size = {160, 80}, color = "accent", focal = true},
+    {id = "running", label = "Running", detail = "on CPU", center = {104, 60}, size = {160, 80}, color = "accent", focal = true},
     {id = "terminated", label = "Terminated", detail = "exit status", center = {350, 60}, size = {160, 80}, color = "muted"},
-    {id = "waiting", label = "Waiting", detail = "sleeping / blocked", center = {80, -125}, size = {200, 80}, color = "secondary"},
+    {id = "waiting", label = "Waiting", detail = "sleeping / blocked", center = {104, -150}, size = {224, 80}},
 }
 
 local stateHandles = {}
@@ -42,8 +39,8 @@ for _, spec in ipairs(state_specs) do
     local group = states:group {id = "process-lifecycle:state:" .. spec.id}
     local prefix = "process-lifecycle:state:" .. spec.id
     group:rectangle {
-        center = spec.center, size = spec.size, corner = 4, fill = "surface",
-        stroke = spec.color or "border", width = spec.focal and 2.25 or 1.5,
+        center = spec.center, size = spec.size, fill = "#00000000",
+        stroke = spec.color or "foreground", width = spec.focal and 1.5 or 1.25,
         layer = LAYER.state, id = prefix .. ":body",
     }
     group:line {
@@ -71,14 +68,14 @@ local function transition(spec)
     local geometry
     if #spec.points == 2 then
         geometry = routes:arrow {
-            from = spec.points[1], to = spec.points[2], tip = 10,
-            color = spec.color or "foreground", width = 2,
+            from = spec.points[1], to = spec.points[2], tip = 7,
+            color = spec.color or "foreground", width = 1,
             dash = spec.dash, layer = LAYER.route, id = prefix .. ":route",
         }
     else
         geometry = routes:route {
-            points = spec.points, tip = 10, color = spec.color or "foreground",
-            width = 2, dash = spec.dash, layer = LAYER.route,
+            points = spec.points, tip = 7, color = spec.color or "foreground",
+            width = 1, dash = spec.dash, layer = LAYER.route,
             id = prefix .. ":route",
         }
     end
@@ -97,26 +94,26 @@ transition {
 }
 transition {
     id = "ready-running", label = "dispatch",
-    points = {{-85, 60}, {0, 60}}, label_point = {-42, 88}, color = "accent",
+    points = {{-85, 60}, {24, 60}}, label_point = {-30, 88}, color = "accent",
 }
 transition {
     id = "running-terminated", label = "exit",
-    points = {{160, 60}, {270, 60}}, label_point = {215, 88},
+    points = {{184, 60}, {270, 60}}, label_point = {227, 88},
 }
 transition {
     id = "running-ready", label = "timer expired / preempt",
-    points = {{80, 100}, {80, 120}, {-160, 120}, {-160, 100}},
-    label_point = {-40, 138}, color = "muted", dash = {7, 5},
+    points = {{104, 100}, {104, 120}, {-160, 120}, {-160, 100}},
+    label_point = {-28, 138},
 }
 transition {
     id = "running-waiting", label = "I/O request / sleep",
-    points = {{80, 20}, {80, -85}}, label_point = {98, -32},
-    align = {0, 0.5}, color = "secondary",
+    points = {{104, 20}, {104, -110}}, label_point = {122, -45},
+    align = {0, 0.5},
 }
 transition {
     id = "waiting-ready", label = "I/O complete / wake",
-    points = {{-20, -125}, {-160, -125}, {-160, 20}},
-    label_point = {-90, -190}, color = "secondary",
+    points = {{-8, -150}, {-160, -150}, {-160, 20}},
+    label_point = {-24, -172}, align = {1, 0.5},
 }
 
 scene:fade_in(header, {duration = 0.4, curve = "gentle"})

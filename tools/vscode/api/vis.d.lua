@@ -2189,7 +2189,7 @@ function Scene:orbit(radians, options) end
 ---@param options? vis.FocusConfig
 function Scene:focus(target, options) end
 
----Advance the timeline cursor.
+---Advance the timeline cursor by duration. It counts from the cursor, which at() puts back, so pad to a total with seek(total) rather than wait(total - duration()).
 ---@param duration number
 function Scene:wait(duration) end
 
@@ -2236,7 +2236,7 @@ function Scene:find(id) end
 ---@return vis.Bounds
 function Scene:bounds(target) end
 
----Return the authored scene duration in seconds.
+---Return the authored scene duration in seconds: the later of the cursor and the latest time any call reached, or a longer mounted child Scene.
 ---@return number
 function Scene:duration() end
 

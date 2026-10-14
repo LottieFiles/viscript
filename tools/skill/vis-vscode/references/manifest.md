@@ -39,7 +39,7 @@ Every path is relative to the workspace folder and uses `/`. A path may not star
 | `line` | no | a one-based line that pins `symbol` when the name repeats or document symbols are unavailable |
 | `animation`, `series` | yes | the Scene path and its group |
 | `title` | no | Viewer title, CodeLens and hover text, and episode label; defaults to `symbol` |
-| `description` | no | escaped Markdown under `NOTES`. The default names the symbol and its file path, so write one. |
+| `description` | no | the text under `NOTES`, in a small Markdown subset: paragraphs, `-` and `1.` lists of one-line items, `#` to `####` headings, `>` quotes, `---`, fenced code, inline code, `**bold**`, `*emphasis*`, and `[text](https://…)` links. Anything else, HTML included, shows as typed. The default names the symbol and its file path, so write one. |
 | `links` | no | Inspector entries in array order. A link with `symbol`, `line`, or `range` also gets its own CodeLens and hover in its file. |
 
 Each link requires `label` and `source` and may add `symbol`, `line`, `column`, `range`, and `diff`. A `range` has one-based inclusive `startLine` and `endLine`, plus optional one-based `startColumn` and exclusive `endColumn`, which must appear together. A `diff` requires a `range`; see [diff-authoring.md](diff-authoring.md). No other keys exist.

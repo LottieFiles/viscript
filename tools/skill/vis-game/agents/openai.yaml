@@ -1,4 +1,0 @@
-interface:
-  display_name: "viscript Game"
-  short_description: "Build small experimental retained-Lua viscript game loops"
-  default_prompt: "Use $vis-game to create a small experimental retained-Lua viscript game loop with only the required UI, Input, Runtime, and Audio sidecars."

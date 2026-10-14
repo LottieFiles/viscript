@@ -67,7 +67,7 @@ Style options include `id`, `stroke`, `fill`, `width`, `opacity`, `progress`, `l
 
 A connector follows sampled endpoint outlines and uses bounds when no closed outline crosses its center ray. `padding` adds world distance beyond each outline. `trim_distance` trims a line, arrow, or vector: one number trims both ends; `{start, finish}` sets separate distances. Arrow and route markers stay solid when their shafts are dashed.
 
-`object:label{...}` creates a child Text. Set its point, align, and layer explicitly. `scene:bounds(handle_or_list)` returns `left`, `right`, `bottom`, `top`, `width`, `height`, `center`, `min`, and `max` in world units. Use `rectangle{around = handles}` for a frame, or `brace{around = handles, label = "term"}` for an annotation; brace returns both the path and label.
+`object:label{...}` creates a child Text. Set its point, align, and layer explicitly. `scene:bounds(handle_or_list)` returns `left`, `right`, `bottom`, `top`, `width`, `height`, `center`, `min`, and `max` in world units. A Text counts with its layout box only when it was created with `measure = true`; otherwise only its anchor point counts, and one such Text has zero width. Use `rectangle{around = handles}` for a frame, or `brace{around = handles, label = "term"}` for an annotation; brace returns both the path and label.
 
 Arcs use radians counterclockwise from +x; a negative sweep runs clockwise. `sector = true` closes through the center. Angles mark two rays from a vertex; `other = true` chooses the outer angle, and `right` selects `"auto"`, `"never"`, or `"always"`. A text or TeX label follows the bisector.
 
@@ -101,13 +101,13 @@ Surfaces use `"solid"`, `"mesh"`, or `"solid_mesh"`. Colors can be a colormap na
 
 Text `size` is in points: the em spans `4/3 * size` screen pixels for billboard text or world units for plane text. Theme roles select font, size, and color. Plain text and numbers use bundled Noto Sans Math outlines for common missing geometry symbols.
 
-`text:measure()` returns width and height in world units. `measure = true` stores a layout box at creation. `baseline = true` pins the first baseline at `point`, with `align.x` selecting horizontal alignment. `reserve = "-0.00"` fixes a box from a sample string and the initial text. `tabular = true` gives digits, minus, and spaces equal advance cells.
+`local w, h = text:measure()` returns width and height in world units, in the registered font. `measure = true` stores that box at creation, so `scene:bounds`, `around`, and arranging see the Text's extent rather than its anchor point. To place a Text that appears later, create it with `opacity = 0`, measure and place it before the timeline calls, and reveal it in its beat. `baseline = true` pins the first baseline at `point`, with `align.x` selecting horizontal alignment. `reserve = "-0.00"` fixes a box from a sample string and the initial text. `tabular = true` gives digits, minus, and spaces equal advance cells.
 
 `number` animates `value`; `decimals`, `separator`, `sign`, `prefix`, and `suffix` format it. `matrix` and `table` return row groups with entry texts. Access parts with `row(r)`, `entry(r, c)`, and `column(c)`; indices start at 1. Matrix children also include its brackets; table children include stripes and rules. A matrix string entry is inline TeX when the tex module is built in (`"\\cos\\theta"`, `"x^2"`; use `"\\text{word}"` for words), and plain text otherwise; numbers stay countable texts, and `""` stays blank. Table strings are always text.
 
 `spans` returns measured texts and formulas on shared baselines. Strings retain their spaces; `split = "words"` or `"letters"` creates separate handles. Parts set local styling and `rise`, and `wrap` sets a width in world units. `leading` sets baseline spacing. Texts/formulas with no explicit ID use `<row-id>/<n>`.
 
-`code` returns line groups containing token handles. Languages include plain, Lua, Python, JavaScript, TypeScript, C, and C++. Tokens use semantic theme colors and the code role's monospaced font. IDs use `<block-id>/<line>/<token>`.
+`code` returns line groups containing token handles. Languages include plain, Lua, Python, JavaScript, TypeScript, C, and C++. Tokens use semantic theme colors and the code role's monospaced font; `plain` keeps every token in `foreground`, so `scene:set {target = token, fill = "danger"}` on the `search` result marks only the decisive tokens. IDs use `<block-id>/<line>/<token>`.
 
 ```lua
 local listing = scene:code {text = "local total = 0\nreturn total", language = "lua", id = "listing"}
@@ -116,7 +116,7 @@ scene:highlight(listing, selected)
 local next_listing = scene:edit(listing, {replace = "total", with = "sum", match = "all"})
 ```
 
-`search` returns covered tokens. `match` selects first, last, all, or an occurrence number; `lines` selects a line or range. `edit` applies replace/insert/remove/append/prepend operations in order and returns the new block. It keeps the original styling and parent, then animates the diff. `highlight` selects line indices or handles; call it without a selection to restore the whole block.
+`search` returns covered tokens and raises an error when nothing matches. `match` selects first, last, all, or an occurrence number; `lines` selects a line or range. `edit` applies replace/insert/remove/append/prepend operations in order and returns the new block. It keeps the original styling and parent, then animates the diff. `highlight` selects line indices or handles; call it without a selection to restore the whole block.
 
 With the TeX module, `tex` returns a typeset Group of glyphs and filled geometry:
 
@@ -133,6 +133,8 @@ local caption = scene:spans {"The area is ", {tex = "\\pi r^2"}, "."}
 Use `move_to`, `next_to`, `align_to`, `arrange`, and `arrange_grid` for initial placement. Coordinates are relative to the direct parent. Measure text before arranging it. For an animated insertion, use the Scene's timeline `arrange` with sibling handles.
 
 Most timeline calls take duration and curve, then advance the cursor. `wait` holds, `seek` moves the authoring cursor, `mark` names a time, and `at` authors at a time while restoring the previous cursor. `parallel` starts branches at the same cursor.
+
+A Scene keeps two times: the cursor, where the next call starts (`scene:time()`), and the extent, the latest time any call reached. `scene:duration()` reports the larger of the two, or a mounted child Scene's duration when that is longer. `wait(d)` adds `d` to the cursor and `at` puts the cursor back, so after an `at` call `wait(total - scene:duration())` stops short of `total`. Pad to a total with `scene:seek(total)`.
 
 Animation calls share a timing table with `duration` and `curve`. Calls that stagger targets also accept `lag`. Reuse the same table across calls:
 
@@ -167,7 +169,7 @@ scene:parallel(
 )
 ```
 
-Text changes interpolate characters. `retype = true` erases to the shared prefix before typing the new suffix. Geometry descriptors use the factory's names, such as `points`, `from`, `to`, `control1`, and `control2`. `arc` bends movement by a central angle. Layer changes use the higher layer during the transition.
+Text changes interpolate characters. `retype = true` erases to the shared prefix before typing the new suffix. Geometry descriptors use the factory's names, such as `points`, `from`, `to`, `control1`, `control2`, `size`, and `radius`. `center` animates arcs only; move other shapes with `shift` or `transform`. `arc` bends movement by a central angle. Layer changes use the higher layer during the transition.
 
 A curve can be a preset (`"linear"`, `"smooth"`, `"gentle"`, `"ease_in_out"`, and others), a cubic Bézier table, or a preset table with strength and reverse settings. A table such as `{preset = "back", strength = 0.6}` tunes a preset; `{bezier = {x1, y1, x2, y2}, strength = 1}` defines a custom curve.
 
@@ -244,8 +246,8 @@ scene:scene_transition({overview, detail, summary}, {
 })
 ```
 
-Use [vis-game](../../vis-game/SKILL.md) for UI, Input, action maps, retained runtime, audio, and simulation loops. Authored sound cues use `vis.audio.cue(scene, options)` when Audio is enabled.
+Use [vis-interactive](../../vis-interactive/SKILL.md) for UI, Input, action maps, retained runtime, audio, and simulation loops. Authored sound cues use `vis.audio.cue(scene, options)` when Audio is enabled.
 
 `vis.motion(scene)` provides semantic states, atomic transitions, and interaction-clock retargeting. `vis.diagram(scene)` provides semantic nodes, edges, groups, and audit metadata; see [diagram/native-authoring.md](diagram/native-authoring.md). Enable the corresponding modules in the build.
 
-Use `math.randomseed(seed)` for repeatable authored randomness. `vis.keys(table)` gives ordered keys; `vis.merge(defaults, options)` combines component options with later values winning. Register fonts and memory-backed assets before loading a scene that measures or uses them. Review every authored timeline with [review.md](review.md).
+Scripts run without `pairs`, `next`, `print`, `pcall`, `load`, `require`, metatables, `os`, `io`, `debug`, and the string pattern functions (`find`, `match`, `gmatch`, `gsub`). Iterate with `ipairs` or `vis.keys`, compare strings with `string.sub` and `string.byte`, and stop with `error(...)` to see a value. Use `math.randomseed(seed)` for repeatable authored randomness. `vis.keys(table)` gives ordered keys; `vis.merge(defaults, options)` combines component options with later values winning. Register fonts and memory-backed assets before loading a scene that measures or uses them. Review every authored timeline with [review.md](review.md).

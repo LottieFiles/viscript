@@ -37,13 +37,13 @@ local function members(step)
     local s = state(step)
     return {
         dot = scene:polygon {id = "projection-dot-" .. step, points = s.dot, fill = "foreground", stroke = "foreground", layer = 30},
-        radius = scene:plot {id = "projection-radius-" .. step, points = s.radius, stroke = "foreground", width = 3, layer = 20},
-        sineComponent = scene:plot {id = "projection-sine-component-" .. step, points = s.sineComponent, stroke = "accent", width = 5, layer = 20},
-        cosineComponent = scene:plot {id = "projection-cos-component-" .. step, points = s.cosineComponent, stroke = "secondary", width = 5, layer = 20},
-        sineBridge = scene:plot {id = "projection-sine-bridge-" .. step, points = s.sineBridge, stroke = "accent", width = 1.5, opacity = 0.42, layer = 5},
-        cosineBridge = scene:plot {id = "projection-cos-bridge-" .. step, points = s.cosineBridge, stroke = "secondary", width = 1.5, opacity = 0.42, layer = 5},
-        sineTrace = scene:plot {id = "projection-sine-trace-" .. step, points = s.sineTrace, stroke = "accent", width = 4, layer = 10},
-        cosineTrace = scene:plot {id = "projection-cos-trace-" .. step, points = s.cosineTrace, stroke = "secondary", width = 4, layer = 10},
+        radius = scene:plot {id = "projection-radius-" .. step, points = s.radius, stroke = "foreground", width = 2, layer = 20},
+        sineComponent = scene:plot {id = "projection-sine-component-" .. step, points = s.sineComponent, stroke = "accent", width = 2, layer = 20},
+        cosineComponent = scene:plot {id = "projection-cos-component-" .. step, points = s.cosineComponent, stroke = "secondary", width = 2, layer = 20},
+        sineBridge = scene:plot {id = "projection-sine-bridge-" .. step, points = s.sineBridge, stroke = "accent", width = 1, opacity = 0.42, layer = 5},
+        cosineBridge = scene:plot {id = "projection-cos-bridge-" .. step, points = s.cosineBridge, stroke = "secondary", width = 1, opacity = 0.42, layer = 5},
+        sineTrace = scene:plot {id = "projection-sine-trace-" .. step, points = s.sineTrace, stroke = "accent", width = 2, layer = 10},
+        cosineTrace = scene:plot {id = "projection-cos-trace-" .. step, points = s.cosineTrace, stroke = "secondary", width = 2, layer = 10},
     }
 end
 local function array(m)
@@ -52,12 +52,12 @@ local function array(m)
 end
 
 -- Stable structure stays quiet while the shared phase does the explanatory work.
-local circle = scene:circle {id = "projection-circle", center = center, radius = radius, fill = "#00000000", stroke = "border", width = 3}
+local circle = scene:circle {id = "projection-circle", center = center, radius = radius, fill = "#00000000", stroke = "border", width = 1.25}
 local axes = {
-    scene:line {id = "projection-circle-x", from = {center[1] - 1.7, 0}, to = {center[1] + 1.7, 0}, stroke = "border", width = 1.5},
-    scene:line {id = "projection-circle-y", from = {center[1], -1.7}, to = {center[1], 1.7}, stroke = "border", width = 1.5},
-    scene:line {id = "projection-sine-axis", from = {graph.x0, graph.sineY}, to = {graph.x0 + graph.width, graph.sineY}, stroke = "border", width = 1.5},
-    scene:line {id = "projection-cos-axis", from = {graph.x0, graph.cosineY}, to = {graph.x0 + graph.width, graph.cosineY}, stroke = "border", width = 1.5},
+    scene:line {id = "projection-circle-x", from = {center[1] - 1.7, 0}, to = {center[1] + 1.7, 0}, stroke = "border", width = 1},
+    scene:line {id = "projection-circle-y", from = {center[1], -1.7}, to = {center[1], 1.7}, stroke = "border", width = 1},
+    scene:line {id = "projection-sine-axis", from = {graph.x0, graph.sineY}, to = {graph.x0 + graph.width, graph.sineY}, stroke = "border", width = 1},
+    scene:line {id = "projection-cos-axis", from = {graph.x0, graph.cosineY}, to = {graph.x0 + graph.width, graph.cosineY}, stroke = "border", width = 1},
 }
 local live = members(0)
 scene:create({circle, axes[1], axes[2], axes[3], axes[4]}, 0.55, "ease_out", 0.04)

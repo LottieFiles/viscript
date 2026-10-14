@@ -38,37 +38,36 @@ end
 
 assert(#VALUES > 0)
 local TRACE, FOUND_INDEX, FINAL_LO, FINAL_HI = buildClosedRangeTrace(VALUES, TARGET)
-local STEP, START_X, Y = 92, -276, 15
+-- The array is the subject: cells are ink slots, the candidate interval carries the one hue (accent),
+-- the probe at mid is a transient `focus` outline, and the found cell takes `result`.
+local CELL, STEP, Y = 84, 100, 40
+local START_X = -(#VALUES - 1) * STEP / 2
 local LAYER = {range = 8, slot = 10, body = 20, text = 40}
 
-local title = scene:text {
-    text = "Binary search", point = {0, 220}, role = "h2",
-    fill = "foreground", layer = LAYER.text, id = "scene-title",
-}
 local contract = scene:text {
     text = "closed interval [lo, hi]  ·  target = " .. TARGET,
-    point = {0, 182}, role = "code", fill = "muted",
+    point = {0, 150}, role = "code", fill = "muted",
     layer = LAYER.text, id = "search-contract",
 }
 
 local array = scene:group {id = "search:array"}
-local cells, bodies = {}, {}
+local cells, bodies, values = {}, {}, {}
 for index, value in ipairs(VALUES) do
     local logical = index - 1
     local x = START_X + logical * STEP
     local cell = array:group {id = "array-cell:" .. logical}
     local body = cell:rectangle {
-        center = {x, Y}, size = {78, 78}, corner = 5,
-        fill = "surface", stroke = "border", width = 2,
+        center = {x, Y}, size = {CELL, CELL},
+        fill = "#00000000", stroke = "foreground", width = 1,
         layer = LAYER.body, id = "array-cell:" .. logical .. ":body",
     }
-    cell:text {
+    values[index] = cell:text {
         text = tostring(value), point = {x, Y}, role = "h3",
         fill = "foreground", layer = LAYER.text,
         id = "array-cell:" .. logical .. ":value",
     }
     cell:text {
-        text = tostring(logical), point = {x, Y - 57}, role = "code",
+        text = tostring(logical), point = {x, Y - 72}, role = "code",
         fill = "muted", layer = LAYER.text,
         id = "array-cell:" .. logical .. ":index",
     }
@@ -78,15 +77,15 @@ end
 local function rangeBox(lo, hi, id)
     local left, right
     if lo <= hi then
-        left = START_X + lo * STEP - 44
-        right = START_X + hi * STEP + 44
+        left = START_X + lo * STEP - CELL / 2 - 5
+        right = START_X + hi * STEP + CELL / 2 + 5
     else
-        left = START_X + (lo - 0.5) * STEP - 5
-        right = left + 10
+        left = START_X + (lo - 0.5) * STEP
+        right = left
     end
     return scene:rectangle {
-        center = {(left + right) / 2, Y}, size = {right - left + 12, 94}, corner = 8,
-        fill = "#00000000", stroke = "accent", width = 3,
+        center = {(left + right) / 2, Y}, size = {right - left + 12, CELL + 16},
+        fill = "#00000000", stroke = "accent", width = 1.5,
         layer = LAYER.range, id = id,
     }
 end
@@ -94,11 +93,10 @@ end
 local range = rangeBox(TRACE[1].lo, TRACE[1].hi, "range:step-1")
 local invariant = scene:text {
     text = "invariant: if target exists, it is inside [lo, hi]",
-    point = {0, -175}, role = "text", fill = "muted",
+    point = {0, -150}, role = "text", fill = "muted",
     layer = LAYER.text, id = "search-invariant",
 }
 
-scene:fade_in(title, {shift = {0, -6}, duration = 0.42, curve = "gentle"})
 scene:fade_in(contract, {shift = {0, -5}, duration = 0.34, curve = "gentle"})
 scene:fade_in(array, {shift = {0, 7}, duration = 0.55, curve = "ease_out"})
 scene:create(range, 0.42, "ease_out")
@@ -112,7 +110,7 @@ local function setStatus(event, step)
             event.lo, event.mid, event.hi, event.mid,
             tostring(event.value), event.relation, tostring(TARGET)
         ),
-        point = {0, -120}, role = "code", fill = "focus",
+        point = {0, -100}, role = "code", fill = "foreground",
         layer = LAYER.text, id = "status:step-" .. step,
     }
     if status then scene:fade_transform(status, nextStatus, 0.20, "gentle")
@@ -123,16 +121,18 @@ end
 for step, event in ipairs(TRACE) do
     setStatus(event, step)
     scene:play({
-        {target = bodies[event.mid + 1], fill = "focus", stroke = "focus"},
+        {target = bodies[event.mid + 1], stroke = "focus", width = 2},
+        {target = values[event.mid + 1], fill = "focus"},
     }, 0.42, "ease_in_out", 0)
     scene:wait(0.45)
 
     if event.relation ~= "=" then
         local reject = {
-            {target = bodies[event.mid + 1], fill = "surface", stroke = "border"},
+            {target = bodies[event.mid + 1], stroke = "foreground", width = 1},
+            {target = values[event.mid + 1], fill = "foreground"},
         }
         for logical = event.rejectedLo, event.rejectedHi do
-            reject[#reject + 1] = {target = cells[logical + 1], opacity = 0.28}
+            reject[#reject + 1] = {target = cells[logical + 1], opacity = 0.4}
         end
         scene:play(reject, 0.45, "ease_in_out", 0)
         local nextRange = rangeBox(event.nextLo, event.nextHi, "range:step-" .. (step + 1))
@@ -144,16 +144,16 @@ end
 local resultText = FOUND_INDEX and ("found target at index " .. FOUND_INDEX)
     or string.format("not found  ·  empty interval [%d, %d]", FINAL_LO, FINAL_HI)
 local result = scene:text {
-    text = resultText, point = {0, -120}, role = "text",
+    text = resultText, point = {0, -100}, role = "text",
     fill = "result", layer = LAYER.text,
     id = FOUND_INDEX and "result:found-index" or "result:not-found",
 }
 scene:fade_transform(status, result, 0.22, "gentle")
 local finish = {{target = range, stroke = "result"}}
 if FOUND_INDEX then
-    finish[#finish + 1] = {
-        target = bodies[FOUND_INDEX + 1], fill = "result", stroke = "result",
-    }
+    -- A stroke highlight, with the value recolored in the same play, keeps the text readable.
+    finish[#finish + 1] = {target = bodies[FOUND_INDEX + 1], stroke = "result", width = 2}
+    finish[#finish + 1] = {target = values[FOUND_INDEX + 1], fill = "result"}
 end
 scene:play(finish, 0.48, "ease_in_out", 0)
 scene:wait(2.2)

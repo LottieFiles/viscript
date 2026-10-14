@@ -41,6 +41,18 @@ Map events to concrete semantic verbs—compare, read, enqueue, dequeue, visit, 
 
 Keep excluded data as quiet context when it explains an invariant. Compress repetition only after the first distinct case is readable and only from the complete trace; never cross a branch, boundary case, first divergence, or conclusion-bearing transition. Display minimal source anchors with exact identifiers, indentation, line order, and control flow. Each highlighted region maps to its controlled state change; code Text does not replace visible state. Point at source by what it says, not by counted token positions: `block:search("total", {match = "all"})` gives the token handles for `highlight`, `rectangle{around = ...}`, and `indicate`, and `scene:edit(block, {...})` turns a block into its next revision with the same look and place, as a diff. A complexity claim needs counted work, a recurrence or bound, and explicit case assumptions; decorative height or a familiar formula is not proof.
 
+## Show the core problem
+
+When code is the subject, the reader should find the one decisive thing at a glance: the stale value, the wrong bound, the missed branch, the aliased write. Give it the finding's hue in every view (code token, value, mark, edge label, caption) and keep everything else ink. Devices that make it visible:
+
+- a limit ruler at a bound, labeled with the expression that sets it (`count`, `i < n`);
+- a scan head or cursor that stops where the code stops;
+- dashed outlines for work that never happens: undrawn items, skipped iterations, unreached states;
+- a value that keeps its copy, captioned plainly ("never written again"), or an overwritten value struck out at opacity 0.5 ("overwritten");
+- paired counts of what exists and what is processed ("items.size() = 5", "count = 3", "3 of 5 drawn").
+
+Draw a fix only when the user asks for it or the change under review is the fix, as a later episode or the final beat: keep the same layout and trace and change only the corrected line and its consequence, so the difference is the only thing that moves. Otherwise name the fix in a caption or, in VS Code, in the notes. When the path spans several functions or passes, use the [pipeline plate](pipeline-plate.md) format.
+
 ## Acceptance
 
 - Replaying the canonical trace reproduces every shown state and final result.

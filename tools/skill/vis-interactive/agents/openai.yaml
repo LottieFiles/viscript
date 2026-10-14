@@ -1,0 +1,4 @@
+interface:
+  display_name: "viscript Interactive"
+  short_description: "Build small experimental retained-Lua viscript interactive scenes"
+  default_prompt: "Use $vis-interactive to create a small experimental retained-Lua viscript interactive scene with only the required UI, Input, Runtime, and Audio sidecars."

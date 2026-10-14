@@ -1,6 +1,8 @@
 -- Educational-cinema pattern: one tracker drives every dependent, the same
 -- ball carries the story, geometry comes before notation, and the camera
--- frames overview -> detail -> overview. No title: the curve is the subject.
+-- frames overview -> detail -> overview. No title: the curve is the subject, and the final frame
+-- answers with a caption. Figure weights: the curve is ink, the ball and its path are accent, and the
+-- slope keeps `result` across the tangent and its label.
 local scene = vis.scene {
     width = 960, height = 540, theme = "pro_black",
     camera = {mode = "fixed", view = "2d", target = {0, 2}, height = 6},
@@ -12,13 +14,14 @@ local df = function(x) return x end
 local start = -2.6
 
 local LAYER = {guide = 0, curve = 1, trail = 2, tangent = 3, ball = 4, label = 5}
-local curve = scene:plot {id = "loss", fn = f, x_range = {-3, 3, 0.05}, stroke = "accent", width = 4, layer = LAYER.curve}
-local trail = scene:plot {id = "trail", fn = f, x_range = {start, 0, 0.05}, stroke = "warning", width = 7,
+local curve = scene:plot {id = "loss", fn = f, x_range = {-3, 3, 0.05}, stroke = "foreground", width = 1.5,
+    layer = LAYER.curve}
+local trail = scene:plot {id = "trail", fn = f, x_range = {start, 0, 0.05}, stroke = "accent", width = 2,
     progress = 0, layer = LAYER.trail}
-local tangent = scene:line {id = "tangent", from = {-0.9, 0}, to = {0.9, 0}, stroke = "danger", width = 3,
+local tangent = scene:line {id = "tangent", from = {-0.9, 0}, to = {0.9, 0}, stroke = "result", width = 1.5,
     layer = LAYER.tangent}
 local ball = scene:group {id = "ball"}
-ball:circle {center = {0, 0}, radius = 0.12, fill = "warning", stroke = "warning", layer = LAYER.ball}
+ball:circle {center = {0, 0}, radius = 0.12, fill = "accent", stroke = "accent", layer = LAYER.ball}
 
 -- One value, many dependents: bind once, then animate only the value.
 local x = scene:tracker(start)
@@ -32,7 +35,7 @@ scene:bind(trail, x, function(v) return {progress = (v - start) / -start} end)
 
 -- Notation arrives after the motion it names, colored like the tangent.
 local slope = scene:text {id = "slope", text = "slope = f'(w)", point = {-0.2, 1.9}, role = "code",
-    fill = "danger", layer = LAYER.label}
+    fill = "result", layer = LAYER.label}
 
 -- Beat 1: the ball rolls part of the way; the viewer sees the tangent flatten.
 scene:wait(0.6)
@@ -48,6 +51,8 @@ scene:wait(0.8)
 scene:focus(nil, {duration = 0.9, curve = "smooth"})  -- back to the opening camera
 scene:fade(curve, 1, 0.4, "smooth")
 scene:track(x, 0, 2, "smooth")
+-- The answer caption: the label that named the slope now states where it vanishes.
+scene:play({target = slope, text = "slope = 0 at the minimum"}, 0.6, "ease_in_out")
 scene:indicate(ball, {duration = 0.6})
 scene:wait(2)
 return scene

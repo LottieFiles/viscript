@@ -16,16 +16,16 @@ end
 local plane = scene:space {
     id = "trig-space", x = {x0, x1, math.pi / 2}, y = {-1.5, 1.5, 0.5},
     matrix = {0.78, 0, 0, 0, 0, 1.25, 0, -0.2, 0, 0, 1, 0, 0, 0, 0, 1},
-    color = "muted", axis_x = "foreground", axis_y = "foreground", numbers = false,
+    color = "border", axis_x = "foreground", axis_y = "foreground", numbers = false,
 }
-local sine = plane:plot {id = "trig-sine", points = sine_points, stroke = "accent", width = 4, layer = 10}
-local cosine = plane:plot {id = "trig-cosine", points = cosine_points, stroke = "secondary", width = 4, layer = 10}
+local sine = plane:plot {id = "trig-sine", points = sine_points, stroke = "accent", width = 2, layer = 10}
+local cosine = plane:plot {id = "trig-cosine", points = cosine_points, stroke = "secondary", width = 2, layer = 10}
 
 -- One full-period landmark is derived from the same domain values.
 local period_x = periodMultiple * math.pi
 local period = plane:line {
     id = "trig-period", from = {period_x, -1.18}, to = {period_x, 1.18},
-    stroke = "result", width = 3, layer = 20,
+    stroke = "result", width = 1.5, layer = 20,
 }
 local labels = {
     scene:text {id = "trig-sine-label", text = "sin(x)", point = {-4.75, 2.45}, role = "code", fill = "accent", align = {0, 0.5}, layer = 40},

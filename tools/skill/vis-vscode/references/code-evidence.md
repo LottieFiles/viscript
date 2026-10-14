@@ -4,7 +4,7 @@ Read this before writing a code-linked Scene. It decides what the Scene may clai
 
 ## Fix the evidence first
 
-Pin the revision and the reader's question. Read the entry point, the callers and callees on the path, the state owners, the data transformations, the failure or cleanup path, and the tests, traces, benchmarks, docs, or review comments that constrain the claim. Then choose one representative scenario, a concrete input or event, and trace it through the code. A familiar textbook variant never substitutes for the implementation in front of you. The [algorithm-and-code profile](../../vis-skills/references/profiles/algorithm-and-code.md) defines what the trace must record.
+Pin the revision and the reader's question. With uncommitted changes, pin `HEAD`, read the ranges from the working tree (the Inspector shows the working tree), and check with `git diff HEAD -- <file>` whether the linked ranges differ from the commit. Read the entry point, the callers and callees on the path, the state owners, the data transformations, the failure or cleanup path, and the tests, traces, benchmarks, docs, or review comments that constrain the claim. Then choose one representative scenario, a concrete input or event, and trace it through the code. A familiar textbook variant never substitutes for the implementation in front of you. The [algorithm-and-code profile](../../vis-skills/references/profiles/algorithm-and-code.md) defines what the trace must record.
 
 Fill in one row per Scene before writing Lua:
 
@@ -35,14 +35,15 @@ Drop rows that have no visible causal transition, repeat another row's claim, or
 
 ## Split Canvas, Inspector, and notes
 
-- **Canvas.** The mechanism, plus only the decisive verified fragment (a condition, call, mutation, return, or signature) with exact identifiers. A fragment may be a strict subset of its link range.
-- **Inspector.** The full source, through `links`. File paths, line numbers, hashes, and directory names stay here, never on the Canvas or in the narration.
-- **`description`.** The revision, scenario input, scope, caveats, alternate branches, benchmark conditions, why an anchor matters, and which statements are inference.
+- **Canvas.** The mechanism, plus only the decisive verified fragment (a condition, call, mutation, return, or signature) with exact identifiers. A fragment may be a strict subset of its link range. Add the words that make the frame readable alone, because PNG, GIF, and MP4 exports carry no Viewer: for a plate, the question as title and one answer line; for every format, labels with real values and a caption at the finding.
+- **Inspector.** The full source, through `links`. File paths, line numbers, and directory names stay here, never on the Canvas or in captions.
+- **`description`.** The revision (the commit hash, and whether the linked ranges differ from it), scenario input, scope, caveats, alternate branches, benchmark conditions, why an anchor matters, the fix when the Scene does not draw it, and which statements are inference. A hash appears only here. `NOTES` opens with the Scene, so write it like a figure caption: one short paragraph that starts with the answer and then gives the conditions, plus at most a short list for the revision, caveats, and inferences.
 - **Never evidence.** The Scene's own Lua, helper Lua, exported PNG/GIF/MP4, authoring calls, and any invented file, symbol, range, or notes document.
 
 ## Pick the format from the evidence
 
 - **One temporal mechanism dominates.** Make an ordinary animation (`loop = false`).
+- **One code path crosses several stages, and each stage needs its own evidence.** Make a pipeline plate from the vis-skills [pipeline-plate profile](../../vis-skills/references/profiles/pipeline-plate.md). The stage spine runs on the left in runtime order, with one section per stage or group on the right and a still camera. Its `links` follow the spine, one or more per stage, and each `label` starts with the spine name. When one timing mechanism also crosses stages, the profile's tie-break decides: a plate when the answer names a stage, an animation when every step happens in one place.
 - **Several regions, states, or invariants must stay visible at once.** Make a plate from the vis-skills [cheatsheet profile](../../vis-skills/references/profiles/cheatsheet.md). Its complete pose must read at `t = 0` and at the loop seam.
 - **Several independent claims.** Make a series: one `series` string, one claim per episode, each episode understandable on its own. The Viewer provides navigation.
 - **Short-form, only on request.** One verified claim per episode, and a final frame that keeps the answer and its evidence. No phone chrome, subtitles, or social controls. A tall Canvas or a wish for energy is not a short-form request.

@@ -12,8 +12,8 @@ const definition = vis.scene({
 });
 const figure = definition.group({id: "figure"});
 const plane = figure.space({x: [-5, 5, 1], y: [-3, 3, 1], numbers: true});
-const vector = plane.vector({value: [3, 2], tip: 14, id: "vector-a"});
-vector.label({text: "a = (3, 2)", point: [3.25, 2.2], align: [0, 0.5], role: "code"});
+const vector = plane.vector({value: [3, 2], stroke: "accent", width: 2, tip: 7, id: "vector-a"});
+vector.label({text: "a = (3, 2)", point: [3.25, 2.2], align: [0, 0.5], role: "code", fill: "accent"});
 definition.wait(0.35).fadeIn(figure, {duration: 0.55, curve: "gentle"}).wait(0.65);
 
 const runtime = await createVis(definition, "vector-scene.js");
@@ -213,4 +213,4 @@ definition.sceneTransition([overview, detail, summary], {
 
 Styles include match, fade, slide, zoom_in, and zoom_out. `hold` controls fully shown time; `live: false` shows completed stages. A zoom `area` is an object ID or normalized rectangle; `area_margin` sets object padding.
 
-Use Lua or C++ for the Diagram semantic builder. See [vis-game](../../vis-game/SKILL.md) for UI, Input, action maps, retained runtime, audio, and simulation loops.
+Use Lua or C++ for the Diagram semantic builder. See [vis-interactive](../../vis-interactive/SKILL.md) for UI, Input, action maps, retained runtime, audio, and simulation loops.

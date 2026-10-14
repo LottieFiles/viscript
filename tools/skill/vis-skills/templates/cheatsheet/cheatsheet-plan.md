@@ -71,7 +71,7 @@ Hard layout rules:
 - Minimum evidence-to-API/caption gap:
 - Minimum module-to-module gap:
 - Minimum scene-internal annotation clearance:
-- Theme typography role map for poster title, figure hierarchy, explanations/captions, and code/API; normally `h1`, `h2`/`h3`, `text`, and `code` respectively:
+- Theme typography role map for poster title, figure hierarchy, explanations/captions, and code/API; normally `h2`, `h3`, `text`, and `code` respectively:
 - Delivery-size readability evidence for each Theme role and every justified local typography override; do not prescribe fixed pixel targets when Theme roles are available:
 
 | Region ID | Owner | Outer bounds | Title band | Evidence Scene/Viewport bounds | API/caption band | Full-cycle motion envelope | Required neighboring clearance |

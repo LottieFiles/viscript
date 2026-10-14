@@ -2,7 +2,7 @@
 
 Use skill-relative `assets/wasm/` only when the user lacks a viscript installation. Copy the entire directory together: `client.js`, `bindings.js`, `vis-wasm.js`, `vis-wasm.wasm`, declarations, fonts, manifest, and license notices have intentional relative relationships. Request `renderEngine: "cpu"` for the portable bundle.
 
-It provides JavaScript/TypeScript construction and embedded Lua rendering. UI/Input, action maps, retained Lua runtime, audio, and game loops route to `vis-game`; this reference covers only rendering or mounting a finished scene.
+It provides JavaScript/TypeScript construction and embedded Lua rendering. UI/Input, action maps, retained Lua runtime, audio, and interaction loops route to `vis-interactive`; this reference covers only rendering or mounting a finished scene.
 
 ## Browser host
 
@@ -22,6 +22,6 @@ If deployment moves the WASM file, provide `locateFile`. For Lua, pass trusted s
 
 ## Fonts, Node, and distribution
 
-Register every selected Theme font before rendering. The standalone default uses `Source Serif 4` for heading and body roles and monospaced `JetBrainsMono` for code and `IBM Plex Sans KR` for inherited Korean Text; register Pretendard only when explicitly selected. In Node, read the `.wasm` bytes and pass `wasmBinary`; copied `render(..., true)` pixels survive subsequent calls. Use `layoutReport(time, 4)` for sampled rendered-layout review, not live layout.
+Register every selected Theme font before rendering. The presets use `Pretendard` for heading and body roles and monospaced `JetBrainsMono` for code. `hostTheme` (the VS Code Viewer's palette) sets heading and body roles in `Source Serif 4`, and a Source Serif Text that contains Korean switches to `IBM Plex Sans KR`, so register both whenever a host Theme or a custom Theme uses Source Serif 4. In Node, read the `.wasm` bytes and pass `wasmBinary`; copied `render(..., true)` pixels survive subsequent calls. Use `layoutReport(time, 4)` for sampled rendered-layout review, not live layout.
 
 Keep each font with its OFL notice, retain all runtime license files, and verify copied releases against `BUILD-MANIFEST.json`.

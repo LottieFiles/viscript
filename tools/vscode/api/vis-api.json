@@ -190,7 +190,7 @@
       },
       "orbit": {"description": "Circle the 3D camera about its target by any angle.", "parameters": [{"name": "radians", "type": "number"}, {"name": "options", "type": "OrbitConfig", "optional": true}]},
       "focus": {"description": "Frame objects with the 2D camera; nil returns to the opening camera from either view.", "parameters": [{"name": "target", "type": "Object|Object[]|nil"}, {"name": "options", "type": "FocusConfig", "optional": true}]},
-      "wait": {"description": "Advance the timeline cursor.", "parameters": [{"name": "duration", "type": "number"}]},
+      "wait": {"description": "Advance the timeline cursor by duration. It counts from the cursor, which at() puts back, so pad to a total with seek(total) rather than wait(total - duration()).", "parameters": [{"name": "duration", "type": "number"}]},
       "parallel": {"description": "Author tracks that start together; the timeline continues after the longest.", "parameters": [{"name": "track", "type": "fun()|fun()[]"}, {"name": "...", "type": "fun()"}]},
       "at": {"description": "Author fn from a time or marker, then return to the current time.", "parameters": [{"name": "time", "type": "number|string"}, {"name": "fn", "type": "fun()"}]},
       "mark": {"description": "Name the current authoring time.", "parameters": [{"name": "name", "type": "string"}]},
@@ -200,7 +200,7 @@
       "clone": {"description": "Copy an object and what is below it in the state they show at the cursor, without their animations, beside it or below options.parent; returns the copy and a table that gives the copy of each object below the source by its handle.", "parameters": [{"name": "source", "type": "Object"}, {"name": "options", "type": "CloneConfig", "optional": true}], "returns": "Object, table<Object, Object>"},
       "find": {"description": "Return the handle of the object with this id, or nil.", "parameters": [{"name": "id", "type": "string"}], "returns": "Object|nil"},
       "bounds": {"description": "Return where a handle, or a list of handles, lies in world units, through the groups above each, as everything authored so far leaves them: the bounds rectangle{around} frames.", "parameters": [{"name": "target", "type": "Object|Object[]"}], "returns": "Bounds"},
-      "duration": {"description": "Return the authored scene duration in seconds.", "parameters": [], "returns": "number"}
+      "duration": {"description": "Return the authored scene duration in seconds: the later of the cursor and the latest time any call reached, or a longer mounted child Scene.", "parameters": [], "returns": "number"}
     },
     "View": {
       "look": {"description": "Animate the view's camera as Scene:look animates the scene's; a target of objects centers it on their bounds.", "parameters": [{"name": "camera", "type": "LookConfig"}, {"name": "duration", "type": "number", "optional": true}, {"name": "curve", "type": "Curve", "optional": true}],

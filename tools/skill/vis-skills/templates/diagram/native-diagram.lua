@@ -16,8 +16,7 @@ local diagram = vis.diagram(scene, {
     route_width = 0.08,
     arrow_length = 0.32,
     arrow_width = 0.28,
-    corner = 0.22,
-})
+})  -- corners follow the Theme: square under the pro presets
 
 local client = diagram:node {id = "client", label = "Client", detail = "request", rank = 0}
 local gateway = diagram:node {id = "gateway", label = "Gateway", detail = "policy", rank = 1}

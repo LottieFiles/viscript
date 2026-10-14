@@ -14,7 +14,7 @@ This directory is a portable, optimized viscript 0.1.0 browser runtime. Keep all
 - Register `SourceSerif4-Semibold.ttf` as `Source Serif 4` for every semantic Text role in the VS Code host.
 - Register `IBMPlexSansKR-SemiBold.ttf` as `IBM Plex Sans KR`; inherited Source Serif Text containing Korean switches to this family.
 - Use `runtime.layoutReport(time, padding)` for root-pixel collision, clipping, stretch, and parent/child containment review across nested Viewports.
-- UI/Input, action maps, retained Lua runtime, audio, and game loops are documented by `vis-game`; this bundle README covers only mounting and rendering finished scenes.
+- UI/Input, action maps, retained Lua runtime, audio, and interaction loops are documented by `vis-interactive`; this bundle README covers only mounting and rendering finished scenes.
 - In Node, pass the contents of `vis-wasm.wasm` as the `wasmBinary` module option.
 - Preserve the included `LICENSE-*.txt` files (viscript, ThorVG, libwebp, LodePNG, Lua, miniaudio) and the Pretendard, JetBrains Mono, Source Serif 4, IBM Plex Sans KR, and Noto Sans Math OFL notices when redistributing the bundle.
 

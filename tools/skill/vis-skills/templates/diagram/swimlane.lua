@@ -1,5 +1,6 @@
 -- Question: which role owns each step, and where does responsibility cross a lane?
 -- Replace step_specs and handoff_specs; keep roles, stages, and routing corridors separate.
+-- Look: hairline grid, ink steps and handoffs, and one hue (accent) for the focal decision.
 local scene = vis.scene {
     width = 960, height = 540, fps = 30, loop = false,
     theme = "adaptive_vscode",
@@ -20,11 +21,11 @@ local stage_centers = {-220, -70, 80, 230, 380}
 
 -- The frame is a process grid, not a set of decorative containers.
 frame:line {
-    from = {-450, TOP}, to = {PROCESS_RIGHT, TOP}, color = "border", width = 1.5,
+    from = {-450, TOP}, to = {PROCESS_RIGHT, TOP}, color = "border", width = 1,
     layer = LAYER.guide, id = "release-handoff:header-rule",
 }
 frame:line {
-    from = {ROLE_RIGHT, 220}, to = {ROLE_RIGHT, BOTTOM}, color = "border", width = 1.5,
+    from = {ROLE_RIGHT, 220}, to = {ROLE_RIGHT, BOTTOM}, color = "border", width = 1,
     layer = LAYER.guide, id = "release-handoff:role-divider",
 }
 for index, y in ipairs({60, -50, BOTTOM}) do
@@ -84,8 +85,8 @@ for _, step in ipairs(step_specs) do
     local center = {stage_centers[step.stage], lane_centers[step.lane]}
     local prefix = "release-handoff:step:" .. step.id
     nodes:rectangle {
-        center = center, size = {STEP_W, STEP_H}, corner = 4, fill = "surface",
-        stroke = step.focal and "accent" or "border", width = step.focal and 2 or 1.5,
+        center = center, size = {STEP_W, STEP_H}, fill = "#00000000",
+        stroke = step.focal and "accent" or "foreground", width = step.focal and 1.5 or 1.25,
         layer = LAYER.node, id = prefix .. ":body",
     }
     nodes:text {
@@ -102,21 +103,21 @@ end
 -- Explicit corridors keep handoffs out of node bodies and make lane crossings auditable.
 local handoff_specs = {
     {
-        id = "submit-triage", label = "HANDOFF",
+        id = "submit-triage", from = "submit", to = "triage", label = "HANDOFF",
         points = {{-220, 90}, {-220, 42}, {-70, 42}, {-70, 30}},
         label_point = {-145, 56},
     },
     {
-        id = "triage-approve", label = "REVIEW",
+        id = "triage-approve", from = "triage", to = "approve", label = "REVIEW",
         points = {{-6, 5}, {16, 5}}, label_point = {5, 47},
     },
     {
-        id = "approve-deploy", label = "APPROVED",
+        id = "approve-deploy", from = "approve", to = "deploy", label = "APPROVED",
         points = {{80, -20}, {80, -40}, {230, -40}, {230, -80}},
         label_point = {155, -58},
     },
     {
-        id = "deploy-notify", label = "RELEASED",
+        id = "deploy-notify", from = "deploy", to = "notify", label = "RELEASED",
         points = {{294, -105}, {380, -105}, {380, 90}},
         label_point = {365, 5}, label_align = {1, 0.5},
     },
@@ -126,7 +127,7 @@ local handoffs = {}
 for _, spec in ipairs(handoff_specs) do
     local prefix = "release-handoff:handoff:" .. spec.id
     local route = root:route {
-        points = spec.points, tip = 10, color = "foreground", width = 2,
+        points = spec.points, tip = 7, color = "foreground", width = 1,
         layer = LAYER.route, id = prefix .. ":route",
     }
     local label = root:text {
@@ -137,6 +138,18 @@ for _, spec in ipairs(handoff_specs) do
     handoffs[#handoffs + 1] = {route = route, label = label}
 end
 
+-- The answer caption is counted from the specs: a handoff crosses a lane when its steps' lanes differ.
+local lane_of, crossings = {}, 0
+for _, step in ipairs(step_specs) do lane_of[step.id] = step.lane end
+for _, spec in ipairs(handoff_specs) do
+    if lane_of[spec.from] ~= lane_of[spec.to] then crossings = crossings + 1 end
+end
+local caption = root:text {
+    text = string.format("%d of %d handoffs cross a lane", crossings, #handoff_specs),
+    point = {-430, BOTTOM - 38}, align = {0, 0.5}, role = "text", fill = "foreground",
+    layer = LAYER.text, id = "release-handoff:caption",
+}
+
 -- The grid and steps settle together; handoffs then trace in process order.
 scene:fade_in(frame, {duration = 0.5, curve = "gentle"})
 scene:fade_in(nodes, {shift = {0, -6}, duration = 0.6, curve = "gentle"})
@@ -144,5 +157,6 @@ for _, handoff in ipairs(handoffs) do
     scene:create(handoff.route, 0.5, "ease_out")
     scene:fade_in(handoff.label, {shift = {0, -4}, duration = 0.18, curve = "gentle"})
 end
+scene:fade_in(caption, {duration = 0.3, curve = "gentle"})
 scene:wait(2.4)
 return scene

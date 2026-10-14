@@ -1,11 +1,11 @@
 ---
-name: vis-game
-description: "Build interactive viscript scenes and small games in retained Lua: UI, Input, fixed-step Runtime, Audio, and Motion state overlays. Not for authored timeline animation (vis-skills)."
+name: vis-interactive
+description: "Build interactive viscript scenes in retained Lua: UI, Input, fixed-step Runtime, Audio, and Motion state overlays. Not for authored timeline animation (vis-skills)."
 ---
 
-# viscript Game
+# viscript Interactive
 
-Build retained-Lua game loops against the delivery host. Start with a deterministic, readable scene and verify every interaction.
+Build retained-Lua interactive scenes against the delivery host. Start with a deterministic, readable scene and verify every interaction.
 
 Route general authored animation to [vis-skills](../vis-skills/SKILL.md), VS Code hosts to [vis-vscode](../vis-vscode/SKILL.md), and engine, bindings, or build work to [vis-animation-dev](../vis-animation-dev/SKILL.md).
 

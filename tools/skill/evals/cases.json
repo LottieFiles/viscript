@@ -4,5 +4,6 @@
   {"id": "gradient-descent", "prompt": "Animate how gradient descent walks down a loss curve to the minimum. Also show what happens when the learning rate is too large."},
   {"id": "http-request", "prompt": "Show, as an animated diagram, the request flow from typing a URL in a browser through DNS, the web server, and the database until the page appears."},
   {"id": "unit-circle", "prompt": "Show how the sin and cos graphs are traced as a point goes around the unit circle, connecting the two."},
-  {"id": "attention", "prompt": "Show step by step how transformer self-attention computes the weights between the words in a sentence."}
+  {"id": "attention", "prompt": "Show step by step how transformer self-attention computes the weights between the words in a sentence."},
+  {"id": "pipeline-plate", "prompt": "Explain this C++ code path as one figure: its stages on the left, and an animated section for each stage on the right. Why does the label still show the old text after setText(\"Score: 20\")?\n\nvoid Label::setText(std::string s) { text = std::move(s); }\nvoid Label::layout() { if (!dirty) return; glyphs = shape(text); dirty = false; }\nvoid Label::draw(Canvas& c) { layout(); for (auto& g : glyphs) c.draw(g); }"}
 ]

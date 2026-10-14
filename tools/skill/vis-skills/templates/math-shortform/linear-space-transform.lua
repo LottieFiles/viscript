@@ -16,7 +16,7 @@ local world = scene:space {
 }
 local localSpace = scene:space {
     id = "shortform-transform-space", x = {-4.5, 4.5, 0.5}, y = {-2.7, 2.7, 0.5}, numbers = false,
-    stroke = "accent", axis_x = "accent", axis_y = "secondary", width = 1.3, opacity = 0.62,
+    stroke = "muted", axis_x = "foreground", axis_y = "foreground", width = 1, opacity = 0.45,
 }
 
 -- The two basis vectors span the area; their sum is its opposite corner.
@@ -24,11 +24,11 @@ local basisX, basisY = {1.55, 0}, {0, 1.55}
 local areaCorner = {basisX[1] + basisY[1], basisX[2] + basisY[2]}
 local region = localSpace:polygon {
     id = "shortform-transform-area", points = {{0, 0}, basisX, areaCorner, basisY},
-    fill = "result", stroke = "result", opacity = 0.22, width = 3, layer = 5,
+    fill = "result", stroke = "result", opacity = 0.22, width = 1.5, layer = 5,
 }
 local basis = {
-    localSpace:vector {id = "shortform-basis-x", origin = {0, 0}, value = basisX, stroke = "accent", width = 5, tip = 13, layer = 20},
-    localSpace:vector {id = "shortform-basis-y", origin = {0, 0}, value = basisY, stroke = "secondary", width = 5, tip = 13, layer = 20},
+    localSpace:vector {id = "shortform-basis-x", origin = {0, 0}, value = basisX, stroke = "accent", width = 2, tip = 7, layer = 20},
+    localSpace:vector {id = "shortform-basis-y", origin = {0, 0}, value = basisY, stroke = "secondary", width = 2, tip = 7, layer = 20},
 }
 local sample = localSpace:point {id = "shortform-transform-point", point = areaCorner, fill = "result", radius = 8, layer = 30}
 

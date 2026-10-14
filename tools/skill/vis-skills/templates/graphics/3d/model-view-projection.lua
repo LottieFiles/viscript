@@ -171,11 +171,11 @@ for index, face in ipairs(cubeFaces) do
         points[#points + 1] = point3(objectVertices[vertexIndex].point)
     end
     meshFaces[index] = mesh:polygon {
-        points = points, fill = index % 2 == 0 and "#4fc1ff30" or "#8b5cf630",
+        points = points, fill = "#4fc1ff30",
         stroke = "border", width = 1.0, id = "mvp:object-face:" .. index,
     }
 end
-local meshEdges = edgeLines(mesh, objectPoints, "accent", 2.4, "mvp:object-edge:")
+local meshEdges = edgeLines(mesh, objectPoints, "accent", 1.5, "mvp:object-edge:")
 for index, vertex in ipairs(objectVertices) do
     meshPoints[index] = mesh:point {
         point = objectPoints[index], radius = index == 7 and 8 or 4,
@@ -198,7 +198,7 @@ local cameraLabel = conceptCamera:text {
     fill = "warning", layer = 20, id = "mvp:camera-label",
 }
 local imagePlane = conceptCamera:polygon {
-    points = planeCorners, fill = "#ffd86620", stroke = "warning", width = 2,
+    points = planeCorners, fill = "#ffd86620", stroke = "warning", width = 1.25,
     id = "mvp:image-plane",
 }
 local frustum = {}
@@ -208,16 +208,16 @@ local function addFrustumLine(from, to, width, id)
     }
 end
 for index, corner in ipairs(planeCorners) do
-    addFrustumLine(conceptEye, corner, 1.5, "mvp:frustum-ray:" .. index)
+    addFrustumLine(conceptEye, corner, 1, "mvp:frustum-ray:" .. index)
 end
 for index = 1, 4 do
-    addFrustumLine(planeCorners[index], planeCorners[index % 4 + 1], 2, "mvp:frustum-edge:" .. index)
+    addFrustumLine(planeCorners[index], planeCorners[index % 4 + 1], 1.25, "mvp:frustum-edge:" .. index)
 end
-local projectedEdges = edgeLines(conceptCamera, planeProjected, "result", 2.2, "mvp:projected-edge:", 5)
+local projectedEdges = edgeLines(conceptCamera, planeProjected, "result", 1.5, "mvp:projected-edge:", 5)
 local projectionRay = conceptCamera:line {
     from = conceptEye,
     to = {selected.world[1], selected.world[2], selected.world[3]},
-    color = "result", width = 3.5, layer = 8, id = "mvp:selected-ray",
+    color = "result", width = 2, layer = 8, id = "mvp:selected-ray",
 }
 local projectedPoint = conceptCamera:point {
     point = planeProjected[7], radius = 7, fill = "result", stroke = "background", width = 1.2,
@@ -252,31 +252,32 @@ local ledger = vis.scene {
     width = 336, height = 405, fps = 30, loop = false, theme = "adaptive_vscode",
     camera = {mode = "fixed", view = "2d", target = {0, 0}, height = 7.4},
 }
+-- Stage labels stay ink; only the final ndc stage carries the result hue.
 local rows = {
-    {"object", format4(selected.point), "accent"},
-    {"world = M p", format4(selected.world), "focus"},
-    {"view = V p", format4(selected.view), "secondary"},
-    {"clip = P p", format4(selected.clip), "warning"},
+    {"object", format4(selected.point), "muted"},
+    {"world = M p", format4(selected.world), "muted"},
+    {"view = V p", format4(selected.view), "muted"},
+    {"clip = P p", format4(selected.clip), "muted"},
     {"ndc = xyz / w", format3(selected.ndc), "result"},
 }
 local rowObjects = {}
 for index, row in ipairs(rows) do
-    local y = 2.95 - (index - 1) * 0.78
+    local y = 3.15 - (index - 1) * 0.87
     local group = ledger:group {id = "mvp:stage:" .. index}
     group:text {
-        text = row[1], point = {-2.75, y + 0.12}, align = {0, 0.5}, role = "code", size = 11.5,
+        text = row[1], point = {-2.75, y + 0.215}, align = {0, 0.5}, role = "code", size = 11.5,
         fill = row[3], id = "mvp:stage-label:" .. index,
     }
     group:text {
-        text = row[2], point = {-2.75, y - 0.22}, align = {0, 0.5}, role = "code", size = 10.5,
+        text = row[2], point = {-2.75, y - 0.215}, align = {0, 0.5}, role = "code", size = 11,
         fill = "foreground", id = "mvp:stage-value:" .. index,
     }
     rowObjects[index] = group
 end
-local screenCenter, screenSize = {0, -2.10}, {4.80, 2.20}
+local screenCenter, screenSize = {0, -2.04}, {4.80, 2.20}
 local viewport = ledger:rectangle {
-    center = screenCenter, size = screenSize, corner = 0.05,
-    fill = "#00000000", stroke = "border", width = 1.5, id = "mvp:viewport-frame",
+    center = screenCenter, size = screenSize,
+    fill = "#00000000", stroke = "border", width = 1, id = "mvp:viewport-frame",
 }
 local function toMiniScreen(ndc)
     return {
@@ -286,13 +287,13 @@ local function toMiniScreen(ndc)
 end
 local screenPoints = {}
 for index, vertex in ipairs(objectVertices) do screenPoints[index] = toMiniScreen(vertex.ndc) end
-local screenEdges = edgeLines(ledger, screenPoints, "result", 2, "mvp:viewport-edge:")
+local screenEdges = edgeLines(ledger, screenPoints, "result", 1.5, "mvp:viewport-edge:")
 local screenPoint = ledger:point {
     point = toMiniScreen(selected.ndc), radius = 6, fill = "result", stroke = "background", width = 1,
     layer = 10, id = "mvp:viewport-selected",
 }
 local viewportLabel = ledger:text {
-    text = "viewport result · same mesh / same v6", point = {0, -3.30}, role = "code",
+    text = "viewport: same mesh, same v6", point = {0, -3.44}, role = "code",
     size = 11.5, fill = "result", id = "mvp:viewport-label",
 }
 local function waitUntil(scene, time)
@@ -311,16 +312,11 @@ ledger:create(screenPoint, 0.22, "ease_out")
 ledger:fade_in(viewportLabel, {duration = 0.28, curve = "gentle"})
 waitUntil(ledger, spatialEnd)
 
-local title = page:text {
-    text = "Model → View → Projection", point = {0, 2.65}, role = "h2",
-    fill = "foreground", id = "mvp:title",
-}
 local subtitle = page:text {
     text = "one object mesh · one concept camera · one vertex lineage into the viewport",
     point = {0, 2.25}, role = "text", fill = "muted", id = "mvp:subtitle",
 }
-page:fade_in(title, {shift = {0, -0.08}, duration = 0.38, curve = "gentle"})
 page:fade_in(subtitle, {duration = 0.28, curve = "gentle"})
-page:viewport(spatial, {x = 0.015, y = 0.23, width = 0.613, height = 0.72})
-page:viewport(ledger, {x = 0.638, y = 0.23, width = 0.336, height = 0.72})
+page:viewport(spatial, {x = 0.015, y = 0.18, width = 0.613, height = 0.72})
+page:viewport(ledger, {x = 0.638, y = 0.18, width = 0.336, height = 0.72})
 return page

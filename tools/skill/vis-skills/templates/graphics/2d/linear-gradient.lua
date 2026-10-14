@@ -21,7 +21,7 @@ local sample_x = left + (right - left) * sample_t
 local start_color, end_color, sample_color = color_at(stop_t[1]), color_at(stop_t[2]), color_at(sample_t)
 local direction = scene:arrow {
     id = "gradient-direction", from = {left, arrow_y}, to = {right, arrow_y},
-    stroke = "foreground", width = 3, tail = 8, tip = 13, layer = 20,
+    stroke = "foreground", width = 1.5, tail = 7, tip = 7, trim_distance = {0, 0.16}, layer = 20,
 }
 local stops = {
     scene:point {id = "gradient-stop-0", point = {left, arrow_y}, fill = start_color, radius = 8, layer = 30},
@@ -30,10 +30,11 @@ local stops = {
 local sample = scene:point {id = "gradient-sample", point = {sample_x, arrow_y}, fill = sample_color, radius = 8, layer = 30}
 local guide = scene:line {
     id = "gradient-sample-guide", from = {sample_x, arrow_y - 0.16}, to = {sample_x, -0.38},
-    stroke = sample_color, width = 2, layer = 10,
+    stroke = sample_color, width = 1, layer = 10,
 }
 
--- Cell centers map exactly to the arrow endpoints, including the selected column.
+-- Cell centers map exactly to the arrow endpoints, including the selected column, which takes an ink
+-- outline because a stroke in its own color would vanish against it.
 local cell_scale = (right - left) / (columns - 1)
 local pixel_space = scene:space {
     x = {0, columns, 1}, y = {0, 4, 1}, opacity = 0,
@@ -49,12 +50,12 @@ local gradient = pixel_space:cell {
 }
 local selected = pixel_space:rectangle {
     id = "gradient-selected-cell", center = {sample_index + 0.5, 2}, size = {1, 4},
-    fill = "#00000000", stroke = sample_color, width = 3, layer = 20,
+    fill = "#00000000", stroke = "foreground", width = 2, layer = 20,
 }
 
 local labels = {
     scene:text {id = "gradient-stop-0-label", text = string.format("t = %.0f", stop_t[1]), point = {left, 0.83}, role = "code", fill = start_color, align = {0, 0.5}, layer = 40},
-    scene:text {id = "gradient-sample-label", text = string.format("t = %.2f", sample_t), point = {sample_x, 0.52}, role = "code", fill = sample_color, align = {0.5, 0.5}, layer = 40},
+    scene:text {id = "gradient-sample-label", text = string.format("t = %.2f", sample_t), point = {sample_x + 0.12, 0.52}, role = "code", fill = sample_color, align = {0, 0.5}, layer = 40},
     scene:text {id = "gradient-stop-1-label", text = string.format("t = %.0f", stop_t[2]), point = {right, 0.83}, role = "code", fill = end_color, align = {1, 0.5}, layer = 40},
     scene:text {id = "gradient-formula", text = "color(t) = mix(c0, c1, t)", point = {0, -2.35}, role = "code", fill = "foreground", align = {0.5, 0.5}, layer = 40},
 }

@@ -156,7 +156,7 @@ for index, face in ipairs(faces) do
     faceObjects[index] = mesh:polygon {
         points = face.points,
         fill = faceColorsA[index], stroke = index == selectedIndex and "result" or "border",
-        width = index == selectedIndex and 3.0 or 1.0,
+        width = index == selectedIndex and 2.0 or 1.0,
         id = "blinn:face:" .. index,
     }
 end
@@ -169,7 +169,7 @@ local function vectorOwner(id, direction, color, vectorLength, labelOffset, labe
     local owner = space:group {matrix = frameFromX(sample, direction), id = "blinn:" .. id .. ":owner"}
     local vector = owner:vector {
         origin = {0, 0, 0}, value = {vectorLength, 0, 0}, color = color,
-        width = 4, tip = 13, layer = 12, id = "blinn:" .. id,
+        width = 2, tip = 7, layer = 12, id = "blinn:" .. id,
     }
     local label = owner:text {
         text = id, point = {vectorLength + (labelExtra or 0.20), labelOffset or 0, 0}, role = "code", fill = color,
@@ -235,25 +235,25 @@ local function stateGroup(id, y, label, state)
         fill = id == "B" and "result" or "muted", id = "blinn:ledger:" .. id .. ":title",
     }
     group:text {
-        text = string.format("N·L = %.3f     N·H = %.3f", state.nDotL, state.nDotH),
+        text = string.format("N·L = %.3f   N·H = %.3f", state.nDotL, state.nDotH),
         point = {-2.78, y}, align = {0, 0.5}, role = "code", size = 12.0,
         fill = "foreground", id = "blinn:ledger:" .. id .. ":dots",
     }
     group:text {
-        text = string.format("A %.3f   D %.3f   S %.3f", state.ambient, state.diffuse, state.specular),
+        text = string.format("A %.3f  D %.3f  S %.3f", state.ambient, state.diffuse, state.specular),
         point = {-2.78, y - 0.42}, align = {0, 0.5}, role = "code", size = 12.0,
         fill = "foreground", id = "blinn:ledger:" .. id .. ":terms",
     }
     group:rectangle {
-        center = {2.20, y - 0.18}, size = {0.92, 0.92}, corner = 0.08,
-        fill = state.color, stroke = id == "B" and "result" or "border", width = 2,
+        center = {2.45, y - 0.18}, size = {0.92, 0.92},
+        fill = state.color, stroke = id == "B" and "result" or "border", width = 1.25,
         id = "blinn:ledger:" .. id .. ":swatch",
     }
     return group
 end
 local poseA = stateGroup("A", 1.35, "LIGHT POSE A", stateA)
 local arrow = ledger:text {
-    text = "light moves → recompute every dependent", point = {0, -0.12}, role = "code",
+    text = "light moves → recompute dependents", point = {0, -0.12}, role = "code",
     size = 11.5, fill = "warning", id = "blinn:recompute",
 }
 local poseB = stateGroup("B", -1.20, "LIGHT POSE B", stateB)
@@ -273,16 +273,11 @@ ledger:fade_in(poseB, {shift = {0.10, 0}, duration = lightMoveEnd - lightMoveSta
 ledger:fade_in(invariant, {duration = 0.28, curve = "gentle"})
 waitUntil(ledger, spatialEnd)
 
-local title = page:text {
-    text = "Blinn–Phong on an indexed mesh", point = {0, 2.65}, role = "h2",
-    fill = "foreground", id = "blinn:title",
-}
 local subtitle = page:text {
     text = "move the light → rebuild L and H → recompute every face color",
     point = {0, 2.25}, role = "text", fill = "muted", id = "blinn:subtitle",
 }
-page:fade_in(title, {shift = {0, -0.08}, duration = 0.38, curve = "gentle"})
 page:fade_in(subtitle, {duration = 0.28, curve = "gentle"})
-page:viewport(spatial, {x = 0.015, y = 0.23, width = 0.613, height = 0.72})
-page:viewport(ledger, {x = 0.638, y = 0.23, width = 0.336, height = 0.72})
+page:viewport(spatial, {x = 0.015, y = 0.18, width = 0.613, height = 0.72})
+page:viewport(ledger, {x = 0.638, y = 0.18, width = 0.336, height = 0.72})
 return page

@@ -18,10 +18,10 @@ These are the only delivery differences from vis-skills:
 
 - **Canvas.** One fixed logical Canvas. FIT scales it uniformly without cropping or stretching, and resizing never reruns Lua. Display zoom never changes export size.
 - **Theme.** `theme = "adaptive_vscode"` follows the workbench theme and rebuilds when the theme changes. Fixed and custom themes stay Scene-owned.
-- **Fonts.** Pretendard, monospaced JetBrains Mono NL (`JetBrainsMono`, used by code), Source Serif 4 (used by the `adaptive_vscode` heading and body roles), and IBM Plex Sans KR. A Text that contains Korean switches to IBM Plex Sans KR as a whole unless it names a font.
+- **Fonts.** Pretendard, monospaced JetBrains Mono NL (`JetBrainsMono`, used by code), Source Serif 4 (used by the `adaptive_vscode` heading and body roles), and IBM Plex Sans KR. A Source Serif Text that contains Korean switches to IBM Plex Sans KR as a whole unless it names a font. The CLI has no host, so it sets `adaptive_vscode` in Pretendard with Pro White colors; the host review below measures what the Viewer shows.
 - **Assets.** `asset = "..."` and `texture = "..."` load relative to the Lua file.
 - **Runtime.** The bundled CPU WASM runtime includes Diagram authoring, UI, Input, the retained Lua Runtime, Motion, and Audio.
-- **Chrome.** The Viewer already shows the title, notes, transport, Related source, and series controls. Do not draw these, IDE chrome, file paths, or episode navigation on the Canvas.
+- **Chrome.** The Viewer already shows the manifest title, notes, transport, Related source, and series controls. Do not draw these controls, IDE chrome, file paths, or episode navigation on the Canvas. Exports contain only the Canvas, so the Canvas still carries its own question, values, and captions ([code-evidence.md](code-evidence.md#split-canvas-inspector-and-notes)).
 
 ## Inspector and navigation
 
@@ -51,7 +51,7 @@ Compact stacks the Canvas and Playback above the Inspector. Wide starts at 600 p
 
 ## Interactive Scenes
 
-Author UI, Input, Runtime, Motion, and Audio with [vis-game](../../vis-game/SKILL.md). The Preview offers each Canvas pointer event to UI first and then to Input; only unhandled events fall through to camera and FIT gestures. With `camera = {mode = "interactive"}`:
+Author UI, Input, Runtime, Motion, and Audio with [vis-interactive](../../vis-interactive/SKILL.md). The Preview offers each Canvas pointer event to UI first and then to Input; only unhandled events fall through to camera and FIT gestures. With `camera = {mode = "interactive"}`:
 
 - dragging pans in 2D or orbits in 3D, and Shift-drag pans;
 - the arrow keys pan and `+`/`-` zoom;
@@ -84,9 +84,19 @@ API completion, hover documentation, and signature help work in the Scene that t
 
 ## Verify before delivery
 
-Run the vis-skills review (`inspect`, `render`, `audit`) on every Scene, then check in VS Code:
+Run the vis-skills review (`inspect`, `render`, `audit`) on every Scene. Then run the host review, which renders a Scene as the Viewer does: the same WASM runtime and fonts, with the extension's fallback Light and Dark palettes. They approximate the default themes; a workbench theme's own colors can differ.
+
+```sh
+node <skill>/scripts/host-review.mjs .vscode/vis/<series>/animations/<scene>.lua --time 0 --time T --time end
+```
+
+`<skill>` is this skill's directory. The script prints one line per palette and time, and exits with 1 when a Text overlaps another, comes closer to it than `--padding` (4 px), or is clipped. Add `--contain TEXT BOX [INSET]` for Text that sits in a box: a `*` in TEXT matches any run of characters and fills the `*` in BOX, so `--contain 'node:*:name' 'node:*:body' 8` covers every node of a plate. The PNGs go to the system temp directory unless `--out` names another directory outside `.vscode/vis`; look at them, because the script checks text, not meaning. It loads the vis-skills bundle; `--runtime` points it at another copy, such as the folder **viscript: Open Bundled Runtime Folder** reveals.
+
+Then check in VS Code:
 
 - the manifest shows no diagnostics, and every CodeLens sits on its definition;
 - each Inspector excerpt shows the intended block, and **SEE** lands on it;
 - the first frame, the decisive beat, and the final frame read at a narrow Compact width, at Wide, and in Canvas Full Screen;
 - in a series, Previous, Next, and the Series list follow the intended order.
+
+Without a VS Code window, the host review still covers the Canvas. For the manifest, check its keys against [manifest.md](manifest.md), confirm that every `animation` exists, and print each linked range from the working tree to confirm it holds the intended block. Report the manifest diagnostics, CodeLens placement, **SEE**, and the Compact, Wide, and Full Screen widths as not verified.

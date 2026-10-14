@@ -14,15 +14,29 @@ Check layout across the timeline with CLI reports, then inspect selected frames 
 
 ```sh
 viscript inspect scene.lua --font "$VIS_FONT"
-viscript audit scene.lua --font "$VIS_FONT" --canvas-inset 4 --text-gap 4
+viscript audit scene.lua --font "$VIS_FONT" --canvas-inset 4 --text-gap 4 --format text
 viscript layout scene.lua --time "$VIS_TIME" --padding 4 --font "$VIS_FONT"
 viscript render scene.lua --time "$VIS_TIME" --font "$VIS_FONT" -o temp/review.png
 ```
 
-Add `--font "$VIS_CODE_FONT"` to each command when the scene sets code. Add the
-audit's containment flags (`--contain TEXT_ID RECTANGLE_ID [INSET]`,
-`--allow-uncontained TEXT_ID`, `--require-containment-ledger`) when text sits in
-backing rectangles, and the Diagram or occlusion policies that apply.
+Add `--font "$VIS_CODE_FONT"` to each command when the scene sets code. Without
+`--format text` the audit prints its full JSON. When text sits in a box, add one
+`--contain TEXT_ID RECTANGLE_ID [INSET]` per pair; the container must be a
+Rectangle. `--require-containment-ledger` also fails every Text with an ID that
+names no box and no `--allow-uncontained TEXT_ID`, which suits a `vis.diagram`
+Scene, whose node labels declare their own containment. Add the Diagram or
+occlusion policies that apply.
+
+`layout` prints JSON. The entries of `report.collisions` name two indices into
+`report.objects`; resolve them to IDs, skip pairs inside one Group whose
+`typeset` is true (a code block's tokens, a formula's parts), and keep the IDs
+of colliding, `clipped`, or `outside` Text as the result for that time.
+
+Review renders and probes go under `temp/` next to the scene. In a VS Code
+workspace keep them outside `.vscode/vis`, which holds only Scenes and their
+assets. A Scene for the VS Code Viewer also gets the vis-vscode host review: the
+CLI sets `adaptive_vscode` in Pretendard, while the Viewer sets headings and body
+text in Source Serif 4 and takes the editor's colors.
 
 A successful command is not proof of correct layout. Check labels against their
 owners' own paint bounds, and tell intended contacts from unrelated collisions. A
@@ -53,7 +67,7 @@ Use its peak or its closest contact, not a midpoint for every animation.
 
 ## Selected frames
 
-Inspect the first settled state, the decisive or densest beat, and the exact final frame. Add reported defect times and use a contact sheet when comparison helps. Render at delivery size and reuse stable filenames under `temp/`.
+Inspect the first settled state, the decisive or densest beat, and the exact final frame. Add reported defect times and use a contact sheet when comparison helps. Render at delivery size and reuse stable filenames in the review directory.
 
 For an independent visual review, provide the source, selected times, and images. Keep findings concise: time, object IDs, problem, and proposed fix.
 

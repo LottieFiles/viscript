@@ -23,7 +23,7 @@ local runtime = vis.runtime(scene, {
         x = x + move.value.x * dt
         ctx:update(player, {shift = {x, 0, 0}})
         if move.pressed then
-            ctx:sound("audio/short-laser.wav", {bus = "effect", gain = 0.5})
+            ctx:sound("audio/click.wav", {bus = "effect", gain = 0.5})
         end
     end,
 })

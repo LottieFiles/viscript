@@ -2,6 +2,8 @@
 -- The tagged duplicate keys 2L and 2R make the left-first equality rule visible.
 -- This is the merge kernel, not the recursive split phase.
 -- Edit LEFT and RIGHT; the stable left-first trace and output are regenerated below.
+-- Look: ink slots and values; the run heads under comparison get a transient `focus` outline, and a value
+-- turns `result` when it is committed to the output buffer. The tags, not hues, tell the runs apart.
 local scene = vis.scene {
     width = 960, height = 540, fps = 30, loop = false,
     theme = "adaptive_vscode",
@@ -53,67 +55,75 @@ end
 local TRACE, MERGED = buildStableMergeTrace(LEFT, RIGHT)
 local INPUT_X = {-315, -225, -135}
 local OUTPUT_X = {-225, -135, -45, 45, 135, 225}
-local INPUT_Y, OUTPUT_Y = 70, -90
+local INPUT_Y, OUTPUT_Y = 115, -25
+local SLOT = {70, 64}
 local LAYER = {slot = 10, token = 20, text = 40}
 
 local function translate(x, y)
     return {1, 0, 0, x, 0, 1, 0, y, 0, 0, 1, 0, 0, 0, 0, 1}
 end
 
-local title = scene:text {
-    text = "Merge Sort · stable merge kernel", point = {0, 220}, role = "h2",
-    fill = "foreground", layer = LAYER.text, id = "scene-title",
-}
 local leftLabel = scene:text {
-    text = "LEFT RUN", point = {-225, 145}, role = "code",
-    fill = "accent", layer = LAYER.text, id = "run:left:label",
+    text = "LEFT RUN", point = {-225, 180}, role = "code",
+    fill = "muted", layer = LAYER.text, id = "run:left:label",
 }
 local rightLabel = scene:text {
-    text = "RIGHT RUN", point = {225, 145}, role = "code",
-    fill = "secondary", layer = LAYER.text, id = "run:right:label",
+    text = "RIGHT RUN", point = {225, 180}, role = "code",
+    fill = "muted", layer = LAYER.text, id = "run:right:label",
 }
 local outputLabel = scene:text {
-    text = "OUTPUT BUFFER", point = {0, -155}, role = "code",
-    fill = "result", layer = LAYER.text, id = "buffer:label",
+    text = "OUTPUT BUFFER", point = {0, -90}, role = "code",
+    fill = "muted", layer = LAYER.text, id = "buffer:label",
 }
 
+-- Slots stay in place while values move, so a drained run still shows where it was.
 local slots = scene:group {id = "buffer:slots"}
 local outputSlots = {}
 for index, x in ipairs(OUTPUT_X) do
     outputSlots[index] = slots:rectangle {
-        center = {x, OUTPUT_Y}, size = {76, 70}, corner = 5,
-        fill = "surface", stroke = "border", width = 2,
+        center = {x, OUTPUT_Y}, size = SLOT,
+        fill = "#00000000", stroke = "border", width = 1,
         layer = LAYER.slot, id = "buffer-slot:" .. index,
+    }
+end
+for index, x in ipairs(INPUT_X) do
+    slots:rectangle {
+        center = {x, INPUT_Y}, size = SLOT, fill = "#00000000", stroke = "border", width = 1,
+        layer = LAYER.slot, id = "run:left:slot:" .. index,
+    }
+    slots:rectangle {
+        center = {-x, INPUT_Y}, size = SLOT, fill = "#00000000", stroke = "border", width = 1,
+        layer = LAYER.slot, id = "run:right:slot:" .. (4 - index),
     }
 end
 
 local tokenLayer = scene:group {id = "merge:values"}
 local leftTokens, leftBodies, rightTokens, rightBodies = {}, {}, {}, {}
-local function makeToken(spec, x, color)
+local function makeToken(spec, x)
     local token = tokenLayer:group {matrix = translate(x, INPUT_Y), id = "value:" .. spec.id}
     local body = token:rectangle {
-        center = {0, 0}, size = {68, 62}, corner = 5,
-        fill = "surface", stroke = color, width = 3,
+        center = {0, 0}, size = SLOT,
+        fill = "#00000000", stroke = "foreground", width = 1.25,
         layer = LAYER.token, id = "value:" .. spec.id .. ":body",
     }
     token:text {
-        text = spec.label, point = {0, 0}, role = "h3", fill = color,
+        text = spec.label, point = {0, 0}, role = "h3", fill = "foreground",
         layer = LAYER.text, id = "value:" .. spec.id .. ":label",
     }
     return token, body
 end
 for index, spec in ipairs(LEFT) do
-    leftTokens[index], leftBodies[index] = makeToken(spec, INPUT_X[index], "accent")
+    leftTokens[index], leftBodies[index] = makeToken(spec, INPUT_X[index])
 end
 for index, spec in ipairs(RIGHT) do
-    rightTokens[index], rightBodies[index] = makeToken(spec, -INPUT_X[4 - index], "secondary")
+    rightTokens[index], rightBodies[index] = makeToken(spec, -INPUT_X[4 - index])
 end
 
 local status, statusCounter = nil, 0
 local function setStatus(message, color)
     statusCounter = statusCounter + 1
     local nextStatus = scene:text {
-        text = message, point = {0, -205}, role = "code", fill = color or "focus",
+        text = message, point = {0, -145}, role = "code", fill = color or "foreground",
         layer = LAYER.text, id = "status:" .. statusCounter,
     }
     if status then scene:fade_transform(status, nextStatus, 0.16, "gentle")
@@ -125,8 +135,8 @@ local leftHead, rightHead, outputHead = 1, 1, 1
 local function compareAndEmit(event, message)
     setStatus(message)
     scene:play({
-        {target = leftBodies[leftHead], fill = "focus"},
-        {target = rightBodies[rightHead], fill = "focus"},
+        {target = leftBodies[leftHead], stroke = "focus", width = 2},
+        {target = rightBodies[rightHead], stroke = "focus", width = 2},
     }, 0.28, "ease_in_out", 0)
     local token, body, sourceX
     if event.side == "left" then
@@ -137,8 +147,8 @@ local function compareAndEmit(event, message)
     end
     scene:play({
         {target = token, shift = {OUTPUT_X[outputHead] - sourceX, OUTPUT_Y - INPUT_Y}},
-        {target = body, fill = "surface"},
-        {target = event.side == "left" and rightBodies[rightHead] or leftBodies[leftHead], fill = "surface"},
+        {target = body, stroke = "result", width = 1.5},
+        {target = event.side == "left" and rightBodies[rightHead] or leftBodies[leftHead], stroke = "foreground", width = 1.25},
         {target = outputSlots[outputHead], stroke = "result"},
     }, 0.55, "ease_out", 0)
     if event.side == "left" then leftHead = leftHead + 1 else rightHead = rightHead + 1 end
@@ -147,21 +157,21 @@ end
 
 local function drain(event, message)
     setStatus(message, "muted")
-    local token, sourceX
+    local token, body, sourceX
     if event.side == "left" then
-        token, sourceX = leftTokens[leftHead], INPUT_X[leftHead]
+        token, body, sourceX = leftTokens[leftHead], leftBodies[leftHead], INPUT_X[leftHead]
     else
-        token, sourceX = rightTokens[rightHead], -INPUT_X[4 - rightHead]
+        token, body, sourceX = rightTokens[rightHead], rightBodies[rightHead], -INPUT_X[4 - rightHead]
     end
     scene:play({
         {target = token, shift = {OUTPUT_X[outputHead] - sourceX, OUTPUT_Y - INPUT_Y}},
+        {target = body, stroke = "result", width = 1.5},
         {target = outputSlots[outputHead], stroke = "result"},
     }, 0.50, "ease_out", 0)
     if event.side == "left" then leftHead = leftHead + 1 else rightHead = rightHead + 1 end
     outputHead = outputHead + 1
 end
 
-scene:fade_in(title, {shift = {0, -6}, duration = 0.42, curve = "gentle"})
 scene:fade_in(leftLabel, {duration = 0.28, curve = "gentle"})
 scene:fade_in(rightLabel, {duration = 0.28, curve = "gentle"})
 scene:fade_in(outputLabel, {duration = 0.28, curve = "gentle"})
@@ -197,7 +207,7 @@ for index, item in ipairs(MERGED) do mergedLabels[index] = item.label end
 local result = scene:text {
     text = "merged: [" .. table.concat(mergedLabels, ", ")
         .. "]  ·  equal keys preserve source order",
-    point = {0, -238}, role = "text", fill = "result",
+    point = {0, -185}, role = "text", fill = "result",
     layer = LAYER.text, id = "result:stable-merge",
 }
 scene:fade_in(result, {shift = {0, 4}, duration = 0.34, curve = "gentle"})

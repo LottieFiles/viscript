@@ -1,9 +1,10 @@
-// Static skill checks: every relative Markdown link resolves, and every
-// `scene:name {`/`obj:name(` call in skill docs and templates is a bound Lua name.
+// Static skill checks: every relative Markdown link resolves, every
+// `scene:name {`/`obj:name(` call in skill docs and templates is a bound Lua name, and
+// the host review renders with the extension's fallback palettes.
 // Usage: node tools/skill/check.mjs [repo-root]
 import {readFileSync, readdirSync, existsSync, statSync} from "node:fs";
 import {dirname, join, normalize, resolve} from "node:path";
-import {fileURLToPath} from "node:url";
+import {fileURLToPath, pathToFileURL} from "node:url";
 
 const root = resolve(process.argv[2] ?? join(dirname(fileURLToPath(import.meta.url)), "..", ".."));
 const skills = join(root, "tools/skill");
@@ -37,6 +38,16 @@ for (const file of files.filter((f) => /\.(md|lua)$/.test(f))) {
     for (const [, name] of text.matchAll(/\b[a-z_]+:([a-z_][a-z_0-9]*)\s*[{(]/g)) {
         if (!bound.has(name)) errors.push(`${file}: unknown Lua method ${name}`);
     }
+}
+
+// host-review.mjs keeps its own copy of the palettes the Viewer falls back to.
+const {PALETTES} = await import(pathToFileURL(join(skills, "vis-vscode/scripts/host-review.mjs")).href);
+const {resolveAdaptiveVscodeTheme} = await import(pathToFileURL(join(root, "tools/vscode/media/adaptive-theme.mjs")).href);
+for (const mode of ["light", "dark"]) {
+    const {dark, ...fallback} = resolveAdaptiveVscodeTheme({dark: mode === "dark", read: () => ""});
+    const keys = new Set([...Object.keys(PALETTES[mode]), ...Object.keys(fallback)]);
+    const differing = [...keys].filter((key) => JSON.stringify(PALETTES[mode][key]) !== JSON.stringify(fallback[key]));
+    if (differing.length) errors.push(`host-review.mjs: the ${mode} palette differs from adaptive-theme.mjs in ${differing.join(", ")}`);
 }
 
 for (const error of errors) console.error(error);
