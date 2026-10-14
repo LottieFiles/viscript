@@ -3,6 +3,7 @@ import type {AudioBus, SceneBuilder} from "./bindings.js";
 export {compileScene, evaluateScene, SceneBuilder, vis} from "./bindings.js";
 export type * from "./bindings.js";
 
+/** `"gl"` is experimental and absent from WebAssembly builds, which render through `"cpu"`. */
 export type RenderEngine = "cpu" | "gl";
 
 export interface VisModuleOptions {
