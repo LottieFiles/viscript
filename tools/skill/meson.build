@@ -31,6 +31,11 @@ skill_templates = [
             '--contain', 'node:screen:when', 'node:screen:body', '8',
         ],
     },
+    {
+        'name': '-readme-demo-command-to-result', 'src': 'vis-skills/templates/readme-demo/command-to-result.lua',
+        'font': true, 'render': true,
+        'audit': ['--contain', 'cmd', 'terminal', '8', '--contain', 'ok', 'terminal', '8'],
+    },
     {'name': '-graphics-2d-coverage-rasterization', 'src': 'vis-skills/templates/graphics/2d/advanced/coverage-rasterization.lua'},
     {'name': '-graphics-2d-linear-gradient', 'src': 'vis-skills/templates/graphics/2d/linear-gradient.lua'},
     {'name': '-graphics-2d-sin-cos-function-plot', 'src': 'vis-skills/templates/graphics/2d/sin-cos-function-plot.lua'},
