@@ -39,6 +39,9 @@ export interface LayoutObjectInfo {
     readonly id: string | null;
     readonly parent: number | null;
     readonly type: string;
+    /** A Group that lays out its descendant Texts as one block, such as a code block; gaps
+     * between those Texts belong to the block. */
+    readonly typeset: boolean;
     readonly layer: number;
     readonly paintBounds: BBox | null;
     readonly familyBounds: BBox | null;

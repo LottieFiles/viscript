@@ -4119,6 +4119,19 @@ try {
     assert.equal(graphLayout.status, 0, graphLayout.stderr);
     const tagged = JSON.parse(graphLayout.stdout).scene.objects.find((object) => object.id === "tag");
     assert.deepEqual(tagged.bounds, { x: 168.375, y: 115.625, width: 16.25, height: 8.75 });
+    // A code block lays its tokens out as one block, and the report says so; a plain Group does not.
+    const blockPath = join(directory, "block.lua");
+    writeFileSync(blockPath, `local scene = vis.scene {width = 320, height = 120}
+scene:group {id = "plain"}
+scene:code {text = "a = b", language = "plain", id = "snippet"}
+return scene
+`);
+    const blockLayout = spawnSync(cliPath, ["layout", blockPath, "--font", font, "--font", monoFont], { encoding: "utf8" });
+    assert.equal(blockLayout.status, 0, blockLayout.stderr);
+    const blockObjects = JSON.parse(blockLayout.stdout).report.objects;
+    const typesetOf = (id) => blockObjects.find((object) => object.id === id)?.typeset;
+    assert.equal(typesetOf("snippet"), true);
+    assert.equal(typesetOf("plain"), false);
     // The lens shows from its first fade at 1.5 times the frame's scale, twice it halfway through
     // the look, and again 1.5 times after focus() returns it to its opening camera. The overview
     // shows from 0.25 s and keeps pixel sizes as it is not optical. A view that is not yet made

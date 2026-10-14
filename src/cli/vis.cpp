@@ -694,7 +694,8 @@ static void _layoutReport(const LayoutReport& report, const Scene* root)
         else std::printf("%u", item->parent);
         std::fputs(",\"type\":", stdout);
         _json(type(object->type()));
-        std::printf(",\"layer\":%d,\"paintBounds\":", item->layer);
+        auto typeset = object->type() == Type::Group && static_cast<const Group*>(object)->typeset;
+        std::printf(",\"typeset\":%s,\"layer\":%d,\"paintBounds\":", typeset ? "true" : "false", item->layer);
         if (item->paintBounds.width > 0.0f && item->paintBounds.height > 0.0f) {
             _bbox(item->paintBounds);
         } else {

@@ -394,8 +394,11 @@ static bool _serialize(const vis::LayoutReport& report, const vis::Scene* root,
         } else if (!json.format(",\"parent\":%u", item->parent)) {
             return false;
         }
+        auto typeset = object->type() == vis::Type::Group
+                    && static_cast<const vis::Group*>(object)->typeset;
         if (!json.append(",\"type\":") || !json.string(vis::type(object->type()))
-            || !json.format(",\"layer\":%d,\"paintBounds\":", item->layer)) {
+            || !json.format(",\"typeset\":%s,\"layer\":%d,\"paintBounds\":",
+                            typeset ? "true" : "false", item->layer)) {
             return false;
         }
         auto painted = item->paintBounds.width > 0.0f && item->paintBounds.height > 0.0f;
