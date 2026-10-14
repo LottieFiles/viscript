@@ -285,8 +285,3 @@ viscript is released under the [MIT License](LICENSE).
 
 The VS Code extension also bundles gifenc (MIT), Mediabunny (MPL-2.0) and Shiki (MIT);
 see [THIRD_PARTY_NOTICES](tools/vscode/THIRD_PARTY_NOTICES.md).
-
-## Inspired by
-
-- [Manim](https://github.com/3b1b/manim)
-- [Motion Canvas](https://github.com/motion-canvas/motion-canvas)
