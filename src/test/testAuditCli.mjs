@@ -328,6 +328,22 @@ return scene
         .filter((issue) => issue.code === "missing_containment_owner").map((issue) => issue.subject.id);
     assert.deepEqual(owners, ["set", "plain", "again"]);
 
+    // Plane text sizes are world units; a point size there makes one em taller than the view.
+    const plane = join(temporary, "plane.lua");
+    writeFileSync(plane, `
+local scene = vis.scene {width=400, height=240, fps=20, theme="pro_white", camera={view="2d", height=4}}
+scene:text {id="points", text="Hi", point={-1,0}, size=30, orientation="plane"}
+scene:text {id="world", text="Hi", point={1,0}, size=0.6, orientation="plane"}
+scene:text {id="billboard", text="Hi", point={0,-1}, size=30}
+return scene
+`);
+    const planeIssues = JSON.parse(run(plane, [], 1).stdout).issues
+        .filter((issue) => issue.code === "plane_text_size");
+    assert.deepEqual(planeIssues.map((issue) => [issue.subject.id, issue.size, issue.repair]),
+        [["points", {em: 30, viewHeight: 4}, "give-plane-text-size-in-world-units"]]);
+    assert.ok(run(plane, ["--format", "text"], 1).stdout
+        .includes("[plane_text_size] root text#1 id=points size[em=30.000 viewHeight=4.000]"));
+
     // A text that changes its string shows characters of every string it changes between.
     const changing = join(temporary, "changing.lua");
     writeFileSync(changing, `

@@ -126,6 +126,7 @@ enum struct IssueCode : uint8_t
     UnmatchedUncontained,
     NeverVisibleText,
     MissingGlyphs,
+    PlaneTextSize,
     ViewportStretch,
     TextOccluded,
     DuplicateOccludedSceneAllowance,
@@ -206,6 +207,9 @@ struct Issue
     // MissingGlyphs: how many characters the font lacks, and the first of them in UTF-8.
     uint32_t missing = 0u;
     char firstMissing[5] = {};
+    // PlaneTextSize: the em in world units, and the world height the camera shows at its target.
+    float planeEm = 0.0f;
+    float viewHeight = 0.0f;
 };
 
 struct IssueList
@@ -661,6 +665,8 @@ static const char* _code(IssueCode code)
         return "never_visible_text";
     case IssueCode::MissingGlyphs:
         return "missing_glyphs";
+    case IssueCode::PlaneTextSize:
+        return "plane_text_size";
     case IssueCode::ViewportStretch:
         return "viewport_stretch";
     case IssueCode::TextOccluded:
@@ -733,6 +739,8 @@ static const char* _repair(IssueCode code)
         return "register-font-or-fix-visibility";
     case IssueCode::MissingGlyphs:
         return "use-a-font-with-these-glyphs";
+    case IssueCode::PlaneTextSize:
+        return "give-plane-text-size-in-world-units";
     case IssueCode::ViewportStretch:
         return "match-viewport-aspect-or-reflow";
     case IssueCode::TextOccluded:
@@ -839,6 +847,18 @@ static Issue* _record(IssueList& issues, IssueCode code, Scope scope, Subject su
 static bool _painted(const LayoutVisual* visual)
 {
     return visual && visual->opacity > 0.0f && visual->paintBounds.width > 0.0f && visual->paintBounds.height > 0.0f;
+}
+
+// The world height the camera shows at its target, or zero when the camera does not say.
+static float _viewHeight(const Camera& camera)
+{
+    if (camera.projection == Projection::Orthographic)
+        return camera.orthoHeight > 0.0f ? camera.orthoHeight : 0.0f;
+    auto dx = camera.eye.x - camera.target.x, dy = camera.eye.y - camera.target.y, dz = camera.eye.z - camera.target.z;
+    auto distance = std::sqrt(dx * dx + dy * dy + dz * dz);
+    if (!(distance > 0.0f) || !(camera.fov > 0.0f))
+        return 0.0f;
+    return 2.0f * distance * std::tan(0.5f * camera.fov);
 }
 
 static float _clearance(const BBox& inner, const BBox& outer)
@@ -1643,6 +1663,19 @@ static bool _inventory(const Scene* scene, const char* authoredPath, Options& op
                     return false;
                 issue->missing = missing;
                 std::memcpy(issue->firstMissing, firstMissing, sizeof(issue->firstMissing));
+            }
+            // Plane text takes its size in world units, while billboard text takes points. A
+            // size written in points on plane text makes an em taller than the whole view,
+            // which covers the frame with one glyph.
+            auto viewHeight = _viewHeight(scene->config().camera);
+            if (text->orientation == TextOrientation::Plane && viewHeight > 0.0f && text->size > viewHeight)
+            {
+                auto issue = _record(issues, IssueCode::PlaneTextSize, scope, _subject(object), {}, {}, structural,
+                                     text->size, viewHeight, text->size - viewHeight);
+                if (!issue)
+                    return false;
+                issue->planeEm = text->size;
+                issue->viewHeight = viewHeight;
             }
             for (auto allowed = 0u; allowed < options.allowedTextCount; allowed++)
             {
@@ -2682,6 +2715,8 @@ static void _jsonReport(const Options& options, const Scene* scene, const IssueL
                 std::fputs("null", stdout);
             std::putchar('}');
         }
+        if (issue.code == IssueCode::PlaneTextSize)
+            std::printf(",\"size\":{\"em\":%.6g,\"viewHeight\":%.6g}", issue.planeEm, issue.viewHeight);
         std::fputs(",\"repair\":", stdout);
         _json(_repair(issue.code));
         std::putchar('}');
@@ -2751,6 +2786,8 @@ static void _textReport(const Options& options, const IssueList& issues, uint32_
             std::printf(" scale[x=%.6g y=%.6g]", issue.scaleX, issue.scaleY);
         if (issue.missing)
             std::printf(" glyphs[missing=%u first=%s]", issue.missing, issue.firstMissing[0] ? issue.firstMissing : "?");
+        if (issue.code == IssueCode::PlaneTextSize)
+            std::printf(" size[em=%.3f viewHeight=%.3f]", issue.planeEm, issue.viewHeight);
         if (issue.worst.valid)
             std::printf(" at %.6gs", issue.worst.time);
         std::printf("; %s\n", _repair(issue.code));
