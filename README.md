@@ -92,6 +92,8 @@ Three ideas carry through every scene:
 
 ### Build
 
+<p align="center"><img src="docs/assets/build.gif" alt="meson setup with -Dmodules attaches optional modules to the core, then meson compile builds build/viscript" width="800"></p>
+
 ```sh
 meson setup build
 meson compile -C build
