@@ -1,0 +1,92 @@
+---
+title: Scenes & Objects
+group: Basics
+summary: Build a scene and learn its units; shapes, styling, text and pictures follow.
+---
+
+# Scenes & Objects
+
+Every script builds one scene. This page covers the scene itself; the pages below cover what goes in it.
+
+## The root scene
+
+### Create and return
+
+Every script builds one root scene with `vis.scene`, adds objects to it, and **returns it**. The script runs once to *construct* the scene; the host then renders any time `t` from it.
+
+```lua live
+local scene = vis.scene {width = 960, height = 540, theme = "pro_black"}
+local dot = scene:circle {center = {0, 0}, radius = 1, fill = "accent"}
+scene:grow_from_center(dot, 0.6)
+
+return scene
+```
+
+```js live
+const scene = vis.scene({width: 960, height: 540, theme: "pro_black"});
+const dot = scene.circle({center: [0, 0], radius: 1, fill: "accent"});
+scene.growFromCenter(dot, 0.6);
+
+return scene;
+```
+
+<table>
+<tr><th>Field</th><th>Unit</th><th>Meaning</th></tr>
+<tr><td><code>width</code>, <code>height</code></td><td>pixels</td><td>Output raster size.</td></tr>
+<tr><td><code>fps</code></td><td>frames/s</td><td>Export frame rate.</td></tr>
+<tr><td><code>theme</code></td><td>token</td><td><code>"pro_white"</code>, <code>"pro_black"</code>, <code>"adaptive_vscode"</code></td></tr>
+</table>
+
+### Camera and world units
+
+Objects are placed in world units, not pixels. The camera decides how much of the world fits in the frame: `height = 6` shows six units vertically, so a 960×540 frame spans about ±5.33 × ±3.
+
+To pan and zoom during the scene, see [Camera](#/docs/camera).
+
+```lua live
+local scene = vis.scene {
+    width = 960, height = 540, theme = "pro_black",
+    camera = {mode = "fixed", view = "2d", height = 6},
+}
+
+local axes = scene:space {x = {-5, 5, 1}, y = {-3, 3, 1}, stroke = "#00000000", ticks = true}
+local dot = axes:circle {center = {0, 0}, radius = 0.2, fill = "warning"}
+
+scene:fade_in(axes, {duration = 0.4})
+scene:shift(dot, {4, 2}, 1, "smooth")
+scene:shift(dot, {-8, -4}, 1.2, "smooth")
+
+return scene
+```
+
+```js live
+const scene = vis.scene({
+    width: 960, height: 540, theme: "pro_black",
+    camera: {mode: "fixed", view: "2d", height: 6},
+});
+
+const axes = scene.space({x: [-5, 5, 1], y: [-3, 3, 1], stroke: "#00000000", ticks: true});
+const dot = axes.circle({center: [0, 0], radius: 0.2, fill: "warning"});
+
+scene.fadeIn(axes, {duration: 0.4});
+scene.shift(dot, [4, 2], 1, "smooth");
+scene.shift(dot, [-8, -4], 1.2, "smooth");
+
+return scene;
+```
+
+<table>
+<tr><th>Field</th><th>Unit</th><th>Meaning</th></tr>
+<tr><td><code>camera.target</code></td><td>world</td><td>Point at the centre of the frame (default <code>&#123;0, 0&#125;</code>).</td></tr>
+<tr><td><code>camera.height</code></td><td>world</td><td>World units visible vertically.</td></tr>
+</table>
+
+## In this chapter
+
+- [Shapes](#/docs/shapes): rectangles, circles, arcs, paths, curves and routes.
+- [Styling](#/docs/styling): colours, strokes, dashes and gradients.
+- [Text and labels](#/docs/text): text, alignment and labels.
+- [Picture](#/docs/picture): images and pixel grids.
+- [Coordinate Spaces](#/docs/spaces): axes, ticks and plots.
+- [Viewports](#/docs/viewports): scenes inside scenes.
+- [Themes](#/docs/themes): presets, semantic colours and custom themes.

@@ -1,0 +1,59 @@
+---
+title: Picture
+group: Basics
+parent: scenes
+summary: Images and inline pixel grids.
+---
+
+# Picture
+
+`picture` places an image, either from a file (`asset`) or from inline pixels (`pixels`).
+
+| Option | Meaning |
+|---|---|
+| `asset` | An SVG, PNG, JPG or WebP file. SVG stays vector, the others are raster. Native runs resolve relative names against the script; a WASM host registers the bytes first with `client.asset(name, data, mime)`. |
+| `pixels` | An inline image: a list of colours, row by row. |
+| `size` | `{columns, rows}` of `pixels`. Goes only with `pixels`. |
+| `width` | Width in world units; the height follows the image. |
+| `center` | Where the image's center sits. |
+| `filter` | How pixels are sampled when scaled: `"bilinear"` (default) blends neighbours into a smooth gradient, `"nearest"` keeps each pixel a sharp square. |
+
+Use exactly one of `asset` or `pixels`. A picture keeps its source colours, so `color`, `stroke`, `fill`, `radius` and `dash` are rejected.
+
+```lua live
+local scene = vis.scene {
+    width = 960, height = 540, theme = "pro_black",
+    camera = {mode = "fixed", view = "2d", height = 6},
+}
+
+-- "The Blue Marble", NASA / Apollo 17 (public domain).
+local earth = scene:picture {asset = "earth.png", width = 4.2, center = {-1.6, 0}}
+local title = scene:text {
+    text = "The Blue Marble", point = {1.1, 0}, align = {0, 0.5},
+    size = 30, fill = "#e6e8ee", opacity = 0,
+}
+
+scene:fade_in(earth, {duration = 0.8, scale = 0.85})
+scene:fade_in(title, {duration = 0.5, shift = {0.3, 0}})
+
+return scene
+```
+
+```js live
+const scene = vis.scene({
+    width: 960, height: 540, theme: "pro_black",
+    camera: {mode: "fixed", view: "2d", height: 6},
+});
+
+// "The Blue Marble", NASA / Apollo 17 (public domain).
+const earth = scene.picture({asset: "earth.png", width: 4.2, center: [-1.6, 0]});
+const title = scene.text({
+    text: "The Blue Marble", point: [1.1, 0], align: [0, 0.5],
+    size: 30, fill: "#e6e8ee", opacity: 0,
+});
+
+scene.fadeIn(earth, {duration: 0.8, scale: 0.85});
+scene.fadeIn(title, {duration: 0.5, shift: [0.3, 0]});
+
+return scene;
+```

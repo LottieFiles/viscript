@@ -1,0 +1,213 @@
+---
+title: Composition & Effects
+group: More
+summary: Groups, isolation, masks, blend modes, blur and shadow.
+---
+
+# Composition & Effects
+
+Groups, isolation, masks, blend modes, blur and shadow.
+
+## Groups and isolation
+
+<p>A <code>group</code> draws nothing itself. The <code>stroke</code>, <code>fill</code> and <code>width</code> it sets flow to
+descendants that set none of their own, as in SVG; <code>opacity</code> and <code>progress</code> multiply down the tree.</p>
+<p>With <code>isolate = true</code> the group renders into one layer and composites once, so overlapping children stop showing through each
+other while the group fades. Compare the two pairs below.</p>
+
+```lua live
+local scene = vis.scene {
+    width = 960, height = 540, theme = "pro_black",
+    camera = {mode = "fixed", view = "2d", height = 6},
+}
+
+local plain = scene:group {fill = "accent"}
+plain:circle {center = {-3.4, 0}, radius = 1}
+plain:circle {center = {-2.2, 0}, radius = 1}
+
+local iso = scene:group {fill = "accent", isolate = true}
+iso:circle {center = {2.2, 0}, radius = 1}
+iso:circle {center = {3.4, 0}, radius = 1}
+
+scene:parallel(
+    function() scene:fade(plain, 0.4, 1.2) end,
+    function() scene:fade(iso, 0.4, 1.2) end)
+scene:wait(0.6)
+
+return scene
+```
+
+```js live
+const scene = vis.scene({
+    width: 960, height: 540, theme: "pro_black",
+    camera: {mode: "fixed", view: "2d", height: 6},
+});
+
+const plain = scene.group({fill: "accent"});
+plain.circle({center: [-3.4, 0], radius: 1});
+plain.circle({center: [-2.2, 0], radius: 1});
+
+const iso = scene.group({fill: "accent", isolate: true});
+iso.circle({center: [2.2, 0], radius: 1});
+iso.circle({center: [3.4, 0], radius: 1});
+
+scene.parallel(
+    () => scene.fade(plain, 0.4, 1.2),
+    () => scene.fade(iso, 0.4, 1.2));
+scene.wait(0.6);
+
+return scene;
+```
+
+## Masks and blend modes
+
+<p>A mask shows an object only through another object, which draws only into the mask and keeps its own timeline. <code>blend</code> mirrors CSS <code>mix-blend-mode</code>.</p>
+<table>
+<tr><th>Mask mode</th><th>Visible where the target is…</th></tr>
+<tr><td><code>alpha</code></td><td>opaque</td></tr>
+<tr><td><code>inverse_alpha</code></td><td>transparent</td></tr>
+<tr><td><code>luma</code></td><td>bright</td></tr>
+<tr><td><code>inverse_luma</code></td><td>dark</td></tr>
+</table>
+<table>
+<tr><th>Blend family</th><th>Modes</th></tr>
+<tr><td>Darken</td><td><code>multiply</code>, <code>darken</code>, <code>color_burn</code></td></tr>
+<tr><td>Lighten</td><td><code>screen</code>, <code>lighten</code>, <code>color_dodge</code>, <code>add</code></td></tr>
+<tr><td>Contrast</td><td><code>overlay</code>, <code>soft_light</code>, <code>hard_light</code></td></tr>
+<tr><td>Difference</td><td><code>difference</code>, <code>exclusion</code></td></tr>
+<tr><td>Component</td><td><code>hue</code>, <code>saturation</code>, <code>color</code>, <code>luminosity</code></td></tr>
+</table>
+
+```lua live
+local scene = vis.scene {
+    width = 960, height = 540, theme = "pro_black",
+    camera = {mode = "fixed", view = "2d", height = 6},
+}
+
+local stripes = scene:group {}
+for i = -6, 6 do
+    stripes:rectangle {center = {i * 0.5, 0}, size = {0.25, 4}, fill = "warning"}
+end
+local hole = scene:circle {center = {-2.5, 0}, radius = 1.2, fill = "#ffffff"}
+stripes:mask(hole)
+
+scene:circle {center = {1, 0.4}, radius = 1, fill = "accent", blend = "screen"}
+
+scene:shift(hole, {5, 0}, 2, "smooth")
+
+return scene
+```
+
+```js live
+const scene = vis.scene({
+    width: 960, height: 540, theme: "pro_black",
+    camera: {mode: "fixed", view: "2d", height: 6},
+});
+
+const stripes = scene.group({});
+for (let i = -6; i <= 6; i++) {
+    stripes.rectangle({center: [i * 0.5, 0], size: [0.25, 4], fill: "warning"});
+}
+const hole = scene.circle({center: [-2.5, 0], radius: 1.2, fill: "#ffffff"});
+stripes.mask(hole);
+
+scene.circle({center: [1, 0.4], radius: 1, fill: "accent", blend: "screen"});
+
+scene.shift(hole, [5, 0], 2, "smooth");
+
+return scene;
+```
+
+## Blur and shadow
+
+<p><code>blur = sigma</code> (screen pixels) blurs an object with its descendants. <code>shadow = &#123;color, offset, blur&#125;</code> casts a
+shadow beneath it; omitted fields default to 40% black, <code>&#123;0, -4&#125;</code> and <code>8</code>. Both animate through <code>play</code>.</p>
+
+```lua live
+local scene = vis.scene {
+    width = 960, height = 540, theme = "pro_black",
+    camera = {mode = "fixed", view = "2d", height = 6},
+}
+
+local card = scene:rectangle {center = {-2.5, 0}, size = {3, 2}, corner = 0.15, fill = "#e6e8ee"}
+local soft = scene:circle {center = {2.5, 0}, radius = 1.1, fill = "accent"}
+
+scene:play({target = card, shadow = {blur = 24, offset = {0, -12}, color = "#000000cc"}}, 1)
+scene:play({target = soft, blur = 18}, 1)
+scene:play({target = soft, blur = 0}, 0.8)
+
+return scene
+```
+
+```js live
+const scene = vis.scene({
+    width: 960, height: 540, theme: "pro_black",
+    camera: {mode: "fixed", view: "2d", height: 6},
+});
+
+const card = scene.rectangle({center: [-2.5, 0], size: [3, 2], corner: 0.15, fill: "#e6e8ee"});
+const soft = scene.circle({center: [2.5, 0], radius: 1.1, fill: "accent"});
+
+scene.play({target: card, shadow: {blur: 24, offset: [0, -12], color: "#000000cc"}}, 1);
+scene.play({target: soft, blur: 18}, 1);
+scene.play({target: soft, blur: 0}, 0.8);
+
+return scene;
+```
+
+## Boolean shapes
+
+<p><code>union</code>, <code>intersection</code>, <code>difference</code> and <code>exclusion</code> combine the shapes listed in <code>of</code> into one new path.</p>
+<table>
+<tr><th>Operation</th><th>Keeps the area inside…</th></tr>
+<tr><td><code>union</code></td><td>any shape</td></tr>
+<tr><td><code>intersection</code></td><td>every shape</td></tr>
+<tr><td><code>difference</code></td><td>the first shape and none of the later ones</td></tr>
+<tr><td><code>exclusion</code></td><td>an odd number of shapes; with two, exactly one</td></tr>
+</table>
+<table>
+<tr><th>Rule</th><th>Detail</th></tr>
+<tr><td>Shapes</td><td>closed only: circles, rectangles, polygons and closed paths</td></tr>
+<tr><td><code>of</code></td><td>2 to 64 shapes, folded from the left</td></tr>
+<tr><td>Sources</td><td>stay where they are; hide or remove them if only the result should show</td></tr>
+<tr><td>Position</td><td>measured from where the shapes stand as authored, not where later animation moves them</td></tr>
+<tr><td>Empty result</td><td>an error, such as the intersection of shapes that do not touch</td></tr>
+</table>
+
+```lua live
+local scene = vis.scene {
+    width = 960, height = 540, theme = "pro_black",
+    camera = {mode = "fixed", view = "2d", height = 6},
+}
+
+local ops = {"union", "intersection", "difference", "exclusion"}
+for i, op in ipairs(ops) do
+    local x = -5.4 + (i - 1) * 3.6
+    local a = scene:circle {center = {x - 0.4, 0.3}, radius = 0.8, stroke = "muted", width = 1}
+    local b = scene:rectangle {center = {x + 0.4, -0.2}, size = {1.4, 1.4}, stroke = "muted", width = 1}
+    local result = scene[op](scene, {of = {a, b}, fill = "accent"})
+    scene:text {text = op, point = {x, -1.7}, size = 18, color = "muted"}
+    scene:fade_in(result, {duration = 0.4})
+end
+
+return scene
+```
+
+```js live
+const scene = vis.scene({
+    width: 960, height: 540, theme: "pro_black",
+    camera: {mode: "fixed", view: "2d", height: 6},
+});
+
+const ops = ["union", "intersection", "difference", "exclusion"];
+ops.forEach((op, i) => {
+    const x = -5.4 + i * 3.6;
+    const a = scene.circle({center: [x - 0.4, 0.3], radius: 0.8, stroke: "muted", width: 1});
+    const b = scene.rectangle({center: [x + 0.4, -0.2], size: [1.4, 1.4], stroke: "muted", width: 1});
+    const result = scene[op]({of: [a, b], fill: "accent"});
+    scene.text({text: op, point: [x, -1.7], size: 18, color: "muted"});
+    scene.fadeIn(result, {duration: 0.4});
+});
+
+return scene;
+```

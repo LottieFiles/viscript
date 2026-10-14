@@ -1,0 +1,233 @@
+---
+title: Coordinate Spaces
+group: Basics
+parent: scenes
+summary: Axes, ticks, numbers, labels and plots, in 2D and 3D.
+---
+
+# Coordinate Spaces
+
+<p><code>space&#123;x, y&#125;</code> is a coordinate system with axes and grid; ranges are <code>&#123;min, max, step&#125;</code>. Children of a space are
+placed in its coordinates, so <code>axes:plot&#123;fn, x_range&#125;</code> draws a function on those axes. <code>create</code> traces it on.</p>
+<p>Only spaces expose sampled fields: <code>space:cell(fn(x, y, t))</code> and <code>space:voxel(fn(x, y, z, t))</code> return a colour per
+sample and run once at construction.</p>
+
+```lua live
+local scene = vis.scene {
+    width = 960, height = 540, theme = "pro_black",
+    camera = {mode = "fixed", view = "2d", height = 7},
+}
+
+local axes = scene:space {x = {-4, 4, 1}, y = {-2, 2, 1}}
+local sine = axes:plot {fn = function(x) return math.sin(x) * 1.5 end,
+                        x_range = {-4, 4, 0.05}, stroke = "accent", width = 4}
+local para = axes:plot {fn = function(x) return 0.15 * x * x - 1.5 end,
+                        x_range = {-4, 4, 0.05}, stroke = "danger", width = 4}
+
+scene:create(axes, 0.8)
+scene:create({sine, para}, 1.4, "smooth", 0.3)
+
+return scene
+```
+
+```js live
+const scene = vis.scene({
+    width: 960, height: 540, theme: "pro_black",
+    camera: {mode: "fixed", view: "2d", height: 7},
+});
+
+const axes = scene.space({x: [-4, 4, 1], y: [-2, 2, 1]});
+const sine = axes.plot({fn: (x) => Math.sin(x) * 1.5,
+                        x_range: [-4, 4, 0.05], stroke: "accent", width: 4});
+const para = axes.plot({fn: (x) => 0.15 * x * x - 1.5,
+                        x_range: [-4, 4, 0.05], stroke: "danger", width: 4});
+
+scene.create(axes, 0.8);
+scene.create([sine, para], 1.4, "smooth", 0.3);
+
+return scene;
+```
+
+## Axes, ticks and numbers
+
+A range is `{min, max, step}`: the axis runs from `min` to `max`, and `step` spaces the grid. Leave out an axis to draw none. `ticks` adds marks across the axes, `numbers` writes the value at each grid step, and `axis_x`, `axis_y`, `axis_z` recolour the axes.
+
+```lua live
+local scene = vis.scene {
+    width = 960, height = 540, theme = "pro_black",
+    camera = {mode = "fixed", view = "2d", height = 7},
+}
+
+local axes = scene:space {
+    x = {-4, 4, 1}, y = {-2, 2, 1},
+    ticks = {x = 0.5, y = true}, tick_length = 10,
+    numbers = true, number_size = 14, number_color = "muted",
+    axis_x = "foreground", axis_y = "foreground", axis_width = 2,
+}
+local wave = axes:plot {fn = function(x) return math.cos(x) end, x_range = {-4, 4, 0.05}, stroke = "accent", width = 3}
+
+scene:create(axes, 0.8)
+scene:create(wave, 1.2)
+
+return scene
+```
+
+```js live
+const scene = vis.scene({
+    width: 960, height: 540, theme: "pro_black",
+    camera: {mode: "fixed", view: "2d", height: 7},
+});
+
+const axes = scene.space({
+    x: [-4, 4, 1], y: [-2, 2, 1],
+    ticks: {x: 0.5, y: true}, tick_length: 10,
+    numbers: true, number_size: 14, number_color: "muted",
+    axis_x: "foreground", axis_y: "foreground", axis_width: 2,
+});
+const wave = axes.plot({fn: (x) => Math.cos(x), x_range: [-4, 4, 0.05], stroke: "accent", width: 3});
+
+scene.create(axes, 0.8);
+scene.create(wave, 1.2);
+
+return scene;
+```
+
+<table>
+<tr><th>Field</th><th>Meaning</th></tr>
+<tr><td><code>x</code>, <code>y</code>, <code>z</code></td><td>Ranges <code>&#123;min, max, step&#125;</code> in the space's own units.</td></tr>
+<tr><td><code>ticks</code></td><td><code>true</code> for a tick at every step, or a step per axis: <code>&#123;x = 0.5, y = true&#125;</code>. The origin gets none.</td></tr>
+<tr><td><code>tick_length</code></td><td>Pixels, centred on the axis; 8 by default.</td></tr>
+<tr><td><code>numbers</code>, <code>number_size</code>, <code>number_color</code></td><td>Values at each step, their size in points and their colour.</td></tr>
+<tr><td><code>number_mode</code></td><td><code>"fixed"</code> keeps numbers one size; <code>"relative"</code> scales them with the space's transform.</td></tr>
+<tr><td><code>axis_x</code>, <code>axis_y</code>, <code>axis_z</code>, <code>axis_width</code></td><td>Axis colours, and axis and tick width in pixels (<code>0</code> hides them).</td></tr>
+<tr><td><code>matrix</code></td><td>A 4×4 transform from the space's units to its parent's.</td></tr>
+</table>
+
+## Labels
+
+`numbers` writes plain values. For named values such as π, or for axis titles, give `labels` pairs of a value and a label. A string becomes a text beside the tick; a handle, such as a `tex` formula, moves there and keeps its parent. Pass `labels` when making the space, or call `space:labels` later and animate the handles it returns.
+
+```lua live
+local scene = vis.scene {
+    width = 960, height = 540, theme = "pro_black",
+    camera = {mode = "fixed", view = "2d", height = 6, target = {math.pi / 2, 0}},
+}
+
+local pi = math.pi
+local axes = scene:space {x = {-pi, 2 * pi, pi / 2}, y = {-1.5, 1.5, 0.5}, ticks = true}
+local half = scene:tex {tex = "\\tfrac{\\pi}{2}", size = 18}
+local labels = axes:labels {
+    x = {{-pi, "-π"}, {pi / 2, half}, {pi, "π"}, {2 * pi, "2π"}},
+    y = {{1, "1"}, {-1, "-1"}},
+    size = 18, color = "muted",
+}
+local sine = axes:plot {fn = math.sin, x_range = {-pi, 2 * pi, 0.05}, stroke = "accent", width = 3}
+
+scene:create(axes, 0.6)
+for _, label in ipairs(labels) do scene:fade_in(label, {duration = 0.2}) end
+scene:create(sine, 1.2)
+
+return scene
+```
+
+```js live
+const scene = vis.scene({
+    width: 960, height: 540, theme: "pro_black",
+    camera: {mode: "fixed", view: "2d", height: 6, target: [Math.PI / 2, 0]},
+});
+
+const pi = Math.PI;
+const axes = scene.space({x: [-pi, 2 * pi, pi / 2], y: [-1.5, 1.5, 0.5], ticks: true});
+const half = scene.tex({tex: "\\tfrac{\\pi}{2}", size: 18});
+const labels = axes.labels({
+    x: [[-pi, "-π"], [pi / 2, half], [pi, "π"], [2 * pi, "2π"]],
+    y: [[1, "1"], [-1, "-1"]],
+    size: 18, color: "muted",
+});
+const sine = axes.plot({fn: Math.sin, x_range: [-pi, 2 * pi, 0.05], stroke: "accent", width: 3});
+
+scene.create(axes, 0.6);
+for (const label of labels) scene.fadeIn(label, {duration: 0.2});
+scene.create(sine, 1.2);
+
+return scene;
+```
+
+<table>
+<tr><th>Field</th><th>Meaning</th></tr>
+<tr><td><code>x</code>, <code>y</code>, <code>z</code></td><td>Lists of <code>&#123;value, label&#125;</code>; a label is a string or a handle.</td></tr>
+<tr><td><code>side</code></td><td>Below x and left of y and z by default: <code>&#123;x = "above", y = "right"&#125;</code>.</td></tr>
+<tr><td><code>gap</code></td><td>Pixels between the tick and the label; 4 by default.</td></tr>
+<tr><td><code>size</code>, <code>color</code></td><td>For labels made from strings; the space's number size and colour by default.</td></tr>
+<tr><td><code>placement</code></td><td><code>"world"</code> places labels once. <code>"screen"</code> keeps them facing outward as a 3D camera moves; it takes only strings and direct text children.</td></tr>
+</table>
+
+## 3D spaces
+
+Give a `z` range and a 3D camera, and the same space draws three axes. Every option above works on `z` as well:
+
+- `axis_x`, `axis_y`, `axis_z` colour each axis, so x, y and z can read as three hues.
+- `ticks = {x = 1, y = 1, z = 0.5}` sets a step per axis; z ticks appear only in 3D.
+- `numbers = true` writes values along all three axes.
+- `labels {z = {...}}` names values on z, and `side = {z = "right"}` moves them to the other side.
+- `placement = "screen"` keeps string labels facing the viewer while the camera moves; place them before the space's first warp.
+
+See [3D](#/docs/three) for cameras, surfaces and voxels.
+
+```lua live
+local scene = vis.scene {
+    width = 960, height = 540, theme = "pro_black",
+    camera = {mode = "fixed", view = "3d", eye = {6, 4.5, 8}, target = {0, 0, 0}, up = {0, 1, 0},
+              projection = "perspective", fov = 0.7},
+}
+
+local space = scene:space {
+    x = {-3, 3, 1}, y = {-2, 2, 1}, z = {-3, 3, 1},
+    axis_x = "danger", axis_y = "success", axis_z = "accent", axis_width = 2.5,
+    ticks = {x = 1, y = 1, z = 0.5}, numbers = true, number_size = 12,
+}
+space:labels {x = {{3, "x"}}, y = {{2, "y"}}, z = {{3, "z"}}, placement = "screen", size = 20, gap = 10}
+local commands = {}
+for i = 0, 120 do
+    local t = i / 120 * 4 * math.pi
+    commands[#commands + 1] = {type = i == 0 and "move" or "line",
+                               to = {1.5 * math.cos(t), -1.8 + t / (4 * math.pi) * 3.6, 1.5 * math.sin(t)}}
+end
+local helix = space:path {commands = commands, stroke = "warning", width = 3}
+
+scene:create(space, 0.8)
+scene:create(helix, 1.5)
+scene:look({view = "3d", eye = {-6, 4.5, 8}, target = {0, 0, 0}, up = {0, 1, 0},
+            projection = "perspective", fov = 0.7}, 2, "ease_in_out")
+
+return scene
+```
+
+```js live
+const scene = vis.scene({
+    width: 960, height: 540, theme: "pro_black",
+    camera: {mode: "fixed", view: "3d", eye: [6, 4.5, 8], target: [0, 0, 0], up: [0, 1, 0],
+             projection: "perspective", fov: 0.7},
+});
+
+const space = scene.space({
+    x: [-3, 3, 1], y: [-2, 2, 1], z: [-3, 3, 1],
+    axis_x: "danger", axis_y: "success", axis_z: "accent", axis_width: 2.5,
+    ticks: {x: 1, y: 1, z: 0.5}, numbers: true, number_size: 12,
+});
+space.labels({x: [[3, "x"]], y: [[2, "y"]], z: [[3, "z"]], placement: "screen", size: 20, gap: 10});
+const commands = [];
+for (let i = 0; i <= 120; i++) {
+    const t = i / 120 * 4 * Math.PI;
+    commands.push({type: i === 0 ? "move" : "line",
+                   to: [1.5 * Math.cos(t), -1.8 + t / (4 * Math.PI) * 3.6, 1.5 * Math.sin(t)]});
+}
+const helix = space.path({commands, stroke: "warning", width: 3});
+
+scene.create(space, 0.8);
+scene.create(helix, 1.5);
+scene.look({view: "3d", eye: [-6, 4.5, 8], target: [0, 0, 0], up: [0, 1, 0],
+            projection: "perspective", fov: 0.7}, 2, "ease_in_out");
+
+return scene;
+```

@@ -1,0 +1,179 @@
+---
+title: Composite
+group: Basics
+parent: animation
+summary: Change many properties in one clip with play and set.
+---
+
+# Composite
+
+<p><code>scene:play(descriptor, duration, curve)</code> changes several properties of one target in a single clip; <code>scene:set</code> applies
+the same descriptor instantly.</p>
+<table>
+<tr><th>Group</th><th>Descriptor keys</th></tr>
+<tr><td>Geometry</td><td><code>shift</code> <em>or</em> <code>transform</code>, <code>arc</code>, <code>size</code>, <code>corner</code>, <code>radius</code></td></tr>
+<tr><td>Paint</td><td><code>fill</code>, <code>stroke</code>, <code>width</code>, <code>opacity</code>, <code>gradient</code></td></tr>
+<tr><td>Stroke</td><td><code>progress</code>, <code>dash_offset</code>, <code>tail</code>, <code>tip</code></td></tr>
+<tr><td>Effects</td><td><code>blur</code>, <code>shadow</code></td></tr>
+</table>
+
+## Many properties, one clip
+
+Every key in the descriptor moves together on the same curve, so position, size, corners and colour change as one motion.
+
+```lua live
+local scene = vis.scene {
+    width = 960, height = 540, theme = "pro_black",
+    camera = {mode = "fixed", view = "2d", height = 6},
+}
+
+local card = scene:rectangle {center = {-3, 0}, size = {1.2, 1.2}, corner = 0, fill = "accent"}
+
+-- one clip, four properties, one curve
+scene:play({target = card, shift = {6, 0}, size = {2.8, 1.4}, corner = 0.7, fill = "danger"}, 1.6, "smooth")
+scene:wait(0.3)
+scene:play({target = card, shift = {-6, 0}, size = {1.2, 1.2}, corner = 0, fill = "accent"}, 1.2)
+
+return scene
+```
+
+```js live
+const scene = vis.scene({
+    width: 960, height: 540, theme: "pro_black",
+    camera: {mode: "fixed", view: "2d", height: 6},
+});
+
+const card = scene.rectangle({center: [-3, 0], size: [1.2, 1.2], corner: 0, fill: "accent"});
+
+// one clip, four properties, one curve
+scene.play({target: card, shift: [6, 0], size: [2.8, 1.4], corner: 0.7, fill: "danger"}, 1.6, "smooth");
+scene.wait(0.3);
+scene.play({target: card, shift: [-6, 0], size: [1.2, 1.2], corner: 0, fill: "accent"}, 1.2);
+
+return scene;
+```
+
+## Moving on an arc
+
+`arc` bends a `shift` into a circular arc by that angle. Without it, points travel in a straight line.
+
+```lua live
+local scene = vis.scene {
+    width = 960, height = 540, theme = "pro_black",
+    camera = {mode = "fixed", view = "2d", height = 6},
+}
+
+local straight = scene:circle {center = {-3.5, -1}, radius = 0.3, fill = "accent"}
+local curved = scene:circle {center = {-3.5, -1}, radius = 0.3, fill = "warning"}
+
+scene:parallel(
+    function() scene:play({target = straight, shift = {7, 0}}, 1.6) end,
+    function() scene:play({target = curved, shift = {7, 0}, arc = -math.pi / 2}, 1.6) end)
+scene:wait(0.5)
+
+return scene
+```
+
+```js live
+const scene = vis.scene({
+    width: 960, height: 540, theme: "pro_black",
+    camera: {mode: "fixed", view: "2d", height: 6},
+});
+
+const straight = scene.circle({center: [-3.5, -1], radius: 0.3, fill: "accent"});
+const curved = scene.circle({center: [-3.5, -1], radius: 0.3, fill: "warning"});
+
+scene.parallel(
+    () => scene.play({target: straight, shift: [7, 0]}, 1.6),
+    () => scene.play({target: curved, shift: [7, 0], arc: -Math.PI / 2}, 1.6));
+scene.wait(0.5);
+
+return scene;
+```
+
+## play vs set
+
+`play` blends over its duration; `set` jumps at the cursor. A `set` before any animation defines the starting state.
+
+```lua live
+local scene = vis.scene {
+    width = 960, height = 540, theme = "pro_black",
+    camera = {mode = "fixed", view = "2d", height = 6},
+}
+
+local a = scene:rectangle {center = {-2, 0}, size = {1.6, 1.6}, fill = "accent"}
+local b = scene:rectangle {center = {2, 0}, size = {1.6, 1.6}, fill = "accent"}
+scene:set({target = b, opacity = 0.3})   -- before any animation: b starts faded
+
+scene:wait(0.5)
+scene:play({target = a, fill = "danger"}, 1)    -- blends over a second
+scene:set({target = b, fill = "danger", opacity = 1})   -- jumps at the cursor
+scene:wait(1.5)
+
+return scene
+```
+
+```js live
+const scene = vis.scene({
+    width: 960, height: 540, theme: "pro_black",
+    camera: {mode: "fixed", view: "2d", height: 6},
+});
+
+const a = scene.rectangle({center: [-2, 0], size: [1.6, 1.6], fill: "accent"});
+const b = scene.rectangle({center: [2, 0], size: [1.6, 1.6], fill: "accent"});
+scene.set({target: b, opacity: 0.3});   // before any animation: b starts faded
+
+scene.wait(0.5);
+scene.play({target: a, fill: "danger"}, 1);    // blends over a second
+scene.set({target: b, fill: "danger", opacity: 1});   // jumps at the cursor
+scene.wait(1.5);
+
+return scene;
+```
+
+<table>
+<tr><th></th><th><code>play</code></th><th><code>set</code></th></tr>
+<tr><td>Timing</td><td>Interpolates over <code>duration</code></td><td>Instant</td></tr>
+<tr><td>Before first animation</td><td>—</td><td>Defines the starting state</td></tr>
+<tr><td><code>arc</code></td><td>Points follow a circular arc</td><td>Not allowed</td></tr>
+</table>
+
+## A list of descriptors
+
+`play` also takes a list, one descriptor per target, and a fourth argument `lag` staggers them.
+
+```lua live
+local scene = vis.scene {
+    width = 960, height = 540, theme = "pro_black",
+    camera = {mode = "fixed", view = "2d", height = 6},
+}
+
+local bars, steps = {}, {}
+for i = 1, 6 do
+    bars[i] = scene:rectangle {center = {-3.75 + i * 1.1, -2}, size = {0.8, 0.4}, fill = "accent"}
+    steps[i] = {target = bars[i], shift = {0, i * 0.3}, size = {0.8, 0.4 + i * 0.6}, fill = "success"}
+end
+
+scene:play(steps, 0.6, "back", 0.12)   -- a list of descriptors, staggered by lag
+scene:wait(0.6)
+
+return scene
+```
+
+```js live
+const scene = vis.scene({
+    width: 960, height: 540, theme: "pro_black",
+    camera: {mode: "fixed", view: "2d", height: 6},
+});
+
+const steps = [];
+for (let i = 1; i <= 6; i++) {
+    const bar = scene.rectangle({center: [-3.75 + i * 1.1, -2], size: [0.8, 0.4], fill: "accent"});
+    steps.push({target: bar, shift: [0, i * 0.3], size: [0.8, 0.4 + i * 0.6], fill: "success"});
+}
+
+scene.play(steps, 0.6, "back", 0.12);   // a list of descriptors, staggered by lag
+scene.wait(0.6);
+
+return scene;
+```

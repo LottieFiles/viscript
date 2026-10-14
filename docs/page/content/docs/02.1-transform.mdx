@@ -1,0 +1,222 @@
+---
+title: Transform
+group: Basics
+parent: animation
+summary: Shift, rotate and scale about a pivot, orbit, and apply a matrix.
+---
+
+# Transform
+
+## Shift
+
+`shift` moves a target by an offset, relative to where it is when the clip starts. Successive shifts add up.
+
+```lua live
+local scene = vis.scene {
+    width = 960, height = 540, theme = "pro_black",
+    camera = {mode = "fixed", view = "2d", height = 6},
+}
+
+local box = scene:rectangle {center = {-3, -1}, size = {1, 1}, corner = 0.15, fill = "accent"}
+
+-- each shift is relative to where the box is now
+scene:shift(box, {6, 0}, 1)
+scene:shift(box, {0, 2}, 0.8)
+scene:shift(box, {-3, 0}, 0.8, "back")
+scene:wait(0.4)
+
+return scene
+```
+
+```js live
+const scene = vis.scene({
+    width: 960, height: 540, theme: "pro_black",
+    camera: {mode: "fixed", view: "2d", height: 6},
+});
+
+const box = scene.rectangle({center: [-3, -1], size: [1, 1], corner: 0.15, fill: "accent"});
+
+// each shift is relative to where the box is now
+scene.shift(box, [6, 0], 1);
+scene.shift(box, [0, 2], 0.8);
+scene.shift(box, [-3, 0], 0.8, "back");
+scene.wait(0.4);
+
+return scene;
+```
+
+## Pivots
+
+<p><code>rotate</code> and <code>scale</code> act about a <strong>pivot</strong>, fixed when the call is made. Pick it with <code>about</code>:</p>
+<table>
+<tr><th><code>about</code> value</th><th>Pivot</th><th>Example</th></tr>
+<tr><td>anchor string</td><td>Point on the target's bounds</td><td><code>"center"</code>, <code>"bottom_right"</code></td></tr>
+<tr><td>vector</td><td>Parent-space point</td><td><code>&#123;0, 0&#125;</code></td></tr>
+<tr><td>object handle</td><td>That object's bounds centre</td><td><code>&#123;about = sun&#125;</code> — an orbit</td></tr>
+</table>
+
+## Rotate
+
+A positive angle turns counter-clockwise. The same quarter turn looks different around the centre (left) and around a corner (right); the yellow dots mark the pivots.
+
+```lua live
+local scene = vis.scene {
+    width = 960, height = 540, theme = "pro_black",
+    camera = {mode = "fixed", view = "2d", height = 6},
+}
+
+local a = scene:rectangle {center = {-2.5, 0}, size = {1.6, 1.6}, fill = "accent"}
+local b = scene:rectangle {center = {2, 0}, size = {1.6, 1.6}, fill = "danger"}
+scene:point {point = {-2.5, 0}, radius = 6, fill = "warning", layer = 2}   -- pivots
+scene:point {point = {2.8, -0.8}, radius = 6, fill = "warning", layer = 2}
+
+scene:parallel(
+    function() scene:rotate(a, math.pi / 2, {about = "center", duration = 1.5}) end,
+    function() scene:rotate(b, math.pi / 2, {about = "bottom_right", duration = 1.5}) end)
+scene:wait(0.5)
+
+return scene
+```
+
+```js live
+const scene = vis.scene({
+    width: 960, height: 540, theme: "pro_black",
+    camera: {mode: "fixed", view: "2d", height: 6},
+});
+
+const a = scene.rectangle({center: [-2.5, 0], size: [1.6, 1.6], fill: "accent"});
+const b = scene.rectangle({center: [2, 0], size: [1.6, 1.6], fill: "danger"});
+scene.point({point: [-2.5, 0], radius: 6, fill: "warning", layer: 2});   // pivots
+scene.point({point: [2.8, -0.8], radius: 6, fill: "warning", layer: 2});
+
+scene.parallel(
+    () => scene.rotate(a, Math.PI / 2, {about: "center", duration: 1.5}),
+    () => scene.rotate(b, Math.PI / 2, {about: "bottom_right", duration: 1.5}));
+scene.wait(0.5);
+
+return scene;
+```
+
+## Scale
+
+Scaling grows away from the pivot: from the centre the square grows evenly; from `bottom_left` that corner stays put.
+
+```lua live
+local scene = vis.scene {
+    width = 960, height = 540, theme = "pro_black",
+    camera = {mode = "fixed", view = "2d", height = 6},
+}
+
+local a = scene:rectangle {center = {-2.5, 0}, size = {1.2, 1.2}, fill = "accent"}
+local b = scene:rectangle {center = {2, -0.4}, size = {1.2, 1.2}, fill = "danger"}
+scene:point {point = {-2.5, 0}, radius = 6, fill = "warning", layer = 2}   -- pivots
+scene:point {point = {1.4, -1}, radius = 6, fill = "warning", layer = 2}
+
+scene:parallel(
+    function() scene:scale(a, 1.8, {about = "center", duration = 1.5}) end,
+    function() scene:scale(b, 1.8, {about = "bottom_left", duration = 1.5}) end)
+scene:wait(0.5)
+
+return scene
+```
+
+```js live
+const scene = vis.scene({
+    width: 960, height: 540, theme: "pro_black",
+    camera: {mode: "fixed", view: "2d", height: 6},
+});
+
+const a = scene.rectangle({center: [-2.5, 0], size: [1.2, 1.2], fill: "accent"});
+const b = scene.rectangle({center: [2, -0.4], size: [1.2, 1.2], fill: "danger"});
+scene.point({point: [-2.5, 0], radius: 6, fill: "warning", layer: 2});   // pivots
+scene.point({point: [1.4, -1], radius: 6, fill: "warning", layer: 2});
+
+scene.parallel(
+    () => scene.scale(a, 1.8, {about: "center", duration: 1.5}),
+    () => scene.scale(b, 1.8, {about: "bottom_left", duration: 1.5}));
+scene.wait(0.5);
+
+return scene;
+```
+
+## Orbits
+
+Pass an object or a point as `about` and the target circles it. Here the planet orbits the sun and the moon runs the other way around `{0, 0}`.
+
+```lua live
+local scene = vis.scene {
+    width = 960, height = 540, theme = "pro_black",
+    camera = {mode = "fixed", view = "2d", height = 6},
+}
+
+scene:circle {radius = 2.4, stroke = "muted", fill = "#00000000", width = 1, dash = {4, 6}}   -- orbits
+scene:circle {radius = 1.84, stroke = "muted", fill = "#00000000", width = 1, dash = {4, 6}}
+local sun = scene:circle {radius = 0.6, fill = "warning"}
+local planet = scene:circle {center = {2.4, 0}, radius = 0.25, fill = "accent"}
+local moon = scene:circle {center = {-1.4, 1.2}, radius = 0.15, fill = "muted"}
+
+scene:parallel(
+    function() scene:rotate(planet, 2 * math.pi, {about = sun, duration = 3, curve = "linear"}) end,
+    function() scene:rotate(moon, -2 * math.pi, {about = {0, 0}, duration = 3, curve = "linear"}) end)
+
+return scene
+```
+
+```js live
+const scene = vis.scene({
+    width: 960, height: 540, theme: "pro_black",
+    camera: {mode: "fixed", view: "2d", height: 6},
+});
+
+scene.circle({radius: 2.4, stroke: "muted", fill: "#00000000", width: 1, dash: [4, 6]});   // orbits
+scene.circle({radius: 1.84, stroke: "muted", fill: "#00000000", width: 1, dash: [4, 6]});
+const sun = scene.circle({radius: 0.6, fill: "warning"});
+const planet = scene.circle({center: [2.4, 0], radius: 0.25, fill: "accent"});
+const moon = scene.circle({center: [-1.4, 1.2], radius: 0.15, fill: "muted"});
+
+scene.parallel(
+    () => scene.rotate(planet, 2 * Math.PI, {about: sun, duration: 3, curve: "linear"}),
+    () => scene.rotate(moon, -2 * Math.PI, {about: [0, 0], duration: 3, curve: "linear"}));
+
+return scene;
+```
+
+## Matrix
+
+`transform` applies any 4×4 matrix, written row by row, on top of the current placement — shears and other maps that `shift`, `rotate` and `scale` cannot express.
+
+```lua live
+local scene = vis.scene {
+    width = 960, height = 540, theme = "pro_black",
+    camera = {mode = "fixed", view = "2d", height = 6},
+}
+
+local box = scene:rectangle {center = {0, 0}, size = {2, 2}, fill = "accent"}
+
+-- a 4x4 matrix, row by row: shear x by 0.6 * y
+scene:transform(box, {1, 0.6, 0, 0,
+                      0, 1,   0, 0,
+                      0, 0,   1, 0,
+                      0, 0,   0, 1}, 1.2)
+scene:wait(0.6)
+
+return scene
+```
+
+```js live
+const scene = vis.scene({
+    width: 960, height: 540, theme: "pro_black",
+    camera: {mode: "fixed", view: "2d", height: 6},
+});
+
+const box = scene.rectangle({center: [0, 0], size: [2, 2], fill: "accent"});
+
+// a 4x4 matrix, row by row: shear x by 0.6 * y
+scene.transform(box, [1, 0.6, 0, 0,
+                      0, 1,   0, 0,
+                      0, 0,   1, 0,
+                      0, 0,   0, 1], 1.2);
+scene.wait(0.6);
+
+return scene;
+```

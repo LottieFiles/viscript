@@ -1,0 +1,112 @@
+---
+title: Morph
+group: Basics
+parent: animation
+summary: Turn one shape into another.
+---
+
+# Morph
+
+<p><code>morph(a, b)</code> interpolates shape <code>a</code> into the outline of <code>b</code>. Both sides must be the same kind
+(polygon, plot, path or curve); outlines are resampled, so point counts may differ. When two unrelated object families represent one identity, use
+<code>fade_transform</code>; to cross-fade two independent handles, use <code>transition</code>.</p>
+
+```lua live
+local scene = vis.scene {
+    width = 960, height = 540, theme = "pro_black",
+    camera = {mode = "fixed", view = "2d", height = 6},
+}
+
+-- a ring and a star, 10 points each
+local ring, star = {}, {}
+for i = 0, 9 do
+    local a = math.pi / 2 + i * math.pi / 5
+    local r = (i % 2 == 0) and 1.4 or 0.6
+    ring[#ring + 1] = {-2.5 + 1.1 * math.cos(a), 1.1 * math.sin(a)}
+    star[#star + 1] = {2.5 + r * math.cos(a), r * math.sin(a)}
+end
+local source = scene:polygon {points = ring, fill = "accent"}
+local target = scene:polygon {points = star, fill = "warning"}
+
+scene:morph(source, target, 1.5, "smooth")
+scene:wait(0.3)
+
+return scene
+```
+
+```js live
+const scene = vis.scene({
+    width: 960, height: 540, theme: "pro_black",
+    camera: {mode: "fixed", view: "2d", height: 6},
+});
+
+// a ring and a star, 10 points each
+const ring = [], star = [];
+for (let i = 0; i <= 9; i++) {
+    const a = Math.PI / 2 + i * Math.PI / 5;
+    const r = i % 2 === 0 ? 1.4 : 0.6;
+    ring.push([-2.5 + 1.1 * Math.cos(a), 1.1 * Math.sin(a)]);
+    star.push([2.5 + r * Math.cos(a), r * Math.sin(a)]);
+}
+const source = scene.polygon({points: ring, fill: "accent"});
+const target = scene.polygon({points: star, fill: "warning"});
+
+scene.morph(source, target, 1.5, "smooth");
+scene.wait(0.3);
+
+return scene;
+```
+
+## Copy and morph
+
+With `{copy = true}` the source stays where it is and a fresh copy does the morphing, so one shape can send copies to several targets. Create each target right before its `morph`.
+
+```lua live
+local scene = vis.scene {
+    width = 960, height = 540, theme = "pro_black",
+    camera = {mode = "fixed", view = "2d", height = 6},
+}
+
+local function ngon(cx, cy, r, n)
+    local points = {}
+    for i = 0, n - 1 do
+        local a = math.pi / 2 + i * 2 * math.pi / n
+        points[#points + 1] = {cx + r * math.cos(a), cy + r * math.sin(a)}
+    end
+    return points
+end
+
+local source = scene:polygon {points = ngon(-3.5, 0, 0.9, 6), fill = "accent"}
+scene:grow_from_center(source, 0.5)
+
+for i, n in ipairs({3, 4, 5}) do
+    local target = scene:polygon {points = ngon(2.5, 3.4 - i * 1.7, 0.6, n), fill = "warning"}
+    scene:morph(source, target, 1, "smooth", {copy = true})
+end
+scene:wait(0.6)
+
+return scene
+```
+
+```js live
+const scene = vis.scene({
+    width: 960, height: 540, theme: "pro_black",
+    camera: {mode: "fixed", view: "2d", height: 6},
+});
+
+const ngon = (cx, cy, r, n) => Array.from({length: n}, (_, i) => {
+    const a = Math.PI / 2 + i * 2 * Math.PI / n;
+    return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+});
+
+const source = scene.polygon({points: ngon(-3.5, 0, 0.9, 6), fill: "accent"});
+scene.growFromCenter(source, 0.5);
+
+[3, 4, 5].forEach((n, i) => {
+    const target = scene.polygon({points: ngon(2.5, 3.4 - (i + 1) * 1.7, 0.6, n), fill: "warning"});
+    scene.morph(source, target, 1, "smooth", {copy: true});
+});
+scene.wait(0.6);
+
+return scene;
+```

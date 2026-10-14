@@ -1,0 +1,236 @@
+---
+title: Cells & Fields
+group: More
+summary: Dense colour grids — static, patched, or sampled over time.
+---
+
+# Cells & Fields
+
+Dense colour grids — static, patched, or sampled over time.
+
+## Cell grids
+
+<p><code>scene:cell&#123;&#125;</code> draws a dense grid where each cell is one world unit. A base <code>color</code> fills it and
+<code>patches</code> paint rectangular regions. Use it for bitmaps, heatmaps or game boards.</p>
+<table>
+<tr><th>Field</th><th>Meaning</th></tr>
+<tr><td><code>origin</code></td><td>Lower-left corner of the grid.</td></tr>
+<tr><td><code>size</code></td><td><code>&#123;columns, rows&#125;</code></td></tr>
+<tr><td><code>color</code></td><td>Base colour.</td></tr>
+<tr><td><code>patches</code></td><td><code>&#123;region = &#123;col, row, w, h&#125;, color&#125;</code>, zero-based.</td></tr>
+<tr><td><code>mode</code>, <code>padding</code></td><td><code>"padd"</code> with a 0 – 0.5 gap fraction.</td></tr>
+</table>
+
+```lua live
+local scene = vis.scene {
+    width = 960, height = 540, theme = "pro_black",
+    camera = {mode = "fixed", view = "2d", height = 10},
+}
+
+local board = scene:cell {
+    origin = {-4, -4}, size = {8, 8}, color = "#1d2230", mode = "padd", padding = 0.06,
+    patches = {
+        {region = {1, 1, 2, 2}, color = "#6cb6ff"},
+        {region = {5, 1, 2, 2}, color = "#e3b341"},
+        {region = {1, 5, 6, 1}, color = "#ff7b72"},
+        {region = {3, 3, 2, 2}, color = "#7ee787"},
+    },
+}
+scene:fade_in(board, {scale = 0.9, duration = 0.6})
+scene:rotate(board, math.pi / 2, {duration = 1})
+
+return scene
+```
+
+```js live
+const scene = vis.scene({
+    width: 960, height: 540, theme: "pro_black",
+    camera: {mode: "fixed", view: "2d", height: 10},
+});
+
+const board = scene.cell({
+    origin: [-4, -4], size: [8, 8], color: "#1d2230", mode: "padd", padding: 0.06,
+    patches: [
+        {region: [1, 1, 2, 2], color: "#6cb6ff"},
+        {region: [5, 1, 2, 2], color: "#e3b341"},
+        {region: [1, 5, 6, 1], color: "#ff7b72"},
+        {region: [3, 3, 2, 2], color: "#7ee787"},
+    ],
+});
+scene.fadeIn(board, {scale: 0.9, duration: 0.6});
+scene.rotate(board, Math.PI / 2, {duration: 1});
+
+return scene;
+```
+
+## Sampled fields
+
+<p>A space with ranges can sample a function into cells with <code>space:cell(fn(x, y, t), config)</code>. The callback runs at
+construction — once per cell per frame of <code>fps</code> — so it must be pure. The result is baked into the timeline and seekable.</p>
+<table>
+<tr><th></th><th><code>scene:cell&#123;&#125;</code></th><th><code>space:cell(fn)</code></th></tr>
+<tr><td>Source</td><td>Fixed colours + patches</td><td>A function of position and time</td></tr>
+<tr><td>Animates</td><td>As an object (move, fade…)</td><td>Content changes per sampled frame</td></tr>
+</table>
+
+```lua live
+local scene = vis.scene {
+    width = 960, height = 540, theme = "pro_black",
+    camera = {mode = "fixed", view = "2d", height = 6},
+}
+
+local field = scene:space {x = {-4.5, 4.5, 0.15}, y = {-2.5, 2.5, 0.15}, opacity = 0}
+local T = 3
+field:cell(function(x, y, t)
+    local r = math.sqrt(x * x + y * y)
+    local v = math.sin(r * 2.2 - t * 4) * 0.5 + 0.5
+    if v > 0.66 then return "#6cb6ff" elseif v > 0.33 then return "#2a3a55" end
+    return "#00000000"
+end, {mode = "padd", padding = 0.08, duration = T, fps = 24})
+scene:wait(0.2)
+
+return scene
+```
+
+```js live
+const scene = vis.scene({
+    width: 960, height: 540, theme: "pro_black",
+    camera: {mode: "fixed", view: "2d", height: 6},
+});
+
+const field = scene.space({x: [-4.5, 4.5, 0.15], y: [-2.5, 2.5, 0.15], opacity: 0});
+const T = 3;
+field.cell((x, y, t) => {
+    const r = Math.sqrt(x * x + y * y);
+    const v = Math.sin(r * 2.2 - t * 4) * 0.5 + 0.5;
+    if (v > 0.66) return "#6cb6ff";
+    if (v > 0.33) return "#2a3a55";
+    return "#00000000";
+}, {mode: "padd", padding: 0.08, duration: T, fps: 24});
+scene.wait(0.2);
+
+return scene;
+```
+
+## Rasterizing a shape
+
+<p>Each cell is one pixel; its alpha is the share of its 4 × 4 samples inside the triangle. Partial alpha along the edges
+is anti-aliasing.</p>
+
+```lua live
+local scene = vis.scene {
+    width = 960, height = 540, theme = "pro_black",
+    camera = {mode = "fixed", view = "2d", height = 18},
+}
+
+-- One cell per pixel: a 26 x 15 grid with 4 x 4 sample points in each pixel.
+local COLS, ROWS, N = 26, 15, 4
+local X0, Y0 = -COLS / 2, -ROWS / 2            -- lower-left corner of the grid
+local A, B, C = {-10.3, -6.1}, {11.6, -3.4}, {-2.2, 6.4}
+local function edge(p, q, x, y) return (q[1] - p[1]) * (y - p[2]) - (q[2] - p[2]) * (x - p[1]) end
+local function inside(x, y) return edge(A, B, x, y) >= 0 and edge(B, C, x, y) >= 0 and edge(C, A, x, y) >= 0 end
+local function coverage(c, r)                  -- the share of the pixel's sample points inside
+    local hits = 0
+    for j = 0, N - 1 do
+        for i = 0, N - 1 do
+            if inside(X0 + c + (i + 0.5) / N, Y0 + r + (j + 0.5) / N) then hits = hits + 1 end
+        end
+    end
+    return hits / (N * N)
+end
+
+scene:cell {origin = {X0, Y0}, size = {COLS, ROWS}, color = "#1d2230", mode = "padd", padding = 0.06}
+-- One cell per pixel row, top first; each patch's alpha is that pixel's coverage.
+local rows = {}
+for r = ROWS - 1, 0, -1 do
+    local patches = {}
+    for c = 0, COLS - 1 do
+        local k = coverage(c, r)
+        if k > 0 then
+            local alpha = string.format("%02x", math.floor(k * 255 + 0.5))
+            patches[#patches + 1] = {region = {c, 0, 1, 1}, color = "#6cb6ff" .. alpha}
+        end
+    end
+    rows[#rows + 1] = scene:cell {
+        origin = {X0, Y0 + r}, size = {COLS, 1}, color = "#00000000", mode = "padd", padding = 0.06,
+        patches = patches, opacity = 0, layer = 1,
+    }
+end
+local triangle = scene:polygon {points = {A, B, C}, fill = "#00000000", stroke = "foreground", width = 1.5, layer = 2}
+local scan = scene:line {
+    from = {X0 - 0.6, Y0 + ROWS}, to = {X0 + COLS + 0.6, Y0 + ROWS},
+    stroke = "warning", width = 1.5, opacity = 0, layer = 3,
+}
+
+-- The scanline steps down one pixel row at a time; each row lights up as it passes.
+scene:create(triangle, {duration = 0.8, curve = "ease_out"})
+scene:fade_in(scan, {duration = 0.2})
+for _, row in ipairs(rows) do
+    scene:parallel(
+        function() scene:shift(scan, {0, -1}, 0.18, "linear") end,
+        function() scene:fade_in(row, {duration = 0.18}) end)
+end
+scene:fade_out(scan, {duration = 0.3})
+scene:wait(1)
+
+return scene
+```
+
+```js live
+const scene = vis.scene({
+    width: 960, height: 540, theme: "pro_black",
+    camera: {mode: "fixed", view: "2d", height: 18},
+});
+
+// One cell per pixel: a 26 x 15 grid with 4 x 4 sample points in each pixel.
+const COLS = 26, ROWS = 15, N = 4;
+const X0 = -COLS / 2, Y0 = -ROWS / 2;          // lower-left corner of the grid
+const A = [-10.3, -6.1], B = [11.6, -3.4], C = [-2.2, 6.4];
+const edge = (p, q, x, y) => (q[0] - p[0]) * (y - p[1]) - (q[1] - p[1]) * (x - p[0]);
+const inside = (x, y) => edge(A, B, x, y) >= 0 && edge(B, C, x, y) >= 0 && edge(C, A, x, y) >= 0;
+const coverage = (c, r) => {                   // the share of the pixel's sample points inside
+    let hits = 0;
+    for (let j = 0; j < N; j++) {
+        for (let i = 0; i < N; i++) {
+            if (inside(X0 + c + (i + 0.5) / N, Y0 + r + (j + 0.5) / N)) hits++;
+        }
+    }
+    return hits / (N * N);
+};
+
+scene.cell({origin: [X0, Y0], size: [COLS, ROWS], color: "#1d2230", mode: "padd", padding: 0.06});
+// One cell per pixel row, top first; each patch's alpha is that pixel's coverage.
+const rows = [];
+for (let r = ROWS - 1; r >= 0; r--) {
+    const patches = [];
+    for (let c = 0; c < COLS; c++) {
+        const k = coverage(c, r);
+        if (k > 0) {
+            const alpha = Math.floor(k * 255 + 0.5).toString(16).padStart(2, "0");
+            patches.push({region: [c, 0, 1, 1], color: "#6cb6ff" + alpha});
+        }
+    }
+    rows.push(scene.cell({
+        origin: [X0, Y0 + r], size: [COLS, 1], color: "#00000000", mode: "padd", padding: 0.06,
+        patches, opacity: 0, layer: 1,
+    }));
+}
+const triangle = scene.polygon({points: [A, B, C], fill: "#00000000", stroke: "foreground", width: 1.5, layer: 2});
+const scan = scene.line({
+    from: [X0 - 0.6, Y0 + ROWS], to: [X0 + COLS + 0.6, Y0 + ROWS],
+    stroke: "warning", width: 1.5, opacity: 0, layer: 3,
+});
+
+// The scanline steps down one pixel row at a time; each row lights up as it passes.
+scene.create(triangle, {duration: 0.8, curve: "ease_out"});
+scene.fadeIn(scan, {duration: 0.2});
+for (const row of rows) {
+    scene.parallel(
+        () => scene.shift(scan, [0, -1], 0.18, "linear"),
+        () => scene.fadeIn(row, {duration: 0.18}));
+}
+scene.fadeOut(scan, {duration: 0.3});
+scene.wait(1);
+
+return scene;
+```

@@ -1,0 +1,122 @@
+---
+title: Diagrams
+group: More
+summary: The diagram module turns nodes and edges into a laid-out, animatable object tree.
+---
+
+# Diagrams
+
+The diagram module turns nodes and edges into a laid-out, animatable object tree.
+
+## Nodes, edges, build
+
+<p><code>vis.diagram(scene, config)</code> collects a semantic inventory — nodes, edges, zones — and <code>build()</code> lowers it
+<strong>once</strong> into ordinary objects. After that, you animate the result with the normal timeline API.</p>
+<table>
+<tr><th>Step</th><th>Call</th><th>Returns</th></tr>
+<tr><td>Declare</td><td><code>d:node&#123;id, label, detail, kind, rank&#125;</code></td><td>Node handle</td></tr>
+<tr><td>Connect</td><td><code>d:connect&#123;id, from, to, label, route, flow&#125;</code></td><td>Edge handle</td></tr>
+<tr><td>Group</td><td><code>d:zone&#123;id, label, members&#125;</code></td><td>Zone handle</td></tr>
+<tr><td>Lower</td><td><code>d:build()</code></td><td>Built diagram</td></tr>
+<tr><td>Animate</td><td><code>built:nodes()</code>, <code>built:routes()</code>, <code>built:edge(e)</code>, <code>built:node_body(n)</code></td><td>Object handles</td></tr>
+</table>
+<p>With <code>flow = true</code> an edge is dashed; animate its <code>dash_offset</code> to show data moving.</p>
+
+```lua live
+local scene = vis.scene {
+    width = 960, height = 540, theme = "pro_black",
+    camera = {mode = "fixed", view = "2d", height = 7.5},
+}
+
+local d = vis.diagram(scene, {
+    id = "flow", direction = "lr", origin = {-3.4, 0},
+    node_size = {2.2, 1.0}, rank_gap = 1.0,
+})
+local input  = d:node {id = "input", label = "Input", rank = 0}
+local xform  = d:node {id = "xform", label = "Transform", rank = 1}
+local output = d:node {id = "output", label = "Output", rank = 2}
+local e1 = d:connect {id = "e1", from = input, to = xform, flow = true}
+local e2 = d:connect {id = "e2", from = xform, to = output, flow = true}
+local built = d:build()
+
+scene:fade_in(built:nodes(), {duration = 0.4})
+scene:create(built:routes(), 0.6, "ease_out")
+scene:play({{target = built:edge(e1), dash_offset = -18},
+            {target = built:edge(e2), dash_offset = -18}}, 1.5, "linear")
+scene:indicate(built:node_body(output), {color = "success", duration = 0.5})
+
+return scene
+```
+
+## Details, kinds and zones
+
+<p>Nodes accept a second line (<code>detail</code>) and a <code>kind</code> that picks a restrained theme treatment. Edges route
+<code>"auto"</code>, <code>"straight"</code> or <code>"orthogonal"</code>, avoiding nodes. Zones draw a labelled region around their members.</p>
+<table>
+<tr><th>Option</th><th>Values</th></tr>
+<tr><td>node <code>kind</code></td><td><code>default</code>, <code>state</code>, <code>decision</code>, <code>terminal</code>, <code>entity</code>, <code>task</code>, <code>cell</code></td></tr>
+<tr><td>edge <code>route</code></td><td><code>auto</code>, <code>straight</code>, <code>orthogonal</code></td></tr>
+<tr><td>edge <code>kind</code></td><td><code>directed</code>, <code>relation</code>, <code>optional</code>, <code>error</code>, …</td></tr>
+<tr><td>config <code>direction</code></td><td><code>lr</code> (left → right), <code>tb</code> (top → bottom)</td></tr>
+</table>
+
+```lua live
+local scene = vis.scene {
+    width = 960, height = 540, theme = "pro_black",
+    camera = {mode = "fixed", view = "2d", height = 7.5},
+}
+
+local d = vis.diagram(scene, {
+    id = "compiler", direction = "lr", origin = {-4.6, 0.3},
+    node_size = {2.2, 1.0}, rank_gap = 0.9, zone_padding = 0.35,
+})
+local src   = d:node {id = "src", label = "Source", kind = "terminal", rank = 0}
+local parse = d:node {id = "parse", label = "Parser", detail = "text → AST", rank = 1}
+local lower = d:node {id = "lower", label = "Lower", detail = "AST → IR", rank = 2}
+local emit  = d:node {id = "emit", label = "Emit", kind = "terminal", rank = 3}
+d:connect {id = "a", from = src, to = parse}
+d:connect {id = "b", from = parse, to = lower, label = "AST", route = "orthogonal"}
+d:connect {id = "c", from = lower, to = emit}
+d:zone {id = "front", label = "Frontend", members = {parse, lower}}
+local built = d:build()
+
+scene:fade_in(built:zones(), {duration = 0.4})
+scene:fade_in(built:nodes(), {duration = 0.4})
+scene:create(built:routes(), 0.8, "smooth", 0.2)
+
+return scene
+```
+
+## Grid and timeline layouts
+
+<p>Besides <code>ranked</code>, a diagram can use <code>grid</code> (unique zero-based <code>row</code>/<code>column</code>),
+<code>timeline</code> (<code>row</code>, <code>start</code>, positive <code>span</code>) or <code>manual</code> (explicit <code>position</code>).</p>
+<table>
+<tr><th><code>layout</code></th><th>Node placement fields</th><th>Good for</th></tr>
+<tr><td><code>ranked</code></td><td><code>rank</code> (optional)</td><td>Pipelines, flows</td></tr>
+<tr><td><code>grid</code></td><td><code>row</code>, <code>column</code></td><td>Matrices, architecture tiles</td></tr>
+<tr><td><code>timeline</code></td><td><code>row</code>, <code>start</code>, <code>span</code></td><td>Schedules, phases</td></tr>
+<tr><td><code>manual</code></td><td><code>position</code></td><td>Hand-placed figures</td></tr>
+</table>
+
+```lua live
+local scene = vis.scene {
+    width = 960, height = 540, theme = "pro_black",
+    camera = {mode = "fixed", view = "2d", height = 7.5},
+}
+
+local d = vis.diagram(scene, {
+    id = "plan", layout = "timeline", origin = {-4.5, 1.2},
+    time_unit = 1.5, node_size = {1.4, 0.7},
+})
+local design = d:node {id = "design", label = "Design", kind = "task", row = 0, start = 0, span = 2}
+local build  = d:node {id = "build", label = "Build", kind = "task", row = 1, start = 1.5, span = 3}
+local ship   = d:node {id = "ship", label = "Ship", kind = "task", row = 2, start = 4.5, span = 1.5}
+local built = d:build()
+
+for _, n in ipairs({design, build, ship}) do
+    scene:grow_from_edge(built:node(n), "left", 0.5, "smooth")
+end
+
+return scene
+```

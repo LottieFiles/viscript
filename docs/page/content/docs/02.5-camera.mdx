@@ -1,0 +1,182 @@
+---
+title: Camera
+group: Basics
+parent: animation
+summary: Frame targets, pan and zoom, tip into 3D, and add close-up views.
+---
+
+# Camera
+
+The camera starts where `camera` in [the scene](#/docs/scenes) puts it. These calls move it over time.
+
+## Focus
+
+<p><code>scene:focus(targets, &#123;padding&#125;)</code> pans and zooms the 2D camera so the targets' bounds fill the frame;
+<code>focus(nil)</code> returns to the opening camera. Billboard text size is in points and stroke width is in screen pixels, so they keep
+their size while geometry scales.</p>
+
+```lua live
+local scene = vis.scene {
+    width = 960, height = 540, theme = "pro_black",
+    camera = {mode = "fixed", view = "2d", height = 6},
+}
+
+scene:circle {center = {-3, 0}, radius = 1.4, stroke = "accent", width = 3}
+local a = scene:circle {center = {3, -1}, radius = 0.2, fill = "danger"}
+local b = scene:circle {center = {3.5, -0.8}, radius = 0.1, fill = "warning"}
+
+scene:wait(0.4)
+scene:focus({a, b}, {padding = 0.6, duration = 1.2})
+scene:wait(0.6)
+scene:focus(nil, {duration = 1})
+
+return scene
+```
+
+```js live
+const scene = vis.scene({
+    width: 960, height: 540, theme: "pro_black",
+    camera: {mode: "fixed", view: "2d", height: 6},
+});
+
+scene.circle({center: [-3, 0], radius: 1.4, stroke: "accent", width: 3});
+const a = scene.circle({center: [3, -1], radius: 0.2, fill: "danger"});
+const b = scene.circle({center: [3.5, -0.8], radius: 0.1, fill: "warning"});
+
+scene.wait(0.4);
+scene.focus([a, b], {padding: 0.6, duration: 1.2});
+scene.wait(0.6);
+scene.focus(null, {duration: 1});
+
+return scene;
+```
+
+## Pan and zoom
+
+`scene:look(camera, duration)` moves the camera to explicit fields: `target` pans, `height` zooms (smaller is closer). Fields you leave out keep their value.
+
+```lua live
+local scene = vis.scene {
+    width = 960, height = 540, theme = "pro_black",
+    camera = {mode = "fixed", view = "2d", height = 6},
+}
+
+local axes = scene:space {x = {-5, 5, 1}, y = {-3, 3, 1}, stroke = "#00000000", ticks = true}
+local colors = {"accent", "warning", "success", "danger"}
+for i, p in ipairs({{-3, 1.5}, {2, 2}, {3.5, -1.5}, {-2, -2}}) do
+    axes:circle {center = p, radius = 0.3, fill = colors[i]}
+end
+
+scene:wait(0.3)
+scene:look({target = {2, 2}, height = 2}, 1.2)      -- pan and zoom in
+scene:wait(0.4)
+scene:look({target = {-2, -2}}, 1.2)                -- pan, same zoom
+scene:wait(0.4)
+scene:look({target = {0, 0}, height = 6}, 1.2)      -- back out
+
+return scene
+```
+
+```js live
+const scene = vis.scene({
+    width: 960, height: 540, theme: "pro_black",
+    camera: {mode: "fixed", view: "2d", height: 6},
+});
+
+const axes = scene.space({x: [-5, 5, 1], y: [-3, 3, 1], stroke: "#00000000", ticks: true});
+const colors = ["accent", "warning", "success", "danger"];
+[[-3, 1.5], [2, 2], [3.5, -1.5], [-2, -2]].forEach((p, i) => axes.circle({center: p, radius: 0.3, fill: colors[i]}));
+
+scene.wait(0.3);
+scene.look({target: [2, 2], height: 2}, 1.2);      // pan and zoom in
+scene.wait(0.4);
+scene.look({target: [-2, -2]}, 1.2);               // pan, same zoom
+scene.wait(0.4);
+scene.look({target: [0, 0], height: 6}, 1.2);      // back out
+
+return scene;
+```
+
+## Into 3D and orbit
+
+`look` can also switch `view` to `"3d"` and place the `eye`, tipping a flat scene back into space. `orbit(angle)` then circles the eye around the target.
+
+```lua live
+local scene = vis.scene {
+    width = 960, height = 540, theme = "pro_black",
+    camera = {mode = "fixed", view = "2d", height = 6},
+}
+
+local axes = scene:space {x = {-5, 5, 1}, y = {-3, 3, 1}, stroke = "#00000000", ticks = true}
+local colors = {"accent", "warning", "success", "danger"}
+for i, p in ipairs({{-3, 1.5}, {2, 2}, {3.5, -1.5}, {-2, -2}}) do
+    axes:circle {center = p, radius = 0.3, fill = colors[i]}
+end
+
+scene:wait(0.3)
+scene:look({view = "3d", eye = {0, -7, 6}, target = {0, 0, 0}}, 1.6)   -- tip the plane back
+scene:orbit(math.pi / 2, {duration = 2})                                  -- then circle around it
+scene:wait(0.3)
+
+return scene
+```
+
+```js live
+const scene = vis.scene({
+    width: 960, height: 540, theme: "pro_black",
+    camera: {mode: "fixed", view: "2d", height: 6},
+});
+
+const axes = scene.space({x: [-5, 5, 1], y: [-3, 3, 1], stroke: "#00000000", ticks: true});
+const colors = ["accent", "warning", "success", "danger"];
+[[-3, 1.5], [2, 2], [3.5, -1.5], [-2, -2]].forEach((p, i) => axes.circle({center: p, radius: 0.3, fill: colors[i]}));
+
+scene.wait(0.3);
+scene.look({view: "3d", eye: [0, -7, 6], target: [0, 0, 0]}, 1.6);   // tip the plane back
+scene.orbit(Math.PI / 2, {duration: 2});                               // then circle around it
+scene.wait(0.3);
+
+return scene;
+```
+
+## Close-up views
+
+`scene:view(rect, options)` adds an inset that renders the same scene through its own camera. `rect` is in fractions of the frame from the top left; `follow` keeps an object centred in it.
+
+```lua live
+local scene = vis.scene {
+    width = 960, height = 540, theme = "pro_black",
+    camera = {mode = "fixed", view = "2d", height = 6},
+}
+
+local track = scene:circle {radius = 2.2, stroke = "muted", width = 2, fill = "#00000000"}
+local ball = scene:circle {center = {2.2, 0}, radius = 0.12, fill = "warning"}
+scene:text {text = "close-up", point = {3.52, 0.6}, size = 14, align = {0.5, 1}, color = "muted"}
+
+-- an inset that renders the same scene through its own camera, following the ball
+scene:view({x = 0.68, y = 0.06, width = 0.3, height = 0.3},
+           {camera = {height = 1}, follow = ball, background = "#14171f"})
+
+scene:rotate(ball, 2 * math.pi, {about = {0, 0}, duration = 4, curve = "linear"})
+
+return scene
+```
+
+```js live
+const scene = vis.scene({
+    width: 960, height: 540, theme: "pro_black",
+    camera: {mode: "fixed", view: "2d", height: 6},
+});
+
+scene.circle({radius: 2.2, stroke: "muted", width: 2, fill: "#00000000"});
+const ball = scene.circle({center: [2.2, 0], radius: 0.12, fill: "warning"});
+scene.text({text: "close-up", point: [3.52, 0.6], size: 14, align: [0.5, 1], color: "muted"});
+
+// an inset that renders the same scene through its own camera, following the ball
+scene.view({x: 0.68, y: 0.06, width: 0.3, height: 0.3},
+           {camera: {height: 1}, follow: ball, background: "#14171f"});
+
+scene.rotate(ball, 2 * Math.PI, {about: [0, 0], duration: 4, curve: "linear"});
+
+return scene;
+```

@@ -1,0 +1,202 @@
+---
+title: Styling
+group: Basics
+parent: scenes
+summary: Colours, strokes, dashes and gradients.
+---
+
+# Styling
+
+Every shape takes the same style fields, and every one of them can be animated with `play`.
+
+## Colors
+
+<p>Colours are theme tokens or hex literals. Tokens resolve through the scene's theme, so switching <code>theme</code> restyles everything consistently.</p>
+<table>
+<tr><th>Token</th><th>Typical use</th></tr>
+<tr><td><span className="sw" style="background:#6cb6ff"></span><code>"accent"</code></td><td>Primary subject</td></tr><tr><td><span className="sw" style="background:#c8a7ff"></span><code>"secondary"</code></td><td>Second subject</td></tr><tr><td><span className="sw" style="background:#7ee787"></span><code>"success"</code></td><td>Correct / result</td></tr><tr><td><span className="sw" style="background:#e3b341"></span><code>"warning"</code></td><td>Highlight</td></tr><tr><td><span className="sw" style="background:#ff7b72"></span><code>"danger"</code></td><td>Error / emphasis</td></tr><tr><td><span className="sw" style="background:#79c0ff"></span><code>"info"</code></td><td>Annotation</td></tr><tr><td><span className="sw" style="background:#b8bcc2"></span><code>"muted"</code></td><td>Guides, grids</td></tr>
+</table>
+<table>
+<tr><th>Hex form</th><th>Example</th></tr>
+<tr><td><code>#rgb</code> / <code>#rgba</code></td><td><code>"#f80"</code>, <code>"#f808"</code></td></tr>
+<tr><td><code>#rrggbb</code> / <code>#rrggbbaa</code></td><td><code>"#ff8800"</code>, <code>"#ff880080"</code></td></tr>
+</table>
+
+```lua live
+local scene = vis.scene {
+    width = 960, height = 540, theme = "pro_black",
+    camera = {mode = "fixed", view = "2d", height = 6},
+}
+
+local tokens = {"accent", "secondary", "success", "warning", "danger", "info", "muted"}
+for i, token in ipairs(tokens) do
+    local x = -4.2 + (i - 1) * 1.4
+    local dot = scene:circle {center = {x, 0.6}, radius = 0.45, fill = token}
+    dot:label {text = token, point = {x, -0.3}, align = {0.5, 0.5}, size = 13,
+               font = "JetBrainsMono", color = "#7d8596"}
+    scene:grow_from_center(dot, 0.18)
+end
+
+local swatch = scene:rectangle {center = {0, -1.8}, size = {8.4, 0.5}, corner = 0.25, fill = "accent"}
+scene:fade_in(swatch, {duration = 0.3})
+for _, token in ipairs({"success", "warning", "danger", "accent"}) do
+    scene:fill(swatch, token, 0.5)
+    scene:wait(0.2)
+end
+
+return scene
+```
+
+```js live
+const scene = vis.scene({
+    width: 960, height: 540, theme: "pro_black",
+    camera: {mode: "fixed", view: "2d", height: 6},
+});
+
+const tokens = ["accent", "secondary", "success", "warning", "danger", "info", "muted"];
+tokens.forEach((token, i) => {
+    const x = -4.2 + i * 1.4;
+    const dot = scene.circle({center: [x, 0.6], radius: 0.45, fill: token});
+    dot.label({text: token, point: [x, -0.3], align: [0.5, 0.5], size: 13,
+               font: "JetBrainsMono", color: "#7d8596"});
+    scene.growFromCenter(dot, 0.18);
+});
+
+const swatch = scene.rectangle({center: [0, -1.8], size: [8.4, 0.5], corner: 0.25, fill: "accent"});
+scene.fadeIn(swatch, {duration: 0.3});
+for (const token of ["success", "warning", "danger", "accent"]) {
+    scene.fill(swatch, token, 0.5);
+    scene.wait(0.2);
+}
+
+return scene;
+```
+
+## Strokes and dashes
+
+<table>
+<tr><th>Field</th><th>Value</th><th>Notes</th></tr>
+<tr><td><code>stroke</code>, <code>fill</code></td><td>colour</td><td>Outline and interior.</td></tr>
+<tr><td><code>width</code></td><td>px</td><td>Stroke thickness (no <code>stroke_width</code>).</td></tr>
+<tr><td><code>dash</code>, <code>dash_offset</code></td><td>px array, px</td><td>Animate the offset by one period for a seamless flow.</td></tr>
+<tr><td><code>opacity</code></td><td>0–1</td><td>Multiplies down the tree.</td></tr>
+</table>
+
+```lua live
+local scene = vis.scene {
+    width = 960, height = 540, theme = "pro_black",
+    camera = {mode = "fixed", view = "2d", height = 6},
+}
+
+local solid = scene:rectangle {center = {-3.4, 0}, size = {2, 2}, corner = 0.2, stroke = "accent", width = 2}
+local dashed = scene:circle {center = {0, 0}, radius = 1, stroke = "warning", width = 5, dash = {14, 8}}
+local faded = scene:circle {center = {3.4, 0}, radius = 1, fill = "success"}
+
+for _, item in ipairs({{-3.4, "width"}, {0, "dash"}, {3.4, "opacity"}}) do
+    scene:text {text = item[2], point = {item[1], -1.7}, align = {0.5, 0.5}, size = 16,
+                font = "JetBrainsMono", color = "#7d8596"}
+end
+
+scene:parallel(
+    function() scene:play({target = solid, width = 10}, 1.5, "ease_in_out") end,
+    function() scene:play({target = dashed, dash_offset = 44}, 2, "linear") end,
+    function() scene:play({target = faded, opacity = 0.2}, 1.5, "ease_in_out") end)
+
+return scene
+```
+
+```js live
+const scene = vis.scene({
+    width: 960, height: 540, theme: "pro_black",
+    camera: {mode: "fixed", view: "2d", height: 6},
+});
+
+const solid = scene.rectangle({center: [-3.4, 0], size: [2, 2], corner: 0.2, stroke: "accent", width: 2});
+const dashed = scene.circle({center: [0, 0], radius: 1, stroke: "warning", width: 5, dash: [14, 8]});
+const faded = scene.circle({center: [3.4, 0], radius: 1, fill: "success"});
+
+for (const [x, name] of [[-3.4, "width"], [0, "dash"], [3.4, "opacity"]]) {
+    scene.text({text: name, point: [x, -1.7], align: [0.5, 0.5], size: 16,
+                font: "JetBrainsMono", color: "#7d8596"});
+}
+
+scene.parallel(
+    () => scene.play({target: solid, width: 10}, 1.5, "ease_in_out"),
+    () => scene.play({target: dashed, dash_offset: 44}, 2, "linear"),
+    () => scene.play({target: faded, opacity: 0.2}, 1.5, "ease_in_out"));
+
+return scene;
+```
+
+## Gradients
+
+A gradient paints over the fill, so the shape needs an opaque `fill`. Rotating the shape rotates the gradient with it.
+
+<table>
+<tr><th>Field</th><th>Value</th><th>Notes</th></tr>
+<tr><td><code>gradient</code></td><td>table</td><td><code>linear</code> · <code>radial</code> · <code>conic</code>, 2–8 stops; needs an opaque <code>fill</code>.</td></tr>
+</table>
+
+```lua live
+local scene = vis.scene {
+    width = 960, height = 540, theme = "pro_black",
+    camera = {mode = "fixed", view = "2d", height = 6},
+}
+
+local linear = scene:rectangle {
+    center = {-3.4, 0}, size = {2.2, 2.2}, corner = 0.3, fill = "#ffffff",
+    gradient = {type = "linear", stops = {"#4f9dff", "#ffb020"}},
+}
+local radial = scene:circle {
+    center = {0, 0}, radius = 1.1, fill = "#ffffff",
+    gradient = {type = "radial", stops = {"#ffe08a", "#ff5c7a", "#2a1030"}},
+}
+local conic = scene:circle {
+    center = {3.4, 0}, radius = 1.1, fill = "#ffffff",
+    gradient = {type = "conic", stops = {"#ff5c7a", "#ffb020", "#3ddc84", "#4f9dff", "#ff5c7a"}},
+}
+
+for _, item in ipairs({{-3.4, "linear"}, {0, "radial"}, {3.4, "conic"}}) do
+    scene:text {text = item[2], point = {item[1], -1.7}, align = {0.5, 0.5}, size = 16,
+                font = "JetBrainsMono", color = "#7d8596"}
+end
+
+scene:parallel(
+    function() scene:rotate(linear, math.pi / 2, {duration = 2, curve = "ease_in_out"}) end,
+    function() scene:scale(radial, 1.15, {duration = 1, curve = "ease_in_out"}) end,
+    function() scene:rotate(conic, 2 * math.pi, {duration = 2, curve = "linear"}) end)
+
+return scene
+```
+
+```js live
+const scene = vis.scene({
+    width: 960, height: 540, theme: "pro_black",
+    camera: {mode: "fixed", view: "2d", height: 6},
+});
+
+const linear = scene.rectangle({
+    center: [-3.4, 0], size: [2.2, 2.2], corner: 0.3, fill: "#ffffff",
+    gradient: {type: "linear", stops: ["#4f9dff", "#ffb020"]},
+});
+const radial = scene.circle({
+    center: [0, 0], radius: 1.1, fill: "#ffffff",
+    gradient: {type: "radial", stops: ["#ffe08a", "#ff5c7a", "#2a1030"]},
+});
+const conic = scene.circle({
+    center: [3.4, 0], radius: 1.1, fill: "#ffffff",
+    gradient: {type: "conic", stops: ["#ff5c7a", "#ffb020", "#3ddc84", "#4f9dff", "#ff5c7a"]},
+});
+
+for (const [x, name] of [[-3.4, "linear"], [0, "radial"], [3.4, "conic"]]) {
+    scene.text({text: name, point: [x, -1.7], align: [0.5, 0.5], size: 16,
+                font: "JetBrainsMono", color: "#7d8596"});
+}
+
+scene.parallel(
+    () => scene.rotate(linear, Math.PI / 2, {duration: 2, curve: "ease_in_out"}),
+    () => scene.scale(radial, 1.15, {duration: 1, curve: "ease_in_out"}),
+    () => scene.rotate(conic, 2 * Math.PI, {duration: 2, curve: "linear"}));
+
+return scene;
+```

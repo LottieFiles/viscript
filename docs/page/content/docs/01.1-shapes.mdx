@@ -1,0 +1,256 @@
+---
+title: Shapes
+group: Basics
+parent: scenes
+summary: Basic shapes, arcs, paths, curves and routes.
+---
+
+# Shapes
+
+<p>The scene and every object handle expose the same factories. The receiver becomes the parent, and each factory returns a handle for
+later timeline calls.</p>
+
+## Basic shapes
+<table>
+<tr><th>Factory</th><th>Key fields</th><th>Units</th></tr>
+<tr><td><code>rectangle</code></td><td><code>center</code>, <code>size = &#123;w, h&#125;</code>, <code>corner</code></td><td>world</td></tr>
+<tr><td><code>circle</code></td><td><code>center</code>, <code>radius</code></td><td>world</td></tr>
+<tr><td><code>polygon</code></td><td><code>points</code> (≥ 3)</td><td>world</td></tr>
+<tr><td><code>line</code> / <code>arrow</code></td><td><code>from</code>, <code>to</code>, <code>tip</code></td><td>world · tip in px</td></tr>
+<tr><td><code>point</code></td><td><code>point</code>, <code>radius</code></td><td>radius in <strong>px</strong></td></tr>
+</table>
+<table>
+<tr><th>Scales with zoom (world)</th><th>Fixed on screen</th></tr>
+<tr><td>positions, shape <code>size</code>, circle <code>radius</code>, <code>corner</code></td><td>stroke <code>width</code>, point <code>radius</code>, <code>tip</code>, <code>dash</code> in pixels; billboard text <code>size</code> in points</td></tr>
+</table>
+
+```lua live
+local scene = vis.scene {
+    width = 960, height = 540, theme = "pro_black",
+    camera = {mode = "fixed", view = "2d", height = 6},
+}
+
+local rect = scene:rectangle {center = {-3.5, 0}, size = {2, 1.4}, corner = 0.2, fill = "accent"}
+local tri = scene:polygon {points = {{-1, -0.8}, {1, -0.8}, {0, 1}}, fill = "warning"}
+local line = scene:line {from = {2.2, -1}, to = {4.6, 1}, width = 4}
+local arrow = scene:arrow {from = {2.2, 1}, to = {4.6, -1}, stroke = "danger", width = 4}
+local dot = scene:point {point = {0, -2}, radius = 8, fill = "success"}
+
+scene:draw_border_then_fill({rect, tri}, 1.2, "smooth", 0.3)  -- outline first, then fill
+scene:create({line, arrow}, 0.6, "smooth", 0.2)
+scene:grow_from_center(dot, 0.4)
+
+return scene
+```
+
+```js live
+const scene = vis.scene({
+    width: 960, height: 540, theme: "pro_black",
+    camera: {mode: "fixed", view: "2d", height: 6},
+});
+
+const rect = scene.rectangle({center: [-3.5, 0], size: [2, 1.4], corner: 0.2, fill: "accent"});
+const tri = scene.polygon({points: [[-1, -0.8], [1, -0.8], [0, 1]], fill: "warning"});
+const line = scene.line({from: [2.2, -1], to: [4.6, 1], width: 4});
+const arrow = scene.arrow({from: [2.2, 1], to: [4.6, -1], stroke: "danger", width: 4});
+const dot = scene.point({point: [0, -2], radius: 8, fill: "success"});
+
+scene.drawBorderThenFill([rect, tri], 1.2, "smooth", 0.3);  // outline first, then fill
+scene.create([line, arrow], 0.6, "smooth", 0.2);
+scene.growFromCenter(dot, 0.4);
+
+return scene;
+```
+## Path commands
+
+`path` takes one contour as a list of commands, like a pen: move, draw, close.
+
+```lua live
+local scene = vis.scene {
+    width = 960, height = 540, theme = "pro_black",
+    camera = {mode = "fixed", view = "2d", height = 6},
+}
+
+local arch = scene:path {commands = {
+    {type = "move", to = {-2, -1.5}},
+    {type = "cubic", control1 = {-2, 2.5}, control2 = {2, 2.5}, to = {2, -1.5}},
+    {type = "close"},
+}, fill = "accent"}
+
+scene:draw_border_then_fill(arch, 1.5)
+
+return scene
+```
+
+```js live
+const scene = vis.scene({
+    width: 960, height: 540, theme: "pro_black",
+    camera: {mode: "fixed", view: "2d", height: 6},
+});
+
+const arch = scene.path({commands: [
+    {type: "move", to: [-2, -1.5]},
+    {type: "cubic", control1: [-2, 2.5], control2: [2, 2.5], to: [2, -1.5]},
+    {type: "close"},
+], fill: "accent"});
+
+scene.drawBorderThenFill(arch, 1.5);
+
+return scene;
+```
+
+<table>
+<tr><th>Command <code>type</code></th><th>Fields</th></tr>
+<tr><td><code>move</code></td><td><code>to</code></td></tr>
+<tr><td><code>line</code></td><td><code>to</code></td></tr>
+<tr><td><code>quadratic</code></td><td><code>control</code>, <code>to</code></td></tr>
+<tr><td><code>cubic</code></td><td><code>control1</code>, <code>control2</code>, <code>to</code></td></tr>
+<tr><td><code>close</code></td><td>—</td></tr>
+</table>
+
+## Bézier curve
+
+`curve` is a shortcut for one cubic Bézier. The control points pull the curve toward them without lying on it — the dashed handles show where they are.
+
+```lua live
+local scene = vis.scene {
+    width = 960, height = 540, theme = "pro_black",
+    camera = {mode = "fixed", view = "2d", height = 6},
+}
+
+local p0, c1, c2, p1 = {-3, -1.5}, {-2, 2}, {2, -2}, {3, 1.5}
+local h1 = scene:line {from = p0, to = c1, stroke = "muted", width = 2, dash = {6, 6}}
+local h2 = scene:line {from = p1, to = c2, stroke = "muted", width = 2, dash = {6, 6}}
+local k1 = scene:point {point = c1, radius = 7, fill = "muted"}
+local k2 = scene:point {point = c2, radius = 7, fill = "muted"}
+local curve = scene:curve {from = p0, control1 = c1, control2 = c2, to = p1, stroke = "warning", width = 5}
+
+scene:create({h1, h2}, 0.5, "smooth", 0.1)
+scene:grow_from_center(k1, 0.2)
+scene:grow_from_center(k2, 0.2)
+scene:create(curve, 1.2, "smooth")
+
+return scene
+```
+
+```js live
+const scene = vis.scene({
+    width: 960, height: 540, theme: "pro_black",
+    camera: {mode: "fixed", view: "2d", height: 6},
+});
+
+const [p0, c1, c2, p1] = [[-3, -1.5], [-2, 2], [2, -2], [3, 1.5]];
+const h1 = scene.line({from: p0, to: c1, stroke: "muted", width: 2, dash: [6, 6]});
+const h2 = scene.line({from: p1, to: c2, stroke: "muted", width: 2, dash: [6, 6]});
+const k1 = scene.point({point: c1, radius: 7, fill: "muted"});
+const k2 = scene.point({point: c2, radius: 7, fill: "muted"});
+const curve = scene.curve({from: p0, control1: c1, control2: c2, to: p1, stroke: "warning", width: 5});
+
+scene.create([h1, h2], 0.5, "smooth", 0.1);
+scene.growFromCenter(k1, 0.2);
+scene.growFromCenter(k2, 0.2);
+scene.create(curve, 1.2, "smooth");
+
+return scene;
+```
+
+## Routes
+
+`route` connects points in order with straight segments, and `tip` adds an arrowhead (size in pixels) — handy for flows and connectors.
+
+```lua live
+local scene = vis.scene {
+    width = 960, height = 540, theme = "pro_black",
+    camera = {mode = "fixed", view = "2d", height = 6},
+}
+
+local route = scene:route {
+    points = {{-4, -1.5}, {-4, 1}, {0, 1}, {0, -1}, {4, -1}},
+    stroke = "danger", width = 4, tip = 14,
+}
+
+scene:create(route, 1.5, "smooth")
+
+return scene
+```
+
+```js live
+const scene = vis.scene({
+    width: 960, height: 540, theme: "pro_black",
+    camera: {mode: "fixed", view: "2d", height: 6},
+});
+
+const route = scene.route({
+    points: [[-4, -1.5], [-4, 1], [0, 1], [0, -1], [4, -1]],
+    stroke: "danger", width: 4, tip: 14,
+});
+
+scene.create(route, 1.5, "smooth");
+
+return scene;
+```
+
+## Arcs, angles and braces
+
+These three mark parts of other shapes. `arc` draws part of a circle, from `start` through `angle` radians; `sector = true` closes it to the centre. `angle` marks the angle at `vertex` between the rays to `from` and `to`, and switches to a square mark for a right angle. `brace` spans a segment or the bounds of objects, and sizes itself to its label.
+
+```lua live
+local scene = vis.scene {
+    width = 960, height = 540, theme = "pro_black",
+    camera = {mode = "fixed", view = "2d", height = 6},
+}
+
+local arc = scene:arc {center = {-4, 0}, radius = 1, start = 0, angle = 2.2, stroke = "accent", width = 3}
+local pie = scene:arc {center = {-4, 0}, radius = 0.6, start = 2.4, angle = 1.6, sector = true, fill = "warning"}
+
+local a = scene:line {from = {-1, -1}, to = {1.5, -1}, stroke = "foreground", width = 2}
+local b = scene:line {from = {-1, -1}, to = {0.6, 1.2}, stroke = "foreground", width = 2}
+local theta = scene:angle {vertex = {-1, -1}, from = {1.5, -1}, to = {0.6, 1.2}, radius = 0.6,
+                           stroke = "accent", width = 2, label = "θ"}
+
+local bar = scene:rectangle {center = {3.8, 0.5}, size = {2.4, 0.6}, fill = "secondary"}
+local brace, width = scene:brace {around = bar, direction = "down", label = "width"}
+
+scene:create({arc, pie}, 0.6)
+scene:create({a, b}, 0.5)
+scene:create(theta, 0.5)
+scene:fade_in(bar, {duration = 0.3})
+scene:grow_from_center(brace, 0.5)
+scene:write(width, 0.4)
+
+return scene
+```
+
+```js live
+const scene = vis.scene({
+    width: 960, height: 540, theme: "pro_black",
+    camera: {mode: "fixed", view: "2d", height: 6},
+});
+
+const arc = scene.arc({center: [-4, 0], radius: 1, start: 0, angle: 2.2, stroke: "accent", width: 3});
+const pie = scene.arc({center: [-4, 0], radius: 0.6, start: 2.4, angle: 1.6, sector: true, fill: "warning"});
+
+const a = scene.line({from: [-1, -1], to: [1.5, -1], stroke: "foreground", width: 2});
+const b = scene.line({from: [-1, -1], to: [0.6, 1.2], stroke: "foreground", width: 2});
+const theta = scene.angle({vertex: [-1, -1], from: [1.5, -1], to: [0.6, 1.2], radius: 0.6,
+                           stroke: "accent", width: 2, label: "θ"});
+
+const bar = scene.rectangle({center: [3.8, 0.5], size: [2.4, 0.6], fill: "secondary"});
+const [brace, width] = scene.brace({around: bar, direction: "down", label: "width"});
+
+scene.create([arc, pie], 0.6);
+scene.create([a, b], 0.5);
+scene.create(theta, 0.5);
+scene.fadeIn(bar, {duration: 0.3});
+scene.growFromCenter(brace, 0.5);
+scene.write(width, 0.4);
+
+return scene;
+```
+
+<table>
+<tr><th>Factory</th><th>Key fields</th></tr>
+<tr><td><code>arc</code></td><td><code>center</code>, <code>radius</code>, <code>start</code> and <code>angle</code> in radians (up to ±2π), <code>sector</code></td></tr>
+<tr><td><code>angle</code></td><td><code>vertex</code>, <code>from</code>, <code>to</code>, <code>radius</code>; <code>other = true</code> marks the reflex side; <code>right</code> is <code>"auto"</code>, <code>"never"</code> or <code>"always"</code>; <code>label</code> (text or a TeX table) at <code>label_distance</code></td></tr>
+<tr><td><code>brace</code></td><td><code>around</code> (handles) or <code>from</code>/<code>to</code>; <code>direction</code>, <code>offset</code>, <code>depth</code>, <code>label</code>, <code>gap</code>. Returns the brace and its label.</td></tr>
+</table>

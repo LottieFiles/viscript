@@ -1,0 +1,322 @@
+---
+title: Text and labels
+group: Basics
+parent: scenes
+summary: Text, alignment and labels that follow objects.
+---
+
+# Text and labels
+
+## Text
+
+`text` draws a string at a world point. Set `size` in points, or pick a `role` and let the theme size it. `write` reveals it stroke by stroke.
+
+```lua live
+local scene = vis.scene {
+    width = 960, height = 540, theme = "pro_black",
+    camera = {mode = "fixed", view = "2d", height = 6},
+}
+
+local title = scene:text {text = "Heading", role = "h1", point = {0, 1.2}, align = {0.5, 0.5}}
+local body = scene:text {text = "Body text sized by the theme", role = "text", point = {0, 0}, align = {0.5, 0.5}}
+local code = scene:text {text = "Monospace for code", font = "JetBrainsMono", size = 22,
+                         color = "warning", point = {0, -1.1}, align = {0.5, 0.5}}
+
+scene:write(title, 0.8)
+scene:write(body, 0.8)
+scene:write(code, 0.8)
+
+return scene
+```
+
+```js live
+const scene = vis.scene({
+    width: 960, height: 540, theme: "pro_black",
+    camera: {mode: "fixed", view: "2d", height: 6},
+});
+
+const title = scene.text({text: "Heading", role: "h1", point: [0, 1.2], align: [0.5, 0.5]});
+const body = scene.text({text: "Body text sized by the theme", role: "text", point: [0, 0], align: [0.5, 0.5]});
+const code = scene.text({text: "Monospace for code", font: "JetBrainsMono", size: 22,
+                         color: "warning", point: [0, -1.1], align: [0.5, 0.5]});
+
+scene.write(title, 0.8);
+scene.write(body, 0.8);
+scene.write(code, 0.8);
+
+return scene;
+```
+
+<table>
+<tr><th>Field</th><th>Meaning</th></tr>
+<tr><td><code>text</code></td><td>The string.</td></tr>
+<tr><td><code>point</code></td><td>Anchor in world units.</td></tr>
+<tr><td><code>align</code></td><td><code>&#123;0, 0&#125;</code> bottom-left … <code>&#123;0.5, 0.5&#125;</code> centred … <code>&#123;1, 1&#125;</code> top-right.</td></tr>
+<tr><td><code>size</code></td><td>Points: a billboard em spans <code>4/3 × size</code> screen pixels. Plane text uses world units. Omit to use the theme size of <code>role</code>.</td></tr>
+<tr><td><code>role</code></td><td><code>"h1"</code>, <code>"h2"</code>, <code>"h3"</code>, <code>"text"</code>, <code>"code"</code></td></tr>
+<tr><td><code>color</code>, <code>font</code>, <code>layer</code></td><td>Override colour, family and draw order.</td></tr>
+</table>
+
+## Alignment
+
+`point` is an anchor, and `align` says which part of the text sits on it: `0` is left/bottom, `0.5` the centre, `1` right/top. Here all three lines anchor on the same vertical line.
+
+```lua live
+local scene = vis.scene {
+    width = 960, height = 540, theme = "pro_black",
+    camera = {mode = "fixed", view = "2d", height = 6},
+}
+
+local guide = scene:line {from = {0, -2}, to = {0, 2}, stroke = "muted", width = 1, dash = {6, 6}}
+local left = scene:text {text = "align {0, 0.5}", point = {0, 1}, align = {0, 0.5}, size = 22}
+local mid = scene:text {text = "align {0.5, 0.5}", point = {0, 0}, align = {0.5, 0.5}, size = 22}
+local right = scene:text {text = "align {1, 0.5}", point = {0, -1}, align = {1, 0.5}, size = 22}
+
+scene:create(guide, 0.4)
+scene:fade_in(left, {duration = 0.4})
+scene:fade_in(mid, {duration = 0.4})
+scene:fade_in(right, {duration = 0.4})
+
+return scene
+```
+
+```js live
+const scene = vis.scene({
+    width: 960, height: 540, theme: "pro_black",
+    camera: {mode: "fixed", view: "2d", height: 6},
+});
+
+const guide = scene.line({from: [0, -2], to: [0, 2], stroke: "muted", width: 1, dash: [6, 6]});
+const left = scene.text({text: "align {0, 0.5}", point: [0, 1], align: [0, 0.5], size: 22});
+const mid = scene.text({text: "align {0.5, 0.5}", point: [0, 0], align: [0.5, 0.5], size: 22});
+const right = scene.text({text: "align {1, 0.5}", point: [0, -1], align: [1, 0.5], size: 22});
+
+scene.create(guide, 0.4);
+scene.fadeIn(left, {duration: 0.4});
+scene.fadeIn(mid, {duration: 0.4});
+scene.fadeIn(right, {duration: 0.4});
+
+return scene;
+```
+
+## Labels
+
+`object:label` creates the same text as a **child** of an object, so it moves with it. `scene:text` stays where you put it.
+
+```lua live
+local scene = vis.scene {
+    width = 960, height = 540, theme = "pro_black",
+    camera = {mode = "fixed", view = "2d", height = 6},
+}
+
+local dot = scene:circle {center = {-3, 0}, radius = 0.5, fill = "accent"}
+dot:label {text = "label", point = {-3, -0.9}, align = {0.5, 1}, size = 20, layer = 2}
+local fixed = scene:text {text = "text", point = {-3, 1}, align = {0.5, 0}, size = 20, color = "muted"}
+
+scene:grow_from_center(dot, 0.4)
+scene:shift(dot, {6, 0}, 1.4, "ease_in_out")  -- the label follows, the text stays
+
+return scene
+```
+
+```js live
+const scene = vis.scene({
+    width: 960, height: 540, theme: "pro_black",
+    camera: {mode: "fixed", view: "2d", height: 6},
+});
+
+const dot = scene.circle({center: [-3, 0], radius: 0.5, fill: "accent"});
+dot.label({text: "label", point: [-3, -0.9], align: [0.5, 1], size: 20, layer: 2});
+const fixed = scene.text({text: "text", point: [-3, 1], align: [0.5, 0], size: 20, color: "muted"});
+
+scene.growFromCenter(dot, 0.4);
+scene.shift(dot, [6, 0], 1.4, "ease_in_out");  // the label follows, the text stays
+
+return scene;
+```
+
+<table>
+<tr><th></th><th><code>scene:text&#123;&#125;</code></th><th><code>object:label&#123;&#125;</code></th></tr>
+<tr><td>Parent</td><td>Scene</td><td>The object</td></tr>
+<tr><td>Follows owner's motion</td><td>No</td><td>Yes</td></tr>
+<tr><td>Auto-placed</td><td colspan="2">No — set <code>point</code>, <code>align</code> and a foreground <code>layer</code></td></tr>
+</table>
+
+## TeX
+
+`tex` typesets math in the scene's fonts. `tex` takes a TeX string, or a list of parts; each part becomes its own group, so `part(tex)` can find it later to colour or animate. The result is an ordinary group of glyphs and shapes, and it places like `text`: `point`, `align`, `size` or `role`.
+
+`part(tex, n)` finds the nth part, or else glyph, whose TeX matches, ignoring spaces. Split a formula into parts to keep terms together when you colour them or `match_transform` one formula into another. Write `\\` for a backslash inside a quoted string. `tex` comes from the TeX module: the WASM runtime includes it, and a native build needs `-Dmodules=tex`.
+
+```lua live
+local scene = vis.scene {
+    width = 960, height = 540, theme = "pro_black",
+    camera = {mode = "fixed", view = "2d", height = 6},
+}
+
+local identity = scene:tex {tex = "e^{i\\pi} + 1 = 0", point = {0, 1.2}, role = "h2"}
+local pythagoras = scene:tex {
+    tex = {"a^2", "+", {"b^2", color = "warning"}, "=", {"c^2", id = "hyp"}},
+    point = {0, -0.6}, role = "h2",
+}
+local inline = scene:tex {tex = "\\sum_{k=1}^{n} k = \\frac{n(n+1)}{2}", display = false,
+                          point = {0, -2}, size = 22, color = "muted"}
+
+scene:write(identity, 1)
+scene:write(pythagoras, 1)
+scene:play({target = pythagoras:part("c^2"), fill = "accent"}, 0.5)
+scene:fade_in(inline, {duration = 0.5})
+
+return scene
+```
+
+```js live
+const scene = vis.scene({
+    width: 960, height: 540, theme: "pro_black",
+    camera: {mode: "fixed", view: "2d", height: 6},
+});
+
+const identity = scene.tex({tex: "e^{i\\pi} + 1 = 0", point: [0, 1.2], role: "h2"});
+const pythagoras = scene.tex({
+    tex: ["a^2", "+", {text: "b^2", color: "warning"}, "=", {text: "c^2", id: "hyp"}],
+    point: [0, -0.6], role: "h2",
+});
+const inline = scene.tex({tex: "\\sum_{k=1}^{n} k = \\frac{n(n+1)}{2}", display: false,
+                          point: [0, -2], size: 22, color: "muted"});
+
+scene.write(identity, 1);
+scene.write(pythagoras, 1);
+scene.play({target: pythagoras.part("c^2"), fill: "accent"}, 0.5);
+scene.fadeIn(inline, {duration: 0.5});
+
+return scene;
+```
+
+<table>
+<tr><th>Field</th><th>Meaning</th></tr>
+<tr><td><code>tex</code></td><td>A TeX string, or a list of parts. A part is a string, or a table with its own <code>color</code>, <code>fill</code> or <code>id</code> (in Lua the TeX is its first entry; in JS it is <code>text</code>).</td></tr>
+<tr><td><code>display</code></td><td>Display style (as <code>$$…$$</code>) by default; <code>false</code> sets it inline (as <code>$…$</code>).</td></tr>
+<tr><td><code>baseline</code></td><td>Pin the baseline at <code>point</code> instead of the box.</td></tr>
+<tr><td><code>point</code>, <code>align</code>, <code>size</code>, <code>role</code>, <code>font</code>, <code>color</code></td><td>As for <code>text</code>.</td></tr>
+</table>
+
+## Code
+
+`code` lays out source as coloured tokens in the theme's monospaced font. It returns a group whose children are the lines, and each line's children are its tokens, so `row(n)` picks a line and `search` picks tokens.
+
+Code holds only text, so shape options such as `fill` or `stroke` are rejected. Token IDs read `<block-id>/<line>/<token>`.
+
+```lua live
+local scene = vis.scene {
+    width = 960, height = 540, theme = "pro_black",
+    camera = {mode = "fixed", view = "2d", height = 6},
+}
+
+local listing = scene:code {
+    text = "local total = 0\nfor i = 1, 10 do\n    total = total + i\nend\nreturn total",
+    language = "lua", point = {0, 0}, align = {0.5, 0.5}, size = 22, id = "listing",
+}
+
+scene:write(listing, 1.2)
+scene:highlight(listing, listing:search("total", {match = "all", whole = true}))
+scene:wait(0.6)
+scene:highlight(listing)
+listing = scene:edit(listing, {replace = "total", with = "sum", match = "all", whole = true}, 1)
+
+return scene
+```
+
+```js live
+const scene = vis.scene({
+    width: 960, height: 540, theme: "pro_black",
+    camera: {mode: "fixed", view: "2d", height: 6},
+});
+
+let listing = scene.code({
+    text: "local total = 0\nfor i = 1, 10 do\n    total = total + i\nend\nreturn total",
+    language: "lua", point: [0, 0], align: [0.5, 0.5], size: 22, id: "listing",
+});
+
+scene.write(listing, 1.2);
+scene.highlight(listing, listing.search("total", {match: "all", whole: true}));
+scene.wait(0.6);
+scene.highlight(listing);
+listing = scene.edit(listing, {replace: "total", with: "sum", match: "all", whole: true}, 1);
+
+return scene;
+```
+
+<table>
+<tr><th>Field</th><th>Meaning</th></tr>
+<tr><td><code>text</code></td><td>The source; <code>\n</code> separates lines.</td></tr>
+<tr><td><code>language</code></td><td><code>"plain"</code> (default), <code>"lua"</code>, <code>"python"</code>, <code>"javascript"</code>, <code>"typescript"</code>, <code>"c"</code>, <code>"cpp"</code></td></tr>
+<tr><td><code>colors</code></td><td>Per-class overrides: <code>plain</code>, <code>keyword</code>, <code>string</code>, <code>number</code>, <code>comment</code>, <code>function</code>, <code>type</code>, <code>operator</code>. <code>color</code> sets every class at once.</td></tr>
+<tr><td><code>leading</code>, <code>pitch</code></td><td>Line spacing: <code>leading</code> multiplies the line height, <code>pitch</code> sets the baseline distance in world units. Use one, not both.</td></tr>
+<tr><td><code>point</code>, <code>align</code>, <code>size</code>, <code>font</code></td><td>As for <code>text</code>.</td></tr>
+</table>
+
+| Call | Does |
+|---|---|
+| `block:row(n)` | The nth line, from 1. |
+| `block:search(find, {match, lines, whole})` | Tokens a string or pattern covers; `match` is `"first"`, `"last"`, `"all"` or an occurrence number. |
+| `scene:highlight(block, selection)` | Dims everything but the selected lines or tokens; no selection restores the block. |
+| `scene:edit(block, edits, duration)` | Returns the edited block and animates the diff. Edits: `replace`/`with`, `insert` + `before`/`after`, `remove`, `append`, `prepend`. |
+
+## Matrices and tables
+
+`matrix` and `table` lay out rows of numbers or strings. In a `matrix`, a string entry is TeX: `"\\cos\\theta"` or `"x^2"` is set as inline math, as a cell of a TeX matrix is, while numbers stay texts that `play {value = ...}` can count. Without the TeX module, string entries fall back to plain text. A `table` always sets strings as text. Like `code`, they return a group of row groups, so `row(r)`, `entry(r, c)` and `column(c)` pick parts, counting from 1. A matrix adds brackets; a table adds an optional header, stripes and rules.
+
+`row(r)` counts only rows: a table's header is not a row, and its stripes and rules are extra children of the group.
+
+```lua live
+local scene = vis.scene {
+    width = 960, height = 540, theme = "pro_black",
+    camera = {mode = "fixed", view = "2d", height = 6},
+}
+
+local m = scene:matrix {rows = {{"\\cos\\theta", "-\\sin\\theta", 0}, {"\\sin\\theta", "\\cos\\theta", 0}, {0, 0, 1}},
+                        point = {-3, 0}, brackets = "square", size = 24}
+local t = scene:table {
+    header = {"op", "cost"},
+    rows = {{"read", 1}, {"write", 4}, {"sort", 12}},
+    point = {2.8, 0}, justify = {"left", "right"}, stripes = true, size = 22,
+}
+
+scene:fade_in(m, {duration = 0.5})
+scene:fade_in(t, {duration = 0.5})
+scene:indicate(m:column(2))
+scene:indicate(t:entry(3, 2))
+
+return scene
+```
+
+```js live
+const scene = vis.scene({
+    width: 960, height: 540, theme: "pro_black",
+    camera: {mode: "fixed", view: "2d", height: 6},
+});
+
+const m = scene.matrix({rows: [["\\cos\\theta", "-\\sin\\theta", 0], ["\\sin\\theta", "\\cos\\theta", 0], [0, 0, 1]],
+                        point: [-3, 0], brackets: "square", size: 24});
+const t = scene.table({
+    header: ["op", "cost"],
+    rows: [["read", 1], ["write", 4], ["sort", 12]],
+    point: [2.8, 0], justify: ["left", "right"], stripes: true, size: 22,
+});
+
+scene.fadeIn(m, {duration: 0.5});
+scene.fadeIn(t, {duration: 0.5});
+scene.indicate(m.column(2));
+scene.indicate(t.entry(3, 2));
+
+return scene;
+```
+
+<table>
+<tr><th>Field</th><th><code>matrix</code></th><th><code>table</code></th></tr>
+<tr><td><code>rows</code></td><td colspan="2">Rows of numbers or strings, all the same length; at most 1024 entries.</td></tr>
+<tr><td>String entries</td><td>Inline TeX (plain text without the TeX module); <code>""</code> stays blank</td><td>Text</td></tr>
+<tr><td>Frame</td><td><code>brackets</code>: <code>"square"</code>, <code>"round"</code>, <code>"bar"</code>, <code>"none"</code></td><td><code>header</code>, <code>stripes</code>, <code>rules</code>: <code>"header"</code>, <code>"rows"</code>, <code>"columns"</code>, <code>"grid"</code>, <code>"none"</code></td></tr>
+<tr><td>Spacing</td><td><code>gap</code> between columns and rows</td><td><code>padding</code> inside each cell</td></tr>
+<tr><td>Both</td><td colspan="2"><code>justify</code> (one value or one per column), <code>decimals</code>, <code>reserve</code>, <code>tabular</code>, <code>point</code>, <code>align</code>, <code>size</code>, <code>font</code>, <code>role</code></td></tr>
+</table>

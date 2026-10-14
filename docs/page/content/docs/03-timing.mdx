@@ -1,0 +1,325 @@
+---
+title: Timing & Sync
+group: Basics
+summary: Run tracks side by side, jump back to named times, drive objects from one value, and follow paths.
+---
+
+# Timing & Sync
+
+Calls normally play one after another. This page covers the ways out of that line: running tracks at once, going back to a named time, linking objects to a shared value, and moving along a path.
+
+## parallel
+
+`scene:parallel(fn, fn, …)` starts each function's track at the same time. The cursor continues after the **longest** one, so the next call waits for every track.
+
+```lua live
+local scene = vis.scene {
+    width = 960, height = 540, theme = "pro_black",
+    camera = {mode = "fixed", view = "2d", height = 6},
+}
+
+local dots = {}
+for i, d in ipairs({1, 2, 3}) do
+    dots[i] = scene:circle {center = {-4, 2 - i * 1.2 + 0.4}, radius = 0.3, fill = "accent"}
+end
+
+scene:parallel(
+    function() scene:shift(dots[1], {8, 0}, 1) end,
+    function() scene:shift(dots[2], {8, 0}, 2) end,
+    function() scene:shift(dots[3], {8, 0}, 3) end)
+scene:indicate(dots, {color = "success", duration = 0.6})   -- runs after the longest track
+
+return scene
+```
+
+```js live
+const scene = vis.scene({
+    width: 960, height: 540, theme: "pro_black",
+    camera: {mode: "fixed", view: "2d", height: 6},
+});
+
+const dots = [1, 2, 3].map((i) => scene.circle({center: [-4, 2 - i * 1.2 + 0.4], radius: 0.3, fill: "accent"}));
+
+scene.parallel(
+    () => scene.shift(dots[0], [8, 0], 1),
+    () => scene.shift(dots[1], [8, 0], 2),
+    () => scene.shift(dots[2], [8, 0], 3));
+scene.indicate(dots, {color: "success", duration: 0.6});   // runs after the longest track
+
+return scene;
+```
+
+## mark and at
+
+`scene:mark(name)` names the current time. `scene:at(name, fn)` jumps back there, records `fn`, and returns the cursor to where it was — handy for adding an accent to a moment you have already passed.
+
+```lua live
+local scene = vis.scene {
+    width = 960, height = 540, theme = "pro_black",
+    camera = {mode = "fixed", view = "2d", height = 6},
+}
+
+local ball = scene:circle {center = {-4, 0}, radius = 0.35, fill = "accent"}
+
+scene:shift(ball, {4, 0}, 1.5, "linear")
+scene:mark("middle")
+scene:shift(ball, {4, 0}, 1.5, "linear")
+
+-- go back to "middle" and add a clip there; the cursor then returns to the end
+scene:at("middle", function()
+    local ring = scene:circle {center = {0, 0}, radius = 0.7, stroke = "warning", width = 4}
+    scene:create(ring, 0.6)
+    scene:fade_out(ring, {duration = 0.6})
+end)
+scene:wait(0.5)
+
+return scene
+```
+
+```js live
+const scene = vis.scene({
+    width: 960, height: 540, theme: "pro_black",
+    camera: {mode: "fixed", view: "2d", height: 6},
+});
+
+const ball = scene.circle({center: [-4, 0], radius: 0.35, fill: "accent"});
+
+scene.shift(ball, [4, 0], 1.5, "linear");
+scene.mark("middle");
+scene.shift(ball, [4, 0], 1.5, "linear");
+
+// go back to "middle" and add a clip there; the cursor then returns to the end
+scene.at("middle", () => {
+    const ring = scene.circle({center: [0, 0], radius: 0.7, stroke: "warning", width: 4});
+    scene.create(ring, 0.6);
+    scene.fadeOut(ring, {duration: 0.6});
+});
+scene.wait(0.5);
+
+return scene;
+```
+
+## Trackers
+
+A tracker is a number that objects follow. Create it with `scene:tracker(value)`, bind each dependent once with `scene:bind(object, tracker, fn)`, then animate only the number with `scene:track`. The bind function returns any `play` property; `shift` is relative to where the object was when bound. `track` bakes its samples into the timeline, so every frame is still seekable.
+
+```lua live
+local scene = vis.scene {
+    width = 960, height = 540, theme = "pro_black",
+    camera = {mode = "fixed", view = "2d", height = 7},
+}
+
+local axes = scene:space {x = {-4, 4, 1}, y = {-2, 2, 1}}
+local f = function(x) return math.sin(x) * 1.5 end
+axes:plot {fn = f, x_range = {-4, 4, 0.05}, stroke = "accent", width = 3}
+
+local dot = axes:circle {center = {0, 0}, radius = 0.15, fill = "danger"}
+local x = scene:tracker(-3)
+scene:bind(dot, x, function(v) return {shift = {v, f(v)}} end)
+
+scene:track(x, 3, 2.5, "smooth")
+scene:track(x, -3, 2.5, "smooth")
+
+return scene
+```
+
+```js live
+const scene = vis.scene({
+    width: 960, height: 540, theme: "pro_black",
+    camera: {mode: "fixed", view: "2d", height: 7},
+});
+
+const axes = scene.space({x: [-4, 4, 1], y: [-2, 2, 1]});
+const f = (x) => Math.sin(x) * 1.5;
+axes.plot({fn: f, x_range: [-4, 4, 0.05], stroke: "accent", width: 3});
+
+const dot = axes.circle({center: [0, 0], radius: 0.15, fill: "danger"});
+const x = scene.tracker(-3);
+scene.bind(dot, x, (v) => ({shift: [v, f(v)]}));
+
+scene.track(x, 3, 2.5, "smooth");
+scene.track(x, -3, 2.5, "smooth");
+
+return scene;
+```
+
+### Many objects, one value
+
+The point of a tracker is that several objects stay in sync without separate animations. Here one `x` drives the dot, the dashed drop line and the readout.
+
+```lua live
+local scene = vis.scene {
+    width = 960, height = 540, theme = "pro_black",
+    camera = {mode = "fixed", view = "2d", height = 6},
+}
+
+local axes = scene:space {x = {-4, 4, 1}, y = {-2, 2, 1}, stroke = "#00000000"}
+local f = function(x) return math.sin(x) * 1.5 end
+axes:plot {fn = f, x_range = {-4, 4, 0.05}, stroke = "accent", width = 3}
+
+local x = scene:tracker(-3)
+local dot = axes:circle {center = {0, 0}, radius = 0.15, fill = "danger"}
+local drop = axes:line {from = {0, 0}, to = {0, 0}, stroke = "danger", width = 2, dash = {6, 6}}
+local value = scene:number {value = 0, point = {0, 2.5}, align = {0.5, 0.5}, size = 32,
+                            decimals = 2, prefix = "x = ", tabular = true}
+
+-- one number drives three objects
+scene:bind(dot, x, function(v) return {shift = {v, f(v)}} end)
+scene:bind(drop, x, function(v) return {from = {v, 0}, to = {v, f(v)}} end)
+scene:bind(value, x, function(v) return {value = v} end)
+
+scene:track(x, 3, 3, "smooth")
+scene:track(x, -1, 1.5, "smooth")
+
+return scene
+```
+
+```js live
+const scene = vis.scene({
+    width: 960, height: 540, theme: "pro_black",
+    camera: {mode: "fixed", view: "2d", height: 6},
+});
+
+const axes = scene.space({x: [-4, 4, 1], y: [-2, 2, 1], stroke: "#00000000"});
+const f = (x) => Math.sin(x) * 1.5;
+axes.plot({fn: f, x_range: [-4, 4, 0.05], stroke: "accent", width: 3});
+
+const x = scene.tracker(-3);
+const dot = axes.circle({center: [0, 0], radius: 0.15, fill: "danger"});
+const drop = axes.line({from: [0, 0], to: [0, 0], stroke: "danger", width: 2, dash: [6, 6]});
+const value = scene.number({value: 0, point: [0, 2.5], align: [0.5, 0.5], size: 32,
+                            decimals: 2, prefix: "x = ", tabular: true});
+
+// one number drives three objects
+scene.bind(dot, x, (v) => ({shift: [v, f(v)]}));
+scene.bind(drop, x, (v) => ({from: [v, 0], to: [v, f(v)]}));
+scene.bind(value, x, (v) => ({value: v}));
+
+scene.track(x, 3, 3, "smooth");
+scene.track(x, -1, 1.5, "smooth");
+
+return scene;
+```
+
+### Springs
+
+`vis.spring_response(seconds, options)` gives a physical spring's displacement after that many seconds. Bind it to a tracker that counts seconds and track it linearly, so physical time runs evenly.
+
+```lua live
+local scene = vis.scene {
+    width = 960, height = 540, theme = "pro_black",
+    camera = {mode = "fixed", view = "2d", height = 6},
+}
+
+local anchor = scene:line {from = {0, -2}, to = {0, 2}, stroke = "muted", width = 1, dash = {6, 6}}
+local ball = scene:circle {center = {0, 0}, radius = 0.35, fill = "accent"}
+
+local elapsed = scene:tracker(0)
+local omega = 2 * math.pi
+scene:bind(ball, elapsed, function(t)
+    return {shift = {vis.spring_response(t, {mass = 1, stiffness = omega * omega,
+                                             damping = 0.25 * omega, displacement = 3}), 0}}
+end)
+scene:track(elapsed, 4, 4, "linear")   -- linear, so physical time runs evenly
+
+return scene
+```
+
+```js live
+const scene = vis.scene({
+    width: 960, height: 540, theme: "pro_black",
+    camera: {mode: "fixed", view: "2d", height: 6},
+});
+
+scene.line({from: [0, -2], to: [0, 2], stroke: "muted", width: 1, dash: [6, 6]});
+const ball = scene.circle({center: [0, 0], radius: 0.35, fill: "accent"});
+
+const elapsed = scene.tracker(0);
+const omega = 2 * Math.PI;
+scene.bind(ball, elapsed, (t) => ({
+    shift: [vis.springResponse(t, {mass: 1, stiffness: omega * omega,
+                                   damping: 0.25 * omega, displacement: 3}), 0],
+}));
+scene.track(elapsed, 4, 4, "linear");   // linear, so physical time runs evenly
+
+return scene;
+```
+
+## Following a path
+
+`move_along(target, path, options)` carries the target's centre along any outline — line, circle, rectangle, polygon, plot, route, path or curve. The outline is copied when the call is made, so later changes to the path do not move existing followers.
+
+```lua live
+local scene = vis.scene {
+    width = 960, height = 540, theme = "pro_black",
+    camera = {mode = "fixed", view = "2d", height = 6},
+}
+
+local curve = scene:curve {from = {-4, -1.5}, control1 = {-2, 3}, control2 = {2, -3}, to = {4, 1.5},
+                          stroke = "muted", width = 2}
+local dot = scene:circle {center = {-4, -1.5}, radius = 0.2, fill = "warning"}
+
+scene:create(curve, 0.6)
+scene:move_along(dot, curve, {duration = 2.5, curve = "ease_in_out"})
+
+return scene
+```
+
+```js live
+const scene = vis.scene({
+    width: 960, height: 540, theme: "pro_black",
+    camera: {mode: "fixed", view: "2d", height: 6},
+});
+
+const curve = scene.curve({from: [-4, -1.5], control1: [-2, 3], control2: [2, -3], to: [4, 1.5],
+                          stroke: "muted", width: 2});
+const dot = scene.circle({center: [-4, -1.5], radius: 0.2, fill: "warning"});
+
+scene.create(curve, 0.6);
+scene.moveAlong(dot, curve, {duration: 2.5, curve: "ease_in_out"});
+
+return scene;
+```
+
+### Turning with the path
+
+`orient = true` also rotates the target to match the path direction (left: off, right: on). Draw the target pointing the way the path starts.
+
+```lua live
+local scene = vis.scene {
+    width = 960, height = 540, theme = "pro_black",
+    camera = {mode = "fixed", view = "2d", height = 6},
+}
+
+-- points up: the direction of travel where a circle's outline starts
+local function arrowhead(cx)
+    return scene:polygon {points = {{cx - 0.2, -0.3}, {cx, 0.35}, {cx + 0.2, -0.3}}, fill = "danger"}
+end
+local left = scene:circle {center = {-2.6, 0}, radius = 1.6, stroke = "muted", width = 2, fill = "#00000000"}
+local right = scene:circle {center = {2.6, 0}, radius = 1.6, stroke = "muted", width = 2, fill = "#00000000"}
+
+scene:parallel(
+    function() scene:move_along(arrowhead(-2.6), left, {duration = 4, curve = "linear"}) end,
+    function() scene:move_along(arrowhead(2.6), right, {orient = true, duration = 4, curve = "linear"}) end)
+
+return scene
+```
+
+```js live
+const scene = vis.scene({
+    width: 960, height: 540, theme: "pro_black",
+    camera: {mode: "fixed", view: "2d", height: 6},
+});
+
+// points up: the direction of travel where a circle's outline starts
+const arrowhead = (cx) =>
+    scene.polygon({points: [[cx - 0.2, -0.3], [cx, 0.35], [cx + 0.2, -0.3]], fill: "danger"});
+const left = scene.circle({center: [-2.6, 0], radius: 1.6, stroke: "muted", width: 2, fill: "#00000000"});
+const right = scene.circle({center: [2.6, 0], radius: 1.6, stroke: "muted", width: 2, fill: "#00000000"});
+
+scene.parallel(
+    () => scene.moveAlong(arrowhead(-2.6), left, {duration: 4, curve: "linear"}),
+    () => scene.moveAlong(arrowhead(2.6), right, {orient: true, duration: 4, curve: "linear"}));
+
+return scene;
+```

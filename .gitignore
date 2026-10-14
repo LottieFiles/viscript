@@ -22,3 +22,7 @@ compile_commands.json
 
 # Local scratch (archived examples/templates)
 /.temp/
+
+# Website dependencies and MDX output (built in CI)
+/docs/page/node_modules/
+/docs/page/build/

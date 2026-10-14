@@ -1,19 +1,86 @@
 # viscript
 
-![viscript quickstart cheatsheet](docs/assets/vis-quickstart-cheatsheet.gif)
+**Explain ideas in motion.**
 
-viscript is an animation engine for mathematical scenes and diagrams, built on
-[ThorVG](https://github.com/thorvg/thorvg). Author a scene in Lua, JavaScript, or C++,
-then render it at any time. The same core powers the native CLI, browser runtime,
-and VS Code preview.
+viscript turns code into animated explanations — algorithms, geometry, and graphics
+internals. You describe a scene once in Lua or JavaScript, record animation on a
+timeline, and render any moment of it: natively from the command line, live in a web
+page, or beside your code in VS Code.
 
-- Shapes, text, images, coordinate spaces, 3D surfaces, cameras, and themes.
-- Seekable timelines with transforms, morphs, trackers, and drawing effects.
-- CPU and OpenGL rendering through a retained ThorVG paint tree.
-- Optional Diagram, TeX, Motion, UI, Input, Lua Runtime, and Audio modules.
-- PNG, GIF, and MP4 export.
+- **Show every step, not just the result.** Sorting passes, graph searches, pixel
+  sampling, rasterization: animate the intermediate states that static diagrams leave out.
+- **Scenes as code, written with AI.** A scene is a retained tree of objects that you
+  animate by changing properties. Bundled [skills](#skills-for-ai-agents) teach your coding
+  agent to draft a scene, check its layout, and render it for you to refine.
+- **Embed it where you need it.** Link the C library into a native app, load the WebAssembly
+  runtime in a web page, or preview beside your code in VS Code. One Lua scene, one renderer.
 
-## Build
+What a scene can hold:
+
+- Shapes, paths, arcs, braces, connectors and vectors
+- Text, TeX formulas, syntax-coloured code, matrices and tables, images
+- Coordinate spaces with axes and plots, 3D surfaces and voxel fields, cameras and inset views
+- Themes, gradients, masks, blend modes, blur and shadow
+- Diagrams with automatic layout
+- Seekable timelines: transforms, morphs, text animation, trackers, springs, path following
+- PNG, GIF and MP4 export
+
+## Your first scene
+
+```lua
+local scene = vis.scene {
+    width = 960, height = 540, theme = "pro_black",
+    camera = {mode = "fixed", view = "2d", height = 6},
+}
+
+local axes = scene:space {x = {-5, 5, 1}, y = {-2, 2, 1}, stroke = "#00000000"}
+local wave = axes:plot {fn = math.sin, x_range = {-5, 5, 0.02}, stroke = "accent", width = 4}
+local label = scene:tex {tex = "y = \\sin x", point = {0, 2.4}, size = 36}
+local dot = axes:circle {center = {-5, math.sin(-5)}, radius = 0.18, fill = "warning"}
+
+scene:fade_in(axes, {duration = 0.5})
+scene:create(wave, {duration = 1.2, curve = "smooth"})
+scene:write(label, 0.6)
+scene:grow_from_center(dot, 0.3)
+scene:move_along(dot, wave, {duration = 2.4, curve = "ease_in_out"})
+
+return scene
+```
+
+The same scene in JavaScript:
+
+```js
+const scene = vis.scene({
+    width: 960, height: 540, theme: "pro_black",
+    camera: {mode: "fixed", view: "2d", height: 6},
+});
+
+const axes = scene.space({x: [-5, 5, 1], y: [-2, 2, 1], stroke: "#00000000"});
+const wave = axes.plot({fn: Math.sin, x_range: [-5, 5, 0.02], stroke: "accent", width: 4});
+const label = scene.tex({tex: "y = \\sin x", point: [0, 2.4], size: 36});
+const dot = axes.circle({center: [-5, Math.sin(-5)], radius: 0.18, fill: "warning"});
+
+scene.fadeIn(axes, {duration: 0.5});
+scene.create(wave, {duration: 1.2, curve: "smooth"});
+scene.write(label, 0.6);
+scene.growFromCenter(dot, 0.3);
+scene.moveAlong(dot, wave, {duration: 2.4, curve: "ease_in_out"});
+
+return scene;
+```
+
+Three ideas carry through every scene:
+
+- **Sizes are pixels, positions are world units.** `camera.height = 6` shows six world
+  units vertically; `width`, stroke widths and font sizes are pixels.
+- **Calls run on a timeline cursor.** Each animation starts where the previous one ended;
+  `wait` holds, and `parallel` runs tracks side by side.
+- **The script runs once.** It describes the scene; the host then samples any time `t`,
+  in any order — which is what makes scrubbing and export exact.
+
+## Command line
+
+### Build
 
 ```sh
 meson setup build
@@ -23,108 +90,200 @@ meson test -C build --print-errorlogs
 
 | Option | Default | Purpose |
 |---|---|---|
-| `engines` | `cpu,gl` | Select render engines. |
-| `modules` | none | Select modules, such as `diagram,tex`, or `all`. |
-| `savers` | `all` | Select GIF and video exporters. PNG is built into core. |
-| `tools` | `all` | Select the CLI and audit command. |
-| `bundled_thorvg` | `false` | Build the pinned ThorVG subproject. |
+| `engines` | `cpu,gl` | Render engines. |
+| `modules` | none | Optional modules, such as `diagram,tex`, or `all`. |
+| `savers` | `all` | GIF and video exporters. PNG is built into the core. |
+| `tools` | `all` | The CLI and the audit command. |
+| `bundled_thorvg` | `false` | Build the pinned ThorVG subproject instead of using the system one. |
 
-The system dependency is ThorVG 1.2.0 or newer. Use `-Dbundled_thorvg=true` to build
-the pinned version. See [Modules](docs/modules.md) for build combinations.
-
-With Emscripten installed, run `scripts/wasm-bundle.sh` to build the WASM runtime and
-update its copies in `tools/vscode/runtime` and `tools/skill/vis-skills/assets/wasm`.
-
-## Quick start
-
-Save this as `scene.lua`:
-
-```lua
-local scene = vis.scene {
-    width = 960,
-    height = 540,
-    theme = "pro_white",
-    camera = {mode = "fixed", view = "2d", height = 6},
-}
-
-local circle = scene:circle {
-    id = "subject",
-    center = {-2, 0},
-    radius = 0.8,
-    fill = "accent",
-    stroke = "accent",
-}
-
-scene:shift(circle, {4, 0}, 1.2, "ease_in_out")
-scene:wait(0.4)
-return scene
-```
+Meson uses a system ThorVG 1.2.0 or newer; without one, add `-Dbundled_thorvg=true`.
+The scene above uses `scene:tex`, so build it with the TeX module:
 
 ```sh
-build/viscript inspect scene.lua
-build/viscript render scene.lua --time 0.6 -o frame.png
-build/viscript render scene.lua --fps 30 -o scene.mp4
-build/viscript render scene.lua --fps 20 -o scene.gif
+meson setup build -Dmodules=tex
+meson compile -C build
+```
+
+Optional modules: Diagram, TeX, Motion, UI, Input, Lua Runtime and Audio.
+
+### Render
+
+Save the Lua scene as `scene.lua`. Text and formulas are measured with the bundled fonts,
+so pass them with `--font` (the presets use Pretendard for text and JetBrains Mono for code):
+
+```sh
+FONTS="--font src/examples/assets/Pretendard.ttf --font src/examples/assets/JetBrainsMono.ttf"
+
+build/viscript render scene.lua --time 3.8 -o frame.png $FONTS   # one frame
+build/viscript render scene.lua --fps 30 -o scene.mp4 $FONTS     # video
+build/viscript render scene.lua --fps 20 -o scene.gif $FONTS     # GIF
+build/viscript inspect scene.lua                                 # objects and timeline
+build/viscript audit scene.lua $FONTS                            # layout problems
 build/viscript benchmark scene.lua --frames 120
 ```
 
-Register fonts before loading a scene that measures or draws text. The default
-presets use Pretendard for text and JetBrainsMono for code:
+- **Video:** `.mp4` and `.gif` export run FFmpeg, so it must be on `PATH`. PNG needs nothing extra.
+- **Audio:** add narration with `--audio narration.mp3`. A build with the Audio module also
+  mixes the scene's own sound cues into the soundtrack.
 
-```sh
-build/viscript render scene.lua -o frame.png   --font src/examples/assets/Pretendard.ttf   --font src/examples/assets/JetBrainsMono.ttf
-build/viscript audit scene.lua --font src/examples/assets/Pretendard.ttf
+## Browser
+
+The repository ships a prebuilt WebAssembly runtime in
+[`tools/skill/vis-skills/assets/wasm/`](tools/skill/vis-skills/assets/wasm), so there is
+nothing to build. The folder is self-contained: `client.js` (the API),
+`vis-wasm.js` + `vis-wasm.wasm` (the engine), fonts and licenses. Copy the whole folder
+next to your page as `viscript/`:
+
+```text
+my-page/
+├── index.html
+└── viscript/        ← copy of tools/skill/vis-skills/assets/wasm/
+    ├── client.js
+    ├── vis-wasm.js
+    ├── vis-wasm.wasm
+    └── …
 ```
 
-MP4 export uses FFmpeg. Add narration with `--audio narration.mp3`. An Audio-enabled
-build also mixes the scene's authored cues into the soundtrack. See [Audio](docs/audio.md).
+`index.html` builds the scene in JavaScript and plays it on a canvas:
 
-## Source layout
+```html
+<!doctype html>
+<meta charset="utf-8">
+<canvas width="960" height="540"></canvas>
+<script type="module">
+import {createVis, vis} from "./viscript/client.js";
 
-| Path | Contents |
-|---|---|
-| `src/core/` | Scene, renderer, loaders, savers, Lua binding, and modules |
-| `src/inc/` | Public C++ headers |
-| `src/cli/` | Command-line tool |
-| `src/bindings/` | WASM ABI and JavaScript builder/client |
-| `src/test/` | Unit, rendering, and binding tests |
-| `src/examples/` | Lua scenes and assets |
-| `tools/vscode/` | Preview extension |
-| `tools/skill/` | Authoring guides and skills |
-| `scripts/` | WASM build and packaging scripts |
+// Start on an empty scene, then register the font text is measured with.
+const runtime = await createVis(vis.scene({width: 16, height: 16}), "boot.js");
+const font = await fetch("./viscript/Pretendard.ttf");
+runtime.font("Pretendard", await font.arrayBuffer(), "ttf");
 
-## Documentation
+// Build and load the real scene.
+const scene = vis.scene({
+    width: 960, height: 540, theme: "pro_white",
+    camera: {mode: "fixed", view: "2d", height: 6},
+});
+const title = scene.text({text: "Hello, viscript", point: [0, 1.2], size: 48, align: [0.5, 0.5]});
+const circle = scene.circle({center: [-2, -0.8], radius: 0.6, fill: "accent", stroke: "accent"});
+scene.write(title, 1);
+scene.growFromCenter(circle, 0.5);
+scene.shift(circle, [4, 0], 1.2, "ease_in_out");
+scene.wait(0.5);
+runtime.load(scene, "scene.js");
 
-- [Architecture](docs/architecture.md) and [Modules](docs/modules.md)
-- [Scene composition](docs/scene-composition.md) and [Themes](docs/themes.md)
-- [TeX math](docs/tex.md), [Cells and voxels](docs/cell-voxel.md), and [Layout audit](docs/layout-audit.md)
-- [Motion](docs/motion.md) and [Audio](docs/audio.md)
-- [Lua API](tools/skill/vis-skills/references/lua.md) and [JavaScript API](tools/skill/vis-skills/references/javascript.md)
-- [Examples](src/examples/lua) and [VS Code extension](tools/vscode/README.md)
-- [MIT License](LICENSE)
+// Play: draw(canvas, time) renders the frame at `time` seconds on the timeline.
+const canvas = document.querySelector("canvas");
+const start = performance.now();
+requestAnimationFrame(function frame(now) {
+    runtime.draw(canvas, ((now - start) / 1000) % runtime.duration);
+    requestAnimationFrame(frame);
+});
+</script>
+```
+
+To run Lua instead, pass the source string: `createVis("return vis.scene {width = 16, height = 16}", "boot.lua")`
+and `runtime.load(luaSource, "scene.lua")`.
+
+Serve the folder over HTTP — the module fetches `vis-wasm.wasm`, so opening the file
+directly will not work:
+
+```sh
+cd my-page && python3 -m http.server
+```
+
+To rebuild the runtime from source, install Emscripten and run `scripts/wasm-bundle.sh`.
+It updates both copies: `tools/vscode/runtime/` and `tools/skill/vis-skills/assets/wasm/`.
+
+## VS Code
+
+The extension lives in [`tools/vscode/`](tools/vscode). It previews `.lua` scenes beside
+the editor with a timeline scrubber, an Inspector, playback ranges and GIF/MP4 export,
+and it can link scenes to the code they explain.
+
+Build and install it from the checkout:
+
+```sh
+cd tools/vscode
+npm ci
+npm run package                                # creates vis-preview-<version>.vsix
+code --install-extension vis-preview-*.vsix
+```
+
+Or press `F5` in `tools/vscode/` to launch an Extension Development Host.
+
+- **Preview:** open a Lua file containing `vis.scene` and click the viscript icon in the
+  editor title bar. The viewer refreshes as you edit, even before you save.
+- **Scenes linked to code:** keep the scenes and a manifest under `.vscode/vis/` in your
+  workspace. `.vscode/vis/visualizations.json` maps each scene to a source file and symbol;
+  the extension then shows CodeLens and hover links from that code to its animation.
+
+```text
+your-project/
+└── .vscode/vis/
+    ├── visualizations.json
+    └── raster/animations/clip-span.lua
+```
+
+See [`tools/vscode/README.md`](tools/vscode/README.md) for the manifest format and viewer controls.
+
+## Skills for AI agents
+
+[`tools/skill/`](tools/skill) holds agent skills that teach an AI coding agent the
+viscript API, its review loop and scene templates. Ask for a scene in plain language and
+the agent writes it, checks it and renders it.
+
+| Skill | Path | Use it for |
+|---|---|---|
+| `vis-skills` | [`tools/skill/vis-skills/`](tools/skill/vis-skills) | Scenes in Lua or JS/TS: animations, diagrams, algorithm traces, 2D/3D graphics, math shorts, cheatsheets. |
+| `vis-interactive` | [`tools/skill/vis-interactive/`](tools/skill/vis-interactive) | Interactive scenes: UI, input, fixed-step runtime, audio. |
+| `vis-vscode` | [`tools/skill/vis-vscode/`](tools/skill/vis-vscode) | Linking scenes to product code in the VS Code extension (`.vscode/vis/`). |
+| `vis-animation-dev` | [`tools/skill/vis-animation-dev/`](tools/skill/vis-animation-dev) | Changing viscript itself: engine, bindings, builds, tests. |
+
+Link them into your agent's skill folder from the repository root, so they stay current
+with the checkout:
+
+```sh
+# Claude Code: this project only (.claude/skills), or every project (~/.claude/skills)
+mkdir -p .claude/skills
+for skill in vis-skills vis-interactive vis-vscode vis-animation-dev; do
+    ln -s "$PWD/tools/skill/$skill" ".claude/skills/$skill"
+done
+
+# Codex
+mkdir -p ~/.codex/skills
+for skill in vis-skills vis-interactive vis-vscode vis-animation-dev; do
+    ln -s "$PWD/tools/skill/$skill" ~/.codex/skills/$skill
+done
+```
+
+`vis-skills` carries the same prebuilt WASM runtime and fonts in
+`tools/skill/vis-skills/assets/wasm/`, so an agent can mount and render scenes in the
+browser or Node without building anything; the `viscript` CLI review commands need a
+native build. Then ask, for example:
+
+```text
+Use vis-skills to animate binary search on a sorted array of 16 numbers.
+```
+
+## License
+
+viscript is released under the [MIT License](LICENSE).
 
 ## Third-party software
-
-viscript builds on these projects. Binary bundles (`tools/vscode/runtime/`,
-`tools/skill/vis-skills/assets/wasm/`) ship their license files; copies also live in
-[`licenses/`](licenses).
 
 | Component | License | Use |
 |---|---|---|
 | [ThorVG](https://github.com/thorvg/thorvg) | MIT | Renderer |
-| [libwebp](https://chromium.googlesource.com/webm/libwebp) | BSD-3-Clause | ThorVG WebP loader |
-| [LodePNG](https://github.com/lvandeve/lodepng) | zlib | ThorVG PNG loader |
-| jpgd | Public Domain | ThorVG JPEG loader |
 | [Lua 5.4](https://www.lua.org) | MIT | Scene scripting |
 | [miniaudio](https://github.com/mackron/miniaudio) | Public Domain / MIT-0 | Audio module |
-| [Noto Sans Math](https://github.com/notofonts/math) | OFL 1.1 | Embedded TeX glyph outlines ([license](src/core/renderer/tvg/NotoSansMath-OFL.txt)) |
-| [Pretendard](https://github.com/orioncactus/pretendard) | OFL 1.1 | Bundled font ([license](src/examples/assets/Pretendard-OFL.txt)) |
-| [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) | OFL 1.1 | Bundled font ([license](src/examples/assets/JetBrainsMono-OFL.txt)) |
+| [Noto Sans Math](https://github.com/notofonts/math) | OFL 1.1 | Embedded TeX glyph outlines |
+| [Pretendard](https://github.com/orioncactus/pretendard) | OFL 1.1 | Bundled font |
+| [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) | OFL 1.1 | Bundled font |
 | [IBM Plex Sans KR](https://github.com/IBM/plex) | OFL 1.1 | Bundled font (runtime bundles) |
 | [Source Serif 4](https://github.com/adobe-fonts/source-serif) | OFL 1.1 | Bundled font (runtime bundles) |
 | [FFmpeg](https://ffmpeg.org) | LGPL/GPL | Optional MP4 export, run as an external program; not linked or distributed |
 
-The VS Code extension also bundles gifenc (MIT), Mediabunny (MPL-2.0), and Shiki (MIT);
+The VS Code extension also bundles gifenc (MIT), Mediabunny (MPL-2.0) and Shiki (MIT);
 see [THIRD_PARTY_NOTICES](tools/vscode/THIRD_PARTY_NOTICES.md).
 
 ## Inspired by

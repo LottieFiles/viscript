@@ -1,0 +1,140 @@
+{
+  "schemaVersion": 1,
+  "project": "viscript",
+  "projectVersion": "0.1.0",
+  "sourceCommit": "75e817a042d2",
+  "sourceDirty": true,
+  "buildDate": "2026-10-13",
+  "toolchain": {
+    "emscripten": "4.0.19",
+    "buildType": "minsize",
+    "optimization": [
+      "-Oz",
+      "-flto"
+    ],
+    "renderer": "ThorVG CPU engine",
+    "thorvg": "1.2.0 (87b2684)",
+    "lua": "5.4.8"
+  },
+  "features": {
+    "javascriptBuilder": true,
+    "luaRuntime": true,
+    "retainedLuaRuntime": true,
+    "canvasRgba": true,
+    "glRenderer": false,
+    "renderEngineSelection": true,
+    "interactiveUi": true,
+    "interactiveInput": true,
+    "audio": true,
+    "runtimeSoundEvents": true,
+    "diagramAuthoring": true,
+    "texMath": true
+  },
+  "artifacts": [
+    {
+      "path": "vis-wasm.js",
+      "bytes": 24778,
+      "sha256": "2f576e14954f03d24848b7181c9c2db6623fa774c7325a6249a6442d5d88a8c6"
+    },
+    {
+      "path": "vis-wasm.wasm",
+      "bytes": 1469479,
+      "sha256": "42d288cacb21209b7eae5228239277a219e362662754b5d644bfefb097e30d6a"
+    },
+    {
+      "path": "client.js",
+      "bytes": 46082,
+      "sha256": "e0c129dc49b1b5c23fe5cbe5ce4f9badcb332d1d1d270d8bca67ec66bd61e5eb"
+    },
+    {
+      "path": "client.d.ts",
+      "bytes": 13376,
+      "sha256": "1328ba0741987cae6830dcff7227184c79542f9c777b4b54b6947c0c7c74b95b"
+    },
+    {
+      "path": "bindings.js",
+      "bytes": 221220,
+      "sha256": "2101dab14fef3fb91a0b76d709e2e1fcfe3b26a16060ab05cc665b79b3a777f6"
+    },
+    {
+      "path": "bindings.d.ts",
+      "bytes": 70144,
+      "sha256": "04dc555cadd9d9ca7501dc1f7b1ee0cc8d05ad10917e55ce72d0f7e10aede317"
+    },
+    {
+      "path": "Pretendard.ttf",
+      "bytes": 2725828,
+      "sha256": "6d0af5258997aec7354a6e340fc2325ba321c410ca48b3af858c8c3d6e92a324"
+    },
+    {
+      "path": "Pretendard-OFL.txt",
+      "bytes": 4418,
+      "sha256": "85fce85e25260b03777bf10373d3bd9363b9da96d9e0ca86a280dd37ed7667a0"
+    },
+    {
+      "path": "IBMPlexSansKR-SemiBold.ttf",
+      "bytes": 2481868,
+      "sha256": "c1640995dae522401987918ac5caf90c2d7ecc90552216b653c97754fa941eb3"
+    },
+    {
+      "path": "IBM-Plex-Sans-KR-OFL.txt",
+      "bytes": 4362,
+      "sha256": "d741e57d5f865e294df801f96b7b5161a88b211df65887e4358d271c9fc5fb4f"
+    },
+    {
+      "path": "SourceSerif4-Semibold.ttf",
+      "bytes": 272088,
+      "sha256": "36db62940cb5728b12b1802476dc7fcf4c6c519a7bdd476ba23a4e555fc4655f"
+    },
+    {
+      "path": "Source-Serif-4-OFL.txt",
+      "bytes": 4492,
+      "sha256": "75784a295293a8992f5a8d99210566e0064a012e6dab6731305e3787f15896c7"
+    },
+    {
+      "path": "JetBrainsMono.ttf",
+      "bytes": 208576,
+      "sha256": "fb3b2575d7b0657359707993288f12a7360344d39387bb26050e276d61f6bd2a"
+    },
+    {
+      "path": "JetBrainsMono-OFL.txt",
+      "bytes": 4399,
+      "sha256": "30f0c136e3c88e422d0791acd97238870f9054a9729bc34cf2ff0d4ed8cac4ad"
+    },
+    {
+      "path": "LICENSE-viscript.txt",
+      "bytes": 1078,
+      "sha256": "f2660c8e3ecad44b8b68c67291782b94f10a93f9b92119e252bc4004ae72e53f"
+    },
+    {
+      "path": "LICENSE-ThorVG.txt",
+      "bytes": 1077,
+      "sha256": "74242cdc4ccaebc73fa04fbd52a538429eae2be7a231f9eaf1dbf59d2bedc16b"
+    },
+    {
+      "path": "LICENSE-libwebp.txt",
+      "bytes": 2995,
+      "sha256": "af5fa202c3ee5483a32fe6d3b060233f77cc6711a7ed7a52d6013ff4e73db5e1"
+    },
+    {
+      "path": "LICENSE-LodePNG.txt",
+      "bytes": 891,
+      "sha256": "e77b75c707396f59591a57d440901c39bda2a5ae30339e069db6a0456315d2e7"
+    },
+    {
+      "path": "LICENSE-Lua.txt",
+      "bytes": 1083,
+      "sha256": "ae12837e770c5401d09feba37e0c6e306216b78f5492369e6c4699b4287dc0ed"
+    },
+    {
+      "path": "LICENSE-miniaudio.txt",
+      "bytes": 2597,
+      "sha256": "457f1b500e0adf6bc059edddfa78a2f62012e7c3bb43476c20e0bd23b25ba0eb"
+    },
+    {
+      "path": "NotoSansMath-OFL.txt",
+      "bytes": 4380,
+      "sha256": "403a95275b469061b7d4371c328e0ada3bc7d63328abe2e88aad5cd243b2fe21"
+    }
+  ]
+}

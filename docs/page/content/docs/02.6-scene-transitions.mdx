@@ -1,0 +1,168 @@
+---
+title: Scene
+group: Basics
+parent: animation
+summary: Play whole scenes in sequence: match, fade, slide and zoom between them.
+---
+
+# Scene
+
+## Scene transitions
+
+<p><code>root:scene_transition(scenes, options)</code> plays complete scenes, called stages, one after another. Each stage is authored on its own, keeps its own timeline, and starts from its own time zero as its incoming transition begins.
+By default the hand-off is <code>"match"</code>: objects that share an <code>id</code> in both stages travel to their new place, and the rest fade.</p>
+<table>
+<tr><th>Option</th><th>Meaning</th></tr>
+<tr><td><code>duration</code>, <code>curve</code></td><td>Length and easing of each transition; 1 second by default.</td></tr>
+<tr><td><code>hold</code></td><td>Seconds each stage stays fully shown: one number for all, or one per stage.</td></tr>
+<tr><td><code>live</code></td><td><code>true</code> (default) plays each stage's timeline; <code>false</code> shows each stage's final frame.</td></tr>
+<tr><td><code>viewport</code></td><td>Play the sequence in part of the frame, as <code>&#123;x, y, width, height&#125;</code> fractions.</td></tr>
+<tr><td><code>style</code></td><td><code>"match"</code>, <code>"fade"</code>, <code>"slide"</code>, <code>"zoom_in"</code>, <code>"zoom_out"</code>.</td></tr>
+<tr><td><code>styles</code></td><td>One style per transition, in order, instead of <code>style</code>.</td></tr>
+</table>
+
+```lua live
+local cam = {mode = "fixed", view = "2d", height = 6}
+local root = vis.scene {width = 960, height = 540, theme = "pro_black", camera = cam}
+
+local function slide(label, color, shape)
+    local s = vis.scene {width = 960, height = 540, theme = "pro_black", camera = cam}
+    local obj = shape == "circle" and s:circle {radius = 1.2, fill = color}
+                or s:rectangle {size = {2.4, 2.4}, corner = 0.2, fill = color}
+    s:text {text = label, point = {0, -2}, size = 36, align = {0.5, 0.5}}
+    s:rotate(obj, math.pi / 2, {duration = 1})
+    return s
+end
+
+root:scene_transition({slide("One", "#6cb6ff", "rect"), slide("Two", "#e3b341", "circle"),
+                       slide("Three", "#ff7b72", "rect")}, {duration = 0.8, hold = 0.8, curve = "smooth"})
+
+return root
+```
+
+```js live
+const cam = {mode: "fixed", view: "2d", height: 6};
+const root = vis.scene({width: 960, height: 540, theme: "pro_black", camera: cam});
+
+function slide(label, color, shape) {
+    const s = vis.scene({width: 960, height: 540, theme: "pro_black", camera: cam});
+    const obj = shape === "circle" ? s.circle({radius: 1.2, fill: color})
+                                   : s.rectangle({size: [2.4, 2.4], corner: 0.2, fill: color});
+    s.text({text: label, point: [0, -2], size: 36, align: [0.5, 0.5]});
+    s.rotate(obj, Math.PI / 2, {duration: 1});
+    return s;
+}
+
+root.sceneTransition([slide("One", "#6cb6ff", "rect"), slide("Two", "#e3b341", "circle"),
+                      slide("Three", "#ff7b72", "rect")], {duration: 0.8, hold: 0.8, curve: "smooth"});
+
+return root;
+```
+
+## Transition styles
+
+Each transition can hand over differently. `styles` lists one per transition: below, the overview zooms into its chart, and the detail slides up into the summary while the title, which has the same `id` in both stages, stays in place above them.
+
+<table>
+<tr><th>Style</th><th>Options</th><th>Effect</th></tr>
+<tr><td><code>"match"</code></td><td></td><td>Objects with the same <code>id</code> travel from their place in one stage to their place in the next; the rest fade out or in. The default.</td></tr>
+<tr><td><code>"fade"</code></td><td></td><td>The next stage fades in over the last as a whole; nothing matches.</td></tr>
+<tr><td><code>"slide"</code></td><td><code>from</code>: <code>"right"</code> (default), <code>"left"</code>, <code>"top"</code>, <code>"bottom"</code></td><td>The next stage pushes the last one out, entering from that side.</td></tr>
+<tr><td><code>"zoom_in"</code>, <code>"zoom_out"</code></td><td><code>area</code> (required): an object <code>id</code> or <code>&#123;x, y, width, height&#125;</code>; <code>area_margin</code></td><td><code>zoom_in</code>: the outgoing stage grows until <code>area</code> fills the frame, and the next stage grows and fades in inside it. <code>zoom_out</code> runs backwards: the next stage starts with its <code>area</code> filling the frame and shrinks back, while the last one shrinks away inside it.</td></tr>
+</table>
+
+With `slide` or a zoom, `match = true` also carries objects that share an `id`, drawing them above both stages.
+
+```lua live
+local cam = {mode = "fixed", view = "2d", height = 6}
+local function stage(build)
+    local s = vis.scene {width = 960, height = 540, theme = "pro_black", camera = cam}
+    build(s)
+    return s
+end
+
+local values = {1.2, 2.0, 1.6, 2.8}
+local function bars(s, left, width)
+    local step = width / #values
+    for i, v in ipairs(values) do
+        local bar = s:rectangle {center = {left + (i - 0.5) * step, -1.5 + v / 2}, size = {step * 0.6, v},
+                                 fill = i == #values and "accent" or "muted", id = "bar" .. i}
+        s:grow_from_edge(bar, "bottom", 0.3)
+    end
+end
+
+local overview = stage(function(s)
+    s:text {text = "Quarterly sales", role = "h2", point = {-2.2, 1.8}, id = "title"}
+    s:text {text = "Four quarters, one region.", point = {-2.2, 0.9}, size = 20, color = "muted"}
+    s:rectangle {center = {2.6, 0}, size = {3.2, 3.4}, stroke = "border", width = 1, id = "chart"}
+    bars(s, 1.1, 3)
+end)
+
+local detail = stage(function(s)
+    s:text {text = "Quarterly sales", role = "h2", point = {0, 2.4}, id = "title"}
+    bars(s, -3.5, 7)
+    s:text {text = "Q4", point = {2.6, 1.6}, size = 22, color = "accent"}
+end)
+
+local summary = stage(function(s)
+    s:text {text = "Quarterly sales", role = "h2", point = {0, 1.4}, id = "title"}
+    local up = s:text {text = "+133% from Q1 to Q4", point = {0, 0}, size = 34, color = "accent"}
+    s:write(up, 0.8)
+end)
+
+local root = vis.scene {width = 960, height = 540, theme = "pro_black", camera = cam}
+root:scene_transition({overview, detail, summary}, {
+    duration = 0.9, hold = {1.4, 1.4, 1.6}, curve = "smooth",
+    styles = {{style = "zoom_in", area = "chart"},
+              {style = "slide", from = "bottom", match = true}},
+})
+
+return root
+```
+
+```js live
+const cam = {mode: "fixed", view: "2d", height: 6};
+function stage(build) {
+    const s = vis.scene({width: 960, height: 540, theme: "pro_black", camera: cam});
+    build(s);
+    return s;
+}
+
+const values = [1.2, 2.0, 1.6, 2.8];
+function bars(s, left, width) {
+    const step = width / values.length;
+    values.forEach((v, i) => {
+        const bar = s.rectangle({center: [left + (i + 0.5) * step, -1.5 + v / 2], size: [step * 0.6, v],
+                                 fill: i === values.length - 1 ? "accent" : "muted", id: `bar${i + 1}`});
+        s.growFromEdge(bar, "bottom", 0.3);
+    });
+}
+
+const overview = stage((s) => {
+    s.text({text: "Quarterly sales", role: "h2", point: [-2.2, 1.8], id: "title"});
+    s.text({text: "Four quarters, one region.", point: [-2.2, 0.9], size: 20, color: "muted"});
+    s.rectangle({center: [2.6, 0], size: [3.2, 3.4], stroke: "border", width: 1, id: "chart"});
+    bars(s, 1.1, 3);
+});
+
+const detail = stage((s) => {
+    s.text({text: "Quarterly sales", role: "h2", point: [0, 2.4], id: "title"});
+    bars(s, -3.5, 7);
+    s.text({text: "Q4", point: [2.6, 1.6], size: 22, color: "accent"});
+});
+
+const summary = stage((s) => {
+    s.text({text: "Quarterly sales", role: "h2", point: [0, 1.4], id: "title"});
+    const up = s.text({text: "+133% from Q1 to Q4", point: [0, 0], size: 34, color: "accent"});
+    s.write(up, 0.8);
+});
+
+const root = vis.scene({width: 960, height: 540, theme: "pro_black", camera: cam});
+root.sceneTransition([overview, detail, summary], {
+    duration: 0.9, hold: [1.4, 1.4, 1.6], curve: "smooth",
+    styles: [{style: "zoom_in", area: "chart"},
+             {style: "slide", from: "bottom", match: true}],
+});
+
+return root;
+```

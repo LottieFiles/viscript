@@ -1,0 +1,184 @@
+---
+title: 3D
+group: More
+summary: Perspective cameras, 3D spaces, surfaces and voxels.
+---
+
+# 3D
+
+Perspective cameras, 3D spaces, surfaces and voxels.
+
+## 3D camera and space
+
+<p>Set <code>camera.view = "3d"</code> and the same objects take <code>&#123;x, y, z&#125;</code> points. A 3D camera is defined by an
+<code>eye</code>, a <code>target</code> and an <code>up</code> vector; <code>look</code> animates between camera states.</p>
+<table>
+<tr><th>Field</th><th>Meaning</th></tr>
+<tr><td><code>eye</code></td><td>Camera position.</td></tr>
+<tr><td><code>target</code></td><td>Point the camera looks at.</td></tr>
+<tr><td><code>up</code></td><td>Which way is up, usually <code>&#123;0, 1, 0&#125;</code>.</td></tr>
+<tr><td><code>projection</code></td><td><code>"perspective"</code> or <code>"orthographic"</code>.</td></tr>
+<tr><td><code>fov</code>, <code>near</code>, <code>far</code></td><td>Field of view (radians) and clip planes.</td></tr>
+</table>
+
+```lua live
+local cam = {mode = "fixed", view = "3d", eye = {7, 5, 9}, target = {0, 0, 0}, up = {0, 1, 0},
+             projection = "perspective", fov = 0.7, near = 0.1, far = 100}
+local scene = vis.scene {width = 960, height = 540, theme = "pro_black", camera = cam}
+
+local space = scene:space {x = {-3, 3, 1}, y = {-2, 2, 1}, z = {-3, 3, 1}, color = "#26313b"}
+local c = {{-1,-1,-1},{1,-1,-1},{1,1,-1},{-1,1,-1},{-1,-1,1},{1,-1,1},{1,1,1},{-1,1,1}}
+local e = {{1,2},{2,3},{3,4},{4,1},{5,6},{6,7},{7,8},{8,5},{1,5},{2,6},{3,7},{4,8}}
+local edges = {}
+for i, p in ipairs(e) do edges[i] = space:line {from = c[p[1]], to = c[p[2]], color = "#6cb6ff", width = 3} end
+
+scene:create(edges, 0.4, "ease_out", 0.05)
+scene:look({view = "3d", eye = {-8, 4, 7}, target = {0, 0, 0}, up = {0, 1, 0},
+            projection = "perspective", fov = 0.7, near = 0.1, far = 100}, 2, "ease_in_out")
+
+return scene
+```
+
+```js live
+const cam = {mode: "fixed", view: "3d", eye: [7, 5, 9], target: [0, 0, 0], up: [0, 1, 0],
+             projection: "perspective", fov: 0.7, near: 0.1, far: 100};
+const scene = vis.scene({width: 960, height: 540, theme: "pro_black", camera: cam});
+
+const space = scene.space({x: [-3, 3, 1], y: [-2, 2, 1], z: [-3, 3, 1], color: "#26313b"});
+const c = [[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]];
+const e = [[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]];
+const edges = e.map(([p, q]) => space.line({from: c[p], to: c[q], color: "#6cb6ff", width: 3}));
+
+scene.create(edges, 0.4, "ease_out", 0.05);
+scene.look({view: "3d", eye: [-8, 4, 7], target: [0, 0, 0], up: [0, 1, 0],
+            projection: "perspective", fov: 0.7, near: 0.1, far: 100}, 2, "ease_in_out");
+
+return scene;
+```
+
+## Surfaces
+
+<p><code>surface</code> takes a row-major grid of 3D <code>points</code> and its <code>size = &#123;columns, rows&#125;</code>, drawn as a mesh.
+Build the points with an ordinary Lua loop over your function.</p>
+<table>
+<tr><th>Field</th><th>Meaning</th></tr>
+<tr><td><code>points</code></td><td><code>columns × rows</code> points, row by row.</td></tr>
+<tr><td><code>size</code></td><td><code>&#123;columns, rows&#125;</code></td></tr>
+<tr><td><code>mode</code></td><td>e.g. <code>"solid_mesh"</code></td></tr>
+<tr><td><code>shading</code></td><td>Light-based shading on or off.</td></tr>
+</table>
+
+```lua live
+local cam = {mode = "fixed", view = "3d", eye = {5.8, 4.4, 6.4}, target = {0, 0.25, 0}, up = {0, 1, 0},
+             projection = "perspective", fov = 0.66, near = 0.1, far = 100}
+local scene = vis.scene {width = 960, height = 540, theme = "pro_black", camera = cam}
+
+local n, pts = 31, {}
+for row = 0, n - 1 do
+    local z = -2.7 + 5.4 * row / (n - 1)
+    for col = 0, n - 1 do
+        local x = -2.7 + 5.4 * col / (n - 1)
+        pts[#pts + 1] = {x, 2.3 * math.exp(-(x * x + z * z) / 1.45) - 0.75, z}
+    end
+end
+local s = scene:surface {points = pts, size = {n, n}, mode = "solid_mesh", shading = false,
+                         fill = "#6cb6ff40", stroke = "#6cb6ffb0", width = 0.75}
+
+scene:create(s, 1.0)
+scene:look({view = "3d", eye = {-5.4, 4.8, 6.0}, target = {0, 0.25, 0}, up = {0, 1, 0},
+            projection = "perspective", fov = 0.66, near = 0.1, far = 100}, 1.5, "ease_in_out")
+
+return scene
+```
+
+```js live
+const cam = {mode: "fixed", view: "3d", eye: [5.8, 4.4, 6.4], target: [0, 0.25, 0], up: [0, 1, 0],
+             projection: "perspective", fov: 0.66, near: 0.1, far: 100};
+const scene = vis.scene({width: 960, height: 540, theme: "pro_black", camera: cam});
+
+const n = 31, pts = [];
+for (let row = 0; row < n; row++) {
+    const z = -2.7 + 5.4 * row / (n - 1);
+    for (let col = 0; col < n; col++) {
+        const x = -2.7 + 5.4 * col / (n - 1);
+        pts.push([x, 2.3 * Math.exp(-(x * x + z * z) / 1.45) - 0.75, z]);
+    }
+}
+const s = scene.surface({points: pts, size: [n, n], mode: "solid_mesh", shading: false,
+                         fill: "#6cb6ff40", stroke: "#6cb6ffb0", width: 0.75});
+
+scene.create(s, 1.0);
+scene.look({view: "3d", eye: [-5.4, 4.8, 6.0], target: [0, 0.25, 0], up: [0, 1, 0],
+            projection: "perspective", fov: 0.66, near: 0.1, far: 100}, 1.5, "ease_in_out");
+
+return scene;
+```
+
+## Voxel fields
+
+<p><code>space:voxel(fn(x, y, z, t), config)</code> samples a colour for every cell of a 3D space. Return a transparent colour to
+leave a voxel empty. With <code>duration</code> and <code>fps</code>, the field is sampled over time and becomes an animation.</p>
+<table>
+<tr><th>Config</th><th>Meaning</th></tr>
+<tr><td><code>duration</code>, <code>fps</code></td><td>Sampled time span and rate (0 = static).</td></tr>
+<tr><td><code>mode</code></td><td><code>"full"</code> or <code>"padd"</code> (gaps between cells).</td></tr>
+<tr><td><code>padding</code></td><td>Fraction of a cell, 0 – 0.5.</td></tr>
+</table>
+<p>The callback runs once per voxel per frame while the script loads, so keep the field coarse: the voxel count times the frame count may be at most 262,144, and the script shares one instruction budget.</p>
+
+```lua live
+local cam = {mode = "fixed", view = "3d", eye = {6.4, 4.6, 6.4}, target = {0, -0.2, 0}, up = {0, 1, 0},
+             projection = "perspective", fov = 0.62, near = 0.1, far = 100}
+local scene = vis.scene {width = 960, height = 540, theme = "pro_black", camera = cam}
+
+-- A ripple spreading from the centre: in each column, the voxel at the wave's height is filled,
+-- coloured from deep blue in the troughs to warm yellow on the crests.
+local step = 0.3
+local field = scene:space {x = {-2.4, 2.4, step}, y = {-1.2, 1.2, step}, z = {-2.4, 2.4, step},
+                           stroke = "#1c2430", width = 0.6}
+
+local palette = {"#3a4cc0", "#4f7be8", "#6cb6ff", "#c8a7ff", "#ff9f6e", "#ffd166"}
+local clear, half, tau = "#00000000", step / 2, 2 * math.pi
+local cos, sqrt, floor = math.cos, math.sqrt, math.floor
+local T = 4
+scene:mark("start")
+field:voxel(function(x, y, z, t)
+    local r = sqrt(x * x + z * z)
+    local height = cos(2.2 * r - tau * t / 2) / (1 + 0.3 * r)
+    if y - height > half or height - y > half then return clear end
+    return palette[floor((height + 1) * 2.5) + 1]
+end, {mode = "padd", padding = 0.08, duration = T, fps = 15})
+scene:at("start", function()  -- circle the camera while the wave plays
+    scene:orbit(math.pi / 3, {duration = T, curve = "ease_in_out"})
+end)
+
+return scene
+```
+
+```js live
+const cam = {mode: "fixed", view: "3d", eye: [6.4, 4.6, 6.4], target: [0, -0.2, 0], up: [0, 1, 0],
+             projection: "perspective", fov: 0.62, near: 0.1, far: 100};
+const scene = vis.scene({width: 960, height: 540, theme: "pro_black", camera: cam});
+
+// A ripple spreading from the centre: in each column, the voxel at the wave's height is filled,
+// coloured from deep blue in the troughs to warm yellow on the crests.
+const step = 0.3;
+const field = scene.space({x: [-2.4, 2.4, step], y: [-1.2, 1.2, step], z: [-2.4, 2.4, step],
+                           stroke: "#1c2430", width: 0.6});
+
+const palette = ["#3a4cc0", "#4f7be8", "#6cb6ff", "#c8a7ff", "#ff9f6e", "#ffd166"];
+const clear = "#00000000", half = step / 2, tau = 2 * Math.PI;
+const T = 4;
+scene.mark("start");
+field.voxel((x, y, z, t) => {
+    const r = Math.sqrt(x * x + z * z);
+    const height = Math.cos(2.2 * r - tau * t / 2) / (1 + 0.3 * r);
+    if (y - height > half || height - y > half) return clear;
+    return palette[Math.floor((height + 1) * 2.5)];
+}, {mode: "padd", padding: 0.08, duration: T, fps: 15});
+scene.at("start", () => {  // circle the camera while the wave plays
+    scene.orbit(Math.PI / 3, {duration: T, curve: "ease_in_out"});
+});
+
+return scene;
+```

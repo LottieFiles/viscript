@@ -1,0 +1,214 @@
+---
+title: Quick Start
+group: Get Started
+summary: Write your first scene, then render it in the browser, the CLI, or VS Code.
+---
+
+# Quick Start
+
+A viscript scene is a short script that builds objects, records animation on a timeline, and returns the scene. The host can then render any moment of it.
+
+## Your first scene
+
+Edit the code: the player re-renders as you type. Switch between Lua and JS with the toggle above the editor.
+
+```lua live
+local scene = vis.scene {
+    width = 960, height = 540, theme = "pro_black",
+    camera = {mode = "fixed", view = "2d", height = 6},
+}
+
+local axes = scene:space {x = {-5, 5, 1}, y = {-2, 2, 1}, stroke = "#00000000"}
+local wave = axes:plot {fn = math.sin, x_range = {-5, 5, 0.02}, stroke = "accent", width = 4}
+local label = scene:tex {tex = "y = \\sin x", point = {0, 2.4}, size = 36}
+local dot = axes:circle {center = {-5, math.sin(-5)}, radius = 0.18, fill = "warning"}
+
+scene:fade_in(axes, {duration = 0.5})
+scene:create(wave, {duration = 1.2, curve = "smooth"})
+scene:write(label, 0.6)
+scene:grow_from_center(dot, 0.3)
+scene:move_along(dot, wave, {duration = 2.4, curve = "ease_in_out"})
+
+return scene
+```
+
+```js live
+const scene = vis.scene({
+    width: 960, height: 540, theme: "pro_black",
+    camera: {mode: "fixed", view: "2d", height: 6},
+});
+
+const axes = scene.space({x: [-5, 5, 1], y: [-2, 2, 1], stroke: "#00000000"});
+const wave = axes.plot({fn: Math.sin, x_range: [-5, 5, 0.02], stroke: "accent", width: 4});
+const label = scene.tex({tex: "y = \\sin x", point: [0, 2.4], size: 36});
+const dot = axes.circle({center: [-5, Math.sin(-5)], radius: 0.18, fill: "warning"});
+
+scene.fadeIn(axes, {duration: 0.5});
+scene.create(wave, {duration: 1.2, curve: "smooth"});
+scene.write(label, 0.6);
+scene.growFromCenter(dot, 0.3);
+scene.moveAlong(dot, wave, {duration: 2.4, curve: "ease_in_out"});
+
+return scene;
+```
+
+Three ideas carry through every scene:
+
+- **Sizes are pixels, positions are world units.** `camera.height = 6` shows six world units vertically.
+- **Calls run on a timeline cursor.** Each animation starts where the previous one ended; `wait` holds.
+- **The script runs once.** It describes the scene; the host samples any time `t` afterwards.
+
+## Render it
+
+### Command line
+
+The CLI renders Lua scenes. Save the Lua version above as `scene.lua`, then build with the `tex` module (the scene uses `scene:tex`) and render:
+
+```sh
+meson setup build -Dmodules=tex
+meson compile -C build
+
+build/viscript render scene.lua --time 3.8 -o frame.png \
+    --font src/examples/assets/Pretendard.ttf
+build/viscript render scene.lua --fps 30 -o scene.mp4 \
+    --font src/examples/assets/Pretendard.ttf
+```
+
+- **Fonts:** text and formulas are measured with Pretendard, so pass it with `--font`.
+- **ThorVG:** Meson uses a system ThorVG 1.2 or newer. Without one, add `-Dbundled_thorvg=true` to `meson setup`.
+- **Video:** `.mp4` and `.gif` export run FFmpeg, so it must be on `PATH`. PNG needs nothing extra.
+
+### Browser
+
+The repository ships a prebuilt WASM runtime in `tools/skill/vis-skills/assets/wasm/`, so there is nothing to build: use that folder as it is. It is self-contained: `client.js` (the API), `vis-wasm.js` + `vis-wasm.wasm` (the engine), fonts, and licenses. Copy the whole folder next to your page as `viscript/`:
+
+```text
+my-page/
+├── index.html
+└── viscript/        ← copied bundle
+    ├── client.js
+    ├── vis-wasm.js
+    ├── vis-wasm.wasm
+    └── …
+```
+
+`index.html` — build the scene in JavaScript, or load Lua source:
+
+```html tab=JS
+<!doctype html>
+<meta charset="utf-8">
+<canvas width="960" height="540"></canvas>
+<script type="module">
+import {createVis, vis} from "./viscript/client.js";
+
+// Start on an empty scene, then register the font text is measured with.
+const runtime = await createVis(vis.scene({width: 16, height: 16}), "boot.js");
+const font = await fetch("./viscript/Pretendard.ttf");
+runtime.font("Pretendard", await font.arrayBuffer(), "ttf");
+
+// Build and load the real scene.
+const scene = vis.scene({
+    width: 960, height: 540, theme: "pro_white",
+    camera: {mode: "fixed", view: "2d", height: 6},
+});
+const title = scene.text({text: "Hello, viscript", point: [0, 1.2], size: 48, align: [0.5, 0.5]});
+const circle = scene.circle({center: [-2, -0.8], radius: 0.6, fill: "accent", stroke: "accent"});
+scene.write(title, 1);
+scene.growFromCenter(circle, 0.5);
+scene.shift(circle, [4, 0], 1.2, "ease_in_out");
+scene.wait(0.5);
+runtime.load(scene, "scene.js");
+
+// Play: draw(canvas, time) renders the frame at `time` seconds on the timeline.
+const canvas = document.querySelector("canvas");
+const start = performance.now();
+requestAnimationFrame(function frame(now) {
+    runtime.draw(canvas, ((now - start) / 1000) % runtime.duration);
+    requestAnimationFrame(frame);
+});
+</script>
+```
+
+```html tab=Lua
+<!doctype html>
+<meta charset="utf-8">
+<canvas width="960" height="540"></canvas>
+<script type="module">
+import {createVis} from "./viscript/client.js";
+
+// Start on an empty scene, then register the font text is measured with.
+const runtime = await createVis("return vis.scene {width = 16, height = 16}", "boot.lua");
+const font = await fetch("./viscript/Pretendard.ttf");
+runtime.font("Pretendard", await font.arrayBuffer(), "ttf");
+
+// Load the real scene from Lua source.
+runtime.load(`
+local scene = vis.scene {
+    width = 960, height = 540, theme = "pro_white",
+    camera = {mode = "fixed", view = "2d", height = 6},
+}
+local title = scene:text {text = "Hello, viscript", point = {0, 1.2}, size = 48, align = {0.5, 0.5}}
+local circle = scene:circle {center = {-2, -0.8}, radius = 0.6, fill = "accent", stroke = "accent"}
+scene:write(title, 1)
+scene:grow_from_center(circle, 0.5)
+scene:shift(circle, {4, 0}, 1.2, "ease_in_out")
+scene:wait(0.5)
+return scene
+`, "scene.lua");
+
+// Play: draw(canvas, time) renders the frame at `time` seconds on the timeline.
+const canvas = document.querySelector("canvas");
+const start = performance.now();
+requestAnimationFrame(function frame(now) {
+    runtime.draw(canvas, ((now - start) / 1000) % runtime.duration);
+    requestAnimationFrame(frame);
+});
+</script>
+```
+
+Serve the folder over HTTP — the module fetches `vis-wasm.wasm`, so opening the file directly will not work:
+
+```sh
+cd my-page && python3 -m http.server
+```
+
+Any time can be drawn directly, in any order — that is what makes scrubbing and export exact.
+
+### VS Code
+
+The viscript extension previews `.lua` scenes beside the editor, with a timeline scrubber and export.
+
+## Skills for AI agents
+
+`tools/skill/` holds agent skills that teach an AI coding agent the viscript API, its review loop and scene templates. Ask for a scene in plain language and the agent writes it, checks it and renders it.
+
+| Skill | Use it for |
+|---|---|
+| `vis-skills` | Scenes in Lua or JS/TS: animations, diagrams, algorithm traces, 2D/3D graphics, math shorts, cheatsheets. |
+| `vis-interactive` | Interactive scenes: UI, input, runtime, audio. |
+| `vis-vscode` | Linking scenes to product code in the VS Code extension. |
+| `vis-animation-dev` | Changing viscript itself: engine, bindings, builds, tests. |
+
+Link them into your agent's skill folder from the project root, so they stay current with the checkout:
+
+```sh
+# Claude Code: this project only, or ~/.claude/skills for every project
+mkdir -p .claude/skills
+for skill in vis-skills vis-interactive vis-vscode vis-animation-dev; do
+    ln -s "$PWD/tools/skill/$skill" ".claude/skills/$skill"
+done
+```
+
+For Codex, link the same folders into `~/.codex/skills/`; `vis-skills` includes `agents/openai.yaml`.
+
+`vis-skills` carries the same prebuilt WASM runtime and fonts in `assets/wasm/`, so an agent can mount and render scenes in the browser or Node without building anything; the `viscript` CLI review commands need a native build. Then ask, for example:
+
+```text
+Use vis-skills to animate binary search on a sorted array of 16 numbers.
+```
+
+## Next
+
+- [Scenes & Objects](#/docs/scenes): shapes, styling, and text.
+- [Animation](#/docs/animation): the timeline in depth.
+- [Examples](#/examples): complete scenes to edit.
