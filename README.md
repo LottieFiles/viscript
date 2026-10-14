@@ -1,19 +1,27 @@
-# viscript
-
-**Explain ideas in motion.**
+<h1 align="center">
+  <img src="docs/assets/hero.gif" alt="viscript" width="800">
+</h1>
 
 viscript turns code into animated explanations — algorithms, geometry, and graphics
 internals. You describe a scene once in Lua or JavaScript, record animation on a
 timeline, and render any moment of it: natively from the command line, live in a web
 page, or beside your code in VS Code.
 
-- **Show every step, not just the result.** Sorting passes, graph searches, pixel
-  sampling, rasterization: animate the intermediate states that static diagrams leave out.
-- **Scenes as code, written with AI.** A scene is a retained tree of objects that you
-  animate by changing properties. Bundled [skills](#skills-for-ai-agents) teach your coding
-  agent to draft a scene, check its layout, and render it for you to refine.
-- **Embed it where you need it.** Link the C library into a native app, load the WebAssembly
-  runtime in a web page, or preview beside your code in VS Code. One Lua scene, one renderer.
+<p align="center"><img src="docs/assets/steps.gif" alt="Sorting, graph search, pixel sampling and rasterization, each shown step by step" width="800"></p>
+
+**Show every step, not just the result.** Sorting passes, graph searches, pixel
+sampling, rasterization: animate the intermediate states that static diagrams leave out.
+
+<p align="center"><img src="docs/assets/ai.gif" alt="An agent drafts scene.lua, checks its layout and renders it, then refines it from a follow-up prompt" width="800"></p>
+
+**Scenes as code, written with AI.** A scene is a retained tree of objects that you
+animate by changing properties. Bundled [skills](#skills-for-ai-agents) teach your coding
+agent to draft a scene, check its layout, and render it for you to refine.
+
+<p align="center"><img src="docs/assets/embed.gif" alt="One scene and one renderer playing the same frames in a native app, a web page and VS Code" width="800"></p>
+
+**Embed it where you need it.** Link the C library into a native app, load the WebAssembly
+runtime in a web page, or preview beside your code in VS Code. One Lua scene, one renderer.
 
 What a scene can hold:
 
@@ -25,11 +33,13 @@ What a scene can hold:
 - Seekable timelines: transforms, morphs, text animation, trackers, springs, path following
 - PNG, GIF and MP4 export
 
-## Your first scene
+## Quick Start
+
+<p align="center"><img src="docs/assets/first-scene.gif" alt="Editing scene.lua live: tweak a value, retime an animation, add and remove objects, and watch the Scene re-render"></p>
 
 ```lua
 local scene = vis.scene {
-    width = 960, height = 540, theme = "pro_black",
+    width = 960, height = 540, theme = "pro_white",
     camera = {mode = "fixed", view = "2d", height = 6},
 }
 
@@ -51,7 +61,7 @@ The same scene in JavaScript:
 
 ```js
 const scene = vis.scene({
-    width: 960, height: 540, theme: "pro_black",
+    width: 960, height: 540, theme: "pro_white",
     camera: {mode: "fixed", view: "2d", height: 6},
 });
 
@@ -108,6 +118,8 @@ Optional modules: Diagram, TeX, Motion, UI, Input, Lua Runtime and Audio.
 
 ### Render
 
+<p align="center"><img src="docs/assets/render.gif" alt="One scene.lua rendered to a PNG frame, a GIF and an MP4"></p>
+
 Save the Lua scene as `scene.lua`. Text and formulas are measured with the bundled fonts,
 so pass them with `--font` (the presets use Pretendard for text and JetBrains Mono for code):
 
@@ -127,6 +139,8 @@ build/viscript benchmark scene.lua --frames 120
   mixes the scene's own sound cues into the soundtrack.
 
 ## Browser
+
+<p align="center"><img src="docs/assets/browser.gif" alt="The JavaScript example playing on a canvas in a page"></p>
 
 The repository ships a prebuilt WebAssembly runtime in
 [`tools/skill/vis-skills/assets/wasm/`](tools/skill/vis-skills/assets/wasm), so there is
@@ -196,6 +210,8 @@ It updates both copies: `tools/vscode/runtime/` and `tools/skill/vis-skills/asse
 
 ## VS Code
 
+<p align="center"><a href="docs/assets/thorvg-vscode-gradient-review.mp4"><img src="docs/assets/vscode-review.gif" alt="Reviewing a ThorVG gradient change with a linked viscript scene in VS Code"></a></p>
+
 The extension lives in [`tools/vscode/`](tools/vscode). It previews `.lua` scenes beside
 the editor with a timeline scrubber, an Inspector, playback ranges and GIF/MP4 export,
 and it can link scenes to the code they explain.
@@ -227,6 +243,8 @@ your-project/
 See [`tools/vscode/README.md`](tools/vscode/README.md) for the manifest format and viewer controls.
 
 ## Skills for AI agents
+
+<p align="center"><img src="docs/assets/skills.gif" alt="A prompt to vis-skills and the binary-search scene it produces"></p>
 
 [`tools/skill/`](tools/skill) holds agent skills that teach an AI coding agent the
 viscript API, its review loop and scene templates. Ask for a scene in plain language and
