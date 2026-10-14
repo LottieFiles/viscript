@@ -51,12 +51,13 @@ const customTheme: ThemeOptions = {
     },
     objects: ["#5e7a9b", "#b8915a", "#557b63"],
     object_width: 1.5,
+    roundness: 0.1,
     gradient: true,
     end_gradient_stop: "#778899",
     axis: {x: "#9b3600", y: "#557b63", z: "#5e7a9b"},
     colors: {accent: "#4cc9f0", success: "#7bd88f", warning: "#ffd166", danger: "#ff6b6b"},
 };
-const namedTheme: ThemeOptions = {preset: "3_blue_1_eyes"};
+const namedTheme: ThemeOptions = {preset: "pro_black"};
 void namedTheme;
 const definition = vis.scene({
     width: 960,

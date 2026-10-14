@@ -6,46 +6,7 @@ namespace vis
 Theme Theme::preset(ThemePreset preset) noexcept
 {
     Theme theme;
-    if (preset == ThemePreset::ProWhite || preset == ThemePreset::AdaptiveVscode) return theme;
-    if (preset == ThemePreset::ThreeBlueOneEyes) {
-        theme.background = Color::hex("#0d1117");
-        theme.h1 = {"Pretendard", 38.0f, Color::hex("#f4f7fb")};
-        theme.h2 = {"Pretendard", 30.0f, Color::hex("#f4f7fb")};
-        theme.h3 = {"Pretendard", 23.0f, Color::hex("#dbe7f3")};
-        theme.text = {"Pretendard", 17.0f, Color::hex("#dbe7f3")};
-        theme.code = {"JetBrainsMono", 15.0f, Color::hex("#ffd166")};
-        const char* objects[] = {
-            "#f28e2b", "#ff6b6b", "#76b7b2", "#7bc96f",
-            "#c29bc0", "#ff9da7", "#c49a83", "#bab0ac",
-        };
-        for (auto i = 0u; i < 8u; i++)
-            theme.objects[i] = Color::hex(objects[i]);
-        theme.objectCount = 8;
-        theme.objectWidth = 2.0f;
-        theme.endGradientStop = Color::hex("#f72585");
-        theme.axis = {
-            Color::hex("#ef5350"),
-            Color::hex("#66bb6a"),
-            Color::hex("#42a5f5"),
-            Color::hex("#374151b4"),
-            Color::hex("#aeb7c3"),
-        };
-        theme.colors = {
-            Color::hex("#f4f7fb"),
-            Color::hex("#aeb7c3"),
-            Color::hex("#4cc9f0"),
-            Color::hex("#9b8cff"),
-            Color::hex("#7bd88f"),
-            Color::hex("#ffd166"),
-            Color::hex("#ff6b6b"),
-            Color::hex("#42a5f5"),
-            Color::hex("#161b22"),
-            Color::hex("#374151"),
-            Color::hex("#edc948"),
-            Color::hex("#6ea8fe"),
-        };
-        return theme;
-    }
+    // Pro White is the default Theme, and adaptive_vscode uses it until a host supplies colors.
     if (preset != ThemePreset::ProBlack) return theme;
 
     theme.background = Color::hex("#000000");

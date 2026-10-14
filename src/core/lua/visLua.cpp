@@ -10436,13 +10436,12 @@ static ThemePreset _themePreset(lua_State* lua, int index)
     size_t size;
     auto value = luaL_checklstring(lua, index, &size);
     if (std::strlen(value) != size) luaL_error(lua, "theme preset cannot contain zero bytes");
-    if (std::strcmp(value, "3_blue_1_eyes") == 0) return ThemePreset::ThreeBlueOneEyes;
     if (std::strcmp(value, "pro_white") == 0 || std::strcmp(value, "pro") == 0) {
         return ThemePreset::ProWhite;
     }
     if (std::strcmp(value, "pro_black") == 0) return ThemePreset::ProBlack;
     if (std::strcmp(value, "adaptive_vscode") == 0) return ThemePreset::AdaptiveVscode;
-    luaL_error(lua, "theme preset must be '3_blue_1_eyes', 'pro_white', 'pro_black' or 'adaptive_vscode'");
+    luaL_error(lua, "theme preset must be 'pro_white', 'pro_black' or 'adaptive_vscode'");
     return ThemePreset::ProWhite;
 }
 
@@ -10495,7 +10494,7 @@ static Theme _theme(lua_State* lua, int index)
     luaL_checktype(lua, index, LUA_TTABLE);
     index = lua_absindex(lua, index);
     _options(lua, index,
-             {"preset", "background", "text", "objects", "object_width", "gradient",
+             {"preset", "background", "text", "objects", "object_width", "roundness", "gradient",
               "end_gradient_stop", "axis", "colors"}, false);
 
     auto theme = Theme::preset(ThemePreset::ProWhite);
@@ -10570,6 +10569,10 @@ static Theme _theme(lua_State* lua, int index)
 
     theme.objectWidth = _fieldNumber(lua, index, "object_width", theme.objectWidth);
     if (theme.objectWidth <= 0.0f) luaL_error(lua, "theme object_width must be positive");
+    theme.roundness = _fieldNumber(lua, index, "roundness", theme.roundness);
+    if (theme.roundness < 0.0f || theme.roundness > 0.5f) {
+        luaL_error(lua, "theme roundness must be between 0 and 0.5");
+    }
 
     lua_getfield(lua, index, "axis");
     if (!lua_isnil(lua, -1)) {

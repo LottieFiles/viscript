@@ -72,7 +72,7 @@ export interface CameraTarget {
     far?: number;
 }
 
-export type ThemePreset = "3_blue_1_eyes" | "pro_white" | "pro_black" | "adaptive_vscode" | "pro";
+export type ThemePreset = "pro_white" | "pro_black" | "adaptive_vscode" | "pro";
 export interface TextTheme {
     font?: string;
     size?: number;
@@ -111,6 +111,8 @@ export interface ThemeOptions {
     };
     objects?: readonly Color[];
     object_width?: number;
+    /** Corner radius of Theme-following Diagram nodes as a share (0 to 0.5) of the shorter node-size side; zones round 1.5 times as much, and 0 keeps them square. */
+    roundness?: number;
     gradient?: boolean;
     end_gradient_stop?: Color;
     axis?: AxisTheme;

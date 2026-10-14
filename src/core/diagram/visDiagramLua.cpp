@@ -361,6 +361,7 @@ static int _newDiagram(lua_State* lua)
     config.routeWidth = _fieldNumber(lua, 2, "route_width", config.routeWidth);
     config.arrowLength = _fieldNumber(lua, 2, "arrow_length", config.arrowLength);
     config.arrowWidth = _fieldNumber(lua, 2, "arrow_width", config.arrowWidth);
+    // An omitted or negative corner follows the Scene Theme.
     config.corner = _fieldNumber(lua, 2, "corner", config.corner);
     config.layers = _fieldLayers(lua, 2, config.layers);
     auto diagram = Diagram::gen(config);

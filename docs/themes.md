@@ -1,8 +1,8 @@
 # Scene themes
 
 A Theme supplies a Scene's background, text styles, object-color cycle, semantic
-colors, stroke width, gradients, and axis colors. Child Scenes keep their own Theme
-and palette position.
+colors, stroke width, corner roundness, gradients, and axis colors. Child Scenes keep
+their own Theme and palette position.
 
 ## Presets
 
@@ -10,7 +10,6 @@ and palette position.
 |---|---|---|
 | `pro_white` | `ProWhite` | Light background; default preset |
 | `pro_black` | `ProBlack` | Dark background |
-| `3_blue_1_eyes` | `ThreeBlueOneEyes` | Dark background with bright object colors |
 | `adaptive_vscode` | `AdaptiveVscode` | Palette supplied by the editor host |
 
 The presets use Pretendard for `h1`, `h2`, `h3`, and `text`, and JetBrainsMono for
@@ -70,6 +69,7 @@ local scene = vis.scene {
             code = {font = "JetBrainsMono", size = 18, color = "#9b3600"},
         },
         object_width = 1.5,
+        roundness = 0.1,
         axis = {x = "#cbd5e1", y = "#cbd5e1", grid = "#e2e8f0"},
     },
 }
@@ -78,6 +78,12 @@ local subject = scene:circle {radius = 1}
 scene:text {text = "42", point = {0, -1.5}, fill = "result"}
 scene:indicate(subject)
 ```
+
+`roundness`, from 0 to 0.5, is the share of a box's shorter side by which
+Theme-styled structural boxes round their corners. A Diagram without an explicit
+`corner` applies it to its node size, rounds zones 1.5 times as much, and draws
+terminal nodes as pills only when corners round. It is 0, square, in every preset;
+set it in a custom Theme to round them.
 
 JavaScript uses the same fields through `SceneConfig.theme`. C++ copies a `Theme`
 into the Scene:

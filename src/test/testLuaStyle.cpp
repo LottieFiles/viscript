@@ -419,6 +419,7 @@ local scene = vis.scene {
         background = "#101426",
         objects = {"#112233", "#445566"},
         object_width = 3.25,
+        roundness = 0.25,
         gradient = true,
         end_gradient_stop = "#778899",
         text = {
@@ -452,6 +453,7 @@ return scene
     if (scene) {
         CHECK(_pixel(scene->config().background) == _pixel(Color::hex("#fafafa")));
         CHECK(scene->theme().objectCount == 2u);
+        CHECK(_near(scene->theme().roundness, 0.25f));
         auto title = static_cast<Text*>(scene->object("title"));
         auto code = static_cast<Text*>(scene->object("code"));
         auto axes = static_cast<Space*>(scene->object("axes"));
@@ -573,21 +575,24 @@ return scene
     delete scene;
 
     static constexpr auto namedSource = R"lua(
-local named = vis.scene {theme = "3_blue_1_eyes"}
+local named = vis.scene {theme = "pro_black"}
 named:point {point = {0, 0}, id = "named-point"}
 return named
 )lua";
     scene = nullptr;
     status = Lua::load(namedSource, static_cast<uint32_t>(std::strlen(namedSource)),
-                       "theme-three-blue-one-eyes.lua", &scene, error, sizeof(error));
+                       "theme-pro-black.lua", &scene, error, sizeof(error));
     CHECK(status == Result::Success);
     CHECK(scene != nullptr);
     if (scene) {
-        CHECK(_pixel(scene->config().background) == _pixel(Color::hex("#0d1117")));
+        CHECK(_pixel(scene->config().background) == _pixel(Color::hex("#000000")));
+        CHECK(scene->theme().roundness == 0.0f);
         auto point = scene->object("named-point");
         CHECK(point && _pixel(point->style.fill) == _pixel(Color::hex("#f28e2b")));
     }
     delete scene;
+    _scriptError("return vis.scene {theme = '3_blue_1_eyes'}",
+                 "theme preset must be 'pro_white', 'pro_black' or 'adaptive_vscode'");
 
     static constexpr auto implicitSource = "return vis.scene {}";
     scene = nullptr;
@@ -598,8 +603,11 @@ return named
     if (scene) {
         CHECK(_pixel(scene->config().background) == _pixel(Color::hex("#ffffff")));
         CHECK(_pixel(scene->theme().objects[0]) == _pixel(Color::hex("#b45f06")));
+        CHECK(scene->theme().roundness == 0.0f);
     }
     delete scene;
+    _scriptError("return vis.scene {theme = {preset = 'pro_black', roundness = 0.75}}",
+                 "theme roundness must be between 0 and 0.5");
 
     static constexpr auto semanticSource = R"lua(
 local scene = vis.scene {

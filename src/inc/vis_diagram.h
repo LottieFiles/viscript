@@ -108,7 +108,10 @@ struct Config
     float routeWidth = 0.08f;
     float arrowLength = 0.32f;
     float arrowWidth = 0.28f;
-    float corner = 0.12f;
+    // A negative corner follows the Theme given to build(): its roundness times the shorter
+    // side of nodeSize. Zero or more is an explicit radius in world units. Zones round 1.5
+    // times as much, and Terminal nodes are pills unless the corner resolves to 0.
+    float corner = -1.0f;
     Layers layers;
     Layout layout = Layout::Ranked;
     float timeUnit = 1.0f;

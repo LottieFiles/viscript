@@ -707,6 +707,7 @@ int main()
     _error("return vis.scene{theme='default'}", "theme-default-renamed.lua");
     _error("return vis.scene{theme={objects={}}}", "theme-palette-empty.lua");
     _error("return vis.scene{theme={object_width=0}}", "theme-object-width.lua");
+    _error("return vis.scene{theme={roundness=-0.1}}", "theme-roundness.lua");
     _error("return vis.scene{theme={gradient=1}}", "theme-gradient-type.lua");
     _error("return vis.scene{theme={text={h1={font=''}}}}", "theme-font-empty.lua");
     _error("return vis.scene{theme={axis={w='#fff'}}}", "theme-axis-option.lua");

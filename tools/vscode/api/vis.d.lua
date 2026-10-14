@@ -153,14 +153,14 @@
 ---@field route_width? number Base route stroke width.
 ---@field arrow_length? number Arrowhead length.
 ---@field arrow_width? number Arrowhead width.
----@field corner? number Node and zone corner radius.
+---@field corner? number Node corner radius in world units; zones round 1.5 times as much. Omitted or negative follows the Theme roundness of the shorter node_size side.
 ---@field layers? vis.DiagramLayersConfig Generated sibling layer assignments.
 
 ---@class vis.DiagramNodeConfig
 ---@field id string Unique node identifier.
 ---@field label? string Primary node label; defaults to id.
 ---@field detail? string Optional secondary node label.
----@field kind? "default"|"state"|"decision"|"terminal"|"entity"|"cell"|"task"|"evidence" Semantic Theme-derived node treatment.
+---@field kind? "default"|"state"|"decision"|"terminal"|"entity"|"cell"|"task"|"evidence" Semantic node kind; sets the label text role, and a terminal is a pill once corners round.
 ---@field rank? integer Explicit ranked-layout rank.
 ---@field row? integer Zero-based grid or timeline row.
 ---@field column? integer Zero-based grid column.
@@ -204,6 +204,7 @@
 ---@field text? table H1, H2, H3, text, and code typography overrides.
 ---@field objects? vis.Color[] Automatic 1..10 color cycle shared in order by lhs, rhs, every later args member, and other peer categories.
 ---@field object_width? number Automatic object stroke width.
+---@field roundness? number Corner radius of Theme-following Diagram nodes as a share (0 to 0.5) of the shorter node_size side; zones round 1.5 times as much, and 0 keeps them square.
 ---@field gradient? boolean Enable automatic object gradients.
 ---@field end_gradient_stop? vis.Color Automatic gradient end color.
 ---@field axis? table Axis, grid, and label color overrides.

@@ -61,6 +61,7 @@ includes each policy entry's matched and used state.
 
 A generated diagram root retains a `vis.diagram.layout/v2` receipt. The audit
 reads its semantic nodes, edges, zones, settings, placements, and Object bindings.
+Settings are recorded as authored, so a `corner` that follows the Theme is negative.
 Generated label-to-body relationships provide containment policy; explicit entries
 replace them.
 

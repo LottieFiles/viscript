@@ -1,6 +1,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <initializer_list>
 #include <limits>
 #include <type_traits>
 
@@ -24,6 +25,11 @@ static int failures = 0;
 static bool near(float lhs, float rhs, float epsilon = 1.0e-4f)
 {
     return std::fabs(lhs - rhs) <= epsilon;
+}
+
+static bool same(Color lhs, Color rhs)
+{
+    return lhs.r == rhs.r && lhs.g == rhs.g && lhs.b == rhs.b && lhs.a == rhs.a;
 }
 
 static const ConstraintIssue* issue(const ConstraintReport& report, ConstraintCode code)
@@ -90,6 +96,14 @@ static ZoneSpec zoneSpec(const char* id, const char* label, const Node* members,
     spec.members = members;
     spec.memberCount = count;
     return spec;
+}
+
+// Every preset keeps boxes square; this Theme rounds them by a tenth of the shorter node side.
+static Theme rounded()
+{
+    auto theme = Theme::preset(ThemePreset::ProWhite);
+    theme.roundness = 0.1f;
+    return theme;
 }
 
 static void aggregateCompatibility()
@@ -369,7 +383,7 @@ static void rankedLayouts()
     CHECK(diagram->add(finalEdge, finalRoute) == Result::Success);
 
     Built* built = nullptr;
-    CHECK(diagram->build(Theme::preset(ThemePreset::ThreeBlueOneEyes), built) == Result::Success);
+    CHECK(diagram->build(Theme::preset(ThemePreset::ProWhite), built) == Result::Success);
     CHECK(built);
     if (built) {
         CHECK(built->body(start)->center.y > built->body(first)->center.y);
@@ -1400,7 +1414,7 @@ static void edgeLabelsClearRoutes()
     CHECK(diagram->add(spec, route) == Result::Success);
 
     Built* built = nullptr;
-    CHECK(diagram->build(Theme::preset(ThemePreset::ThreeBlueOneEyes), built) == Result::Success);
+    CHECK(diagram->build(Theme::preset(ThemePreset::ProWhite), built) == Result::Success);
     CHECK(built && built->label(route));
     if (built && built->label(route)) {
         auto arrow = static_cast<Arrow*>(built->object(route));
@@ -1441,7 +1455,7 @@ static void gridAndTimelineLayouts()
     Zone firstLane;
     CHECK(diagram->add(firstLaneSpec, firstLane) == Result::Success);
     Built* built = nullptr;
-    CHECK(diagram->build(Theme::preset(ThemePreset::ThreeBlueOneEyes), built) == Result::Success);
+    CHECK(diagram->build(Theme::preset(ThemePreset::ProWhite), built) == Result::Success);
     CHECK(built && near(built->body(first)->center.x, -4.0f));
     CHECK(built && near(built->body(first)->center.y, 3.0f));
     CHECK(built && near(built->body(second)->center.x, -1.5f));
@@ -1468,7 +1482,7 @@ static void gridAndTimelineLayouts()
     taskSpec.span = 3.0f;
     CHECK(diagram->add(taskSpec, task) == Result::Success);
     built = nullptr;
-    CHECK(diagram->build(Theme::preset(ThemePreset::ThreeBlueOneEyes), built) == Result::Success);
+    CHECK(diagram->build(Theme::preset(ThemePreset::ProWhite), built) == Result::Success);
     CHECK(built && near(built->body(task)->size.x, 4.5f));
     CHECK(built && near(built->body(task)->center.x, 0.25f));
     CHECK(built && near(built->body(task)->center.y, 0.8f));
@@ -1518,13 +1532,225 @@ static void manualCyclesAndKinds()
     CHECK(diagram->add(edge, relation) == Result::Success);
 
     Built* built = nullptr;
-    CHECK(diagram->build(Theme::preset(ThemePreset::ThreeBlueOneEyes), built) == Result::Success);
+    CHECK(diagram->build(rounded(), built) == Result::Success);
     CHECK(built && built->object(firstEdge)->type() == Type::Arrow);
     CHECK(built && built->object(secondEdge)->style.dashCount == 2u);
     CHECK(built && built->object(relation)->type() == Type::Line);
     CHECK(built && near(built->body(third)->corner, 0.6f));
     delete built;
     delete diagram;
+}
+
+// A corner left negative follows the Theme's roundness of the shorter node side, which is 0 in
+// every preset and gives a roundness of 0.1 the former 0.12 at the default node size. Zones round
+// 1.5 times as much, and a Terminal is a pill only once corners round. An explicit corner wins.
+static void themeCorners()
+{
+    CHECK(vis::diagram::Config{}.corner < 0.0f);
+    auto round = Theme::preset(ThemePreset::ProWhite);
+    round.roundness = 0.5f;
+    struct Case
+    {
+        Theme theme;
+        Vec2 nodeSize;
+        float corner;
+        float expected;
+    };
+    const Vec2 standard = vis::diagram::Config{}.nodeSize;
+    const Case cases[] = {
+        {Theme::preset(ThemePreset::ProWhite), standard, -1.0f, 0.0f},
+        {Theme::preset(ThemePreset::ProBlack), standard, -1.0f, 0.0f},
+        {Theme::preset(ThemePreset::AdaptiveVscode), standard, -1.0f, 0.0f},
+        {rounded(), standard, -1.0f, 0.12f},
+        {rounded(), {2.0f, 3.0f}, -1.0f, 0.2f},
+        {round, {2.0f, 1.0f}, -0.5f, 0.5f},
+        {Theme::preset(ThemePreset::ProWhite), standard, 0.2f, 0.2f},
+        {rounded(), standard, 0.2f, 0.2f},
+        {rounded(), standard, 0.0f, 0.0f},
+    };
+    for (const auto& item : cases) {
+        vis::diagram::Config config;
+        config.layout = Layout::Manual;
+        config.nodeSize = item.nodeSize;
+        config.corner = item.corner;
+        auto diagram = Diagram::gen(config);
+        CHECK(diagram);
+        if (!diagram) continue;
+        auto plainSpec = nodeSpec("node", "Node");
+        plainSpec.manualPosition = true;
+        auto terminalSpec = nodeSpec("terminal", "Done");
+        terminalSpec.manualPosition = true;
+        terminalSpec.position = {6.0f, 0.0f};
+        terminalSpec.kind = NodeKind::Terminal;
+        Node node;
+        Node terminal;
+        CHECK(diagram->add(plainSpec, node) == Result::Success);
+        CHECK(diagram->add(terminalSpec, terminal) == Result::Success);
+        Node members[] = {node, terminal};
+        Zone zone;
+        CHECK(diagram->add(zoneSpec("scope", nullptr, members, 2u), zone) == Result::Success);
+
+        Built* built = nullptr;
+        CHECK(diagram->build(item.theme, built) == Result::Success);
+        CHECK(built && built->body(node) && built->body(terminal) && built->body(zone));
+        if (built && built->body(node) && built->body(terminal) && built->body(zone)) {
+            auto pill = std::fmin(item.nodeSize.x, item.nodeSize.y) * 0.5f;
+            CHECK(near(built->body(node)->corner, item.expected));
+            CHECK(near(built->body(terminal)->corner, item.expected > 0.0f ? pill : 0.0f));
+            CHECK(near(built->body(zone)->corner, item.expected * 1.5f));
+            // The receipt keeps the corner as authored.
+            CHECK(built->ir()->config().corner == item.corner);
+        }
+        delete built;
+
+        // A Theme whose roundness is not a number builds nothing.
+        auto invalid = item.theme;
+        invalid.roundness = std::numeric_limits<float>::quiet_NaN();
+        built = nullptr;
+        auto result = diagram->build(invalid, built);
+        CHECK(item.corner >= 0.0f ? result == Result::Success : result == Result::InvalidArguments);
+        CHECK(item.corner >= 0.0f ? built != nullptr : built == nullptr);
+        delete built;
+        delete diagram;
+    }
+
+    vis::diagram::Config infinite;
+    infinite.corner = -std::numeric_limits<float>::infinity();
+    CHECK(Diagram::gen(infinite) == nullptr);
+}
+
+// Structure is ink: every node kind is the Theme's foreground on its background and zones only
+// outline. Routes stay gray but for an error and a flowing directed edge, and labels match.
+static void restrainedColors()
+{
+    vis::diagram::Config config;
+    config.layout = Layout::Manual;
+    auto diagram = Diagram::gen(config);
+    CHECK(diagram);
+    if (!diagram) return;
+
+    const NodeKind kinds[] = {
+        NodeKind::Default, NodeKind::State, NodeKind::Decision, NodeKind::Terminal,
+        NodeKind::Entity, NodeKind::Cell, NodeKind::Task, NodeKind::Evidence,
+    };
+    const char* ids[] = {
+        "default", "state", "decision", "terminal", "entity", "cell", "task", "evidence",
+    };
+    Node nodes[8];
+    for (auto i = 0u; i < 8u; i++) {
+        auto spec = nodeSpec(ids[i], ids[i]);
+        spec.manualPosition = true;
+        spec.position = {static_cast<float>(i) * 5.0f, 0.0f};
+        spec.kind = kinds[i];
+        CHECK(diagram->add(spec, nodes[i]) == Result::Success);
+    }
+    struct RouteCase
+    {
+        const char* id;
+        EdgeKind kind;
+        bool flow;
+    };
+    const RouteCase routes[] = {
+        {"directed", EdgeKind::Directed, false},
+        {"flowing", EdgeKind::Directed, true},
+        {"relation", EdgeKind::Relation, false},
+        {"return", EdgeKind::Return, false},
+        {"error", EdgeKind::Error, false},
+        {"optional", EdgeKind::Optional, false},
+        {"flowing-return", EdgeKind::Return, true},
+    };
+    Edge edges[7];
+    for (auto i = 0u; i < 7u; i++) {
+        auto spec = edgeSpec(routes[i].id, nodes[i], nodes[i + 1u]);
+        spec.label = routes[i].id;
+        spec.route = Route::Straight;
+        spec.kind = routes[i].kind;
+        spec.flow = routes[i].flow;
+        CHECK(diagram->add(spec, edges[i]) == Result::Success);
+    }
+    Node members[] = {nodes[0], nodes[1]};
+    Zone zone;
+    CHECK(diagram->add(zoneSpec("scope", "Scope", members, 2u), zone) == Result::Success);
+
+    for (auto preset : {ThemePreset::ProWhite, ThemePreset::ProBlack}) {
+        auto theme = Theme::preset(preset);
+        Built* built = nullptr;
+        CHECK(diagram->build(theme, built) == Result::Success);
+        if (!built) continue;
+        for (auto i = 0u; i < 8u; i++) {
+            auto body = built->body(nodes[i]);
+            CHECK(body && same(body->style.fill, theme.background));
+            CHECK(body && same(body->style.stroke, theme.colors.foreground));
+            CHECK(body && near(body->style.width, theme.objectWidth));
+            CHECK(built->label(nodes[i])
+                  && same(built->label(nodes[i])->style.fill, theme.colors.foreground));
+        }
+        auto zoneBody = built->body(zone);
+        CHECK(zoneBody && zoneBody->style.fill.a == 0u);
+        CHECK(zoneBody && same(zoneBody->style.stroke, theme.colors.border));
+        CHECK(zoneBody && near(zoneBody->style.width, theme.objectWidth));
+        CHECK(built->label(zone) && same(built->label(zone)->style.fill, theme.colors.muted));
+
+        const Color expected[] = {
+            theme.colors.muted, theme.colors.accent, theme.colors.border, theme.colors.muted,
+            theme.colors.danger, theme.colors.muted, theme.colors.muted,
+        };
+        for (auto i = 0u; i < 7u; i++) {
+            auto route = built->object(edges[i]);
+            CHECK(route && same(route->style.stroke, expected[i]));
+            CHECK(route && near(route->style.width, theme.objectWidth));
+            CHECK(built->label(edges[i])
+                  && same(built->label(edges[i])->style.fill, expected[i]));
+        }
+        delete built;
+    }
+    delete diagram;
+}
+
+// The label of a route keeps the gap of the former 0.12 corner while the corner follows the
+// Theme, whatever it rounds; an explicit corner sets the gap as before.
+static void labelGapIgnoresTheme()
+{
+    struct Case
+    {
+        Theme theme;
+        float corner;
+        float gap;
+    };
+    const Case cases[] = {
+        {Theme::preset(ThemePreset::ProWhite), -1.0f, 0.24f},
+        {rounded(), -1.0f, 0.24f},
+        {Theme::preset(ThemePreset::ProWhite), 0.3f, 0.42f},
+        {rounded(), 0.0f, 0.16f},
+    };
+    for (const auto& item : cases) {
+        vis::diagram::Config config;
+        config.layout = Layout::Manual;
+        config.corner = item.corner;
+        auto diagram = Diagram::gen(config);
+        CHECK(diagram);
+        if (!diagram) continue;
+        auto sourceSpec = nodeSpec("source", "Source");
+        sourceSpec.manualPosition = true;
+        auto targetSpec = nodeSpec("target", "Target");
+        targetSpec.manualPosition = true;
+        targetSpec.position = {6.0f, 0.0f};
+        Node source;
+        Node target;
+        CHECK(diagram->add(sourceSpec, source) == Result::Success);
+        CHECK(diagram->add(targetSpec, target) == Result::Success);
+        auto spec = edgeSpec("route", source, target);
+        spec.label = "payload";
+        spec.route = Route::Straight;
+        Edge route;
+        CHECK(diagram->add(spec, route) == Result::Success);
+        Built* built = nullptr;
+        CHECK(diagram->build(item.theme, built) == Result::Success);
+        CHECK(built && built->label(route));
+        if (built && built->label(route)) CHECK(near(built->label(route)->point.y, item.gap));
+        delete built;
+        delete diagram;
+    }
 }
 
 static void constraintDiagnostics()
@@ -1750,7 +1976,7 @@ static void invalidGraphs()
     CHECK(diagram->add(edgeSpec("forward", first, second), forward) == Result::Success);
     CHECK(diagram->add(edgeSpec("backward", second, first), backward) == Result::Success);
     Built* built = nullptr;
-    CHECK(diagram->build(Theme::preset(ThemePreset::ThreeBlueOneEyes), built)
+    CHECK(diagram->build(Theme::preset(ThemePreset::ProWhite), built)
           == Result::InvalidArguments);
     CHECK(!built);
     delete diagram;
@@ -1773,7 +1999,7 @@ static void invalidGraphs()
     Edge invalid;
     CHECK(diagram->add(invalidRoute, invalid) == Result::Success);
     built = nullptr;
-    CHECK(diagram->build(Theme::preset(ThemePreset::ThreeBlueOneEyes), built)
+    CHECK(diagram->build(Theme::preset(ThemePreset::ProWhite), built)
           == Result::InvalidArguments);
     CHECK(!built);
     delete diagram;
@@ -2031,6 +2257,9 @@ int main()
     edgeLabelsClearRoutes();
     gridAndTimelineLayouts();
     manualCyclesAndKinds();
+    themeCorners();
+    restrainedColors();
+    labelGapIgnoresTheme();
     constraintDiagnostics();
     endpointRouteDiagnostics();
     rankBoundariesAndFiniteGeometry();

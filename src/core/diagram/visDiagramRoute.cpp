@@ -403,8 +403,10 @@ Vec2 labelPoint(const Config& config, const Vec2* points,
                 || (_near(normal.y, 0.0f) && normal.x < 0.0f)) {
                 normal = _mul(normal, -1.0f);
             }
-            auto gap = std::fmax(config.routeWidth * 2.0f,
-                                 config.corner + 0.12f);
+            // A corner that follows the Theme clears the label as the former 0.12 default
+            // did, so labels keep their place whatever the Theme rounds.
+            auto corner = config.corner >= 0.0f ? config.corner : 0.12f;
+            auto gap = std::fmax(config.routeWidth * 2.0f, corner + 0.12f);
             return _add(point, _mul(normal, gap));
         }
         cursor += length;

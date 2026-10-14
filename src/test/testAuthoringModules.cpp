@@ -1,3 +1,4 @@
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 
@@ -276,6 +277,59 @@ return scene
 }
 #endif
 
+#if defined(VIS_DIAGRAM)
+// An omitted or negative corner takes the Scene Theme's roundness of the shorter node side; an
+// explicit corner wins. Zones round 1.5 times as much, and a terminal is a pill once corners round.
+static void diagramThemeCorners()
+{
+    struct Case
+    {
+        const char* scene;
+        const char* corner;
+        float expected;
+    };
+    const Case cases[] = {
+        {"", "", 0.0f},
+        {"theme = 'pro_black'", "", 0.0f},
+        {"theme = {roundness = 0.1}", "", 0.1f},
+        {"theme = {preset = 'pro_black', roundness = 0.25}", "", 0.25f},
+        {"theme = {roundness = 0.1}", "corner = -1", 0.1f},
+        {"theme = {roundness = 0.1}", "corner = 0", 0.0f},
+        {"theme = 'pro_white'", "corner = 0.2", 0.2f},
+    };
+    for (const auto& item : cases) {
+        char source[512];
+        std::snprintf(source, sizeof(source), R"lua(
+local scene = vis.scene {%s}
+local diagram = vis.diagram(scene, {id = "corners", node_size = {2, 1}, %s})
+local a = diagram:node {id = "a"}
+local b = diagram:node {id = "b", kind = "terminal"}
+diagram:connect {id = "ab", from = a, to = b}
+diagram:zone {id = "scope", members = {a, b}}
+diagram:build()
+return scene
+)lua", item.scene, item.corner);
+        Scene* scene = nullptr;
+        char error[1024] = {};
+        auto result = diagram::Lua::load(source, static_cast<uint32_t>(std::strlen(source)),
+                                         "diagram-theme-corners.lua", &scene, error, sizeof(error));
+        CHECK(result == Result::Success && scene);
+        if (result != Result::Success) std::fprintf(stderr, "diagram theme corners: %s\n", error);
+        auto corner = [scene](const char* id) {
+            auto object = scene ? scene->object(id) : nullptr;
+            return object && object->type() == Type::Rectangle
+                       ? static_cast<const Rectangle*>(object)->corner
+                       : -1.0f;
+        };
+        auto near = [](float lhs, float rhs) { return std::fabs(lhs - rhs) < 1.0e-4f; };
+        CHECK(near(corner("corners:node:a:body"), item.expected));
+        CHECK(near(corner("corners:node:b:body"), item.expected > 0.0f ? 0.5f : 0.0f));
+        CHECK(near(corner("corners:zone:scope:body"), item.expected * 1.5f));
+        delete scene;
+    }
+}
+#endif
+
 int main()
 {
 #if defined(VIS_DIAGRAM)
@@ -283,6 +337,7 @@ int main()
     diagramScriptFailures();
     standaloneDiagramLoader();
     numericDiagramText();
+    diagramThemeCorners();
 #endif
     if (failures) std::fprintf(stderr, "%d authoring module checks failed\n", failures);
     return failures ? 1 : 0;

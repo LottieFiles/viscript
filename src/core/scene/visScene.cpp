@@ -129,6 +129,8 @@ static bool _valid(const Theme& theme)
 {
     return theme.objectCount && theme.objectCount <= Theme::ColorLimit
            && std::isfinite(theme.objectWidth) && theme.objectWidth > 0.0f
+           && std::isfinite(theme.roundness) && theme.roundness >= 0.0f
+           && theme.roundness <= 0.5f
            && _valid(theme.h1) && _valid(theme.h2) && _valid(theme.h3)
            && _valid(theme.text) && _valid(theme.code);
 }

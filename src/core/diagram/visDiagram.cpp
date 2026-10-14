@@ -87,7 +87,7 @@ static bool _valid(const Config& config) noexcept
            && _finite(config.routeWidth) && config.routeWidth > 0.0f
            && _finite(config.arrowLength) && config.arrowLength > 0.0f
            && _finite(config.arrowWidth) && config.arrowWidth > config.routeWidth
-           && _finite(config.corner) && config.corner >= 0.0f;
+           && _finite(config.corner);
 }
 
 static bool _valid(Port port) noexcept
@@ -128,49 +128,14 @@ static Result _tag(Object* object, const char* prefix, const char* kind,
                : Result::OutOfMemory;
 }
 
-static Color _alpha(Color color, uint8_t alpha) noexcept
-{
-    color.a = static_cast<uint8_t>((static_cast<uint16_t>(color.a) * alpha) / 255u);
-    return color;
-}
-
-static Color _nodeStroke(const Theme& theme, NodeKind kind) noexcept
-{
-    switch (kind) {
-        case NodeKind::State: return theme.colors.accent;
-        case NodeKind::Decision: return theme.colors.warning;
-        case NodeKind::Terminal: return theme.colors.result;
-        case NodeKind::Entity: return theme.colors.info;
-        case NodeKind::Task: return theme.colors.accent;
-        case NodeKind::Evidence: return theme.colors.danger;
-        case NodeKind::Cell:
-        case NodeKind::Default: return theme.colors.border;
-    }
-    return theme.colors.border;
-}
-
-static Color _nodeFill(const Theme& theme, NodeKind kind) noexcept
-{
-    switch (kind) {
-        case NodeKind::Decision: return _alpha(theme.colors.warning, 44u);
-        case NodeKind::Terminal: return _alpha(theme.colors.result, 48u);
-        case NodeKind::Task: return _alpha(theme.colors.accent, 56u);
-        case NodeKind::Evidence: return _alpha(theme.colors.danger, 44u);
-        case NodeKind::State:
-        case NodeKind::Entity:
-        case NodeKind::Cell:
-        case NodeKind::Default: return theme.colors.surface;
-    }
-    return theme.colors.surface;
-}
-
+// Routes are quiet structure; only errors and flowing directed edges take a hue.
 static Color _edgeColor(const Theme& theme, const EdgeRecord& edge) noexcept
 {
     switch (edge.kind) {
         case EdgeKind::Relation: return theme.colors.border;
         case EdgeKind::Return: return theme.colors.muted;
         case EdgeKind::Error: return theme.colors.danger;
-        case EdgeKind::Optional: return theme.colors.secondary;
+        case EdgeKind::Optional: return theme.colors.muted;
         case EdgeKind::Directed: return edge.flow ? theme.colors.accent : theme.colors.muted;
     }
     return theme.colors.muted;
@@ -789,6 +754,12 @@ uint32_t Diagram::zoneCount() const noexcept
 Result Diagram::build(const Theme& theme, Built*& output) const noexcept
 {
     if (output || !pImpl->nodeCount) return Result::InvalidArguments;
+    // A negative corner follows the Theme: its roundness of the node size's shorter side.
+    auto& nodeSize = pImpl->config.nodeSize;
+    auto corner = pImpl->config.corner >= 0.0f
+                      ? pImpl->config.corner
+                      : theme.roundness * std::fmin(nodeSize.x, nodeSize.y);
+    if (!_finite(corner) || corner < 0.0f) return Result::InvalidArguments;
 
     NodeLayout layouts[NodeLimit]{};
     EdgeLayout edgeLayouts[EdgeLimit]{};
@@ -876,7 +847,7 @@ Result Diagram::build(const Theme& theme, Built*& output) const noexcept
         auto maximum = _add(layout.center, _mul(layout.size, 0.5f));
         auto zone = Group::gen();
         auto body = Rectangle::gen({layout.center.x, layout.center.y, 0.0f}, layout.size,
-                                   pImpl->config.corner * 1.5f);
+                                   corner * 1.5f);
         auto label = Text::gen(record.label,
                                {minimum.x + pImpl->config.zonePadding * 0.35f,
                                 maximum.y - pImpl->config.zonePadding * 0.55f, 0.0f});
@@ -898,7 +869,8 @@ Result Diagram::build(const Theme& theme, Built*& output) const noexcept
             delete builtImpl;
             return result;
         }
-        body->fill(_alpha(theme.colors.surface, 150u));
+        // A zone only outlines its members.
+        body->fill({0, 0, 0, 0});
         body->stroke(theme.colors.border, theme.objectWidth);
         body->layer = pImpl->config.layers.zones;
         label->fill(theme.colors.muted);
@@ -1019,11 +991,11 @@ Result Diagram::build(const Theme& theme, Built*& output) const noexcept
         auto& record = pImpl->nodes[i];
         auto& layout = layouts[i];
         auto node = Group::gen();
-        auto corner = record.kind == NodeKind::Terminal
-                          ? std::fmin(layout.size.x, layout.size.y) * 0.5f
-                          : pImpl->config.corner;
+        // A Terminal is a pill once corners round, and square like the rest otherwise.
+        auto pill = record.kind == NodeKind::Terminal && corner > 0.0f;
         auto body = Rectangle::gen({layout.center.x, layout.center.y, 0.0f}, layout.size,
-                                   corner);
+                                   pill ? std::fmin(layout.size.x, layout.size.y) * 0.5f
+                                        : corner);
         auto labelPoint = record.detail
                               ? Vec3{layout.center.x, layout.center.y + layout.size.y * 0.27f,
                                      0.0f}
@@ -1057,8 +1029,9 @@ Result Diagram::build(const Theme& theme, Built*& output) const noexcept
             delete builtImpl;
             return result;
         }
-        body->fill(_nodeFill(theme, record.kind));
-        body->stroke(_nodeStroke(theme, record.kind), theme.objectWidth);
+        // Every kind is ink on the background; the author colors the node in focus.
+        body->fill(theme.background);
+        body->stroke(theme.colors.foreground, theme.objectWidth);
         body->layer = pImpl->config.layers.nodes;
         label->fill(theme.colors.foreground);
         label->role = record.kind == NodeKind::Cell || record.kind == NodeKind::Task

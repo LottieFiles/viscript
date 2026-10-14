@@ -194,8 +194,7 @@ enum struct TextRole : uint8_t
 
 enum struct ThemePreset : uint8_t
 {
-    ThreeBlueOneEyes = 0,
-    ProWhite,
+    ProWhite = 0,
     ProBlack,
     AdaptiveVscode,
     Pro = ProWhite
@@ -637,8 +636,8 @@ struct SemanticTheme
     Color focus = {49, 95, 140, 255};
 };
 
-// Theme fonts are nonempty; role sizes and object width are finite and positive.
-// Use 1..10 palette colors. Scene::theme() copies font names.
+// Theme fonts are nonempty; role sizes and object width are finite and positive, and
+// roundness is 0 to 0.5. Use 1..10 palette colors. Scene::theme() copies font names.
 struct Theme
 {
     static constexpr uint32_t ColorLimit = 10;
@@ -661,6 +660,9 @@ struct Theme
     };
     uint32_t objectCount = 8;
     float objectWidth = 1.25f;
+    // Corner radius of Diagram boxes that follow the Theme, as a share of the shorter side of
+    // the Diagram's node size (zones round 1.5 times as much); 0 keeps them square.
+    float roundness = 0.0f;
     bool gradient = false;
     Color endGradientStop = {102, 102, 102, 255};
     AxisTheme axis = {

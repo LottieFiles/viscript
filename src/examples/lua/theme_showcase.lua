@@ -1,6 +1,6 @@
 local function custom_theme(gradient)
     return {
-        preset = "3_blue_1_eyes",
+        preset = "pro_black",
         background = "#171225",
         text = {
             h1 = { font = "Pretendard", size = 38, color = "#f8fafc" },
@@ -32,7 +32,6 @@ end
 
 local custom = custom_theme(false)
 local custom_gradient = custom_theme(true)
-local gradient_three_blue_one_eyes = { preset = "3_blue_1_eyes", gradient = true }
 local gradient_pro_white = { preset = "pro_white", gradient = true }
 local gradient_pro_black = { preset = "pro_black", gradient = true }
 
@@ -64,7 +63,7 @@ local function vector_to_point(origin, target, clearance)
     return { dx * scale, dy * scale }
 end
 
-local function panel(theme, name)
+local function panel(theme, name, heading)
     local scene = vis.scene {
         width = 480,
         height = 500,
@@ -84,7 +83,7 @@ local function panel(theme, name)
         id = "title",
     }
     typography:text {
-        text = "VISUAL SYSTEM",
+        text = heading,
         point = { -3.35, 3.40 },
         align = { 0, 0.5 },
         role = "h2",
@@ -180,39 +179,31 @@ local function panel(theme, name)
 end
 
 local page = vis.scene {
-    width = 1920,
+    width = 1440,
     height = 1000,
     fps = 30,
     loop = false,
     background = "#111827",
 }
 
-page:viewport(panel("3_blue_1_eyes", "3 BLUE 1 EYES"), { x = 0, y = 0, width = 0.25, height = 0.5 })
-page:viewport(panel("pro_white", "PRO WHITE"), { x = 0.25, y = 0, width = 0.25, height = 0.5 })
-page:viewport(panel("pro_black", "PRO BLACK"), { x = 0.5, y = 0, width = 0.25, height = 0.5 })
-page:viewport(panel(custom, "CUSTOM"), { x = 0.75, y = 0, width = 0.25, height = 0.5 })
-page:viewport(panel(gradient_three_blue_one_eyes, "3 BLUE 1 EYES · GRAD"), {
-    x = 0,
-    y = 0.5,
-    width = 0.25,
-    height = 0.5,
-})
-page:viewport(panel(gradient_pro_white, "PRO WHITE · GRAD"), {
-    x = 0.25,
-    y = 0.5,
-    width = 0.25,
-    height = 0.5,
-})
-page:viewport(panel(gradient_pro_black, "PRO BLACK · GRAD"), {
-    x = 0.5,
-    y = 0.5,
-    width = 0.25,
-    height = 0.5,
-})
-page:viewport(panel(custom_gradient, "CUSTOM · GRAD"), {
-    x = 0.75,
-    y = 0.5,
-    width = 0.25,
-    height = 0.5,
-})
+local columns = {
+    { "pro_white", gradient_pro_white, "PRO WHITE" },
+    { "pro_black", gradient_pro_black, "PRO BLACK" },
+    { custom, custom_gradient, "CUSTOM" },
+}
+for index, column in ipairs(columns) do
+    local x = (index - 1) / #columns
+    page:viewport(panel(column[1], column[3], "VISUAL SYSTEM"), {
+        x = x,
+        y = 0,
+        width = 1 / #columns,
+        height = 0.5,
+    })
+    page:viewport(panel(column[2], column[3], "GRADIENT"), {
+        x = x,
+        y = 0.5,
+        width = 1 / #columns,
+        height = 0.5,
+    })
+end
 return page

@@ -152,6 +152,7 @@ const themed = vis.scene({
         text: { h1: { font: "Pretendard", size: 36, color: "#202124" } },
         objects: ["#5e7a9b", "#b8915a", "#557b63"],
         object_width: 1.5,
+        roundness: 0.25,
         gradient: true,
         end_gradient_stop: "#778899",
         axis: { x: "#9b3600", y: "#557b63", z: "#5e7a9b" },
@@ -163,6 +164,7 @@ const themedLua = compileScene(themed);
 assert.match(themedLua, /\["preset"\]="pro_black"/);
 assert.match(themedLua, /\["objects"\]=\{"#5e7a9b","#b8915a","#557b63"\}/);
 assert.match(themedLua, /\["object_width"\]=1\.5/);
+assert.match(themedLua, /\["roundness"\]=0\.25/);
 assert.match(themedLua, /\["gradient"\]=true/);
 assert.match(themedLua, /\["end_gradient_stop"\]="#778899"/);
 assert.match(themedLua, /\["colors"\]=\{\["accent"\]="#4cc9f0",\["danger"\]="#ff6b6b",\["focus"\]="#6ea8fe",\["result"\]="#edc948",\["surface"\]="#161b22"\}/);
@@ -4547,7 +4549,7 @@ return root
     );
     assert.equal(themeLayout.status, 0, `theme-showcase/layout: ${themeLayout.stderr}`);
     const themeReport = JSON.parse(themeLayout.stdout).scene;
-    assert.equal(themeReport.viewports.length, 8);
+    assert.equal(themeReport.viewports.length, 6);
     for (const viewport of themeReport.viewports) {
         const objects = new Map(viewport.scene.objects.map((object) => [object.handle, object]));
         const textCollisions = viewport.scene.intersections.filter((pair) => {

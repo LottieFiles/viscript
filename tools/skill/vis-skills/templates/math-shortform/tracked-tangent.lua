@@ -2,7 +2,7 @@
 -- ball carries the story, geometry comes before notation, and the camera
 -- frames overview -> detail -> overview. No title: the curve is the subject.
 local scene = vis.scene {
-    width = 960, height = 540, theme = "3_blue_1_eyes",
+    width = 960, height = 540, theme = "pro_black",
     camera = {mode = "fixed", view = "2d", target = {0, 2}, height = 6},
 }
 

@@ -77,24 +77,23 @@ void highlightedParts(SwRenderer* renderer)
 
 void sceneThemes(SwRenderer* renderer)
 {
-    auto threeBlueOneEyes = Theme::preset(ThemePreset::ThreeBlueOneEyes);
     auto proWhite = Theme::preset(ThemePreset::ProWhite);
     auto proBlack = Theme::preset(ThemePreset::ProBlack);
     auto adaptiveVscode = Theme::preset(ThemePreset::AdaptiveVscode);
     auto legacyPro = Theme::preset(ThemePreset::Pro);
     CHECK(Theme::ColorLimit == 10u);
     Theme implicit;
-    const Theme presets[] = {implicit, threeBlueOneEyes, proWhite, proBlack, adaptiveVscode, legacyPro};
+    const Theme presets[] = {implicit, proWhite, proBlack, adaptiveVscode, legacyPro};
     for (const auto& preset : presets) {
         CHECK(std::strcmp(preset.code.font, "JetBrainsMono") == 0);
     }
-    CHECK(threeBlueOneEyes.objectCount == 8u);
     CHECK(proWhite.objectCount == 8u);
     CHECK(proBlack.objectCount == 8u);
-    CHECK(near(threeBlueOneEyes.objectWidth, 2.0f));
     CHECK(near(proWhite.objectWidth, 1.25f));
     CHECK(near(proBlack.objectWidth, 1.25f));
-    CHECK(same(threeBlueOneEyes.background, Color::hex("#0d1117")));
+    // Every preset keeps structural boxes square; a custom Theme may round them.
+    CHECK(implicit.roundness == 0.0f && proWhite.roundness == 0.0f && proBlack.roundness == 0.0f
+          && adaptiveVscode.roundness == 0.0f && legacyPro.roundness == 0.0f);
     CHECK(same(adaptiveVscode.background, proWhite.background));
     CHECK(same(adaptiveVscode.objects[0], proWhite.objects[0]));
     CHECK(same(implicit.background, proWhite.background));
@@ -104,8 +103,6 @@ void sceneThemes(SwRenderer* renderer)
     CHECK(same(proBlack.background, Color::hex("#000000")));
     CHECK(same(proBlack.objects[0], Color::hex("#f28e2b")));
     CHECK(same(proBlack.h1.color, Color::hex("#ffffff")));
-    CHECK(same(threeBlueOneEyes.color(ThemeColorRole::Accent), Color::hex("#4cc9f0")));
-    CHECK(same(threeBlueOneEyes.color(ThemeColorRole::Warning), Color::hex("#ffd166")));
     CHECK(same(proWhite.color(ThemeColorRole::Danger), Color::hex("#b3261e")));
     CHECK(same(proBlack.color(ThemeColorRole::Success), Color::hex("#7ee787")));
     CHECK(same(proWhite.color(ThemeColorRole::Result), Color::hex("#8a6500")));
@@ -121,8 +118,7 @@ void sceneThemes(SwRenderer* renderer)
     CHECK(same(proBlack.axis.y, proBlack.axis.grid));
     CHECK(same(proBlack.axis.z, proBlack.axis.grid));
     CHECK(same(proBlack.axis.grid, Color::hex("#d8dadd")));
-    CHECK(!threeBlueOneEyes.gradient && !proWhite.gradient && !proBlack.gradient);
-    CHECK(same(threeBlueOneEyes.endGradientStop, Color::hex("#f72585")));
+    CHECK(!proWhite.gradient && !proBlack.gradient);
     CHECK(same(proWhite.endGradientStop, Color::hex("#666666")));
     CHECK(same(proBlack.endGradientStop, Color::hex("#999999")));
 
@@ -133,8 +129,8 @@ void sceneThemes(SwRenderer* renderer)
     if (!scene) return;
     CHECK(same(scene->theme().background, proWhite.background));
     CHECK(same(scene->theme().objects[0], proWhite.objects[0]));
-    CHECK(scene->theme(threeBlueOneEyes) == Result::Success);
-    CHECK(same(scene->config().background, threeBlueOneEyes.background));
+    CHECK(scene->theme(proBlack) == Result::Success);
+    CHECK(same(scene->config().background, proBlack.background));
     CHECK(scene->theme(proWhite) == Result::Success);
     CHECK(same(scene->config().background, proWhite.background));
     CHECK(std::strcmp(scene->theme().h1.font, "Pretendard") == 0);
@@ -222,7 +218,7 @@ void sceneThemes(SwRenderer* renderer)
         CHECK(same(filledSurface->style.fill, proWhite.objects[1]));
         CHECK(filledSurface->style.fill.a == 255u);
     }
-    CHECK(scene->theme(threeBlueOneEyes) == Result::InsufficientCondition);
+    CHECK(scene->theme(proBlack) == Result::InsufficientCondition);
     delete scene;
 
     auto editorial = proWhite;
@@ -254,18 +250,33 @@ void sceneThemes(SwRenderer* renderer)
     }
     delete scene;
 
-    auto invalid = threeBlueOneEyes;
+    auto invalid = proBlack;
     invalid.objectCount = 0u;
     scene = Scene::gen();
     CHECK(scene != nullptr);
     if (scene) CHECK(scene->theme(invalid) == Result::InvalidArguments);
     delete scene;
 
-    invalid = threeBlueOneEyes;
+    invalid = proBlack;
     invalid.objectWidth = 0.0f;
     scene = Scene::gen();
     CHECK(scene != nullptr);
     if (scene) CHECK(scene->theme(invalid) == Result::InvalidArguments);
+    delete scene;
+
+    for (auto roundness : {-0.01f, 0.51f, std::numeric_limits<float>::quiet_NaN()}) {
+        invalid = proBlack;
+        invalid.roundness = roundness;
+        scene = Scene::gen();
+        CHECK(scene != nullptr);
+        if (scene) CHECK(scene->theme(invalid) == Result::InvalidArguments);
+        delete scene;
+    }
+    auto pill = proBlack;
+    pill.roundness = 0.5f;
+    scene = Scene::gen();
+    CHECK(scene != nullptr);
+    if (scene) CHECK(scene->theme(pill) == Result::Success && scene->theme().roundness == 0.5f);
     delete scene;
 
     Config gradientConfig;
@@ -273,7 +284,7 @@ void sceneThemes(SwRenderer* renderer)
     gradientConfig.height = 100u;
     gradientConfig.camera.orthoHeight = 4.0f;
     gradientConfig.background = Color::hex("#ffffff");
-    auto gradientTheme = threeBlueOneEyes;
+    auto gradientTheme = proBlack;
     gradientTheme.objects[0] = Color::hex("#ff0000");
     gradientTheme.objectCount = 1u;
     gradientTheme.gradient = true;
