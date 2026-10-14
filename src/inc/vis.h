@@ -27,6 +27,7 @@ enum struct Result : uint8_t
 enum struct RenderEngine : uint8_t
 {
     Cpu = 0,
+    // Experimental: built only with -Dengines=cpu,gl, and never in WebAssembly builds.
     Gl
 };
 

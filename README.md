@@ -90,7 +90,7 @@ meson test -C build --print-errorlogs
 
 | Option | Default | Purpose |
 |---|---|---|
-| `engines` | `cpu,gl` | Render engines. |
+| `engines` | `cpu` | Render engines. `gl` is experimental and opt-in (`-Dengines=cpu,gl`); WASM builds are CPU-only. |
 | `modules` | none | Optional modules, such as `diagram,tex`, or `all`. |
 | `savers` | `all` | GIF and video exporters. PNG is built into the core. |
 | `tools` | `all` | The CLI and the audit command. |

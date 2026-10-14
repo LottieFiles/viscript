@@ -91,6 +91,7 @@ VIS_API VisResult vis_load_asset(VisEngine engine, const char* name, const uint8
                                        const char* mime);
 VIS_API VisResult vis_render(VisEngine engine, float time);
 VIS_API VisResult vis_render_scaled(VisEngine engine, float time, uint32_t pixel_ratio);
+// Experimental: needs a build with the GL engine (-Dengines=cpu,gl).
 VIS_API VisResult vis_render_gl(VisEngine engine, float time, const VisGlTarget* target);
 VIS_API VisResult vis_bounds(VisEngine engine, const char* object, float time, VisBBox* output);
 VIS_API VisResult vis_intersects(VisEngine engine, const char* first, const char* second, float time,

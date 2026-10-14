@@ -2,8 +2,8 @@ option(
     'engines',
     type: 'array',
     choices: ['cpu', 'gl'],
-    value: ['cpu', 'gl'],
-    description: 'Build the selected viscript render engines (GL is dropped with a warning on Emscripten or when the platform has no OpenGL)',
+    value: ['cpu'],
+    description: 'Build the selected viscript render engines. GL is experimental and opt-in (-Dengines=cpu,gl); it is dropped with a warning on Emscripten or when the platform has no OpenGL',
 )
 option(
     'modules',

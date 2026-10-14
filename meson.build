@@ -41,7 +41,7 @@ if gl_enabled
     gl_platform = false
     gl_system = host_machine.system()
     if gl_system == 'emscripten'
-        warning('GL engine disabled for Emscripten builds; the WebAssembly API renders through the CPU engine')
+        warning('GL engine (experimental) disabled for Emscripten builds; the WebAssembly API renders through the CPU engine')
     elif gl_system == 'darwin'
         gl_platform = dependency('appleframeworks', modules: 'OpenGL', required: false).found()
     elif gl_system == 'windows'
