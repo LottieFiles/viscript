@@ -1,7 +1,7 @@
-#include <charconv>
 #include <cmath>
 #include <cstddef>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <limits>
 #include <new>
@@ -487,13 +487,67 @@ static tvg::Paint* _text(const DrawCommand& command)
     return text;
 }
 
+// Shortest text that reads back as value, written as std::to_chars(value, general) writes it:
+// fixed for decimal exponents -4..5 and scientific otherwise, as %g does at its default
+// precision. Built on snprintf so the WASM runtime does not link libc++'s ~100 KB of Ryu tables.
+static bool _shortest(float value, char* output, size_t capacity)
+{
+    if (!std::isfinite(value) || value == 0.0f) {
+        auto n = std::snprintf(output, capacity, "%g", value);
+        return n > 0 && static_cast<size_t>(n) < capacity;
+    }
+    char sci[32];
+    for (auto precision = 0; precision < 9; precision++) {
+        std::snprintf(sci, sizeof(sci), "%.*e", precision, value);
+        if (std::strtof(sci, nullptr) == value) break;
+    }
+    // sci is [-]d[.ddd]e±XX: collect sign, digits and the decimal exponent
+    auto at = sci;
+    auto negative = *at == '-';
+    if (negative) at++;
+    char digits[16];
+    auto count = 0;
+    for (; *at != 'e'; at++) {
+        if (*at != '.') digits[count++] = *at;
+    }
+    auto exponent = std::atoi(at + 1);
+    while (count > 1 && digits[count - 1] == '0') count--;
+
+    char fixed[64], shortSci[32];
+    auto f = 0;
+    if (negative) fixed[f++] = '-';
+    if (exponent >= 0) {
+        for (auto i = 0; i <= exponent || i < count; i++) {
+            if (i == exponent + 1) fixed[f++] = '.';
+            fixed[f++] = i < count ? digits[i] : '0';
+        }
+    } else {
+        fixed[f++] = '0';
+        fixed[f++] = '.';
+        for (auto i = 0; i < -exponent - 1; i++) fixed[f++] = '0';
+        for (auto i = 0; i < count; i++) fixed[f++] = digits[i];
+    }
+    fixed[f] = '\0';
+    auto s = 0;
+    if (negative) shortSci[s++] = '-';
+    shortSci[s++] = digits[0];
+    if (count > 1) {
+        shortSci[s++] = '.';
+        for (auto i = 1; i < count; i++) shortSci[s++] = digits[i];
+    }
+    s += std::snprintf(shortSci + s, sizeof(shortSci) - s, "e%c%02d", exponent < 0 ? '-' : '+',
+                       exponent < 0 ? -exponent : exponent);
+    auto useFixed = exponent >= -4 && exponent < 6;
+    auto pick = useFixed ? fixed : shortSci;
+    auto length = static_cast<size_t>(useFixed ? f : s);
+    if (length >= capacity) return false;
+    std::memcpy(output, pick, length + 1);
+    return true;
+}
+
 static bool _numberText(const DrawCommand& command, char (&value)[64])
 {
-    auto converted = std::to_chars(value, value + sizeof(value) - 1u, command.number,
-                                   std::chars_format::general);
-    if (converted.ec != std::errc{}) return false;
-    *converted.ptr = '\0';
-    return true;
+    return _shortest(command.number, value, sizeof(value));
 }
 
 static tvg::Paint* _number(const DrawCommand& command)

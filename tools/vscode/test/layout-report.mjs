@@ -39,5 +39,25 @@ assert.ok(containment);
 assert.equal(containment.contained, false);
 assert.ok(containment.overflow.right > 0);
 
+// A code block is a typeset Group: its token Texts form one block.
+runtime.font("JetBrainsMono", fs.readFileSync(path.join(extensionRoot, "runtime", "JetBrainsMono.ttf")), "ttf");
+runtime.loadLua(`
+local root = vis.scene {width = 200, height = 100, camera = {height = 2}}
+root:group {id = "plain"}
+root:code {text = "a = b", language = "plain", id = "snippet"}
+return root
+`, "layout-report-typeset.lua");
+const typeset = runtime.layoutReport(0, 2);
+const snippet = typeset.objects.find((object) => object.id === "snippet");
+assert.equal(snippet?.typeset, true);
+assert.equal(typeset.objects.find((object) => object.id === "plain")?.typeset, false);
+const inSnippet = (object) => {
+    for (let parent = object.parent; parent !== null; parent = typeset.objects[parent].parent) {
+        if (parent === snippet.index) return true;
+    }
+    return false;
+};
+assert.ok(typeset.objects.some((object) => object.type === "text" && inSnippet(object)));
+
 runtime.destroy();
 console.log("whole-Scene layout report passed");

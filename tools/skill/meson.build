@@ -78,4 +78,17 @@ endforeach
 node = find_program('node', required: false)
 if node.found()
     test('skill-static-check', node, args: [files('check.mjs'), meson.project_source_root()])
+    # The plate template, rendered with the bundled runtime as the VS Code Viewer renders it,
+    # in Source Serif 4 and both fallback palettes.
+    test(
+        'skill-host-review',
+        node,
+        args: [
+            files('vis-vscode/scripts/host-review.mjs'),
+            files('vis-skills/templates/pipeline-plate/pipeline-plate.lua'),
+            '--contain', 'node:*:name', 'node:*:body', '8',
+            '--contain', 'node:*:when', 'node:*:body', '8',
+            '--out', meson.current_build_dir() / 'host-review',
+        ],
+    )
 endif

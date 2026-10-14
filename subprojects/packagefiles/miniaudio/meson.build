@@ -24,6 +24,9 @@ if host_machine.system() == 'emscripten'
         '-DMA_NO_RUNTIME_LINKING',
         '-DMA_ENABLE_ONLY_SPECIFIC_BACKENDS',
         '-DMA_ENABLE_WEBAUDIO',
+        # the browser runtime decodes WAV only; FLAC and MP3 cost ~150 KB of code
+        '-DMA_NO_FLAC',
+        '-DMA_NO_MP3',
     ]
     miniaudio_overrides = ['c_std=gnu11']
 elif host_machine.system() == 'linux'

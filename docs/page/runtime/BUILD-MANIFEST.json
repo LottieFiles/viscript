@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "project": "viscript",
   "projectVersion": "0.1.0",
-  "sourceCommit": "75e817a042d2",
+  "sourceCommit": "ceecbf0a51af",
   "sourceDirty": true,
-  "buildDate": "2026-10-13",
+  "buildDate": "2026-10-14",
   "toolchain": {
     "emscripten": "4.0.19",
     "buildType": "minsize",
@@ -33,13 +33,13 @@
   "artifacts": [
     {
       "path": "vis-wasm.js",
-      "bytes": 24778,
-      "sha256": "2f576e14954f03d24848b7181c9c2db6623fa774c7325a6249a6442d5d88a8c6"
+      "bytes": 24548,
+      "sha256": "7db7a58c9ddd145c89a529654f3e63c4b0396712c1a0e00cc7a13888a40195cc"
     },
     {
       "path": "vis-wasm.wasm",
-      "bytes": 1469479,
-      "sha256": "42d288cacb21209b7eae5228239277a219e362662754b5d644bfefb097e30d6a"
+      "bytes": 1192033,
+      "sha256": "a24fd9ebed2c488e06c4abea4f0b3b7725fcac9935d5c52b94d7f776c3a70288"
     },
     {
       "path": "client.js",
@@ -58,8 +58,8 @@
     },
     {
       "path": "bindings.d.ts",
-      "bytes": 70144,
-      "sha256": "04dc555cadd9d9ca7501dc1f7b1ee0cc8d05ad10917e55ce72d0f7e10aede317"
+      "bytes": 70172,
+      "sha256": "35c033883cf9a7afa89925b2edfde056a928e6290f88240929033ef8348ead10"
     },
     {
       "path": "Pretendard.ttf",
@@ -110,11 +110,6 @@
       "path": "LICENSE-ThorVG.txt",
       "bytes": 1077,
       "sha256": "74242cdc4ccaebc73fa04fbd52a538429eae2be7a231f9eaf1dbf59d2bedc16b"
-    },
-    {
-      "path": "LICENSE-libwebp.txt",
-      "bytes": 2995,
-      "sha256": "af5fa202c3ee5483a32fe6d3b060233f77cc6711a7ed7a52d6013ff4e73db5e1"
     },
     {
       "path": "LICENSE-LodePNG.txt",

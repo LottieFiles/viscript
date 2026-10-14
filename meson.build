@@ -75,11 +75,13 @@ foreach engine : ['cpu', 'gl']
 endforeach
 
 # External dependencies: ThorVG (system or bundled subproject), then Lua.
+# The browser runtime loads SVG and PNG pictures only; JPG and WebP stay native.
+tvg_loaders = host_machine.system() == 'emscripten' ? 'svg,png,ttf' : 'svg,png,jpg,webp,ttf'
 tvg_options = [
     'engines=' + ','.join(tvg_engines),
     'default_library=static',
     'static=true',
-    'loaders=svg,png,jpg,webp,ttf',
+    'loaders=' + tvg_loaders,
     'savers=',
     'bindings=',
     'extra=',
@@ -88,7 +90,8 @@ tvg_options = [
     'werror=false',
 ]
 if host_machine.system() == 'emscripten'
-    tvg_options += 'file=false'
+    # ThorVG defaults to debugoptimized -O3; the browser runtime wants it as small as the rest.
+    tvg_options += ['file=false', 'partial=false', 'buildtype=minsize', 'optimization=s', 'debug=false']
 endif
 
 tvg_bundled = get_option('bundled_thorvg') or host_machine.system() == 'emscripten'

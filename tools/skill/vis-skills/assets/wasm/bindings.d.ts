@@ -72,7 +72,7 @@ export interface CameraTarget {
     far?: number;
 }
 
-export type ThemePreset = "3_blue_1_eyes" | "pro_white" | "pro_black" | "adaptive_vscode" | "pro";
+export type ThemePreset = "pro_white" | "pro_black" | "adaptive_vscode" | "pro";
 export interface TextTheme {
     font?: string;
     size?: number;
@@ -111,6 +111,8 @@ export interface ThemeOptions {
     };
     objects?: readonly Color[];
     object_width?: number;
+    /** Corner radius of Theme-following Diagram nodes as a share (0 to 0.5) of the shorter node-size side; zones round 1.5 times as much, and 0 keeps them square. */
+    roundness?: number;
     gradient?: boolean;
     end_gradient_stop?: Color;
     axis?: AxisTheme;
@@ -356,7 +358,8 @@ export interface TexOptions extends TexStyle {
 }
 /** How an entry sits across its column. */
 export type Justify = "left" | "center" | "right";
-/** A number counts as `number` does; a string is set as it is. */
+/** A number counts as `number` does. A string is set as it is in a table; in a matrix it is inline TeX
+ * when the tex module is built in, and text otherwise. */
 export type MatrixEntry = number | string;
 /** The matrix's id, opacity, progress and layer effects go to its group; color and fill to its entries,
  * color, stroke and width to its brackets, and layer to every part. */
@@ -743,7 +746,7 @@ export interface CloneOptions extends Style {
     /** Moves the copy by this world vector before it is attached; a connector follows its endpoints instead. */
     shift?: WorldVector;
 }
-/** Picture from a registered asset (SVG stays vector; PNG/JPG/WebP are raster) or inline RGBA pixels. */
+/** Picture from a registered asset (SVG stays vector, PNG is raster; native builds also read JPG and WebP) or inline RGBA pixels. */
 export type PictureOptions = Omit<Style, "color" | "stroke" | "fill" | "radius"> & ({
     asset: string;
     pixels?: never;

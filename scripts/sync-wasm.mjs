@@ -3,7 +3,7 @@
 // Usage: node scripts/sync-wasm.mjs <build-dir> <bundle-dir>...
 import {execFileSync} from "node:child_process";
 import {createHash} from "node:crypto";
-import {copyFileSync, existsSync, readFileSync, writeFileSync} from "node:fs";
+import {existsSync, readFileSync, writeFileSync} from "node:fs";
 import {dirname, join, resolve} from "node:path";
 import {fileURLToPath} from "node:url";
 
@@ -26,7 +26,6 @@ const sources = {
     // Licenses for everything compiled into vis-wasm.wasm.
     "LICENSE-viscript.txt": join(root, "LICENSE"),
     "LICENSE-ThorVG.txt": join(root, "licenses/LICENSE-ThorVG.txt"),
-    "LICENSE-libwebp.txt": join(root, "licenses/LICENSE-libwebp.txt"),
     "LICENSE-LodePNG.txt": join(root, "licenses/LICENSE-LodePNG.txt"),
     "LICENSE-Lua.txt": join(root, "licenses/LICENSE-Lua.txt"),
     "LICENSE-miniaudio.txt": join(root, "licenses/LICENSE-miniaudio.txt"),
@@ -41,7 +40,9 @@ const commit = git("rev-parse", "--short=12", "HEAD");
 const dirty = git("status", "--porcelain").length > 0;
 
 for (const bundle of bundles) {
-    for (const [name, path] of Object.entries(sources)) copyFileSync(path, join(bundle, name));
+    // write the bytes rather than copyFileSync: on APFS a copy clones the linker's file and keeps its
+    // preallocated blocks, so a 1.3 MB wasm took 2.2 MB on disk
+    for (const [name, path] of Object.entries(sources)) writeFileSync(join(bundle, name), readFileSync(path));
 
     const manifestPath = join(bundle, "BUILD-MANIFEST.json");
     const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
@@ -51,7 +52,8 @@ for (const bundle of bundles) {
     for (const path of Object.keys(sources)) {
         if (!manifest.artifacts.some((artifact) => artifact.path === path)) manifest.artifacts.push({path});
     }
-    manifest.artifacts = manifest.artifacts.map(({path}) => {
+    // drop artifacts that are no longer shipped, such as a removed loader's license
+    manifest.artifacts = manifest.artifacts.filter(({path}) => existsSync(join(bundle, path))).map(({path}) => {
         const bytes = readFileSync(join(bundle, path));
         return {path, bytes: bytes.length, sha256: createHash("sha256").update(bytes).digest("hex")};
     });

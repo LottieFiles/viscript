@@ -46,13 +46,15 @@ runtime.loadLua("return vis.scene {width = 8, height = 8}", "implicit-pro-white.
 assert.equal(runtime.adaptiveTheme, false);
 assert.deepEqual([...runtime.render(0).slice(0, 4)], [255, 255, 255, 255]);
 
-runtime.loadLua("return vis.scene {width = 8, height = 8, theme = '3_blue_1_eyes'}", "three-blue-one-eyes.lua");
+runtime.loadLua("return vis.scene {width = 8, height = 8, theme = 'pro_black'}", "pro-black.lua");
 assert.equal(runtime.adaptiveTheme, false);
-assert.deepEqual([...runtime.render(0).slice(0, 4)], [13, 17, 23, 255]);
-assert.throws(
-    () => runtime.loadLua("return vis.scene {theme = 'default'}", "removed-default.lua"),
-    /theme preset must be '3_blue_1_eyes'/,
-);
+assert.deepEqual([...runtime.render(0).slice(0, 4)], [0, 0, 0, 255]);
+for (const removed of ["default", "3_blue_1_eyes"]) {
+    assert.throws(
+        () => runtime.loadLua(`return vis.scene {theme = '${removed}'}`, "removed-preset.lua"),
+        /theme preset must be 'pro_white', 'pro_black' or 'adaptive_vscode'/,
+    );
+}
 
 runtime.loadLua("return vis.scene {width = 8, height = 8, theme = {preset = 'adaptive_vscode'}}", "adaptive-table.lua");
 assert.equal(runtime.adaptiveTheme, true);

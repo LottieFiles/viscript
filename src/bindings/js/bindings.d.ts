@@ -746,7 +746,7 @@ export interface CloneOptions extends Style {
     /** Moves the copy by this world vector before it is attached; a connector follows its endpoints instead. */
     shift?: WorldVector;
 }
-/** Picture from a registered asset (SVG stays vector; PNG/JPG/WebP are raster) or inline RGBA pixels. */
+/** Picture from a registered asset (SVG stays vector, PNG is raster; native builds also read JPG and WebP) or inline RGBA pixels. */
 export type PictureOptions = Omit<Style, "color" | "stroke" | "fill" | "radius"> & ({
     asset: string;
     pixels?: never;

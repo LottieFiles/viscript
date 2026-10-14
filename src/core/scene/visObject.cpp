@@ -1,6 +1,6 @@
 #include <algorithm>
-#include <charconv>
 #include <cmath>
+#include <cstdio>
 #include <cstring>
 #include <limits>
 #include <new>
@@ -680,10 +680,11 @@ uint32_t Text::write(float value, char* output, uint32_t capacity) const noexcep
 {
     if (!objCounting || !output || !std::isfinite(value)) return 0u;
     char digits[NUMBER_ROOM];
-    auto converted = std::to_chars(digits, digits + sizeof(digits), std::fabs(value), std::chars_format::fixed,
-                                   static_cast<int>(objFormat.decimals));
-    if (converted.ec != std::errc{}) return 0u;
-    auto length = static_cast<uint32_t>(converted.ptr - digits);
+    // snprintf rather than std::to_chars: same digits, without libc++'s float tables in the WASM runtime
+    auto written = std::snprintf(digits, sizeof(digits), "%.*f", static_cast<int>(objFormat.decimals),
+                                 static_cast<double>(std::fabs(value)));
+    if (written < 0 || static_cast<size_t>(written) >= sizeof(digits)) return 0u;
+    auto length = static_cast<uint32_t>(written);
     // Digits before the point, and whether the value rounds to zero.
     auto whole = length;
     auto zero = true;

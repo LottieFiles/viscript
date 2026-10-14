@@ -528,6 +528,11 @@ export class PreviewPanel implements vscode.Disposable {
         const errors: string[] = [];
         const directory = vscode.Uri.file(path.dirname(uri.fsPath));
         for (const name of names) {
+            const unsupported = unsupportedAsset(name);
+            if (unsupported) {
+                errors.push(unsupported);
+                continue;
+            }
             const assetUri = vscode.Uri.joinPath(directory, ...name.replaceAll("\\", "/").split("/"));
             try {
                 const bytes = await vscode.workspace.fs.readFile(assetUri);
@@ -1289,17 +1294,23 @@ function defaultDescription(document: vscode.TextDocument): string {
     return `Live viscript scene. Changes in \`${name}\` are rendered automatically.`;
 }
 
+// The bundled WASM runtime decodes SVG/PNG images and WAV audio only; native builds read the rest.
+const UNSUPPORTED_ASSETS: Record<string, string> = {
+    ".jpg": "SVG or PNG", ".jpeg": "SVG or PNG", ".webp": "SVG or PNG",
+    ".mp3": "WAV", ".ogg": "WAV", ".flac": "WAV",
+};
+
+function unsupportedAsset(name: string): string | undefined {
+    const extension = path.extname(name).toLowerCase();
+    const use = UNSUPPORTED_ASSETS[extension];
+    return use && `${name}: ${extension.slice(1).toUpperCase()} is not supported in the preview; use ${use}`;
+}
+
 function mimeFor(name: string): string {
     switch (path.extname(name).toLowerCase()) {
         case ".png": return "png";
-        case ".jpg":
-        case ".jpeg": return "jpeg";
-        case ".webp": return "webp";
         case ".svg": return "svg";
         case ".wav": return "audio/wav";
-        case ".mp3": return "audio/mpeg";
-        case ".ogg": return "audio/ogg";
-        case ".flac": return "audio/flac";
         default: return path.extname(name).slice(1) || "application/octet-stream";
     }
 }
