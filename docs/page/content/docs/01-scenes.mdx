@@ -12,7 +12,8 @@ Every script builds one scene. This page covers the scene itself; the pages belo
 
 ### Create and return
 
-Every script builds one root scene with `vis.scene`, adds objects to it, and **returns it**. The script runs once to *construct* the scene; the host then renders any time `t` from it.
+Every script builds one root scene with `vis.scene`, adds objects to it, and **returns it**.<br />
+The script runs once to *construct* the scene; the host then renders any time `t` from it.
 
 ```lua live
 local scene = vis.scene {width = 960, height = 540, theme = "pro_black"}
@@ -39,7 +40,8 @@ return scene;
 
 ### Camera and world units
 
-Objects are placed in world units, not pixels. The camera decides how much of the world fits in the frame: `height = 6` shows six units vertically, so a 960×540 frame spans about ±5.33 × ±3.
+Objects are placed in world units, not pixels.<br />
+The camera decides how much of the world fits in the frame: `height = 6` shows six units vertically, so a 960×540 frame spans about ±5.33 × ±3.
 
 To pan and zoom during the scene, see [Camera](#/docs/camera).
 

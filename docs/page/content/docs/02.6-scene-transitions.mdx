@@ -9,8 +9,8 @@ summary: Play whole scenes in sequence: match, fade, slide and zoom between them
 
 ## Scene transitions
 
-<p><code>root:scene_transition(scenes, options)</code> plays complete scenes, called stages, one after another. Each stage is authored on its own, keeps its own timeline, and starts from its own time zero as its incoming transition begins.
-By default the hand-off is <code>"match"</code>: objects that share an <code>id</code> in both stages travel to their new place, and the rest fade.</p>
+<p><code>root:scene_transition(scenes, options)</code> plays complete scenes, called stages, one after another. Each stage is authored on its own, keeps its own timeline, and starts from its own time zero as its incoming transition begins.</p>
+<p>By default the hand-off is <code>"match"</code>: objects that share an <code>id</code> in both stages travel to their new place, and the rest fade.</p>
 <table>
 <tr><th>Option</th><th>Meaning</th></tr>
 <tr><td><code>duration</code>, <code>curve</code></td><td>Length and easing of each transition; 1 second by default.</td></tr>

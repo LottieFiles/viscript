@@ -6,11 +6,13 @@ summary: Write your first scene, then render it in the browser, the CLI, or VS C
 
 # Quick Start
 
-A viscript scene is a short script that builds objects, records animation on a timeline, and returns the scene. The host can then render any moment of it.
+A viscript scene is a short script that builds objects, records animation on a timeline, and returns the scene.<br />
+The host can then render any moment of it.
 
 ## Your first scene
 
-Edit the code: the player re-renders as you type. Switch between Lua and JS with the toggle above the editor.
+Edit the code: the player re-renders as you type.<br />
+Switch between Lua and JS with the toggle above the editor.
 
 ```lua live
 local scene = vis.scene {
@@ -80,7 +82,11 @@ build/viscript render scene.lua --fps 30 -o scene.mp4 \
 
 ### Browser
 
-The repository ships a prebuilt WASM runtime in `tools/skill/vis-skills/assets/wasm/`, so there is nothing to build: use that folder as it is. It is self-contained: `client.js` (the API), `vis-wasm.js` + `vis-wasm.wasm` (the engine), fonts, and licenses. Copy the whole folder next to your page as `viscript/`:
+The repository ships a prebuilt WASM runtime in `tools/skill/vis-skills/assets/wasm/`, so there is nothing to build: use that folder as it is.
+
+It is self-contained: `client.js` (the API), `vis-wasm.js` + `vis-wasm.wasm` (the engine), fonts, and licenses.
+
+Copy the whole folder next to your page as `viscript/`:
 
 ```text
 my-page/
@@ -180,7 +186,9 @@ The viscript extension previews `.lua` scenes beside the editor, with a timeline
 
 ## Skills for AI agents
 
-`tools/skill/` holds agent skills that teach an AI coding agent the viscript API, its review loop and scene templates. Ask for a scene in plain language and the agent writes it, checks it and renders it.
+`tools/skill/` holds agent skills that teach an AI coding agent the viscript API, its review loop and scene templates.
+
+Ask for a scene in plain language and the agent writes it, checks it and renders it.
 
 | Skill | Use it for |
 |---|---|
@@ -201,7 +209,11 @@ done
 
 For Codex, link the same folders into `~/.codex/skills/`; `vis-skills` includes `agents/openai.yaml`.
 
-`vis-skills` carries the same prebuilt WASM runtime and fonts in `assets/wasm/`, so an agent can mount and render scenes in the browser or Node without building anything; the `viscript` CLI review commands need a native build. Then ask, for example:
+`vis-skills` carries the same prebuilt WASM runtime and fonts in `assets/wasm/`, so an agent can mount and render scenes in the browser or Node without building anything.
+
+The `viscript` CLI review commands need a native build.
+
+Then ask, for example:
 
 ```text
 Use vis-skills to animate binary search on a sorted array of 16 numbers.

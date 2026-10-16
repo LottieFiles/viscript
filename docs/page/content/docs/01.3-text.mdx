@@ -144,9 +144,16 @@ return scene;
 
 ## TeX
 
-`tex` typesets math in the scene's fonts. `tex` takes a TeX string, or a list of parts; each part becomes its own group, so `part(tex)` can find it later to colour or animate. The result is an ordinary group of glyphs and shapes, and it places like `text`: `point`, `align`, `size` or `role`.
+`tex` typesets math in the scene's fonts. `tex` takes a TeX string, or a list of parts; each part becomes its own group, so `part(tex)` can find it later to colour or animate.
 
-`part(tex, n)` finds the nth part, or else glyph, whose TeX matches, ignoring spaces. Split a formula into parts to keep terms together when you colour them or `match_transform` one formula into another. Write `\\` for a backslash inside a quoted string. `tex` comes from the TeX module: the WASM runtime includes it, and a native build needs `-Dmodules=tex`.
+The result is an ordinary group of glyphs and shapes, and it places like `text`: `point`, `align`, `size` or `role`.
+
+`part(tex, n)` finds the nth part, or else glyph, whose TeX matches, ignoring spaces.
+
+Split a formula into parts to keep terms together when you colour them or `match_transform` one formula into another.
+
+Write `\\` for a backslash inside a quoted string.<br />
+`tex` comes from the TeX module: the WASM runtime includes it, and a native build needs `-Dmodules=tex`.
 
 ```lua live
 local scene = vis.scene {
@@ -194,7 +201,7 @@ return scene;
 
 <table>
 <tr><th>Field</th><th>Meaning</th></tr>
-<tr><td><code>tex</code></td><td>A TeX string, or a list of parts. A part is a string, or a table with its own <code>color</code>, <code>fill</code> or <code>id</code> (in Lua the TeX is its first entry; in JS it is <code>text</code>).</td></tr>
+<tr><td><code>tex</code></td><td>A TeX string, or a list of parts.<br />A part is a string, or a table with its own <code>color</code>, <code>fill</code> or <code>id</code> (in Lua the TeX is its first entry; in JS it is <code>text</code>).</td></tr>
 <tr><td><code>display</code></td><td>Display style (as <code>$$…$$</code>) by default; <code>false</code> sets it inline (as <code>$…$</code>).</td></tr>
 <tr><td><code>baseline</code></td><td>Pin the baseline at <code>point</code> instead of the box.</td></tr>
 <tr><td><code>point</code>, <code>align</code>, <code>size</code>, <code>role</code>, <code>font</code>, <code>color</code></td><td>As for <code>text</code>.</td></tr>
@@ -202,7 +209,9 @@ return scene;
 
 ## Code
 
-`code` lays out source as coloured tokens in the theme's monospaced font. It returns a group whose children are the lines, and each line's children are its tokens, so `row(n)` picks a line and `search` picks tokens.
+`code` lays out source as coloured tokens in the theme's monospaced font.
+
+It returns a group whose children are the lines, and each line's children are its tokens, so `row(n)` picks a line and `search` picks tokens.
 
 Code holds only text, so shape options such as `fill` or `stroke` are rejected. Token IDs read `<block-id>/<line>/<token>`.
 
@@ -264,7 +273,14 @@ return scene;
 
 ## Matrices and tables
 
-`matrix` and `table` lay out rows of numbers or strings. In a `matrix`, a string entry is TeX: `"\\cos\\theta"` or `"x^2"` is set as inline math, as a cell of a TeX matrix is, while numbers stay texts that `play {value = ...}` can count. Without the TeX module, string entries fall back to plain text. A `table` always sets strings as text. Like `code`, they return a group of row groups, so `row(r)`, `entry(r, c)` and `column(c)` pick parts, counting from 1. A matrix adds brackets; a table adds an optional header, stripes and rules.
+`matrix` and `table` lay out rows of numbers or strings.
+
+In a `matrix`, a string entry is TeX: `"\\cos\\theta"` or `"x^2"` is set as inline math, as a cell of a TeX matrix is, while numbers stay texts that `play {value = ...}` can count. Without the TeX module, string entries fall back to plain text.
+
+A `table` always sets strings as text.
+
+Like `code`, they return a group of row groups, so `row(r)`, `entry(r, c)` and `column(c)` pick parts, counting from 1.<br />
+A matrix adds brackets; a table adds an optional header, stripes and rules.
 
 `row(r)` counts only rows: a table's header is not a row, and its stripes and rules are extra children of the group.
 

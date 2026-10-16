@@ -12,8 +12,10 @@ The timeline cursor, curves, entrances and lag. The pages below cover transforms
 
 <p>viscript records animation against a <strong>cursor</strong>. Each call adds a clip that starts at the cursor and moves the cursor to the
 clip's end, so the order you write calls in is the order they play. <code>scene:wait(d)</code> simply advances the cursor.</p>
-<p>Clips are tracked per property. A <code>shift</code> and a <code>fade</code> of the same object may overlap; two <code>shift</code>s may not.
-Breaking that rule fails with an error that names it. Because the result is a plain timeline, any frame can be sampled directly — drag the
+<p>Clips are tracked per property.<br />
+A <code>shift</code> and a <code>fade</code> of the same object may overlap; two <code>shift</code>s may not.
+Breaking that rule fails with an error that names it.</p>
+<p>Because the result is a plain timeline, any frame can be sampled directly — drag the
 scrubber under the player.</p>
 <p>The last argument picks the curve: a preset name, or a cubic Bézier.</p>
 <table>

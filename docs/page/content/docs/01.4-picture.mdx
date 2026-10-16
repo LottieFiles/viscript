@@ -11,7 +11,7 @@ summary: Images and inline pixel grids.
 
 | Option | Meaning |
 |---|---|
-| `asset` | An SVG or PNG file; native builds also read JPG and WebP. SVG stays vector, the others are raster. Native runs resolve relative names against the script; a WASM host registers the bytes first with `client.asset(name, data, mime)`. |
+| `asset` | An SVG or PNG file; native builds also read JPG and WebP. SVG stays vector, the others are raster.<br />Native runs resolve relative names against the script; a WASM host registers the bytes first with `client.asset(name, data, mime)`. |
 | `pixels` | An inline image: a list of colours, row by row. |
 | `size` | `{columns, rows}` of `pixels`. Goes only with `pixels`. |
 | `width` | Width in world units; the height follows the image. |

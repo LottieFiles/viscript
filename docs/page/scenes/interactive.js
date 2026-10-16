@@ -205,8 +205,8 @@ export const INTERACTIVE = {
   summary: "Scenes that respond to pointer and keyboard input through a retained Lua runtime.",
   episodes: [
     {id: "shortest-path", title: "Shortest path (BFS)", category: "Pointer", code: PATH, interactive: true,
-     blurb: "Click a cell to move the source and watch the BFS wave spread. Hover any reached cell to trace its shortest path back. Hold Shift and drag to draw or erase walls."},
+     blurb: "Click a cell to move the source and watch the BFS wave spread.\nHover any reached cell to trace its shortest path back.\nHold Shift and drag to draw or erase walls."},
     {id: "sort-stepper", title: "Bubble sort stepper", category: "Keyboard", code: STEPPER, interactive: true,
-     blurb: "Click the canvas, then press Space or → for one comparison at a time. A toggles autoplay, R reshuffles."},
+     blurb: "Click the canvas, then press Space or → for one comparison at a time.\nA toggles autoplay, R reshuffles."},
   ],
 };

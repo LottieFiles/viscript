@@ -7,7 +7,8 @@ summary: Axes, ticks, numbers, labels and plots, in 2D and 3D.
 
 # Coordinate Spaces
 
-<p><code>space&#123;x, y&#125;</code> is a coordinate system with axes and grid; ranges are <code>&#123;min, max, step&#125;</code>. Children of a space are
+<p><code>space&#123;x, y&#125;</code> is a coordinate system with axes and grid; ranges are <code>&#123;min, max, step&#125;</code>.<br />
+Children of a space are
 placed in its coordinates, so <code>axes:plot&#123;fn, x_range&#125;</code> draws a function on those axes. <code>create</code> traces it on.</p>
 <p>Only spaces expose sampled fields: <code>space:cell(fn(x, y, t))</code> and <code>space:voxel(fn(x, y, z, t))</code> return a colour per
 sample and run once at construction.</p>
@@ -50,7 +51,9 @@ return scene;
 
 ## Axes, ticks and numbers
 
-A range is `{min, max, step}`: the axis runs from `min` to `max`, and `step` spaces the grid. Leave out an axis to draw none. `ticks` adds marks across the axes, `numbers` writes the value at each grid step, and `axis_x`, `axis_y`, `axis_z` recolour the axes.
+A range is `{min, max, step}`: the axis runs from `min` to `max`, and `step` spaces the grid. Leave out an axis to draw none.
+
+`ticks` adds marks across the axes, `numbers` writes the value at each grid step, and `axis_x`, `axis_y`, `axis_z` recolour the axes.
 
 ```lua live
 local scene = vis.scene {
@@ -105,7 +108,11 @@ return scene;
 
 ## Labels
 
-`numbers` writes plain values. For named values such as π, or for axis titles, give `labels` pairs of a value and a label. A string becomes a text beside the tick; a handle, such as a `tex` formula, moves there and keeps its parent. Pass `labels` when making the space, or call `space:labels` later and animate the handles it returns.
+`numbers` writes plain values. For named values such as π, or for axis titles, give `labels` pairs of a value and a label.
+
+A string becomes a text beside the tick; a handle, such as a `tex` formula, moves there and keeps its parent.
+
+Pass `labels` when making the space, or call `space:labels` later and animate the handles it returns.
 
 ```lua live
 local scene = vis.scene {

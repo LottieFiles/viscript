@@ -87,7 +87,7 @@ pre { background: var(--panel); border: 1px solid var(--line); padding: 14px 16p
 .gallery-list button:hover { color: var(--fg); }
 .gallery-list button.on { color: var(--accent); background: var(--accent-soft); }
 .gallery-info h2 { margin: 0 0 6px; }
-.gallery-info p { margin: 0; color: var(--dim); }
+.gallery-info p { margin: 0; color: var(--dim); white-space: pre-line; }
 
 /* players */
 .scene { position: relative; }

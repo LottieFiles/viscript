@@ -6,7 +6,8 @@ summary: Run tracks side by side, jump back to named times, drive objects from o
 
 # Timing & Sync
 
-Calls normally play one after another. This page covers the ways out of that line: running tracks at once, going back to a named time, linking objects to a shared value, and moving along a path.
+Calls normally play one after another.<br />
+This page covers the ways out of that line: running tracks at once, going back to a named time, linking objects to a shared value, and moving along a path.
 
 ## parallel
 
@@ -101,7 +102,12 @@ return scene;
 
 ## Trackers
 
-A tracker is a number that objects follow. Create it with `scene:tracker(value)`, bind each dependent once with `scene:bind(object, tracker, fn)`, then animate only the number with `scene:track`. The bind function returns any `play` property; `shift` is relative to where the object was when bound. `track` bakes its samples into the timeline, so every frame is still seekable.
+A tracker is a number that objects follow.
+
+Create it with `scene:tracker(value)`, bind each dependent once with `scene:bind(object, tracker, fn)`, then animate only the number with `scene:track`.
+
+The bind function returns any `play` property; `shift` is relative to where the object was when bound.<br />
+`track` bakes its samples into the timeline, so every frame is still seekable.
 
 ```lua live
 local scene = vis.scene {

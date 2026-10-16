@@ -10,7 +10,8 @@ Groups, isolation, masks, blend modes, blur and shadow.
 
 ## Groups and isolation
 
-<p>A <code>group</code> draws nothing itself. The <code>stroke</code>, <code>fill</code> and <code>width</code> it sets flow to
+<p>A <code>group</code> draws nothing itself.<br />
+The <code>stroke</code>, <code>fill</code> and <code>width</code> it sets flow to
 descendants that set none of their own, as in SVG; <code>opacity</code> and <code>progress</code> multiply down the tree.</p>
 <p>With <code>isolate = true</code> the group renders into one layer and composites once, so overlapping children stop showing through each
 other while the group fades. Compare the two pairs below.</p>
@@ -121,7 +122,8 @@ return scene;
 ## Blur and shadow
 
 <p><code>blur = sigma</code> (screen pixels) blurs an object with its descendants. <code>shadow = &#123;color, offset, blur&#125;</code> casts a
-shadow beneath it; omitted fields default to 40% black, <code>&#123;0, -4&#125;</code> and <code>8</code>. Both animate through <code>play</code>.</p>
+shadow beneath it.<br />
+Omitted fields default to 40% black, <code>&#123;0, -4&#125;</code> and <code>8</code>. Both animate through <code>play</code>.</p>
 
 ```lua live
 local scene = vis.scene {

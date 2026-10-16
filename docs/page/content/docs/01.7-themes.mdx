@@ -7,7 +7,8 @@ summary: Presets, semantic colours and custom themes.
 
 # Themes
 
-A theme supplies a scene's background, text styles, colour cycle, semantic colours, stroke width and axis colours. Colour names such as `"accent"` resolve through it, so changing `theme` restyles the whole scene.
+A theme supplies a scene's background, text styles, colour cycle, semantic colours, stroke width and axis colours.<br />
+Colour names such as `"accent"` resolve through it, so changing `theme` restyles the whole scene.
 
 ## Presets
 
@@ -106,7 +107,10 @@ return scene;
 
 ## Themes with viewports
 
-A theme belongs to a scene, not to the page. Put scenes side by side with [viewports](#/docs/viewports), and each one draws in its own theme. Below, one function builds the same card six times: the two presets and four custom themes. The uncoloured circles take each theme's `objects`, the bar its `accent`, the label its `result`, and `indicate` its `focus`.
+A theme belongs to a scene, not to the page. Put scenes side by side with [viewports](#/docs/viewports), and each one draws in its own theme.
+
+Below, one function builds the same card six times: the two presets and four custom themes.<br />
+The uncoloured circles take each theme's `objects`, the bar its `accent`, the label its `result`, and `indicate` its `focus`.
 
 ```lua live
 local root = vis.scene {width = 960, height = 540, theme = "pro_black",
@@ -187,9 +191,13 @@ return root;
 
 ## Themes in animation
 
-Emphasis effects colour themselves from the theme: `indicate`, `circumscribe`, `flash` and `ripple` use `focus` unless you pass `color`. Write the scene once with role names, and the same animation reads on any theme.
+Emphasis effects colour themselves from the theme: `indicate`, `circumscribe`, `flash` and `ripple` use `focus` unless you pass `color`.<br />
+Write the scene once with role names, and the same animation reads on any theme.
 
-A scene's theme is set once, when the scene is made; it does not animate. To change themes during a video, as below, make one scene per theme and play them with [`scene_transition`](#/docs/scene-transitions), which cross-fades from one to the next. Each child scene in a [viewport](#/docs/viewports) keeps its own theme.
+A scene's theme is set once, when the scene is made; it does not animate.
+
+To change themes during a video, as below, make one scene per theme and play them with [`scene_transition`](#/docs/scene-transitions), which cross-fades from one to the next.<br />
+Each child scene in a [viewport](#/docs/viewports) keeps its own theme.
 
 ```lua live
 local cam = {mode = "fixed", view = "2d", height = 6}

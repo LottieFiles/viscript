@@ -7,7 +7,8 @@ summary: Basic shapes, arcs, paths, curves and routes.
 
 # Shapes
 
-<p>The scene and every object handle expose the same factories. The receiver becomes the parent, and each factory returns a handle for
+<p>The scene and every object handle expose the same factories.<br />
+The receiver becomes the parent, and each factory returns a handle for
 later timeline calls.</p>
 
 ## Basic shapes
@@ -110,7 +111,8 @@ return scene;
 
 ## Bézier curve
 
-`curve` is a shortcut for one cubic Bézier. The control points pull the curve toward them without lying on it — the dashed handles show where they are.
+`curve` is a shortcut for one cubic Bézier.<br />
+The control points pull the curve toward them without lying on it — the dashed handles show where they are.
 
 ```lua live
 local scene = vis.scene {
@@ -192,7 +194,11 @@ return scene;
 
 ## Arcs, angles and braces
 
-These three mark parts of other shapes. `arc` draws part of a circle, from `start` through `angle` radians; `sector = true` closes it to the centre. `angle` marks the angle at `vertex` between the rays to `from` and `to`, and switches to a square mark for a right angle. `brace` spans a segment or the bounds of objects, and sizes itself to its label.
+These three mark parts of other shapes:
+
+- `arc` draws part of a circle, from `start` through `angle` radians; `sector = true` closes it to the centre.
+- `angle` marks the angle at `vertex` between the rays to `from` and `to`, and switches to a square mark for a right angle.
+- `brace` spans a segment or the bounds of objects, and sizes itself to its label.
 
 ```lua live
 local scene = vis.scene {
