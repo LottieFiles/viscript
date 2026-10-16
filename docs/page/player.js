@@ -12,6 +12,8 @@ const fonts = Promise.all([
   ["IBM Plex Sans KR", "runtime/IBMPlexSansKR-SemiBold.ttf"],
   ["Pretendard", "runtime/Pretendard.ttf"],
   ["JetBrainsMono", "runtime/JetBrainsMono.ttf"],
+  ["CMUTypewriter-Regular", "assets/thorvg/CMUTypewriter-Regular.ttf"],
+  ["CMUSerif-Roman", "assets/thorvg/CMUSerif-Roman.ttf"],
 ].map(async ([name, url]) => {
   const response = await fetch(new URL(url, import.meta.url));
   if (!response.ok) throw new Error(`Could not load font: ${url}`);
@@ -19,7 +21,9 @@ const fonts = Promise.all([
 }));
 
 // Images that documentation scenes load with picture{asset = ...}.
-const assets = Promise.all([["earth.png", "assets/earth.png", "png"]].map(async ([name, url, mime]) => {
+const assets = Promise.all([
+  ["earth.png", "assets/earth.png", "png"],
+].map(async ([name, url, mime]) => {
   const response = await fetch(new URL(url, import.meta.url));
   if (!response.ok) throw new Error(`Could not load asset: ${url}`);
   return [name, await response.arrayBuffer(), mime];
@@ -50,7 +54,7 @@ function themeAdapt(src) {
   const light = mode() === "light";
   const map = light ? DARK_TO_LIGHT : LIGHT_TO_DARK;
   return src
-    .replace(/theme( = |: )"pro_(black|white)"/g, (_, sep) => `theme${sep}"${light ? "pro_white" : "pro_black"}"`)
+    .replace(/\b((?:theme|preset)\s*(?:=|:)\s*)"pro_(?:black|white)"/g, (_, key) => `${key}"${light ? "pro_white" : "pro_black"}"`)
     .replace(/#([0-9a-fA-F]{6})/g, (m, hex) => "#" + (map[hex.toLowerCase()] ?? hex));
 }
 export function retheme() {
@@ -105,17 +109,18 @@ export function setLang(next) {
 
 const STACK_LINES = 15;
 
-export function createPlayer(host, source, {js = null, editable = false, name = "scene.lua", onEnd = null, loop = false, dark = false, maxRatio = 3} = {}) {
+export function createPlayer(host, source, {js = null, editable = false, name = "scene.lua", onEnd = null, loop = false, interactive = false, clips = [], dark = false, maxRatio = 3} = {}) {
   // dark: keep the authored dark palette in light mode (cinematic hero scenes)
   const adapt = dark ? (x) => x : themeAdapt;
   const originals = {lua: source, js};
   let mine = js && lang === "js" ? "js" : "lua";
-  let code = adapt(originals[mine]), rt = null, pending = null, t = 0, playing = true, last = 0, releaseTimer = 0, shown = false;
-  // retained (interactive) scenes: input events queue here and are pumped once per frame
+  let code = adapt(originals[mine]), rt = null, pending = null, t = 0, playing = !clips.length, last = 0, releaseTimer = 0, shown = false;
+  let activeClip = null;
+  // Interactive scenes queue input once per frame; UI controls also work without a retained runtime.
   let live = false, events = [], consumed = true, buttons = 0;
 
   host.innerHTML = editable ? `
-    <div class="view"><canvas></canvas>
+    <div class="view"><div class="canvas-wrap"><canvas></canvas></div>
       <div class="bar"><button class="pp" title="Play / pause">❚❚</button>
         <input type="range" aria-label="Scene time" min="0" max="1" step="0.001" value="0"><span class="t">0.00 / 0.00</span></div>
     </div>
@@ -142,20 +147,50 @@ export function createPlayer(host, source, {js = null, editable = false, name = 
     ghost.style.transition = ""; ghost.style.opacity = 0;
   };
   const setPlaying = (p) => { playing = p; if (pp) pp.textContent = p ? "❚❚" : "▶"; };
+  const clipButtons = clips.map((clip) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.title = `Play ${clip.label}`;
+    button.setAttribute("aria-label", `Play ${clip.label}`);
+    button.setAttribute("aria-pressed", "false");
+    const [left, top, width, height] = clip.bounds;
+    Object.assign(button.style, {left: `${left * 100}%`, top: `${top * 100}%`, width: `${width * 100}%`, height: `${height * 100}%`});
+    button.onclick = () => {
+      selectClip(clip);
+      t = clip.range[0];
+      last = 0;
+      setPlaying(true);
+    };
+    return button;
+  });
+  const selectClip = (clip) => {
+    activeClip = clip;
+    clipButtons.forEach((button, i) => button.setAttribute("aria-pressed", String(clips[i] === clip)));
+  };
+  if (clips.length) {
+    const overlay = document.createElement("div");
+    overlay.className = "scene-clips";
+    overlay.setAttribute("role", "group");
+    overlay.setAttribute("aria-label", "Animation sections");
+    overlay.append(...clipButtons);
+    canvas.parentElement.append(overlay);
+    setPlaying(false);
+  }
   const load = () => {
     if (!rt) return;
     try {
       if (mine === "js") rt.load(evaluateScene(code, fileName()));
       else rt.load(code, name);
-      live = Boolean(rt.retainedLua && rt.input && rt.beginInputFrame && rt.advanceRuntime);
-      events = []; consumed = true;
+      live = Boolean(rt.input && (interactive || (rt.retainedLua && rt.beginInputFrame && rt.advanceRuntime)));
+      events = []; consumed = true; buttons = 0;
+      if (live && interactive) t = 0;
       canvas.classList.toggle("live", live);
       canvas.classList.toggle("input", live && /ctx:(pointer|key|action)\(/.test(code));
       host.classList.toggle("live", live);
       canvas.tabIndex = live ? 0 : -1;
       const [w, h] = rt.size();
       canvas.style.aspectRatio = `${w} / ${h}`;
-      if (t > rt.duration) t = 0;
+      if (t > rt.duration) { t = 0; selectClip(null); }
       if (err) err.hidden = true;
     } catch (e) {
       if (err) { err.textContent = String(e.message || e); err.hidden = false; }
@@ -180,9 +215,13 @@ export function createPlayer(host, source, {js = null, editable = false, name = 
     tick(now) {
       if (!rt || !shown) { last = now; return; }
       const d = rt.duration;
-      if (playing && d > 0) {
+      if (playing && d > 0 && !(live && interactive)) {
         t += (now - (last || now)) / 1000;
-        if (loop) { if (t >= d) t %= d; }  // seamless: the scene ends where it starts
+        if (activeClip) {
+          const end = Math.min(activeClip.range[1], d);
+          if (t >= end) { t = end; setPlaying(false); }
+        }
+        else if (loop) { if (t >= d) t %= d; }  // seamless: the scene ends where it starts
         // others replay at once, the last frame dissolving over the restart instead of holding
         else if (t >= d) { if (onEnd?.()) return; t %= d; crossfade(); }
       }
@@ -190,10 +229,10 @@ export function createPlayer(host, source, {js = null, editable = false, name = 
       last = now;
       if (live) {
         try {
-          if (consumed) rt.beginInputFrame(rt.runtimeTime);
+          if (consumed) rt.beginInputFrame?.(rt.runtimeTime);
           for (const e of events.splice(0)) rt.input({x: 0, y: 0, dx: 0, dy: 0, wheelX: 0, wheelY: 0, button: -1,
             buttons, modifiers: 0, pointerId: 0, time: rt.runtimeTime, ...e});
-          const r = rt.advanceRuntime(dt);
+          const r = rt.advanceRuntime?.(dt);
           consumed = !r || r.steps > 0;
         } catch (e) {
           live = false;
@@ -220,7 +259,9 @@ export function createPlayer(host, source, {js = null, editable = false, name = 
     }
     const cm = CodeMirror($(".cm-wrap", host), {value: code, mode: mine === "js" ? "javascript" : "lua", lineNumbers: true, indentUnit: 4, viewportMargin: Infinity});
     let debounce = 0;
-    cm.on("change", () => { code = cm.getValue(); clearTimeout(debounce); debounce = setTimeout(() => { t = 0; setPlaying(true); load(); }, 220); });
+    cm.on("change", () => { code = cm.getValue(); clearTimeout(debounce); debounce = setTimeout(() => {
+      t = 0; last = 0; selectClip(null); setPlaying(!clips.length); load();
+    }, 220); });
     $(".reset", host).onclick = () => cm.setValue(adapt(originals[mine]));
     const showLang = () => {
       $(".file", host).textContent = `${fileName()} — live`;
@@ -238,8 +279,13 @@ export function createPlayer(host, source, {js = null, editable = false, name = 
     langs.add(switchLang);
     api.switchLang = switchLang;
     showLang();
-    pp.onclick = () => { if (rt && t >= rt.duration) t = 0; setPlaying(!playing); };
-    scrub.oninput = () => { t = +scrub.value; setPlaying(false); };
+    pp.onclick = () => {
+      if (activeClip && t >= Math.min(activeClip.range[1], rt?.duration ?? Infinity)) t = activeClip.range[0];
+      else if (rt && t >= rt.duration) t = 0;
+      last = 0;
+      setPlaying(!playing);
+    };
+    scrub.oninput = () => { t = +scrub.value; selectClip(null); setPlaying(false); };
     api.refresh = () => cm.refresh();
     api.retheme = () => cm.setValue(adapt(cm.getValue()));
   }
@@ -264,6 +310,7 @@ export function createPlayer(host, source, {js = null, editable = false, name = 
     events.push({type: "pointerup", ...at(e), button: e.button});
   });
   canvas.addEventListener("pointerleave", (e) => { if (live && !e.buttons) events.push({type: "pointermove", x: -1, y: -1}); });
+  canvas.addEventListener("pointercancel", () => { if (live) { buttons = 0; events.push({type: "pointercancel"}); } });
   for (const type of ["keydown", "keyup"]) {
     canvas.addEventListener(type, (e) => {
       const key = keyOf(e);
@@ -273,7 +320,16 @@ export function createPlayer(host, source, {js = null, editable = false, name = 
       events.push({type, key});
     });
   }
-  canvas.addEventListener("blur", () => { if (live && rt) { events = []; buttons = 0; try { rt.releaseInput(rt.runtimeTime); } catch { /* torn down */ } } });
+  canvas.addEventListener("blur", () => {
+    if (live && rt) {
+      events = []; buttons = 0;
+      try {
+        rt.input({type: "pointercancel", x: 0, y: 0, dx: 0, dy: 0, wheelX: 0, wheelY: 0, button: -1,
+          buttons: 0, modifiers: 0, pointerId: 0, time: rt.runtimeTime});
+        rt.releaseInput?.(rt.runtimeTime);
+      } catch { /* torn down */ }
+    }
+  });
   host.__player = api;
   players.add(api);
   observer.observe(host);

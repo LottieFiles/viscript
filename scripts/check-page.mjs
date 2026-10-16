@@ -4,7 +4,8 @@ import assert from "node:assert/strict";
 import {readdirSync, readFileSync} from "node:fs";
 import {createHash} from "node:crypto";
 import {createVis, evaluateScene} from "../docs/page/runtime/client.js";
-import {HERO, HERO_JS} from "../docs/page/scenes/hero.js";
+import {HERO} from "../docs/page/scenes/hero.js";
+import {SKILLS} from "../docs/page/scenes/skills.js";
 import {COLLECTIONS} from "../docs/page/scenes/collections.js";
 
 const bundle = new URL("../docs/page/runtime/", import.meta.url);
@@ -21,11 +22,17 @@ for (const [name, file] of [["Pretendard", "Pretendard.ttf"], ["Source Serif 4",
     ["IBM Plex Sans KR", "IBMPlexSansKR-SemiBold.ttf"], ["JetBrainsMono", "JetBrainsMono.ttf"]]) {
     runtime.font(name, readFileSync(new URL(file, bundle)), "ttf");
 }
+for (const name of ["CMUTypewriter-Regular", "CMUSerif-Roman"]) {
+    runtime.font(name, readFileSync(new URL(`../docs/page/assets/thorvg/${name}.ttf`, import.meta.url)), "ttf");
+}
 runtime.asset("earth.png", readFileSync(new URL("../docs/page/assets/earth.png", import.meta.url)), "png");
 const scenes = [];
-const add = (name, code, js) => { if (code) scenes.push({name, code, js}); };
-add("home/hero", HERO, HERO_JS);
-for (const c of COLLECTIONS) for (const e of c.episodes) add(`examples/${c.id}/${e.id}`, e.code, e.js);
+const add = (name, code, js, clips = []) => { if (code) scenes.push({name, code, js, clips}); };
+add("home/hero", HERO);
+add("home/skills", SKILLS);
+for (const c of COLLECTIONS) for (const e of c.episodes) {
+    add(`examples/${c.id}/${e.id}`, e.src ? readFileSync(e.src, "utf8") : e.code, e.js, e.clips);
+}
 const content = new URL("../docs/page/content/", import.meta.url);
 for (const file of readdirSync(content, {recursive: true}).filter((f) => f.endsWith(".mdx"))) {
     const text = readFileSync(new URL(file, content), "utf8");
@@ -35,10 +42,17 @@ for (const file of readdirSync(content, {recursive: true}).filter((f) => f.endsW
 }
 // Usage filter: node scripts/check-page.mjs [name-substring]
 const only = process.argv[2];
-const sample = (scene) => {
+const sample = (clips = []) => {
     assert.ok(Number.isFinite(runtime.duration) && runtime.duration >= 0);
+    for (const {label, range: [start, end], bounds} of clips) {
+        assert.ok(start >= 0 && start < end && end <= runtime.duration + 1e-3, `${label}: playback range fits scene`);
+        const [x, y, w, h] = bounds;
+        assert.ok(x >= 0 && y >= 0 && w > 0 && h > 0 && x + w <= 1 && y + h <= 1, `${label}: hotspot fits canvas`);
+    }
     const frames = [];
-    for (const time of [0, runtime.duration / 3, runtime.duration * 2 / 3, runtime.duration]) {
+    const times = [0, runtime.duration / 3, runtime.duration * 2 / 3, runtime.duration,
+        ...clips.flatMap(({range: [start, end]}) => [start, (start + end) / 2, end])];
+    for (const time of times) {
         if (runtime.retainedLua) {
             runtime.beginInputFrame(runtime.runtimeTime);
             runtime.input({type: "pointermove", x: 480, y: 270, dx: 0, dy: 0, wheelX: 0, wheelY: 0,
@@ -55,13 +69,13 @@ const sample = (scene) => {
 let failed = 0, paired = 0;
 const checked = scenes.filter((s) => !only || s.name.includes(only));
 try {
-    for (const {name, code, js} of checked) {
+    for (const {name, code, js, clips} of checked) {
         try {
             runtime.loadLua(code, `${name}.lua`);
-            const lua = sample();
+            const lua = sample(clips);
             if (!js) continue;
             runtime.loadScene(evaluateScene(js, `${name}.js`), `${name}.js`);
-            const other = sample();
+            const other = sample(clips);
             assert.ok(Math.abs(lua.duration - other.duration) < 1e-3, `JS duration ${other.duration} != Lua ${lua.duration}`);
             lua.frames.forEach((a, f) => {
                 let diff = 0;

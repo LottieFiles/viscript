@@ -1,5 +1,5 @@
 -- README "Build": optional modules plug into the core at configure time, then compile.
--- Module names follow meson_options.txt.
+-- Module names follow meson_options.txt; interactive is one option over four internal modules.
 local scene = vis.scene {width = 1200, height = 420, fps = 20, theme = "pro_white",
   camera = {view = "2d", target = {0, 0.1}, height = 7.6}}
 local INK = "foreground"
@@ -30,25 +30,35 @@ local CX, CY = 5.3, 0
 local core = scene:rectangle {center = {CX, CY}, size = {3.8, 1.3}, fill = "#ffffff", stroke = INK, width = 3, layer = 2, id = "core"}
 TEXT {text = "core", point = {CX, CY + 0.2}, size = 15, role = "code", fill = INK, layer = 3, id = "core:t"}
 TEXT {text = "Scene · Lua · ThorVG · PNG", point = {CX, CY - 0.25}, size = 10, fill = "muted", layer = 3, id = "core:s"}
-TEXT {text = "MODULES", point = {CX - 3.9, 3.1}, align = {0, 0.5}, size = 12, role = "code", fill = INK, id = "modules:title"}
-local MODS = {"diagram", "tex", "motion", "ui", "input", "runtime", "audio"}
-local SLOTS = {{-2.6, 1.95}, {0, 1.95}, {2.6, 1.95}, {-3.15, -1.95}, {-1.05, -1.95}, {1.05, -1.95}, {3.15, -1.95}}
-local tiles, wires, labels = {}, {}, {}
+TEXT {text = "MODULES", point = {CX - 4.25, 3.1}, align = {0, 0.5}, size = 12, role = "code", fill = INK, id = "modules:title"}
+local MODS = {"diagram", "tex", "interactive", "audio"}
+local SUBS = {[3] = "ui · input · states · runtime"}
+local SLOTS = {{-1.55, 1.95}, {1.55, 1.95}, {-1.75, -1.95}, {2.35, -1.95}}
+local WIDTHS = {2.6, 2.6, 5.0, 2.0}
+local tiles, wires, labels, subs = {}, {}, {}, {}
 for i, name in ipairs(MODS) do
   local x, y = CX + SLOTS[i][1], CY + SLOTS[i][2]
-  local w = (i <= 3) and 2.1 or 1.85
+  local w, h = WIDTHS[i], SUBS[i] and 0.95 or 0.7
   local edge = (y > CY) and (CY + 0.65) or (CY - 0.65)
-  local tip = (y > CY) and (y - 0.35) or (y + 0.35)
+  local tip = (y > CY) and (y - h / 2) or (y + h / 2)
   wires[i] = scene:line {from = {x * 0.35 + CX * 0.65, edge}, to = {x, tip}, stroke = INK, width = 2, layer = 1, progress = 0, id = "wire-" .. name}
-  scene:rectangle {center = {x, y}, size = {w, 0.7}, fill = "#ffffff", stroke = "border", width = 2, dash = {5, 4}, layer = 2, id = "slot-" .. name}
-  tiles[i] = scene:rectangle {center = {x, y}, size = {w, 0.7}, fill = "#e8f0fb", stroke = INK, width = 2.5, layer = 2, opacity = 0, id = "mod-" .. name}
-  labels[i] = TEXT {text = name, point = {x, y}, size = 13, role = "code", fill = "muted", layer = 3, id = "mod-" .. name .. ":t"}
+  scene:rectangle {center = {x, y}, size = {w, h}, fill = "#ffffff", stroke = "border", width = 2, dash = {5, 4}, layer = 2, id = "slot-" .. name}
+  tiles[i] = scene:rectangle {center = {x, y}, size = {w, h}, fill = "#e8f0fb", stroke = INK, width = 2.5, layer = 2, opacity = 0, id = "mod-" .. name}
+  local ly = SUBS[i] and (y + 0.17) or y
+  labels[i] = TEXT {text = name, point = {x, ly}, size = 13, role = "code", fill = "muted", layer = 3, id = "mod-" .. name .. ":t"}
+  if SUBS[i] then
+    subs[i] = TEXT {text = SUBS[i], point = {x, y - 0.22}, size = 9, role = "code", fill = "muted", layer = 3, id = "mod-" .. name .. ":s"}
+  end
 end
 local function attach(i, d)
   return function()
     scene:parallel(
       function() scene:create(wires[i], {duration = d, curve = "ease_out"}) end,
-      function() scene:play({{target = tiles[i], opacity = 1}, {target = labels[i], fill = INK}}, d, "ease_out") end)
+      function()
+        local t = {{target = tiles[i], opacity = 1}, {target = labels[i], fill = INK}}
+        if subs[i] then t[#t + 1] = {target = subs[i], fill = INK} end
+        scene:play(t, d, "ease_out")
+      end)
   end
 end
 
@@ -59,14 +69,14 @@ scene:wait(0.4)
 scene:set({target = cmd1, opacity = 1})
 scene:write(cmd1, 1.0)
 -- Configure: the named modules attach.
-scene:focus({core, tiles[1], tiles[2], tiles[7], tiles[4]}, {padding = 0.08, duration = 0.7, curve = "ease_in_out"})
+scene:focus({core, tiles[1], tiles[2], tiles[3], tiles[4]}, {padding = 0.08, duration = 0.7, curve = "ease_in_out"})
 scene:parallel(attach(1, 0.45), function() scene:wait(0.12); attach(2, 0.45)() end)
 scene:wait(0.4)
 -- Reconfigure with all modules: the rest attach in a wave.
 scene:focus(nil, CAM)
 scene:play({target = cmd1, text = "$ meson setup build -Dmodules=all", retype = true}, 0.7)
 local wave = {}
-for k, i in ipairs({3, 4, 5, 6, 7}) do wave[k] = function() scene:wait((k - 1) * 0.1); attach(i, 0.4)() end end
+for k, i in ipairs({3, 4}) do wave[k] = function() scene:wait((k - 1) * 0.1); attach(i, 0.4)() end end
 scene:parallel(table.unpack(wave))
 scene:wait(0.3)
 -- Compile.

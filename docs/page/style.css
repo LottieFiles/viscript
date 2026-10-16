@@ -45,19 +45,22 @@ pre { background: var(--panel); border: 1px solid var(--line); padding: 14px 16p
 .btn:hover { border-color: var(--dim); text-decoration: none; }
 .btn.solid { background: var(--accent); border-color: var(--accent); color: #fff; }
 
-/* home: one section */
+/* home */
 .home { max-width: 1240px; margin: 0 auto; padding: 72px 24px 96px; }
-.hero { display: grid; grid-template-columns: minmax(280px, 1fr) 1.4fr; gap: 56px; align-items: center; }
-.hero h1 { font-size: clamp(34px, 4.4vw, 56px); line-height: 1.06; letter-spacing: -.035em; font-weight: 650; margin: 0 0 18px; }
-.hero-copy > p { color: var(--dim); font-size: 17px; max-width: 30em; margin: 0; }
+.hero { display: grid; gap: 36px; }
+.hero-copy { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; justify-items: start; }
+.hero h1 { font-size: clamp(34px, 4.4vw, 56px); line-height: 1.06; letter-spacing: -.035em; font-weight: 650; margin: 0; }
+.hero-copy > p { color: var(--dim); font-size: 17px; max-width: 44em; margin: 0; }
 .hero > * { min-width: 0; }
-.cta { display: flex; gap: 10px; margin-top: 28px; }
+.cta { display: flex; gap: 10px; }
 .hero-stage .scene { border-radius: 14px; overflow: hidden; border: 1px solid var(--line); }
-.features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; margin-top: 72px; background: var(--line); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
-.feature { background: var(--bg); padding: 24px 26px; }
-.feature h3 { margin: 0 0 8px; font-size: 16px; letter-spacing: -.01em; }
-.feature h3::before { content: ""; display: block; width: 18px; height: 3px; border-radius: 2px; background: var(--accent); margin-bottom: 14px; }
-.feature p { margin: 0; color: var(--dim); font-size: 14.5px; }
+.home-section { margin-top: 80px; padding-top: 36px; border-top: 1px solid var(--line); }
+.home-section h2 { margin: 0 0 12px; font-size: clamp(24px, 3vw, 32px); line-height: 1.2; letter-spacing: -.025em; }
+.home-section > p { max-width: 50em; margin: 0 0 28px; color: var(--dim); font-size: 16px; }
+.home-section .stage-frame { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.home-section .player { margin: 0; }
+.home-section .cm-wrap { max-height: 420px; }
+.home-section video { display: block; width: 100%; border: 1px solid var(--line); border-radius: 10px; background: #101318; }
 
 /* docs */
 .docs { display: grid; grid-template-columns: 230px minmax(0, 1fr) 210px; max-width: 1400px; margin: 0 auto; }
@@ -79,6 +82,7 @@ pre { background: var(--panel); border: 1px solid var(--line); padding: 14px 16p
 
 /* examples */
 .gallery { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 32px; margin-top: 28px; }
+.gallery-list { position: sticky; top: 80px; align-self: start; max-height: calc(100vh - 104px); overflow-y: auto; padding-right: 8px; scrollbar-width: thin; }
 .gallery-list button { display: block; width: 100%; text-align: left; padding: 5px 10px; border: 0; background: none; color: var(--dim); font: 14px var(--sans); border-radius: 6px; cursor: pointer; }
 .gallery-list button:hover { color: var(--fg); }
 .gallery-list button.on { color: var(--accent); background: var(--accent-soft); }
@@ -94,6 +98,10 @@ pre { background: var(--panel); border: 1px solid var(--line); padding: 14px 16p
 .player { margin: 20px 0 8px; border: 1px solid var(--line); background: var(--panel); border-radius: 10px; overflow: hidden;
   display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); }
 .player .view { position: relative; border-right: 1px solid var(--line); display: flex; flex-direction: column; }
+.canvas-wrap { position: relative; }
+.scene-clips { position: absolute; inset: 0; pointer-events: none; }
+.scene-clips button { position: absolute; padding: 0; border: 2px solid transparent; background: transparent; cursor: pointer; pointer-events: auto; }
+.scene-clips button:hover, .scene-clips button:focus-visible { border-color: var(--accent); outline: 2px solid var(--accent); outline-offset: 2px; }
 .player canvas { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; background: var(--stage); }
 .player .bar { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-top: 1px solid var(--line); }
 .player .bar button { width: 30px; height: 26px; border: 1px solid var(--line2); background: transparent; color: var(--fg); cursor: pointer; border-radius: 6px; font-size: 11px; }
@@ -115,7 +123,7 @@ pre { background: var(--panel); border: 1px solid var(--line); padding: 14px 16p
 .cm-s-default .cm-variable-2, .cm-s-default .cm-variable-3 { color: var(--cm-var); }
 .player .err { grid-column: 1 / -1; margin: 0; border: 0; border-top: 1px solid var(--err-line); border-radius: 0; background: var(--err-bg); color: var(--err-fg); white-space: pre-wrap; font-size: 12px; }
 .player.live .bar, .stage-frame.live .progress { display: none; }
-canvas.live { outline: none; }
+canvas.live { outline: none; touch-action: none; cursor: pointer; }
 canvas.live.input { cursor: crosshair; }
 canvas.ghost { position: absolute; left: 0; top: 0; width: 100%; height: auto; aspect-ratio: auto; pointer-events: none; opacity: 0; transition: opacity .7s ease; background: none !important; }
 .gallery .player { margin-top: 16px; grid-template-columns: 1fr; }
@@ -140,8 +148,10 @@ canvas.ghost { position: absolute; left: 0; top: 0; width: 100%; height: auto; a
   .top { gap: 12px; padding: 0 16px; }
   .theme-toggle { margin-left: auto; }
   .home { padding: 40px 16px 64px; }
-  .hero, .features, .docs, .gallery, .player { grid-template-columns: 1fr; }
+  .hero, .docs, .gallery, .player { grid-template-columns: 1fr; }
+  .home-section { margin-top: 56px; padding-top: 28px; }
   .hero { gap: 32px; }
+  .gallery-list { position: relative; top: auto; max-height: 260px; }
   .side { position: static; max-height: none; border-right: 0; border-bottom: 1px solid var(--line); padding: 16px; }
   .prose { padding: 28px 16px 64px; }
   .page.wide { padding: 28px 16px 64px; }

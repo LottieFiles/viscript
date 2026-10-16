@@ -5,17 +5,25 @@ title: Home
 <Hero>
 # Explain ideas<br />in motion.
 
-viscript turns code into animated explanations — algorithms, geometry, and graphics internals — natively or in the browser.
+An experimental project that brings motion and animation to ThorVG.<br />
+Use it to explain mathematics, algorithms, diagrams, and codebases through animation.
 </Hero>
 
-<Features>
 <Feature title="Show every step, not just the result">
-Sorting passes, graph searches, pixel sampling, rasterization: animate the intermediate states that static diagrams leave out.
+Compare adjacent values and watch each swap in bubble sort. Click the canvas or press Space / → to step, A to toggle autoplay, and R to reshuffle.
+
+<BubbleSortDemo />
 </Feature>
 <Feature title="Scenes as code, written with AI">
 Describe a retained scene once in Lua or JavaScript, then animate it by changing properties. Bundled skills teach your coding agent to draft a scene, check its layout, and render it for you to refine.
+
+<SkillsDemo />
 </Feature>
 <Feature title="Embed it where you need it">
-Link the C library into a native app, load the WebAssembly runtime in a web page, or preview beside your code in VS Code. One Lua scene, one renderer.
+Link the C library into a native app, load the WebAssembly runtime in a web page, or preview beside your code in VS Code.
+
+<video controls playsInline preload="metadata" poster="assets/thorvg/vscode-review.jpg" aria-label="ThorVG code review in VS Code">
+  <source src="assets/thorvg/thorvg-vscode-gradient-review.mp4" type="video/mp4" />
+  <a href="assets/thorvg/thorvg-vscode-gradient-review.mp4">Download the MP4</a>
+</video>
 </Feature>
-</Features>

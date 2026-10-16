@@ -2,7 +2,7 @@ name: Documentation
 
 on:
   push:
-    branches: [main]
+    branches: [viscript]
     paths:
       - 'docs/**'
       - 'scripts/*page*.mjs'
@@ -34,7 +34,7 @@ jobs:
       - name: Compile MDX pages
         run: npm ci --prefix docs/page && node scripts/build-page.mjs
       - name: Verify documentation scenes and runtime
-        run: node scripts/check-page.mjs
+        run: npm run check --prefix docs/page
       - name: Drop build tooling from the site
         run: rm -rf docs/page/node_modules
       - uses: actions/upload-pages-artifact@v4
@@ -42,7 +42,7 @@ jobs:
           path: docs/page
 
   deploy:
-    if: github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/viscript'
     needs: build
     runs-on: ubuntu-latest
     permissions:

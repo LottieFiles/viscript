@@ -1,123 +1,130 @@
-// Home hero: each API call lights up, then shows what it builds.
-export const HERO = `local scene = vis.scene {
-    width = 960, height = 540, theme = "pro_black",
-    camera = {mode = "fixed", view = "2d", height = 6},
-}
-local ACC, DIM = "#ff7a45", "#3a4152"
-local calls = {"scene:circle", "scene:route", "axes:plot", "scene:tex", "scene:morph"}
-local tags, list = {}, scene:group {}
-for i, name in ipairs(calls) do
-    tags[i] = list:text {text = name, point = {-4.7, 1.8 - (i - 1) * 0.9}, align = {0, 0.5},
-                          size = 22, font = "JetBrainsMono", color = DIM}
+// Home hero: the README embedding scene, sampled by the live WASM player.
+// Source: docs/assets/embed.lua; label fades keep the close-ups inside the web canvas.
+export const HERO = String.raw`-- README "Embed it where you need it": one Lua scene and one renderer, playing the same frames
+-- in a native app, a web page and VS Code.
+local scene = vis.scene {width = 1200, height = 400, fps = 20, theme = "pro_white",
+  camera = {view = "2d", target = {0.3, -0.3}, height = 6.67}}
+
+-- Text is set in world units (plane) so it scales with the camera moves below; sizes are
+-- authored in points at the opening camera and converted here.
+local PT = (4 / 3) * 6.67 / 400
+local function plane(o) o.orientation = "plane"; o.size = (o.size or 14) * PT; return o end
+local sourceLabels, hostLabels = {}, {}
+local labels = sourceLabels
+local function TEXT(o)
+  if labels ~= sourceLabels then o.opacity = 0 end
+  local t = scene:text(plane(o))
+  labels[#labels + 1] = t
+  return t
 end
-local cursor = scene:rectangle {center = {-4.95, 1.8}, size = {0.08, 0.5}, fill = ACC, stroke = ACC, width = 0}
-local fast = {duration = 0.35, curve = "smooth"}
-local function pick(i)
-    if i > 1 then scene:fill(tags[i - 1], DIM, 0.3) end
-    scene:play({target = cursor, shift = {0, i > 1 and -0.9 or 0}}, 0.3, "smooth")
-    scene:fill(tags[i], "#e6e8ee", 0.3)
+local function show(items, opacity)
+  local q = {}
+  for _, t in ipairs(items) do q[#q + 1] = {target = t, opacity = opacity} end
+  return q
 end
--- The loop ends with the list shown and dim, so it starts that way too.
+local function CODE(o) return scene:code(plane(o)) end
+local INK = "foreground"
+
+local function box(x, y, w, h, title, sub, id)
+  scene:rectangle {center = {x, y}, size = {w, h}, fill = "#ffffff", stroke = INK, width = 2.5, layer = 1, id = id}
+  TEXT {text = title, point = {x, y + 0.15}, size = 13, role = "code", fill = INK, layer = 2, id = id .. ":t"}
+  TEXT {text = sub, point = {x, y - 0.22}, size = 10, fill = "muted", layer = 2, id = id .. ":s"}
+end
+
+-- Source and renderer.
+local SX = -7.3
+box(SX, 1.1, 2.8, 1.0, "scene.lua", "one scene", "src")
+box(SX, -1.1, 2.8, 1.0, "ThorVG", "one renderer", "tvg")
+local a1 = scene:arrow {from = {SX, 0.6}, to = {SX, -0.6}, stroke = INK, width = 2, tip = 9, layer = 1, id = "a-src"}
+
+-- Hosts.
+local HW, HH, HY = 4.3, 3.7, 0.15
+local HOSTS = {{x = -2.75, name = "Native app", sub = "C library"}, {x = 1.85, name = "Web page", sub = "WebAssembly"}, {x = 6.45, name = "VS Code", sub = "preview"}}
+local FX = SX + 1.4 + 0.55
+local routes = {}
+for i, h in ipairs(HOSTS) do
+  routes[i] = scene:route {points = {{SX + 1.4, -1.1}, {FX, -1.1}, {FX, -2.8}, {h.x, -2.8}, {h.x, HY - HH / 2}}, stroke = INK, width = 2, tip = 9, layer = 1, id = "r" .. i}
+end
+local frames = {}
+for i, h in ipairs(HOSTS) do
+  labels = {}
+  hostLabels[i] = labels
+  local x, top = h.x, HY + HH / 2
+  scene:rectangle {center = {x, HY}, size = {HW, HH}, fill = "#ffffff", stroke = INK, width = 2.5, layer = 1, id = "host" .. i}
+  scene:rectangle {center = {x, top - 0.25}, size = {HW, 0.5}, fill = "surface", stroke = INK, width = 2.5, layer = 2}
+  local cx, cw = x, HW - 0.4      -- the region the scene draws into
+  if i == 1 then
+    for k = 0, 2 do scene:rectangle {center = {x - HW / 2 + 0.25 + k * 0.22, top - 0.25}, size = {0.12, 0.12}, fill = INK, stroke = INK, layer = 3} end
+    TEXT {text = "my-app", point = {x, top - 0.25}, size = 10, role = "code", fill = INK, layer = 3, id = "chrome1"}
+  elseif i == 2 then
+    scene:rectangle {center = {x, top - 0.25}, size = {HW - 1.0, 0.3}, fill = "#ffffff", stroke = INK, width = 1.5, layer = 3}
+    TEXT {text = "localhost:8000", point = {x, top - 0.25}, size = 10, role = "code", fill = "muted", layer = 4, id = "chrome2"}
+  else
+    TEXT {text = "scene.lua", point = {x - HW / 2 + 0.2, top - 0.25}, align = {0, 0.5}, size = 10, role = "code", fill = INK, layer = 3, id = "chrome3"}
+    scene:line {from = {x - 0.55, top - 0.5}, to = {x - 0.55, HY - HH / 2}, stroke = INK, width = 1.5, layer = 2}
+    for k = 0, 5 do
+      scene:rectangle {center = {x - HW / 2 + 0.25 + (0.25 + (k % 3) * 0.15), top - 0.85 - k * 0.32}, size = {0.5 + (k % 3) * 0.3, 0.1}, fill = "border", stroke = "#00000000", layer = 2}
+    end
+    cx, cw = x + 1.05, 1.95
+  end
+  frames[i] = {cx = cx, cw = cw}
+  TEXT {text = h.name, point = {x - HW / 2, HY - HH / 2 - 0.3}, align = {0, 0.5}, size = 11, role = "code", fill = INK, id = "host" .. i .. ":name"}
+  TEXT {text = h.sub, point = {x + HW / 2, HY - HH / 2 - 0.3}, align = {1, 0.5}, size = 10, fill = "muted", id = "host" .. i .. ":sub"}
+end
+
+local allHostLabels, otherLabels = {}, {}
+for _, t in ipairs(sourceLabels) do otherLabels[#otherLabels + 1] = t end
+for i, items in ipairs(hostLabels) do
+  for _, t in ipairs(items) do
+    allHostLabels[#allHostLabels + 1] = t
+    if i ~= 3 then otherLabels[#otherLabels + 1] = t end
+  end
+end
+
+-- The same scene in each host: a wave drawn and a dot riding it.
+local waves, dots = {}, {}
+for i, f in ipairs(frames) do
+  local w, cy = f.cw * 0.42, HY - 0.25
+  local x0, x1 = f.cx - w, f.cx + w
+  local amp = 0.55 * (f.cw / (HW - 0.4))
+  waves[i] = scene:plot {fn = function(t) return cy + amp * math.sin((t - x0) / (x1 - x0) * 2 * math.pi) end, x_range = {x0, x1, 0.01},
+    stroke = "accent", width = 3.5, layer = 3, progress = 0, id = "wave" .. i}
+  dots[i] = scene:circle {center = {x0, cy}, radius = 0.1 * f.cw / 3.9 + 0.04, fill = "warning", stroke = "warning", layer = 4, opacity = 0, id = "dot" .. i}
+end
+
+-- Timeline: frames leave the renderer for all three hosts; the hosts play in lockstep.
+local srcBox, tvgBox = scene:find("src"), scene:find("tvg")
+scene:focus({srcBox, tvgBox}, {padding = 0.1, duration = 0.01})
 scene:wait(0.5)
-
--- circle
-pick(1)
-local c = scene:circle {center = {2, 0}, radius = 1.4, fill = "#ff7a4522", stroke = ACC, width = 3}
-scene:grow_from_center(c, {duration = 0.6})
-scene:wait(0.4)
-scene:fade_out(c, {duration = 0.3})
-
--- route
-pick(2)
-local r = scene:route {points = {{-0.2, -1.4}, {1.2, 1.2}, {2.8, -0.6}, {4.3, 1.4}}, stroke = ACC, width = 3, tip = 12}
-scene:create(r, {duration = 0.8, curve = "smooth"})
-scene:wait(0.4)
-scene:fade_out(r, {duration = 0.3})
-
--- plot
-pick(3)
-local stage = scene:group {matrix = {1,0,0,2, 0,1,0,0, 0,0,1,0, 0,0,0,1}}
-local axes = stage:space {x = {-2.6, 2.6, 1}, y = {-1.6, 1.6, 1}, stroke = "#00000000"}
-local wave = axes:plot {fn = function(x) return math.sin(2 * x) * 1.2 end, x_range = {-2.6, 2.6, 0.02}, stroke = ACC, width = 3}
-scene:create(wave, {duration = 0.9, curve = "linear"})
-scene:wait(0.4)
-scene:fade_out(stage, {duration = 0.3})
-
--- tex
-pick(4)
-local eq = scene:tex {tex = "e^{i\\\\pi} + 1 = 0", point = {2, 0}, size = 44, color = "#e6e8ee"}
-scene:write(eq, {duration = 0.8})
-scene:indicate(eq, {duration = 0.6})
-scene:fade_out(eq, {duration = 0.3})
-
--- morph
-pick(5)
-local a = scene:circle {center = {2, 0}, radius = 1.3, fill = "#ff7a4522", stroke = ACC, width = 3}
-scene:fade_in(a, {duration = 0.3})
-local b = scene:polygon {points = {{2, 1.5}, {3.5, -1.1}, {0.5, -1.1}}, fill = "#ff7a4522", stroke = ACC, width = 3}
-scene:morph(a, b, {duration = 0.9, curve = "smooth"})
-scene:wait(0.5)
-scene:fade_out(b, {duration = 0.3})
-scene:fill(tags[5], DIM, 0.3)
-scene:play({target = cursor, shift = {0, 3.6}}, 0.4, "smooth")
+scene:passing_flash(a1, {duration = 0.4})
+scene:parallel(
+  function() scene:focus(nil, {duration = 0.9, curve = "ease_in_out"}) end,
+  function() scene:wait(0.7); scene:play(show(allHostLabels, 1), 0.2) end,
+  table.unpack((function()
+    local fs = {}
+    for i = 1, #routes do fs[i] = function() scene:wait(0.2); scene:passing_flash(routes[i], {duration = 0.7}) end end
+    return fs
+  end)()))
+local fs = {}
+for i = 1, #waves do
+  fs[#fs + 1] = function() scene:create(waves[i], {duration = 1.0, curve = "ease_out"}) end
+end
+scene:parallel(table.unpack(fs))
+local on = {}
+for i = 1, #dots do on[i] = {target = dots[i], opacity = 1} end
+scene:play(on, 0.2)
+local ride = {}
+for i = 1, #dots do ride[i] = function() scene:move_along(dots[i], waves[i], {duration = 1.8, curve = "ease_in_out"}) end end
+scene:parallel(table.unpack(ride))
+-- Push in on the VS Code preview, then back out.
+scene:parallel(
+  function() scene:focus(scene:find("host3"), {padding = 0.18, duration = 0.6, curve = "ease_in_out"}) end,
+  function() scene:play(show(otherLabels, 0), 0.1) end)
+local back = {}
+for i = 1, #dots do back[i] = function() scene:move_along(dots[i], waves[i], {duration = 1.8, curve = {preset = "ease_in_out", reverse = true}}) end end
+scene:parallel(table.unpack(back))
+scene:parallel(
+  function() scene:focus(nil, {duration = 0.7, curve = "ease_in_out"}) end,
+  function() scene:wait(0.55); scene:play(show(otherLabels, 1), 0.15) end)
+scene:wait(0.6)
 return scene`;
-
-export const HERO_JS = `const scene = vis.scene({
-    width: 960, height: 540, theme: "pro_black",
-    camera: {mode: "fixed", view: "2d", height: 6},
-});
-const ACC = "#ff7a45", DIM = "#3a4152";
-const calls = ["scene:circle", "scene:route", "axes:plot", "scene:tex", "scene:morph"];
-const list = scene.group({});
-const tags = calls.map((name, i) => list.text({text: name, point: [-4.7, 1.8 - i * 0.9], align: [0, 0.5],
-                                              size: 22, font: "JetBrainsMono", color: DIM}));
-const cursor = scene.rectangle({center: [-4.95, 1.8], size: [0.08, 0.5], fill: ACC, stroke: ACC, width: 0});
-const pick = (i) => {
-    if (i > 0) scene.fill(tags[i - 1], DIM, 0.3);
-    scene.play({target: cursor, shift: [0, i > 0 ? -0.9 : 0]}, 0.3, "smooth");
-    scene.fill(tags[i], "#e6e8ee", 0.3);
-};
-// The loop ends with the list shown and dim, so it starts that way too.
-scene.wait(0.5);
-
-// circle
-pick(0);
-const c = scene.circle({center: [2, 0], radius: 1.4, fill: "#ff7a4522", stroke: ACC, width: 3});
-scene.growFromCenter(c, {duration: 0.6});
-scene.wait(0.4);
-scene.fadeOut(c, {duration: 0.3});
-
-// route
-pick(1);
-const r = scene.route({points: [[-0.2, -1.4], [1.2, 1.2], [2.8, -0.6], [4.3, 1.4]], stroke: ACC, width: 3, tip: 12});
-scene.create(r, {duration: 0.8, curve: "smooth"});
-scene.wait(0.4);
-scene.fadeOut(r, {duration: 0.3});
-
-// plot
-pick(2);
-const stage = scene.group({matrix: [1,0,0,2, 0,1,0,0, 0,0,1,0, 0,0,0,1]});
-const axes = stage.space({x: [-2.6, 2.6, 1], y: [-1.6, 1.6, 1], stroke: "#00000000"});
-const wave = axes.plot({fn: (x) => Math.sin(2 * x) * 1.2, x_range: [-2.6, 2.6, 0.02], stroke: ACC, width: 3});
-scene.create(wave, {duration: 0.9, curve: "linear"});
-scene.wait(0.4);
-scene.fadeOut(stage, {duration: 0.3});
-
-// tex
-pick(3);
-const eq = scene.tex({tex: "e^{i\\\\pi} + 1 = 0", point: [2, 0], size: 44, color: "#e6e8ee"});
-scene.write(eq, {duration: 0.8});
-scene.indicate(eq, {duration: 0.6});
-scene.fadeOut(eq, {duration: 0.3});
-
-// morph
-pick(4);
-const a = scene.circle({center: [2, 0], radius: 1.3, fill: "#ff7a4522", stroke: ACC, width: 3});
-scene.fadeIn(a, {duration: 0.3});
-const b = scene.polygon({points: [[2, 1.5], [3.5, -1.1], [0.5, -1.1]], fill: "#ff7a4522", stroke: ACC, width: 3});
-scene.morph(a, b, {duration: 0.9, curve: "smooth"});
-scene.wait(0.5);
-scene.fadeOut(b, {duration: 0.3});
-scene.fill(tags[4], DIM, 0.3);
-scene.play({target: cursor, shift: [0, 3.6]}, 0.4, "smooth");
-return scene;`;
