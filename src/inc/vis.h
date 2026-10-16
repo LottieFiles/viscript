@@ -309,7 +309,7 @@ struct AnimCurve
 
 struct TimingOptions
 {
-    // Seconds; positive for animations, or zero for immediate restore and Motion transitions.
+    // Seconds; positive for animations, or zero for immediate restore and States transitions.
     float duration = 1.0f;
     AnimCurve curve;
 };

@@ -60,9 +60,9 @@ if diagram_enabled
         'args': cpu_enabled ? ['-DVIS_EXPECT_CPU', font_arg] : [],
     }
 endif
-if motion_enabled
+if states_enabled
     cpp_tests += [
-        {'name': 'motion', 'exe': 'testMotion', 'when': true, 'deps': [vis_motion_dep]},
+        {'name': 'states', 'exe': 'testStates', 'when': true, 'deps': [vis_states_dep]},
     ]
 endif
 if tex_enabled
@@ -93,8 +93,8 @@ cpp_tests += [
         'deps': input_deps + ui_deps, 'args': expect_lua + ui_args,
     },
 ]
-if motion_enabled
-    cpp_tests += {'name': 'motion-sw', 'exe': 'testMotionSw', 'when': cpu_enabled, 'deps': [vis_motion_dep]}
+if states_enabled
+    cpp_tests += {'name': 'states-sw', 'exe': 'testStatesSw', 'when': cpu_enabled, 'deps': [vis_states_dep]}
 endif
 cpp_tests += {
     'name': 'lua-runtime', 'exe': 'testLuaRuntime', 'when': cpu_enabled and lua_runtime_enabled,
@@ -120,10 +120,10 @@ cpp_tests += {
 
 # Lua binding tests.
 if lua_enabled
-    if motion_enabled
+    if states_enabled
         cpp_tests += {
-            'name': 'motion-lua', 'exe': 'testMotionLua', 'when': true,
-            'deps': [vis_motion_dep] + runtime_deps, 'args': ['-DVIS_MOTION'] + runtime_args,
+            'name': 'states-lua', 'exe': 'testStatesLua', 'when': true,
+            'deps': [vis_states_dep] + runtime_deps, 'args': ['-DVIS_STATES'] + runtime_args,
             'inc': [lua_inc],
         }
     endif

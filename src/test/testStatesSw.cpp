@@ -1,10 +1,10 @@
 #include <cmath>
 #include <cstdio>
 
-#include "vis_motion.h"
+#include "vis_states.h"
 
 using namespace vis;
-using namespace vis::motion;
+using namespace vis::states;
 
 static int failures = 0;
 
@@ -167,6 +167,6 @@ int main()
         _visibility(renderer);
     }
     delete renderer;
-    if (failures) std::fprintf(stderr, "%d motion render test(s) failed\n", failures);
+    if (failures) std::fprintf(stderr, "%d states render test(s) failed\n", failures);
     return failures ? 1 : 0;
 }

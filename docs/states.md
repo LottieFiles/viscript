@@ -1,33 +1,34 @@
-# Runtime motion
+# Object states
 
-`vis-motion` changes retained Objects between named visual states. A Controller
+`vis-states` changes retained Objects between named visual states. A Controller
 adds relative shift, rotation, scale, opacity, and progress to the state sampled
 from the Scene timeline. Its interaction clock is advanced by the host.
 
 ## Build
 
 ```sh
-meson setup build-motion -Dmodules=motion -Dengines=cpu
-meson compile -C build-motion
+meson setup build-interactive -Dmodules=interactive -Dengines=cpu
+meson compile -C build-interactive
 ```
 
-The module installs `vis_motion.h`, `libvis-motion`, and `vis-motion.pc`.
-Lua-enabled hosts expose `vis.motion(scene)`.
+The `interactive` selector builds this module with UI, Input, and the retained Lua
+runtime. It installs `vis_states.h`, `libvis-states`, and `vis-states.pc`.
+Lua-enabled hosts expose `vis.states(scene)`.
 
 ## Define and select states
 
 ```lua
 local scene = vis.scene {width = 960, height = 540}
 local answer = scene:rectangle {id = "answer", size = {2, 0.8}}
-local motion = vis.motion(scene)
+local states = vis.states(scene)
 
-motion:define(answer, "answer.idle", {})
-motion:define(answer, "answer.correct", {
+states:define(answer, "answer.idle", {})
+states:define(answer, "answer.correct", {
     shift = {0, 0.12},
     rotation = 0.03,
     scale = {1.08, 1.08},
 })
-motion:transition(answer, "answer.correct", 0.18, "smooth")
+states:transition(answer, "answer.correct", 0.18, "smooth")
 return scene
 ```
 
@@ -38,15 +39,15 @@ follow the sampled Object model. Opacity and progress multiply their sampled val
 C++ uses the same Controller:
 
 ```cpp
-#include "vis_motion.h"
+#include "vis_states.h"
 
 using namespace vis;
 auto scene = Scene::gen();
 auto answer = Rectangle::gen({}, {2.0f, 0.8f});
 scene->add(answer);
-auto controller = motion::Controller::gen(scene);
+auto controller = states::Controller::gen(scene);
 
-motion::State correct;
+states::State correct;
 correct.shift = {0.0f, 0.12f, 0.0f};
 correct.rotation.z = 0.03f;
 correct.scale = {1.08f, 1.08f, 1.0f};
@@ -61,21 +62,21 @@ with the authored Scene state at the requested Scene time.
 
 ## Host clock
 
-A host performs semantic decisions and advances motion once per interaction tick:
+A host performs semantic decisions and advances states once per interaction tick:
 
 ```text
 input -> select state -> transition(...)
 tick  -> advance(dt)
-frame -> sample Scene time + motion overlay
+frame -> sample Scene time + state overlay
 ```
 
-Advance Motion alongside a retained Lua Runtime when they share a cadence:
+Advance States alongside a retained Lua Runtime when they share a cadence:
 
 ```lua
 vis.runtime(scene, {
     fixed_step = 1 / 60,
     update = function(ctx, dt)
-        motion:advance(dt)
+        states:advance(dt)
     end,
 })
 ```
@@ -88,7 +89,7 @@ settles. A capture host can step both clocks, or bake its decisions into Scene c
 `transition(Target*, count, ...)` accepts a batch as one transaction. Each accepted
 target produces an Event with:
 
-- motion time and transaction number;
+- state-clock time and transaction number;
 - Scene-local Object ID and copied state name;
 - duration and animation curve.
 

@@ -1,7 +1,7 @@
 -- Input-only keyboard motion.
--- Requires a viscript build configured with -Dmodules=input; no UI Panel is used.
+-- Requires a viscript build configured with -Dmodules=interactive; no UI Panel is used.
 if not vis.input then
-    error("keyboard-object-motion.lua requires a viscript build configured with -Dmodules=input")
+    error("keyboard-object-motion.lua requires a viscript build configured with -Dmodules=interactive")
 end
 
 local WIDTH, HEIGHT = 960, 540

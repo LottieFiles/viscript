@@ -1,22 +1,22 @@
 # Interaction model
 
-Apply the viscript scene, typography, layout, motion, and review workflow to the authored base scene. Then add UI, Input, Runtime, Audio, or Motion for the interaction the subject needs.
+Apply the viscript scene, typography, layout, motion, and review workflow to the authored base scene. Then add UI, Input, States, Runtime, or Audio for the interaction the subject needs.
 
 ## Modules
 
 | Module | Build option | Lua entry | Purpose |
 |---|---|---|---|
-| UI | `-Dmodules=ui` | `vis.ui.panel(scene)` | Buttons, toggles, sliders, pointer capture, rendered sampling |
-| Input | `-Dmodules=input` | `vis.input.controller(scene)` | Object bindings, frame input/actions, camera gestures |
-| Runtime | `-Dmodules=runtime` | `vis.runtime(scene, config)` | Retained Lua and fixed-step object overlays |
+| UI | `-Dmodules=interactive` | `vis.ui.panel(scene)` | Buttons, toggles, sliders, pointer capture, rendered sampling |
+| Input | `-Dmodules=interactive` | `vis.input.controller(scene)` | Object bindings, frame input/actions, camera gestures |
+| Runtime | `-Dmodules=interactive` | `vis.runtime(scene, config)` | Retained Lua and fixed-step object overlays |
 | Audio | `-Dmodules=audio` | `vis.audio` | Authored cues and host playback |
-| Motion | `-Dmodules=motion` | `vis.motion(scene)` | Named states and capture-current retargeting |
+| States | `-Dmodules=interactive` | `vis.states(scene)` | Named states and capture-current retargeting |
 
 Feature-detect each module used by the delivered scene. For example:
 
 ```lua
 if not vis.input then
-    error("this scene requires a viscript build configured with -Dmodules=input")
+    error("this scene requires a viscript build configured with -Dmodules=interactive")
 end
 ```
 
@@ -81,20 +81,20 @@ py = height/2 - (worldY - targetY) * height/cameraHeight
 
 PointerFollow computes normalized coordinates in its region, then `map_origin + map_x*u + map_y*v`. Choose `map_y` explicitly for the desired vertical direction.
 
-## Composed state and Motion
+## Composed state and States
 
 Rendering samples the authored timeline, composes registered object/fill modifiers, composes camera modifiers, then draws. Retargeted transitions capture the current composed state. Use a semantic Group when several painted objects represent one state, and provide a visible camera-reset path.
 
 ```lua
-local motion = vis.motion(scene)
-motion:define(card, "card.idle", {})
-motion:define(card, "card.correct", {shift = {0, 0.12}, scale = {1.08, 1.08}})
-motion:transition(card, "card.correct", 0.18, "smooth")
-motion:transition({{object = card, state = "card.correct"}}, 0.18, "smooth")
-motion:advance(1 / 60)
-local visible = motion:sample(card)
+local states = vis.states(scene)
+states:define(card, "card.idle", {})
+states:define(card, "card.correct", {shift = {0, 0.12}, scale = {1.08, 1.08}})
+states:transition(card, "card.correct", 0.18, "smooth")
+states:transition({{object = card, state = "card.correct"}}, 0.18, "smooth")
+states:advance(1 / 60)
+local visible = states:sample(card)
 ```
 
-Motion uses its own clock. Define states during construction, capture the handle in retained decisions, and call `advance(dt)` once per simulation step when the clocks should share a cadence. Pass one object and state, or an array of `{object, state}` entries, to `transition`. A batch applies atomically. `event_count`, `event`, and `clear_events` expose acknowledgements.
+States uses its own clock. Define states during construction, capture the handle in retained decisions, and call `advance(dt)` once per simulation step when the clocks should share a cadence. Pass one object and state, or an array of `{object, state}` entries, to `transition`. A batch applies atomically. `event_count`, `event`, and `clear_events` expose acknowledgements.
 
 See [review.md](review.md) for retained runtime setup and interaction checks.

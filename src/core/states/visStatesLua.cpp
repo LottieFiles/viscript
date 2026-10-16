@@ -6,16 +6,16 @@ extern "C" {
 #include <lua.h>
 }
 
-#include "vis_motion.h"
-#include "visMotionLuaExtension.h"
+#include "vis_states.h"
+#include "visStatesLuaExtension.h"
 
-namespace vis::motion
+namespace vis::states
 {
 
 namespace
 {
 
-static constexpr const char* MotionMetatable = "vis.motion.Controller";
+static constexpr const char* StatesMetatable = "vis.states.Controller";
 
 struct LuaController
 {
@@ -24,9 +24,9 @@ struct LuaController
 
 static Controller* _controller(lua_State* lua)
 {
-    auto handle = static_cast<LuaController*>(luaL_checkudata(lua, 1, MotionMetatable));
+    auto handle = static_cast<LuaController*>(luaL_checkudata(lua, 1, StatesMetatable));
     if (!handle->controller || !handle->controller->scene()) {
-        luaL_error(lua, "motion controller is no longer available");
+        luaL_error(lua, "states controller is no longer available");
     }
     return handle->controller;
 }
@@ -125,7 +125,7 @@ static State _state(lua_State* lua, int index)
     static const char* const options[] = {
         "origin", "shift", "rotation", "scale", "opacity", "progress", nullptr,
     };
-    _options(lua, index, "motion state", options);
+    _options(lua, index, "state", options);
     State state;
     lua_getfield(lua, index, "origin");
     if (!lua_isnil(lua, -1)) {
@@ -149,8 +149,8 @@ static State _state(lua_State* lua, int index)
 static float _duration(lua_State* lua, int index, float fallback)
 {
     if (lua_isnoneornil(lua, index)) return fallback;
-    auto value = _number(lua, index, "motion duration");
-    if (value < 0.0f) luaL_error(lua, "motion duration must be non-negative");
+    auto value = _number(lua, index, "transition duration");
+    if (value < 0.0f) luaL_error(lua, "transition duration must be non-negative");
     return value;
 }
 
@@ -163,7 +163,7 @@ static AnimCurve _curve(lua_State* lua, int index)
 static int _result(lua_State* lua, Result result, const char* operation)
 {
     if (result != Result::Success) {
-        return luaL_error(lua, "motion %s failed: %s", operation, vis::result(result));
+        return luaL_error(lua, "states %s failed: %s", operation, vis::result(result));
     }
     lua_settop(lua, 1);
     return 1;
@@ -173,10 +173,10 @@ static int _define(lua_State* lua)
 {
     auto controller = _controller(lua);
     if (!detail::luaAuthoring(lua)) {
-        return luaL_error(lua, "motion definitions are immutable after loading");
+        return luaL_error(lua, "state definitions are immutable after loading");
     }
     auto object = detail::luaObject(lua, controller->scene(), 2);
-    auto name = _text(lua, 3, "motion state name");
+    auto name = _text(lua, 3, "state name");
     auto state = _state(lua, 4);
     return _result(lua, controller->define(object, name, state), "define");
 }
@@ -187,14 +187,14 @@ static int _transition(lua_State* lua)
     auto controller = _controller(lua);
     if (!lua_istable(lua, 2)) {
         auto object = detail::luaObject(lua, controller->scene(), 2);
-        auto name = _text(lua, 3, "motion state name");
+        auto name = _text(lua, 3, "state name");
         return _result(lua,
                        controller->transition(object, name, _duration(lua, 4, 0.2f), _curve(lua, 5)),
                        "transition");
     }
     auto count = lua_rawlen(lua, 2);
     if (!count || count > Controller::ObjectLimit) {
-        return luaL_error(lua, "motion targets must contain 1 to %d entries",
+        return luaL_error(lua, "transition targets must contain 1 to %d entries",
                           static_cast<int>(Controller::ObjectLimit));
     }
     // A state given as a number turns into a string that only the stack holds, so the states
@@ -208,12 +208,12 @@ static int _transition(lua_State* lua)
         lua_rawgeti(lua, 2, i + 1u);
         luaL_checktype(lua, -1, LUA_TTABLE);
         static const char* const options[] = {"object", "state", nullptr};
-        _options(lua, -1, "motion target", options);
+        _options(lua, -1, "transition target", options);
         lua_getfield(lua, -1, "object");
         targets[i].object = detail::luaObject(lua, controller->scene(), -1);
         lua_pop(lua, 1);
         lua_getfield(lua, -1, "state");
-        targets[i].state = _text(lua, -1, "motion target state");
+        targets[i].state = _text(lua, -1, "transition target state");
         lua_rawseti(lua, states, i + 1u);
         lua_pop(lua, 1);
     }
@@ -226,7 +226,7 @@ static int _transition(lua_State* lua)
 static int _advance(lua_State* lua)
 {
     auto controller = _controller(lua);
-    return _result(lua, controller->advance(_number(lua, 2, "motion elapsed")), "advance");
+    return _result(lua, controller->advance(_number(lua, 2, "elapsed time")), "advance");
 }
 
 static void _vec3Table(lua_State* lua, const Vec3& value)
@@ -247,7 +247,7 @@ static int _sample(lua_State* lua)
     State state;
     auto result = controller->sample(object, state);
     if (result != Result::Success) {
-        return luaL_error(lua, "motion sample failed: %s", vis::result(result));
+        return luaL_error(lua, "state sample failed: %s", vis::result(result));
     }
     lua_createtable(lua, 0, 6);
     _vec3Table(lua, state.origin);
@@ -386,21 +386,21 @@ static int _controllerGc(lua_State* lua)
 static int _newController(lua_State* lua)
 {
     if (!detail::luaAuthoring(lua)) {
-        return luaL_error(lua, "motion authoring is unavailable after loading");
+        return luaL_error(lua, "states authoring is unavailable after loading");
     }
     auto context =
         static_cast<lua_extension::LuaContext*>(lua_touserdata(lua, lua_upvalueindex(1)));
     if (context->controller) {
-        return luaL_error(lua, "a scene can have only one motion controller");
+        return luaL_error(lua, "a scene can have only one states controller");
     }
     auto scene = detail::luaScene(lua, 1);
     auto controller = Controller::gen(scene);
-    if (!controller) return luaL_error(lua, "could not create motion controller");
+    if (!controller) return luaL_error(lua, "could not create states controller");
     context->controller = controller;
     context->scene = scene;
     auto handle = static_cast<LuaController*>(lua_newuserdatauv(lua, sizeof(LuaController), 1));
     handle->controller = controller;
-    luaL_setmetatable(lua, MotionMetatable);
+    luaL_setmetatable(lua, StatesMetatable);
     lua_pushvalue(lua, 1);
     lua_setiuservalue(lua, -2, 1);
     return 1;
@@ -421,10 +421,10 @@ static int _open(lua_State* lua, void* data)
         {"clear_events", _clearEvents},
         {nullptr, nullptr},
     };
-    luaL_newmetatable(lua, MotionMetatable);
+    luaL_newmetatable(lua, StatesMetatable);
     lua_pushcfunction(lua, _controllerGc);
     lua_setfield(lua, -2, "__gc");
-    lua_pushliteral(lua, "vis.motion.Controller");
+    lua_pushliteral(lua, "vis.states.Controller");
     lua_setfield(lua, -2, "__name");
     lua_pushliteral(lua, "protected");
     lua_setfield(lua, -2, "__metatable");
@@ -436,7 +436,7 @@ static int _open(lua_State* lua, void* data)
     lua_getglobal(lua, "vis");
     lua_pushlightuserdata(lua, data);
     lua_pushcclosure(lua, _newController, 1);
-    lua_setfield(lua, -2, "motion");
+    lua_setfield(lua, -2, "states");
     lua_pop(lua, 1);
     return 0;
 }
@@ -471,4 +471,4 @@ vis::detail::LuaHooks lua_extension::luaHooks(LuaContext& context) noexcept
     return {_open, _loaded, &context};
 }
 
-}  // namespace vis::motion
+}  // namespace vis::states

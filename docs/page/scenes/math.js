@@ -3,7 +3,7 @@
 // each fixed step, plays an autonomous demo, and hands that state to the pointer while the viewer drags.
 
 const HEAD = `if not vis.runtime or not vis.input then
-    error("this scene requires a viscript build configured with -Dmodules=input,runtime")
+    error("this scene requires a viscript build configured with -Dmodules=interactive")
 end
 local W, H, U = 960, 540, 90          -- logical pixels, pixels per world unit
 local scene = vis.scene {

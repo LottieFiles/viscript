@@ -1,9 +1,8 @@
-// Demo collection: interactive scenes driven by viscript's retained runtime.
-// The page only forwards pointer/key events; all state and drawing live in Lua
-// (vis.runtime update callback + ctx:pointer / ctx:key / ctx:update).
+// Interactive scenes driven by the retained runtime.
+// The page forwards pointer/key events; all bindings, state, and drawing live in Lua.
 
 const HEAD = `if not vis.runtime or not vis.input then
-    error("this scene requires a viscript build configured with -Dmodules=input,runtime")
+    error("this scene requires a viscript build configured with -Dmodules=interactive")
 end
 local W, H, U = 960, 540, 90          -- logical pixels, pixels per world unit
 local scene = vis.scene {
@@ -203,7 +202,7 @@ export const INTERACTIVE = {
   id: "interactive",
   title: "Interactive",
   tags: "pointer · keyboard · retained runtime",
-  summary: "Scenes that respond to you. Pointer and keyboard events go straight into viscript's retained runtime, and a Lua update callback redraws the scene every fixed step.",
+  summary: "Scenes that respond to pointer and keyboard input through a retained Lua runtime.",
   episodes: [
     {id: "shortest-path", title: "Shortest path (BFS)", category: "Pointer", code: PATH, interactive: true,
      blurb: "Click a cell to move the source and watch the BFS wave spread. Hover any reached cell to trace its shortest path back. Hold Shift and drag to draw or erase walls."},

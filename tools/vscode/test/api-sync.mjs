@@ -12,7 +12,7 @@ const binding = ["visLua.cpp", "visLuaApi.cpp", "visLuaValues.h", "visLuaStyle.h
 const uiBinding = fs.readFileSync(path.join(repositoryRoot, "src", "core", "ui", "visUiLua.cpp"), "utf8");
 const inputBinding = fs.readFileSync(path.join(repositoryRoot, "src", "core", "input", "visInputLua.cpp"), "utf8");
 const runtimeBinding = fs.readFileSync(path.join(repositoryRoot, "src", "core", "lua_runtime", "visLuaRuntime.cpp"), "utf8");
-const motionBinding = fs.readFileSync(path.join(repositoryRoot, "src", "core", "motion", "visMotionLua.cpp"), "utf8");
+const statesBinding = fs.readFileSync(path.join(repositoryRoot, "src", "core", "states", "visStatesLua.cpp"), "utf8");
 const diagramBinding = fs.readFileSync(path.join(repositoryRoot, "src", "core", "diagram", "visDiagramLua.cpp"), "utf8");
 const texBinding = fs.readFileSync(path.join(repositoryRoot, "src", "core", "tex", "visTexLua.cpp"), "utf8");
 
@@ -24,7 +24,7 @@ const viewMethods = registrationNames(binding, "VIEW_METHODS");
 const panelMethods = registrationNames(uiBinding, "methods");
 const inputMethods = registrationNames(inputBinding, "methods");
 const runtimeMethods = registrationNames(runtimeBinding, "methods");
-const motionMethods = registrationNames(motionBinding, "methods");
+const statesMethods = registrationNames(statesBinding, "methods");
 const diagramMethods = registrationNames(diagramBinding, "diagramMethods");
 const diagramBuiltMethods = registrationNames(diagramBinding, "builtMethods");
 // A module that adds methods to the handles marks them with its name; the core binding lacks them.
@@ -51,11 +51,11 @@ assert.deepEqual(Object.keys(api.methods.Runtime).sort(), runtimeMethods,
 assert.deepEqual(api.globals.runtime.parameters,
     [{name: "scene", type: "Scene"}, {name: "config", type: "RuntimeConfig"}]);
 assert.equal(api.globals.runtime.returns, "Runtime");
-assert.deepEqual(Object.keys(api.methods.MotionController).sort(), motionMethods,
-    "MotionController API schema differs from the optional Motion binding");
-assert.match(motionBinding, /lua_setfield\(lua, -2, "motion"\)/);
-assert.deepEqual(api.globals.motion.parameters, [{name: "scene", type: "Scene"}]);
-assert.equal(api.globals.motion.returns, "MotionController");
+assert.deepEqual(Object.keys(api.methods.StatesController).sort(), statesMethods,
+    "StatesController API schema differs from the optional States binding");
+assert.match(statesBinding, /lua_setfield\(lua, -2, "states"\)/);
+assert.deepEqual(api.globals.states.parameters, [{name: "scene", type: "Scene"}]);
+assert.equal(api.globals.states.returns, "StatesController");
 for (const factory of Object.values(api.factories)) assert.ok(api.configs[factory.config], `Missing ${factory.config}`);
 assert.equal(api.factories.contour.returns, "Group");
 assert.equal(api.configs.ContourConfig.levels.required, true);
@@ -151,15 +151,15 @@ assertConfig("InputKeyMoveConfig", optionNames(inputBinding, "_keyMove"),
 assertConfig("RuntimeConfig", optionNames(runtimeBinding, "_newRuntime"), ["update"]);
 assertConfig("RuntimeObjectState", optionNames(runtimeBinding, "_objectState"), []);
 assertConfig("RuntimeSoundConfig", optionNames(runtimeBinding, "_sound"), []);
-assertConfig("MotionState", optionNames(motionBinding, "_state"), []);
-assertConfig("MotionTarget", optionNames(motionBinding, "_transition"), ["object", "state"]);
-assert.deepEqual(api.methods.MotionController.transition.overloads[0], {
-    parameters: [{name: "targets", type: "MotionTarget[]"}, {name: "duration", type: "number", optional: true}, {name: "curve", type: "Curve", optional: true}],
-    returns: "MotionController",
+assertConfig("StateOverlay", optionNames(statesBinding, "_state"), []);
+assertConfig("StateTarget", optionNames(statesBinding, "_transition"), ["object", "state"]);
+assert.deepEqual(api.methods.StatesController.transition.overloads[0], {
+    parameters: [{name: "targets", type: "StateTarget[]"}, {name: "duration", type: "number", optional: true}, {name: "curve", type: "Curve", optional: true}],
+    returns: "StatesController",
 });
-assert.deepEqual(api.methods.MotionController.transition.overloads.slice(1).map((overload) => overload.parameters), [
+assert.deepEqual(api.methods.StatesController.transition.overloads.slice(1).map((overload) => overload.parameters), [
     [{name: "object", type: "Object"}, {name: "state", type: "string"}, {name: "options", type: "TimingOptions"}],
-    [{name: "targets", type: "MotionTarget[]"}, {name: "options", type: "TimingOptions"}],
+    [{name: "targets", type: "StateTarget[]"}, {name: "options", type: "TimingOptions"}],
 ]);
 for (const [name, base] of Object.entries(api.configBases)) {
     assert.ok(api.configs[name] && api.configs[base], `Unknown timing config inheritance: ${name}`);
@@ -189,10 +189,10 @@ for (const config of [
     "RuntimeConfig", "RuntimeObjectState", "RuntimeActionState", "RuntimeKeyState",
     "RuntimePointerState", "RuntimeSoundConfig",
 ]) assert.match(meta, new RegExp(`---@class vis\\.${config}`));
-assert.match(meta, /function Library\.motion\(scene\)/);
-for (const name of motionMethods) assert.match(meta, new RegExp(`function MotionController:${name}\\(`));
-assert.match(meta, /---@overload fun\(self: vis\.MotionController, targets: vis\.MotionTarget\[\], duration\?: number, curve\?: vis\.Curve\): vis\.MotionController/);
-for (const config of ["MotionState", "MotionTarget", "MotionCurveRecord", "MotionEvent"]) {
+assert.match(meta, /function Library\.states\(scene\)/);
+for (const name of statesMethods) assert.match(meta, new RegExp(`function StatesController:${name}\\(`));
+assert.match(meta, /---@overload fun\(self: vis\.StatesController, targets: vis\.StateTarget\[\], duration\?: number, curve\?: vis\.Curve\): vis\.StatesController/);
+for (const config of ["StateOverlay", "StateTarget", "StateCurveRecord", "StateEvent"]) {
     assert.match(meta, new RegExp(`---@class vis\\.${config}`));
 }
 assert.match(meta, /function Library\.diagram\(scene, config\)/);

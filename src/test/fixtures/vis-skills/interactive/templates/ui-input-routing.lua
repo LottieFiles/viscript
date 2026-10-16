@@ -1,10 +1,10 @@
 -- Combined UI and Input routing template.
--- Requires a viscript build configured with -Dmodules=ui,input.
+-- Requires a viscript build configured with -Dmodules=interactive.
 if not vis.ui then
-    error("ui-input-routing.lua requires a viscript build configured with -Dmodules=ui")
+    error("ui-input-routing.lua requires a viscript build configured with -Dmodules=interactive")
 end
 if not vis.input then
-    error("ui-input-routing.lua requires a viscript build configured with -Dmodules=input")
+    error("ui-input-routing.lua requires a viscript build configured with -Dmodules=interactive")
 end
 
 local WIDTH, HEIGHT = 960, 540

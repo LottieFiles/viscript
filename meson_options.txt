@@ -8,9 +8,9 @@ option(
 option(
     'modules',
     type: 'array',
-    choices: ['', 'ui', 'input', 'runtime', 'audio', 'motion', 'diagram', 'tex', 'all'],
+    choices: ['', 'interactive', 'audio', 'diagram', 'tex', 'all'],
     value: [''],
-    description: 'Build selected optional viscript native modules',
+    description: 'Build selected optional viscript native modules; interactive builds the UI, input, states and retained Lua runtime modules together',
 )
 option(
     'savers',

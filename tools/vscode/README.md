@@ -96,7 +96,7 @@ Use full commit SHAs from `git rev-parse`; for a rename, add the previous path a
 
 ## Interaction and assets
 
-The bundled runtime includes Diagram, TeX, UI, Input, retained Lua Runtime, Motion, and Audio. UI supplies buttons, toggles, sliders, and rendered sampling. Input maps logical pointer/key events to objects and cameras. Retained Lua supplies fixed-step decisions, and Motion supplies named states.
+The bundled runtime includes Diagram, TeX, UI, Input, retained Lua Runtime, States, and Audio. UI supplies buttons, toggles, sliders, and rendered sampling. Input maps logical pointer/key events to objects and cameras. Retained Lua supplies fixed-step decisions, and States supplies named object states.
 
 ```lua
 local input = vis.input.controller(scene)

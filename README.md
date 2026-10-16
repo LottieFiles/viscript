@@ -103,7 +103,7 @@ meson test -C build --print-errorlogs
 | Option | Default | Purpose |
 |---|---|---|
 | `engines` | `cpu` | Render engines. `gl` is experimental and opt-in (`-Dengines=cpu,gl`); WASM builds are CPU-only. |
-| `modules` | none | Optional modules, such as `diagram,tex`, or `all`. |
+| `modules` | none | Optional modules: `diagram`, `tex`, `interactive`, `audio`, or `all`. |
 | `savers` | `all` | GIF and video exporters. PNG is built into the core. |
 | `tools` | `all` | The CLI and the audit command. |
 | `bundled_thorvg` | `false` | Build the pinned ThorVG subproject instead of using the system one. |
@@ -116,7 +116,7 @@ meson setup build -Dmodules=tex
 meson compile -C build
 ```
 
-Optional modules: Diagram, TeX, Motion, UI, Input, Lua Runtime and Audio.
+Optional modules: `diagram`, `tex`, `interactive` (UI, input, states and the retained Lua runtime) and `audio`.
 
 ### Render
 

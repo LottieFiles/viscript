@@ -1,9 +1,9 @@
-#ifndef _VIS_MOTION_H_
-#define _VIS_MOTION_H_
+#ifndef _VIS_STATES_H_
+#define _VIS_STATES_H_
 
 #include "vis.h"
 
-namespace vis::motion
+namespace vis::states
 {
 
 // Complete relative state: local pivot, parent-space shift, XYZ rotation in radians,
@@ -35,7 +35,7 @@ struct Controller final : Group
     static constexpr uint32_t EventLimit = 4096u;
     static constexpr uint32_t StateNameLimit = 96u;
 
-    // One motion controller/runtime slot per scene; lifetime follows the scene.
+    // One states controller/runtime slot per scene; lifetime follows the scene.
     static Controller* gen(Scene* scene) noexcept;
     Scene* scene() const noexcept;
     // Definitions are immutable and construction-only. Names use lowercase ASCII/digit
@@ -105,6 +105,6 @@ struct Lua
                        bool* adaptiveThemeUsed = nullptr) noexcept;
 };
 
-}  // namespace vis::motion
+}  // namespace vis::states
 
 #endif

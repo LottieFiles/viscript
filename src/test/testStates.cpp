@@ -4,13 +4,13 @@
 #include <limits>
 #include <type_traits>
 
-#include "vis_motion.h"
+#include "vis_states.h"
 
 using namespace vis;
-using namespace vis::motion;
+using namespace vis::states;
 
 static_assert(std::is_base_of<Group, Controller>::value,
-              "Motion Controller remains a renderer group");
+              "States controller remains a renderer group");
 
 static int failures = 0;
 
@@ -300,6 +300,6 @@ int main()
     _atomicBatch();
     _boundaries();
     _journalBackpressure();
-    if (failures) std::fprintf(stderr, "%d motion test(s) failed\n", failures);
+    if (failures) std::fprintf(stderr, "%d states test(s) failed\n", failures);
     return failures ? 1 : 0;
 }

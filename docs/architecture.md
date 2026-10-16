@@ -90,13 +90,13 @@ These features share the same bounds, animation, view, and export paths. See
 ## Interaction modules
 
 `RuntimeModifier` is the composition seam between authored sampling and interaction.
-UI, Input, Motion, and Lua Runtime register their state here; renderers consume the
+UI, Input, States, and Lua Runtime register their state here; renderers consume the
 resulting visual state.
 
 - UI selects authored control faces and handles pointer capture.
 - Input stores logical key/pointer state, action maps, Object bindings, and camera
   deltas.
-- Motion retains named relative states and advances on a host interaction clock.
+- States retains named relative states and advances on a host interaction clock.
 - Lua Runtime retains an explicitly registered fixed-step callback. Successful
   updates commit Object overlays and sound events for the host to consume.
 
@@ -104,7 +104,7 @@ Hosts dispatch pointer events to UI, then forward unhandled events to Input. The
 advance simulation clocks and provide audio transport separately. A normal Lua load
 releases its VM after construction; `vis.runtime` retains it with the Scene.
 
-See [Motion](motion.md), [Audio](audio.md), and [Modules](modules.md).
+See [States](states.md), [Audio](audio.md), and [Modules](modules.md).
 
 ## Retained rendering
 
@@ -141,7 +141,7 @@ across the export timeline. See [Layout audit](layout-audit.md).
 | `src/core/loaders/` | Assets and image decoding |
 | `src/core/savers/` | Snapshot and animation output |
 | `src/core/lua/` | Scene authoring binding |
-| `src/core/{diagram,tex,motion,ui,input,lua_runtime,audio}/` | Optional modules |
+| `src/core/{diagram,tex,states,ui,input,lua_runtime,audio}/` | Optional modules |
 | `src/inc/` | Public headers |
 | `src/bindings/` | WASM ABI and JavaScript builder/client |
 | `src/cli/` | Native commands |

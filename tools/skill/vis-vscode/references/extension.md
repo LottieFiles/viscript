@@ -20,7 +20,7 @@ These are the only delivery differences from vis-skills:
 - **Theme.** `theme = "adaptive_vscode"` follows the workbench theme and rebuilds when the theme changes. Fixed and custom themes stay Scene-owned.
 - **Fonts.** Pretendard, monospaced JetBrains Mono NL (`JetBrainsMono`, used by code), Source Serif 4 (used by the `adaptive_vscode` heading and body roles), and IBM Plex Sans KR. A Source Serif Text that contains Korean switches to IBM Plex Sans KR as a whole unless it names a font. The CLI has no host, so it sets `adaptive_vscode` in Pretendard with Pro White colors; the host review below measures what the Viewer shows.
 - **Assets.** `asset = "..."` and `texture = "..."` load relative to the Lua file.
-- **Runtime.** The bundled CPU WASM runtime includes Diagram authoring, UI, Input, the retained Lua Runtime, Motion, and Audio.
+- **Runtime.** The bundled CPU WASM runtime includes Diagram authoring, UI, Input, the retained Lua Runtime, States, and Audio.
 - **Chrome.** The Viewer already shows the manifest title, notes, transport, Related source, and series controls. Do not draw these controls, IDE chrome, file paths, or episode navigation on the Canvas. Exports contain only the Canvas, so the Canvas still carries its own question, values, and captions ([code-evidence.md](code-evidence.md#split-canvas-inspector-and-notes)).
 
 ## Inspector and navigation
@@ -51,7 +51,7 @@ Compact stacks the Canvas and Playback above the Inspector. Wide starts at 600 p
 
 ## Interactive Scenes
 
-Author UI, Input, Runtime, Motion, and Audio with [vis-interactive](../../vis-interactive/SKILL.md). The Preview offers each Canvas pointer event to UI first and then to Input; only unhandled events fall through to camera and FIT gestures. With `camera = {mode = "interactive"}`:
+Author UI, Input, States, Runtime, and Audio with [vis-interactive](../../vis-interactive/SKILL.md). The Preview offers each Canvas pointer event to UI first and then to Input; only unhandled events fall through to camera and FIT gestures. With `camera = {mode = "interactive"}`:
 
 - dragging pans in 2D or orbits in 3D, and Shift-drag pans;
 - the arrow keys pan and `+`/`-` zoom;

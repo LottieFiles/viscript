@@ -1,8 +1,8 @@
 #include <cstdio>
 
-#include "vis_motion.h"
+#include "vis_states.h"
 
-namespace vis::motion
+namespace vis::states
 {
 
 Result Lua::load(const char*, uint32_t, const char*, Scene** scene,
@@ -17,4 +17,4 @@ Result Lua::load(const char*, uint32_t, const char*, Scene** scene,
     return scene ? Result::NonSupport : Result::InvalidArguments;
 }
 
-}  // namespace vis::motion
+}  // namespace vis::states

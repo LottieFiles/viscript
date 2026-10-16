@@ -16,88 +16,88 @@ const center = (bounds) => ({
 });
 
 const runtime = await createVis(`
-if not vis.motion then error("motion module missing") end
+if not vis.states then error("states module missing") end
 if not vis.runtime then error("runtime module missing") end
 local scene = vis.scene {
     width = 200, height = 100,
     camera = {view = "2d", target = {0, 0}, height = 10},
 }
 local subject = scene:rectangle {
-    center = {0, 0}, size = {2, 1}, fill = "accent", id = "motion-subject",
+    center = {0, 0}, size = {2, 1}, fill = "accent", id = "states-subject",
 }
-local motion = vis.motion(scene)
-motion:define(subject, "idle", {})
-motion:define(subject, "right", {shift = {2, 0}})
-motion:define(subject, "up", {shift = {1, 2}})
-motion:transition(subject, "right", 1, "linear")
+local states = vis.states(scene)
+states:define(subject, "idle", {})
+states:define(subject, "right", {shift = {2, 0}})
+states:define(subject, "up", {shift = {1, 2}})
+states:transition(subject, "right", 1, "linear")
 vis.runtime(scene, {
     fixed_step = 0.25,
     max_steps = 4,
     update = function(ctx, dt, time, tick)
-        motion:advance(dt)
+        states:advance(dt)
         if tick == 2 then
-            local visible = motion:sample(subject)
+            local visible = states:sample(subject)
             assert(math.abs(visible.shift[1] - 1) < 0.0001)
-            motion:transition(subject, "up", 1, "linear")
-            assert(motion:event_count() == 2)
-            assert(motion:event(1).transaction == "1")
-            assert(motion:event(2).transaction == "2")
+            states:transition(subject, "up", 1, "linear")
+            assert(states:event_count() == 2)
+            assert(states:event(1).transaction == "1")
+            assert(states:event(2).transaction == "2")
         end
     end,
 })
 return scene
-`, "runtime-motion.lua", {wasmBinary});
+`, "runtime-states.lua", {wasmBinary});
 
 try {
-    const initial = center(runtime.bounds("motion-subject", 0));
+    const initial = center(runtime.bounds("states-subject", 0));
     assert.equal(runtime.advanceRuntime(0.5).steps, 2);
-    const interrupted = center(runtime.bounds("motion-subject", 0));
+    const interrupted = center(runtime.bounds("states-subject", 0));
     assert(interrupted.x > initial.x);
     assert(Math.abs(interrupted.y - initial.y) < 0.1);
 
     assert.equal(runtime.advanceRuntime(0.5).steps, 2);
-    const midway = center(runtime.bounds("motion-subject", 0));
+    const midway = center(runtime.bounds("states-subject", 0));
     assert(Math.abs(midway.x - interrupted.x) < 0.1);
     assert(midway.y < interrupted.y);
 
     assert.equal(runtime.advanceRuntime(0.5).steps, 2);
-    const settled = center(runtime.bounds("motion-subject", 0));
+    const settled = center(runtime.bounds("states-subject", 0));
     assert(Math.abs(settled.x - interrupted.x) < 0.1);
     assert(settled.y < midway.y);
     assert.equal(runtime.render(0, true).length, 200 * 100 * 4);
 
     runtime.loadLua(`
-if not vis.motion then error("motion module missing") end
+if not vis.states then error("states module missing") end
 local scene = vis.scene {
     width = 100, height = 50,
     camera = {view = "2d", target = {0, 0}, height = 5},
 }
-local subject = scene:circle {center = {0, 0}, radius = 0.5, id = "motion-static"}
-local motion = vis.motion(scene)
-motion:define(subject, "visible", {shift = {1, 0}})
-motion:transition(subject, "visible", 0)
-assert(motion:sample(subject).shift[1] == 1)
+local subject = scene:circle {center = {0, 0}, radius = 0.5, id = "states-static"}
+local states = vis.states(scene)
+states:define(subject, "visible", {shift = {1, 0}})
+states:transition(subject, "visible", 0)
+assert(states:sample(subject).shift[1] == 1)
 return scene
-`, "ordinary-motion.lua");
+`, "ordinary-states.lua");
     assert.equal(runtime.retainedLua, false);
-    assert(center(runtime.bounds("motion-static", 0)).x > 50);
+    assert(center(runtime.bounds("states-static", 0)).x > 50);
 
     runtime.loadLua(`
 local scene = vis.scene {width = 100, height = 50}
 local a = scene:circle {id = "a"}
 local b = scene:circle {id = "b"}
-local motion = vis.motion(scene)
-motion:define(a, "right", {shift = {1, 0}})
-motion:define(b, "up", {shift = {0, 1}})
-motion:transition({{object = a, state = "right"}, {object = b, state = "up"}}, {duration = 1, curve = "linear"})
-assert(motion:event(1).transaction == motion:event(2).transaction)
-motion:advance(0.5)
-assert(math.abs(motion:sample(a).shift[1] - 0.5) < 0.0001)
-assert(math.abs(motion:sample(b).shift[2] - 0.5) < 0.0001)
+local states = vis.states(scene)
+states:define(a, "right", {shift = {1, 0}})
+states:define(b, "up", {shift = {0, 1}})
+states:transition({{object = a, state = "right"}, {object = b, state = "up"}}, {duration = 1, curve = "linear"})
+assert(states:event(1).transaction == states:event(2).transaction)
+states:advance(0.5)
+assert(math.abs(states:sample(a).shift[1] - 0.5) < 0.0001)
+assert(math.abs(states:sample(b).shift[2] - 0.5) < 0.0001)
 local target = scene:rectangle {id = "morphed"}
 scene:morph(a, target, {duration = 1})
 return scene
-`, "batch-motion.lua");
+`, "batch-states.lua");
     assert.equal(runtime.duration, 1);
     assert.ok(runtime.bounds("morphed", 1).width > 0);
     assert.equal(runtime.render(1, true).length, 100 * 50 * 4);
@@ -105,4 +105,4 @@ return scene
     runtime.destroy();
 }
 
-console.log("WASM Lua semantic Motion and retained two-clock integration passed");
+console.log("WASM Lua semantic States and retained two-clock integration passed");

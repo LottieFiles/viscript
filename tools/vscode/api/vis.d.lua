@@ -20,7 +20,7 @@
 ---@field displacement number Finite initial displacement from equilibrium in scene units.
 ---@field velocity? number Finite initial velocity in scene units/s, default zero.
 
----@class vis.MotionState
+---@class vis.StateOverlay
 ---@field origin? vis.Vec2|vis.Vec3 Optional Object-local pivot; otherwise the Object-family bounds center is resolved when defining the state.
 ---@field shift? vis.Vec2|vis.Vec3 Parent-space translation relative to the authored Scene sample.
 ---@field rotation? number|vis.Vec2|vis.Vec3 Z radians or XYZ radians around origin.
@@ -28,23 +28,23 @@
 ---@field opacity? number Multiplicative opacity in [0, 1].
 ---@field progress? number Multiplicative draw progress in [0, 1].
 
----@class vis.MotionTarget
+---@class vis.StateTarget
 ---@field object vis.Object Live Object owned by the controller Scene.
 ---@field state string Previously defined state name for this Object.
 
----@class vis.MotionCurveRecord
+---@class vis.StateCurveRecord
 ---@field preset string Canonical preset name, or custom for a cubic Bézier curve.
 ---@field strength number Recorded curve strength.
 ---@field reverse boolean Whether the recorded curve is reversed.
 ---@field bezier? number[] Four control coordinates for a custom cubic Bézier curve.
 
----@class vis.MotionEvent
----@field time number Controller-local motion-clock time at acceptance.
+---@class vis.StateEvent
+---@field time number Controller-local state-clock time at acceptance.
 ---@field transaction string Controller-local uint64 transaction encoded as decimal text without precision loss.
 ---@field object integer Scene-local numeric Object identifier.
 ---@field state string Copied semantic state name.
 ---@field duration number Accepted transition duration.
----@field curve vis.MotionCurveRecord Accepted symbolic animation curve.
+---@field curve vis.StateCurveRecord Accepted symbolic animation curve.
 
 ---@class vis.RuntimeConfig
 ---@field fixed_step? number Deterministic callback step in seconds; defaults to 1/120 and must be at most 1.
@@ -2457,62 +2457,62 @@ function Runtime:update(object, state) end
 ---@return vis.Runtime
 function Runtime:clear(object) end
 
----Scene-owned semantic state-transition controller; available only with optional Motion support.
----@class vis.MotionController
-local MotionController = {}
+---Scene-owned semantic state-transition controller; available only with optional interactive support.
+---@class vis.StatesController
+local StatesController = {}
 
 ---Define one immutable complete semantic overlay state during scene construction.
 ---@param object vis.Object
 ---@param name string
----@param state vis.MotionState
----@return vis.MotionController
-function MotionController:define(object, name, state) end
+---@param state vis.StateOverlay
+---@return vis.StatesController
+function StatesController:define(object, name, state) end
 
----Retarget one Object or atomically retarget an array of Objects to named motion states.
----@overload fun(self: vis.MotionController, targets: vis.MotionTarget[], duration?: number, curve?: vis.Curve): vis.MotionController
----@overload fun(self: vis.MotionController, object: vis.Object, state: string, options: vis.TimingOptions): vis.MotionController
----@overload fun(self: vis.MotionController, targets: vis.MotionTarget[], options: vis.TimingOptions): vis.MotionController
+---Retarget one Object or atomically retarget an array of Objects to named states.
+---@overload fun(self: vis.StatesController, targets: vis.StateTarget[], duration?: number, curve?: vis.Curve): vis.StatesController
+---@overload fun(self: vis.StatesController, object: vis.Object, state: string, options: vis.TimingOptions): vis.StatesController
+---@overload fun(self: vis.StatesController, targets: vis.StateTarget[], options: vis.TimingOptions): vis.StatesController
 ---@param object vis.Object
 ---@param state string
 ---@param duration? number
 ---@param curve? vis.Curve
----@return vis.MotionController
-function MotionController:transition(object, state, duration, curve) end
+---@return vis.StatesController
+function StatesController:transition(object, state, duration, curve) end
 
----Advance the independent motion clock by a non-negative elapsed duration.
+---Advance the independent state clock by a non-negative elapsed duration.
 ---@param elapsed number
----@return vis.MotionController
-function MotionController:advance(elapsed) end
+---@return vis.StatesController
+function StatesController:advance(elapsed) end
 
 ---Return the current complete relative overlay for a tracked Object.
 ---@param object vis.Object
----@return vis.MotionState
-function MotionController:sample(object) end
+---@return vis.StateOverlay
+function StatesController:sample(object) end
 
----Return the independent motion clock in seconds.
+---Return the independent state clock in seconds.
 ---@return number
-function MotionController:time() end
+function StatesController:time() end
 
----Return whether any motion track has not reached its target.
+---Return whether any state track has not reached its target.
 ---@return boolean
-function MotionController:active() end
+function StatesController:active() end
 
 ---Return the number of immutable Object-state definitions.
 ---@return integer
-function MotionController:definition_count() end
+function StatesController:definition_count() end
 
 ---Return the number of undrained accepted transition events.
 ---@return integer
-function MotionController:event_count() end
+function StatesController:event_count() end
 
 ---Return one one-based native acknowledgement event, or nil when the index is outside the journal.
 ---@param index integer
----@return vis.MotionEvent|nil
-function MotionController:event(index) end
+---@return vis.StateEvent|nil
+function StatesController:event(index) end
 
 ---Clear acknowledged native events without changing definitions, tracks, clock, or transaction sequence.
----@return vis.MotionController
-function MotionController:clear_events() end
+---@return vis.StatesController
+function StatesController:clear_events() end
 
 ---A second view of a scene's live objects made by Scene:view; its camera moves and the whole view fades with the calls the scene's camera takes.
 ---@class vis.View
@@ -2588,10 +2588,10 @@ function Library.diagram(scene, config) end
 ---@return vis.Runtime
 function Library.runtime(scene, config) end
 
----Create the optional Scene-owned semantic motion controller. The host must advance its independent clock explicitly.
+---Create the optional Scene-owned semantic state controller. The host must advance its independent clock explicitly.
 ---@param scene vis.Scene
----@return vis.MotionController
-function Library.motion(scene) end
+---@return vis.StatesController
+function Library.states(scene) end
 
 ---@type vis.Library
 vis = {}

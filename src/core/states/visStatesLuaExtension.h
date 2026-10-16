@@ -1,9 +1,9 @@
-#ifndef VIS_MOTION_LUA_EXTENSION_H
-#define VIS_MOTION_LUA_EXTENSION_H
+#ifndef VIS_STATES_LUA_EXTENSION_H
+#define VIS_STATES_LUA_EXTENSION_H
 
 #include "../lua/visLuaExtension.h"
 
-namespace vis::motion
+namespace vis::states
 {
 
 struct Controller;
@@ -21,6 +21,6 @@ vis::detail::LuaHooks luaHooks(LuaContext& context) noexcept;
 
 }  // namespace lua_extension
 
-}  // namespace vis::motion
+}  // namespace vis::states
 
 #endif

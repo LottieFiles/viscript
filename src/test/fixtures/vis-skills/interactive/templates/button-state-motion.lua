@@ -1,8 +1,8 @@
 -- Interactive state template.
--- Requires a viscript build configured with -Dmodules=ui.
+-- Requires a viscript build configured with -Dmodules=interactive.
 -- Replace the two state labels, descriptions, target positions, and Button labels together.
 if not vis.ui then
-    error("button-state-motion.lua requires a viscript build configured with -Dmodules=ui")
+    error("button-state-motion.lua requires a viscript build configured with -Dmodules=interactive")
 end
 
 local WIDTH, HEIGHT = 960, 540

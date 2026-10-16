@@ -12,7 +12,7 @@ During fixed-step catch-up, pass transient edges and deltas to the first step an
 
 ## Retained Lua
 
-Create the runtime after its authored objects and sidecar bindings. Detect `vis.runtime` and any Input/Audio/Motion features used by the scene, following [interaction-model.md](interaction-model.md).
+Create the runtime after its authored objects and sidecar bindings. Detect `vis.runtime` and any Input/Audio/States features used by the scene, following [interaction-model.md](interaction-model.md).
 
 ```lua
 local x = 0

@@ -25,11 +25,13 @@ tools = get_option('tools')
 all_tools = tools.contains('all')
 cli_requested = all_tools or tools.contains('cli') or tools.contains('audit')
 audit_requested = all_tools or tools.contains('audit')
-ui_enabled = all_modules or modules.contains('ui')
-input_enabled = all_modules or modules.contains('input')
-lua_runtime_enabled = all_modules or modules.contains('runtime')
+# The interactive selector builds four internal modules that are used together.
+interactive_enabled = all_modules or modules.contains('interactive')
+ui_enabled = interactive_enabled
+input_enabled = interactive_enabled
+lua_runtime_enabled = interactive_enabled
+states_enabled = interactive_enabled
 audio_enabled = all_modules or modules.contains('audio')
-motion_enabled = all_modules or modules.contains('motion')
 diagram_enabled = all_modules or modules.contains('diagram')
 tex_enabled = all_modules or modules.contains('tex')
 engines = get_option('engines')
@@ -224,11 +226,8 @@ summary(
         'CLI': cli_enabled,
         'Layout audit': audit_enabled,
         'Lua': lua_enabled,
-        'Experimental UI': ui_enabled,
-        'Experimental Input': input_enabled,
-        'Experimental retained Lua runtime': lua_runtime_enabled,
+        'Experimental Interactive (UI, input, states, runtime)': interactive_enabled,
         'Experimental Audio': audio_enabled,
-        'Experimental Motion': motion_enabled,
         'Experimental Diagram': diagram_enabled,
         'Experimental TeX': tex_enabled,
         'Tests': get_option('tests'),

@@ -20,10 +20,10 @@
       "parameters": [{"name": "scene", "type": "Scene"}, {"name": "config", "type": "RuntimeConfig"}],
       "returns": "Runtime"
     },
-    "motion": {
-      "description": "Create the optional Scene-owned semantic motion controller. The host must advance its independent clock explicitly.",
+    "states": {
+      "description": "Create the optional Scene-owned semantic state controller. The host must advance its independent clock explicitly.",
       "parameters": [{"name": "scene", "type": "Scene"}],
-      "returns": "MotionController"
+      "returns": "StatesController"
     }
   },
   "namespaces": {
@@ -58,7 +58,7 @@
     "DiagramBuilt": {"description": "Built Diagram object tree and its stable semantic lookups."},
     "InputController": {"description": "Scene-owned input binding controller; available only with optional Input support."},
     "Runtime": {"description": "Experimental retained Lua fixed-step context; available only with optional Lua Runtime support."},
-    "MotionController": {"description": "Scene-owned semantic state-transition controller; available only with optional Motion support."},
+    "StatesController": {"description": "Scene-owned semantic state-transition controller; available only with optional interactive support."},
     "View": {"description": "A second view of a scene's live objects made by Scene:view; its camera moves and the whole view fades with the calls the scene's camera takes."}
   },
   "factories": {
@@ -260,17 +260,17 @@
       "update": {"description": "Atomically stage one bounded render-time Object overlay inside the fixed-step callback.", "parameters": [{"name": "object", "type": "Object"}, {"name": "state", "type": "RuntimeObjectState"}], "returns": "Runtime"},
       "clear": {"description": "Atomically clear one Object overlay, or every runtime overlay when object is omitted, inside the fixed-step callback.", "parameters": [{"name": "object", "type": "Object", "optional": true}], "returns": "Runtime"}
     },
-    "MotionController": {
-      "define": {"description": "Define one immutable complete semantic overlay state during scene construction.", "parameters": [{"name": "object", "type": "Object"}, {"name": "name", "type": "string"}, {"name": "state", "type": "MotionState"}], "returns": "MotionController"},
-      "transition": {"description": "Retarget one Object or atomically retarget an array of Objects to named motion states.", "parameters": [{"name": "object", "type": "Object"}, {"name": "state", "type": "string"}, {"name": "duration", "type": "number", "optional": true}, {"name": "curve", "type": "Curve", "optional": true}], "returns": "MotionController", "overloads": [{"parameters": [{"name": "targets", "type": "MotionTarget[]"}, {"name": "duration", "type": "number", "optional": true}, {"name": "curve", "type": "Curve", "optional": true}], "returns": "MotionController"}, {"parameters": [{"name": "object", "type": "Object"}, {"name": "state", "type": "string"}, {"name": "options", "type": "TimingOptions"}], "returns": "MotionController"}, {"parameters": [{"name": "targets", "type": "MotionTarget[]"}, {"name": "options", "type": "TimingOptions"}], "returns": "MotionController"}]},
-      "advance": {"description": "Advance the independent motion clock by a non-negative elapsed duration.", "parameters": [{"name": "elapsed", "type": "number"}], "returns": "MotionController"},
-      "sample": {"description": "Return the current complete relative overlay for a tracked Object.", "parameters": [{"name": "object", "type": "Object"}], "returns": "MotionState"},
-      "time": {"description": "Return the independent motion clock in seconds.", "parameters": [], "returns": "number"},
-      "active": {"description": "Return whether any motion track has not reached its target.", "parameters": [], "returns": "boolean"},
+    "StatesController": {
+      "define": {"description": "Define one immutable complete semantic overlay state during scene construction.", "parameters": [{"name": "object", "type": "Object"}, {"name": "name", "type": "string"}, {"name": "state", "type": "StateOverlay"}], "returns": "StatesController"},
+      "transition": {"description": "Retarget one Object or atomically retarget an array of Objects to named states.", "parameters": [{"name": "object", "type": "Object"}, {"name": "state", "type": "string"}, {"name": "duration", "type": "number", "optional": true}, {"name": "curve", "type": "Curve", "optional": true}], "returns": "StatesController", "overloads": [{"parameters": [{"name": "targets", "type": "StateTarget[]"}, {"name": "duration", "type": "number", "optional": true}, {"name": "curve", "type": "Curve", "optional": true}], "returns": "StatesController"}, {"parameters": [{"name": "object", "type": "Object"}, {"name": "state", "type": "string"}, {"name": "options", "type": "TimingOptions"}], "returns": "StatesController"}, {"parameters": [{"name": "targets", "type": "StateTarget[]"}, {"name": "options", "type": "TimingOptions"}], "returns": "StatesController"}]},
+      "advance": {"description": "Advance the independent state clock by a non-negative elapsed duration.", "parameters": [{"name": "elapsed", "type": "number"}], "returns": "StatesController"},
+      "sample": {"description": "Return the current complete relative overlay for a tracked Object.", "parameters": [{"name": "object", "type": "Object"}], "returns": "StateOverlay"},
+      "time": {"description": "Return the independent state clock in seconds.", "parameters": [], "returns": "number"},
+      "active": {"description": "Return whether any state track has not reached its target.", "parameters": [], "returns": "boolean"},
       "definition_count": {"description": "Return the number of immutable Object-state definitions.", "parameters": [], "returns": "integer"},
       "event_count": {"description": "Return the number of undrained accepted transition events.", "parameters": [], "returns": "integer"},
-      "event": {"description": "Return one one-based native acknowledgement event, or nil when the index is outside the journal.", "parameters": [{"name": "index", "type": "integer"}], "returns": "MotionEvent|nil"},
-      "clear_events": {"description": "Clear acknowledged native events without changing definitions, tracks, clock, or transaction sequence.", "parameters": [], "returns": "MotionController"}
+      "event": {"description": "Return one one-based native acknowledgement event, or nil when the index is outside the journal.", "parameters": [{"name": "index", "type": "integer"}], "returns": "StateEvent|nil"},
+      "clear_events": {"description": "Clear acknowledged native events without changing definitions, tracks, clock, or transaction sequence.", "parameters": [], "returns": "StatesController"}
     },
     "Diagram": {
       "node": {"description": "Add a semantic node and return its builder-owned handle.", "parameters": [{"name": "config", "type": "DiagramNodeConfig"}], "returns": "DiagramNode"},
@@ -303,7 +303,7 @@
       "displacement": {"type": "number", "required": true, "description": "Finite initial displacement from equilibrium in scene units."},
       "velocity": {"type": "number", "description": "Finite initial velocity in scene units/s, default zero."}
     },
-    "MotionState": {
+    "StateOverlay": {
       "origin": {"type": "Vec2|Vec3", "description": "Optional Object-local pivot; otherwise the Object-family bounds center is resolved when defining the state."},
       "shift": {"type": "Vec2|Vec3", "description": "Parent-space translation relative to the authored Scene sample."},
       "rotation": {"type": "number|Vec2|Vec3", "description": "Z radians or XYZ radians around origin."},
@@ -311,23 +311,23 @@
       "opacity": {"type": "number", "description": "Multiplicative opacity in [0, 1]."},
       "progress": {"type": "number", "description": "Multiplicative draw progress in [0, 1]."}
     },
-    "MotionTarget": {
+    "StateTarget": {
       "object": {"type": "Object", "required": true, "description": "Live Object owned by the controller Scene."},
       "state": {"type": "string", "required": true, "description": "Previously defined state name for this Object."}
     },
-    "MotionCurveRecord": {
+    "StateCurveRecord": {
       "preset": {"type": "string", "required": true, "description": "Canonical preset name, or custom for a cubic Bézier curve."},
       "strength": {"type": "number", "required": true, "description": "Recorded curve strength."},
       "reverse": {"type": "boolean", "required": true, "description": "Whether the recorded curve is reversed."},
       "bezier": {"type": "number[]", "description": "Four control coordinates for a custom cubic Bézier curve."}
     },
-    "MotionEvent": {
-      "time": {"type": "number", "required": true, "description": "Controller-local motion-clock time at acceptance."},
+    "StateEvent": {
+      "time": {"type": "number", "required": true, "description": "Controller-local state-clock time at acceptance."},
       "transaction": {"type": "string", "required": true, "description": "Controller-local uint64 transaction encoded as decimal text without precision loss."},
       "object": {"type": "integer", "required": true, "description": "Scene-local numeric Object identifier."},
       "state": {"type": "string", "required": true, "description": "Copied semantic state name."},
       "duration": {"type": "number", "required": true, "description": "Accepted transition duration."},
-      "curve": {"type": "MotionCurveRecord", "required": true, "description": "Accepted symbolic animation curve."}
+      "curve": {"type": "StateCurveRecord", "required": true, "description": "Accepted symbolic animation curve."}
     },
     "RuntimeConfig": {
       "fixed_step": {"type": "number", "description": "Deterministic callback step in seconds; defaults to 1/120 and must be at most 1."},

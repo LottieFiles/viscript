@@ -12,6 +12,6 @@ runtime.draw(document.querySelector("canvas"), runtime.duration);
 
 Serve the files over HTTP so `vis-wasm.wasm` loads beside the module. In Node, pass its bytes as `wasmBinary`. Register the selected fonts before rendering or measuring text; included families are Pretendard, Source Serif 4, IBM Plex Sans KR, and JetBrainsMono.
 
-The bundle enables TeX, Diagram, UI, Input, retained Lua Runtime, Motion, and Audio. Use `layoutReport(time, padding)` to inspect sampled bounds, clipping, paths, and collisions. API contracts, ownership, and lifetime rules are documented beside declarations in `client.d.ts` and `bindings.d.ts`.
+The bundle enables TeX, Diagram, UI, Input, retained Lua Runtime, States, and Audio. Use `layoutReport(time, padding)` to inspect sampled bounds, clipping, paths, and collisions. API contracts, ownership, and lifetime rules are documented beside declarations in `client.d.ts` and `bindings.d.ts`.
 
 Destroy the runtime when the host closes. Preserve runtime licenses and font OFL notices when redistributing. `BUILD-MANIFEST.json` records native build provenance, features, file sizes, and SHA-256 checksums.

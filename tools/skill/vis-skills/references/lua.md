@@ -248,6 +248,6 @@ scene:scene_transition({overview, detail, summary}, {
 
 Use [vis-interactive](../../vis-interactive/SKILL.md) for UI, Input, action maps, retained runtime, audio, and simulation loops. Authored sound cues use `vis.audio.cue(scene, options)` when Audio is enabled.
 
-`vis.motion(scene)` provides semantic states, atomic transitions, and interaction-clock retargeting. `vis.diagram(scene)` provides semantic nodes, edges, groups, and audit metadata; see [diagram/native-authoring.md](diagram/native-authoring.md). Enable the corresponding modules in the build.
+`vis.states(scene)` provides named object states, atomic transitions, and interaction-clock retargeting. `vis.diagram(scene)` provides semantic nodes, edges, groups, and audit metadata; see [diagram/native-authoring.md](diagram/native-authoring.md). Enable the corresponding modules in the build.
 
 Scripts run without `pairs`, `next`, `print`, `pcall`, `load`, `require`, metatables, `os`, `io`, `debug`, and the string pattern functions (`find`, `match`, `gmatch`, `gsub`). Iterate with `ipairs` or `vis.keys`, compare strings with `string.sub` and `string.byte`, and stop with `error(...)` to see a value. Use `math.randomseed(seed)` for repeatable authored randomness. `vis.keys(table)` gives ordered keys; `vis.merge(defaults, options)` combines component options with later values winning. Register fonts and memory-backed assets before loading a scene that measures or uses them. Review every authored timeline with [review.md](review.md).

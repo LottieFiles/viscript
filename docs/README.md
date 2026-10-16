@@ -16,7 +16,7 @@ See [website maintenance](page/README.md) for preview, validation, and deploymen
 ## Review and run
 
 - [Layout audit](layout-audit.md): clipping, overlap, containment, and fonts
-- [Motion](motion.md): named states on the interaction clock
+- [States](states.md): named object states on the interaction clock
 - [Audio](audio.md): cues, playback, and offline mixing
 
 ## Understand and build

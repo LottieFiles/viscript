@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "project": "viscript",
   "projectVersion": "0.1.0",
-  "sourceCommit": "ceecbf0a51af",
+  "sourceCommit": "adea14b351c1",
   "sourceDirty": true,
-  "buildDate": "2026-10-14",
+  "buildDate": "2026-10-16",
   "toolchain": {
     "emscripten": "4.0.19",
     "buildType": "minsize",
@@ -38,8 +38,8 @@
     },
     {
       "path": "vis-wasm.wasm",
-      "bytes": 1192033,
-      "sha256": "a24fd9ebed2c488e06c4abea4f0b3b7725fcac9935d5c52b94d7f776c3a70288"
+      "bytes": 1192029,
+      "sha256": "584d07fc9a0f0ad6da9d279bd7f350b45f42fa368791166bff0c7f39543bd228"
     },
     {
       "path": "client.js",
@@ -103,8 +103,8 @@
     },
     {
       "path": "LICENSE-viscript.txt",
-      "bytes": 1078,
-      "sha256": "f2660c8e3ecad44b8b68c67291782b94f10a93f9b92119e252bc4004ae72e53f"
+      "bytes": 1067,
+      "sha256": "963356568c764ea77326bb4f4edc2c35275d2208589df0d7478d91082433ff84"
     },
     {
       "path": "LICENSE-ThorVG.txt",

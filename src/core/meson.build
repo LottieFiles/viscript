@@ -81,13 +81,13 @@ if audio_enabled
         'libraries': miniaudio_system_deps,
     }
 endif
-if motion_enabled
-    subdir('motion')
-    vis_module_args += '-DVIS_MOTION'
-    vis_module_deps += vis_motion_dep
+if states_enabled
+    subdir('states')
+    vis_module_args += '-DVIS_STATES'
+    vis_module_deps += vis_states_dep
     vis_module_pkgs += {
-        'lib': vis_motion_lib, 'name': 'vis-motion',
-        'description': 'Experimental semantic runtime motion module for viscript',
+        'lib': vis_states_lib, 'name': 'vis-states',
+        'description': 'Experimental named object states and transitions for viscript',
     }
 endif
 if diagram_enabled

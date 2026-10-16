@@ -2,12 +2,12 @@
 #include <cstring>
 #include <new>
 
-#include "vis_motion.h"
+#include "vis_states.h"
 #include "../common/visFinite.h"
 #include "../common/visRetarget.h"
 #include "../scene/visScene.h"
 
-namespace vis::motion
+namespace vis::states
 {
 
 namespace
@@ -429,4 +429,4 @@ Result Controller::modifyObject(const Object* object, float time, Mat4& model,
         : Result::InvalidArguments;
 }
 
-}  // namespace vis::motion
+}  // namespace vis::states

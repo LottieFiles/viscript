@@ -9,8 +9,8 @@
 #if defined(VIS_DIAGRAM)
 #include "../diagram/visDiagramLuaExtension.h"
 #endif
-#if defined(VIS_MOTION)
-#include "../motion/visMotionLuaExtension.h"
+#if defined(VIS_STATES)
+#include "../states/visStatesLuaExtension.h"
 #endif
 #if defined(VIS_TEX)
 #include "../tex/visTexLuaExtension.h"
@@ -42,15 +42,15 @@ struct LuaHostContext
 #if defined(VIS_LUA_RUNTIME)
     lua_runtime::lua_extension::LuaContext runtime;
 #endif
-#if defined(VIS_MOTION)
-    motion::lua_extension::LuaContext motion;
+#if defined(VIS_STATES)
+    states::lua_extension::LuaContext states;
 #endif
 };
 
 inline void luaHostResetFailedLoad(LuaHostContext& context) noexcept
 {
-#if defined(VIS_MOTION)
-    context.motion = {};
+#if defined(VIS_STATES)
+    context.states = {};
 #else
     (void) context;
 #endif
@@ -69,8 +69,8 @@ inline LuaHookSpan luaHostHooks(LuaHostContext& context,
 #if defined(VIS_TEX)
     storage[count++] = tex::lua_extension::luaHooks();
 #endif
-#if defined(VIS_MOTION)
-    storage[count++] = motion::lua_extension::luaHooks(context.motion);
+#if defined(VIS_STATES)
+    storage[count++] = states::lua_extension::luaHooks(context.states);
 #endif
 #if defined(VIS_INPUT)
     storage[count++] = input::lua_extension::luaHooks(context.input);
@@ -82,7 +82,7 @@ inline LuaHookSpan luaHostHooks(LuaHostContext& context,
     storage[count++] = lua_runtime::lua_extension::luaHooks(context.runtime);
 #endif
 #if !defined(VIS_AUDIO) && !defined(VIS_UI) && !defined(VIS_INPUT) \
-    && !defined(VIS_LUA_RUNTIME) && !defined(VIS_MOTION)
+    && !defined(VIS_LUA_RUNTIME) && !defined(VIS_STATES)
     (void) context;
 #endif
     return {storage, count};
