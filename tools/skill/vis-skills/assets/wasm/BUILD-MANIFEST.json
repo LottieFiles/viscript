@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "project": "viscript",
   "projectVersion": "0.1.0",
-  "sourceCommit": "adea14b351c1",
-  "sourceDirty": true,
+  "sourceCommit": "1bedc4219b1f",
+  "sourceDirty": false,
   "buildDate": "2026-10-16",
   "toolchain": {
     "emscripten": "4.0.19",
