@@ -4750,11 +4750,7 @@ Result Scene::measure(const Text* text, const char* sample, TextExtent& output) 
     auto font = text->font() ? text->font() : _textFont(typography, text);
     auto size = text->size > 0.0f ? text->size : typography.size;
     auto result = renderer::measureText(font, size, sample, text->slant, text->tabular, output);
-    if (result == Result::InsufficientCondition) {
-        std::snprintf(pImpl->reason, sizeof(pImpl->reason),
-                      "its font '%s' is not loaded; load %s.ttf or %s.otf before measuring", font, font, font);
-        return pImpl->fail(result, pImpl->reason);
-    }
+    if (result == Result::InsufficientCondition) return pImpl->fail(result, "no font is loaded, not even the default one");
     if (result != Result::Success) return pImpl->fail(result, MEASURE_FONT);
     if (text->orientation == TextOrientation::Billboard) {
         auto scale = _pixelWorld(pImpl->cfg);
@@ -6265,7 +6261,7 @@ Result Scene::emphasize(const Emphasis& emphasis, float duration, const AnimCurv
         Bounds bounds = {emphasis.point, emphasis.point};
         auto defined = !target;
         auto result = target ? _emphasisBounds(*this, impl, target, impl.cursor, bounds, defined) : Result::Success;
-        // Measuring a text whose font is not loaded leaves its reason behind.
+        // Measuring a text while no font is loaded leaves its reason behind.
         impl.diagnostic = nullptr;
         if (result != Result::Success) return impl.fail(result, TARGET_CHANGED);
         if (!defined || !_finite(bounds.min) || !_finite(bounds.max)) {
@@ -9049,6 +9045,34 @@ Object* Scene::object(const char* tag) const noexcept
         if (value && std::strcmp(value, tag) == 0) return pImpl->objects[i].object;
     }
     return nullptr;
+}
+
+// Adds to output the fonts that the texts of scene, and of the scenes it shows, are set in but
+// that are not loaded, after the count names it holds, each once; returns the new count.
+static uint32_t _missingFonts(const Scene* scene, const char** output, uint32_t capacity, uint32_t count)
+{
+    for (auto i = 0u; i < scene->count() && count < capacity; i++) {
+        auto object = scene->objectAt(i);
+        if (object->type() != Type::Text) continue;
+        auto font = static_cast<const Text*>(object)->font();
+        if (!font || !font[0]) continue;
+        auto named = false;
+        for (auto j = 0u; j < count && !named; j++) named = std::strcmp(output[j], font) == 0;
+        if (named) continue;
+        // A font that is not loaded is measured as the default font, and the extent says so.
+        TextExtent extent;
+        if (renderer::measureText(font, 1.0f, "x", 0.0f, false, extent) == Result::Success && extent.fallback) {
+            output[count++] = font;
+        }
+    }
+    for (auto i = 0u; i < scene->viewportCount(); i++) count = _missingFonts(scene->sceneAt(i), output, capacity, count);
+    for (auto i = 0u; i < scene->transitionCount(); i++) count = _missingFonts(scene->transitionAt(i), output, capacity, count);
+    return count;
+}
+
+uint32_t Scene::missingFonts(const char** output, uint32_t capacity) const noexcept
+{
+    return output ? _missingFonts(this, output, capacity, 0u) : 0u;
 }
 
 uint32_t Scene::viewportCount() const noexcept

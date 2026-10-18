@@ -37,7 +37,8 @@ static void _usage()
                  "extension, so font = \"Pretendard\" needs a file such as Pretendard.ttf. Fonts\n"
                  "load before the script runs, so a script can measure text in them.\n"
                  "Default themes use Pretendard.ttf and JetBrainsMono.ttf (code);\n"
-                 "pass both with --font when a script uses both text roles.\n"
+                 "pass both with --font when a script uses both text roles. Text in a font\n"
+                 "that is not loaded is drawn in the engine's default font, with a warning.\n"
                  "--audio plays a sound file, such as a narration, from time 0 in an .mp4.\n"
     );
 }
@@ -180,13 +181,11 @@ static const char* _describe(Result status)
     }
 }
 
-// Reports a failed renderer call, preferring the renderer's own reason. Without --font no
-// text can be drawn, which is the usual reason, so that case names the option.
-static void _failed(const char* action, Result status, const Renderer* renderer, bool fonts)
+// Reports a failed renderer call, preferring the renderer's own reason.
+static void _failed(const char* action, Result status, const Renderer* renderer)
 {
     auto reason = renderer ? renderer->diagnostic() : nullptr;
     std::fprintf(stderr, "viscript: %s failed: %s\n", action, reason ? reason : _describe(status));
-    if (reason && !fonts) std::fprintf(stderr, "viscript: no --font was given; pass each font file with --font FILE\n");
 }
 
 // Font files given with --font, in command-line order.
@@ -219,13 +218,28 @@ static bool _loadFonts(Renderer* renderer, const Fonts& fonts)
     return true;
 }
 
+// Text in a font that is not loaded is drawn in the default font, which may lack its letters
+// and differs in shape and width; names those fonts.
+static void _missingFonts(const Scene* scene)
+{
+    const char* fonts[16];
+    auto count = scene->missingFonts(fonts, 16u);
+    for (auto i = 0u; i < count; i++) {
+        std::fprintf(stderr, "viscript: the font '%s' is not loaded, so its text is drawn in the default "
+                     "font; pass its file, such as %s.ttf, with --font\n", fonts[i], fonts[i]);
+    }
+}
+
 // Loads a scene; context keeps what the optional modules collected, such as audio cues.
 static Scene* _load(const char* path, detail::LuaHostContext& context)
 {
     char error[2048] = {};
     Scene* scene = nullptr;
     auto status = detail::luaHostLoadFile(path, &scene, error, sizeof(error), context);
-    if (status == Result::Success) return scene;
+    if (status == Result::Success) {
+        _missingFonts(scene);
+        return scene;
+    }
     if (error[0]) std::fprintf(stderr, "viscript: %s\n", error);
     else std::fprintf(stderr, "viscript: could not load %s: %s\n", path, _describe(status));
     return nullptr;
@@ -833,7 +847,7 @@ static int _layout(int argc, char** argv)
     LayoutReport report;
     auto reportResult = renderer->layout(scene, time, report, padding);
     if (reportResult != Result::Success) {
-        _failed("layout report", reportResult, renderer, fonts.count != 0u);
+        _failed("layout report", reportResult, renderer);
         delete renderer;
         delete scene;
         return 4;
@@ -855,10 +869,10 @@ static int _layout(int argc, char** argv)
 
 // Reports a failed GIF or MP4 export; both pipe the rendered frames into ffmpeg.
 static void _saveFailed(const char* output, Result status, const Renderer* renderer,
-                        const Config& config, bool fonts)
+                        const Config& config)
 {
     if (renderer->diagnostic()) {
-        _failed("render", status, renderer, fonts);
+        _failed("render", status, renderer);
     } else if (status == Result::InvalidArguments && _ends(output, ".mp4")
                && ((config.width | config.height) & 1u)) {
         std::fprintf(stderr, "viscript: render failed: mp4 needs an even width and height, got %ux%u\n",
@@ -869,7 +883,7 @@ static void _saveFailed(const char* output, Result status, const Renderer* rende
     } else if (status == Result::NonSupport) {
         std::fprintf(stderr, "viscript: render failed: this build cannot write .gif or .mp4 files\n");
     } else {
-        _failed("render", status, renderer, fonts);
+        _failed("render", status, renderer);
     }
 }
 
@@ -963,13 +977,13 @@ static int _render(int argc, char** argv)
         }
 #endif
         status = Saver::save(scene, *renderer, output, fps, soundtrackPath);
-        if (status != Result::Success) _saveFailed(output, status, renderer, config, fonts.count != 0u);
+        if (status != Result::Success) _saveFailed(output, status, renderer, config);
     } else if (_ends(output, ".png")) {
         Surface surface;
         if (time < 0.0f) time = scene->duration();
         status = renderer->render(scene, time, surface);
         if (status != Result::Success) {
-            _failed("render", status, renderer, fonts.count != 0u);
+            _failed("render", status, renderer);
         } else {
             status = Saver::png(surface, output);
             if (status != Result::Success) std::fprintf(stderr, "viscript: render failed: could not write %s\n", output);
@@ -1045,7 +1059,7 @@ static int _benchmark(int argc, char** argv)
     for (auto i = 0u; i < warmup; i++) {
         auto status = render(i % frames, frames);
         if (status != Result::Success) {
-            _failed("benchmark warmup", status, renderer, fonts.count != 0u);
+            _failed("benchmark warmup", status, renderer);
             delete renderer;
             delete scene;
             return 4;
@@ -1056,7 +1070,7 @@ static int _benchmark(int argc, char** argv)
     for (auto i = 0u; i < frames; i++) {
         auto status = render(i, frames);
         if (status != Result::Success) {
-            _failed("benchmark render", status, renderer, fonts.count != 0u);
+            _failed("benchmark render", status, renderer);
             delete renderer;
             delete scene;
             return 4;

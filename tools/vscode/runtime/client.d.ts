@@ -6,9 +6,14 @@ export type * from "./bindings.js";
 /** `"gl"` is experimental and absent from WebAssembly builds, which render through `"cpu"`. */
 export type RenderEngine = "cpu" | "gl";
 
+/** A loaded WebAssembly instance from `createVisModule`; it can host many scenes. */
+export type VisModule = Readonly<Record<string, unknown>>;
+
 export interface VisModuleOptions {
     /** Fixed at creation; unavailable engines fail without fallback. The portable bundle is CPU-only. */
     readonly renderEngine?: RenderEngine;
+    /** Create the scene's engine in this instance instead of a new one. Fonts loaded through any engine in it are shared by all of them while one is alive. */
+    readonly module?: VisModule;
     readonly [option: string]: unknown;
 }
 
@@ -317,8 +322,14 @@ export interface VisScene {
     bounds(object: string, time?: number): BBox;
     intersects(first: string, second: string, time?: number, padding?: number): boolean;
     layoutReport(time?: number, padding?: number): LayoutReport;
-    /** Register before text measurement or rendering; missing required font glyphs appear in audit. */
-    font(name: string, data: Uint8Array | ArrayBuffer, mime?: string): void;
+    /**
+     * Registers a TrueType or OpenType font under `name` for every engine in the instance; the first font a name gets
+     * stays. Register before loading the scene that measures text in it: text in a font that is not registered is
+     * measured and drawn in the default font the runtime holds, `"default"`.
+     */
+    font(name: string, data: Uint8Array | ArrayBuffer, mime?: "ttf" | "otf" | string): void;
+    /** Fonts the loaded scene's text names that are not registered, so are drawn in the default font. */
+    missingFonts(): string[];
     /** Register before loading an asset-dependent scene. WASM resolves bytes through the host, not a filesystem. */
     asset(name: string, data: Uint8Array | ArrayBuffer, mime: string): void;
     /** Applies interactive camera input. Returns false for fixed scenes or when UI and Input are absent. */
@@ -340,6 +351,9 @@ export interface VisScene {
     resize(width: number, height: number): void;
     destroy(): void;
 }
+
+/** Loads the WebAssembly runtime once, for `createVis(..., {module})`. */
+export function createVisModule(moduleOptions?: VisModuleOptions): Promise<VisModule>;
 
 export function createVis(
     source: string | SceneBuilder,

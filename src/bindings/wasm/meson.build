@@ -9,7 +9,7 @@ wasm_exports = [
     'vis_bounds', 'vis_intersects', 'vis_layout_report', 'vis_layout_report_data',
     'vis_layout_report_size', 'vis_resize', 'vis_camera_mode', 'vis_camera_view',
     'vis_pixels', 'vis_pixels_size', 'vis_width', 'vis_height', 'vis_duration',
-    'vis_loop', 'vis_last_error',
+    'vis_loop', 'vis_last_error', 'vis_missing_fonts',
 ]
 if ui_enabled or input_enabled
     wasm_exports += ['vis_camera', 'vis_input']

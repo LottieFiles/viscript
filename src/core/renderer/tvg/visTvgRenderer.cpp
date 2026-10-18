@@ -8,6 +8,7 @@
 
 #include <thorvg.h>
 
+#include "visDefaultFont.h"
 #include "visMathGlyphs.h"
 
 #include "vis.h"
@@ -39,17 +40,19 @@ static bool _add(tvg::Scene* scene, tvg::Paint* paint)
 // Why the most recent paint on this thread could not be built; empty when none failed.
 static thread_local char _reason[256];
 
-// ThorVG knows a font loaded from a file by the file name without its extension.
-static void _missingFont(const char* font)
+// Only when no font at all is loaded, not even the default one.
+static void _missingFont()
 {
-    if (font) {
-        std::snprintf(_reason, sizeof(_reason),
-                      "text needs the font '%s', which is not loaded; load %s.ttf or %s.otf first",
-                      font, font, font);
-    } else {
-        std::snprintf(_reason, sizeof(_reason),
-                      "text needs a font, and none is loaded; load a .ttf or .otf file first");
-    }
+    std::snprintf(_reason, sizeof(_reason), "text needs a font, and none is loaded; load a .ttf or .otf file first");
+}
+
+// Sets text in the font it names or, when that font is not loaded, in any loaded font, which is
+// the default one unless it failed to load: ThorVG's Lottie loader falls back the same way.
+static bool _font(tvg::Text* text, const char* font, bool* fallback = nullptr)
+{
+    if (font && _success(text->font(font))) return true;
+    if (fallback) *fallback = true;
+    return _success(text->font(nullptr));
 }
 
 static void _extent(const DrawCommand& command, Vec2& min, Vec2& max)
@@ -436,7 +439,7 @@ static tvg::Paint* _mathText(const DrawCommand& command, tvg::Text* text)
             pen += math->advance * scale;
         } else {
             auto glyph = tvg::Text::gen();
-            if (glyph && _success(glyph->font(command.font)) && _success(glyph->size(command.size))
+            if (glyph && _font(glyph, command.font) && _success(glyph->size(command.size))
                 && _success(glyph->text(character)) && _success(glyph->align(0.0f, 0.0f))
                 && _success(glyph->fill(command.style.fill.r, command.style.fill.g, command.style.fill.b))
                 && _success(glyph->translate(x, y - metrics.ascent))) paint = glyph;
@@ -455,8 +458,8 @@ static tvg::Paint* _text(const DrawCommand& command)
 {
     auto text = tvg::Text::gen();
     if (!text) return nullptr;
-    if (!_success(text->font(command.font))) {
-        _missingFont(command.font);
+    if (!_font(text, command.font)) {
+        _missingFont();
         _release(text);
         return nullptr;
     }
@@ -2268,13 +2271,23 @@ struct RetainedTree
     }
 };
 
+// ThorVG counts its users the same way, unguarded, and drops every font when the last one
+// terminates it; the default font goes in again for the next first user. It is registered
+// under its name before any other font, so it is also the one any loaded font finds.
+static uint32_t _users = 0u;
+
 static bool _init()
 {
-    return _success(tvg::Initializer::init(0));
+    if (!_success(tvg::Initializer::init(0))) return false;
+    if (_users++ == 0u) {
+        tvg::Text::load(DEFAULT_FONT_NAME, reinterpret_cast<const char*>(DEFAULT_FONT), sizeof(DEFAULT_FONT), "ttf", false);
+    }
+    return true;
 }
 
 static void _term()
 {
+    if (_users > 0u) _users--;
     tvg::Initializer::term();
 }
 
@@ -2433,11 +2446,12 @@ static bool _missing(bool found, const tvg::GlyphMetrics& glyph, const char* cha
 
 // Adds up the glyph advances of every line the way the font loader lays them out, gathers the
 // box their outlines cover, leaning by slant, and counts the characters the font has no glyph
-// for, which the loader skips.
+// for, which the loader skips. A font that is not loaded is measured as the default one that
+// draws it.
 static Result _measure(tvg::Text* text, const char* font, float size, const char* value, float slant, bool tabular,
                        TextExtent& output)
 {
-    if (!_success(text->font(font))) return Result::InsufficientCondition;
+    if (!_font(text, font, &output.fallback)) return Result::InsufficientCondition;
     tvg::TextMetrics metrics;
     if (!_success(text->size(size)) || !_success(text->metrics(metrics))) return Result::Unknown;
     auto cell = tabular ? _digitAdvance(text) : 0.0f;

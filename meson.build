@@ -77,8 +77,9 @@ foreach engine : ['cpu', 'gl']
 endforeach
 
 # External dependencies: ThorVG (system or bundled subproject), then Lua.
-# The browser runtime loads SVG and PNG pictures only; JPG and WebP stay native.
-tvg_loaders = host_machine.system() == 'emscripten' ? 'svg,png,ttf' : 'svg,png,jpg,webp,ttf'
+# The browser runtime loads SVG and PNG pictures only; JPG and WebP stay native. Fonts are
+# TrueType or OpenType, with TrueType or CFF outlines.
+tvg_loaders = host_machine.system() == 'emscripten' ? 'svg,png,ttf,otf' : 'svg,png,jpg,webp,ttf,otf'
 tvg_options = [
     'engines=' + ','.join(tvg_engines),
     'default_library=static',

@@ -105,10 +105,10 @@ return s
         TextExtent world;
         CHECK(detached && scene->measure(detached, world) == Result::Success);
         CHECK(wide && std::fabs(world.width - wide->box.x) < 1.0e-5f && std::fabs(world.height - wide->box.y) < 1.0e-5f);
+        // A font that is not loaded measures as the default font that draws it.
         if (detached) {
             CHECK(detached->font("Missing") == Result::Success);
-            CHECK(scene->measure(detached, world) == Result::InsufficientCondition);
-            CHECK(scene->diagnostic() && std::strstr(scene->diagnostic(), "its font 'Missing' is not loaded"));
+            CHECK(scene->measure(detached, world) == Result::Success && world.fallback && world.width > 0.0f);
         }
         delete detached;
         CHECK(scene->measure(nullptr, world) == Result::InvalidArguments);
@@ -122,9 +122,9 @@ return s
     if (loose) {
         CHECK(loose->font("Missing") == Result::Success);
         loose->size = 20.0f;
-        CHECK(loose->measure(extent) == Result::InsufficientCondition);
+        CHECK(loose->measure(extent) == Result::Success && extent.fallback);
         CHECK(loose->font("Pretendard") == Result::Success);
-        CHECK(loose->measure(extent) == Result::Success && extent.width > 0.0f);
+        CHECK(loose->measure(extent) == Result::Success && extent.width > 0.0f && !extent.fallback);
         CHECK(extent.missing == 0u && extent.firstMissing[0] == '\0');
         // The font has no glyph for the intersection sign, so the text leaves it out.
         auto width = extent.width;
@@ -143,8 +143,7 @@ return s
         CHECK(loose->measure(extent) == Result::Success && extent.missing == 0u);
     }
     delete loose;
-    _scriptError("local s=vis.scene{}; s:text{text='a', font='Missing'}:measure(); return s",
-                 "could not measure text: its font 'Missing' is not loaded; load Missing.ttf");
+    _scriptLoads("local s=vis.scene{}; s:text{text='a', font='Missing'}:measure(); return s");
     _scriptError("local s=vis.scene{}; s:circle{radius=1}:measure(); return s", "measure requires a text");
 }
 
@@ -482,8 +481,7 @@ return s
                  "spans need at least one character that is not blank");
     _scriptError("local s=vis.scene{}; s:spans{5}; return s", "a spans part must be a string or a table, got number");
     _scriptError("local s=vis.scene{}; s:spans{[3]='a'}; return s", "spans parts must form a list");
-    _scriptError("local s=vis.scene{}; s:spans{'a', font='Missing'}; return s",
-                 "could not measure text: its font 'Missing' is not loaded");
+    _scriptLoads("local s=vis.scene{}; s:spans{'a', font='Missing'}; return s");
     // A formula part needs the tex module, which this script runs without, before any font.
     _scriptError("local s=vis.scene{}; s:spans{'a ', {tex='x^2'}, font='Missing'}; return s",
                  "a tex part needs the tex module: build viscript with -Dmodules=tex");

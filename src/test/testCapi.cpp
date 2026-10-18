@@ -225,6 +225,23 @@ return root
     CHECK(vis_pixels(engine) == nullptr && vis_pixels_size(engine) == 0);
     CHECK(vis_render(engine, vis_duration(engine)) == VIS_RESULT_SUCCESS);
     CHECK(vis_pixels_size(engine) == 400u * 200u * 4u);
+    CHECK(std::strcmp(vis_missing_fonts(engine), "") == 0);
+
+    // No font is loaded but the default one, which draws text in any other font; the scene
+    // names those fonts, its viewports' included, each once.
+    static constexpr char fontSource[] = R"lua(
+local root = vis.scene {width = 80, height = 40}
+root:text {text = "a", font = "Missing Family"}
+root:text {text = "b", font = "Missing Family", point = {1, 0}}
+local inner = vis.scene {width = 40, height = 40}
+inner:text {text = "c", font = "Inner Family"}
+root:viewport(inner, {x = 0.5, y = 0, width = 0.5, height = 1})
+return root
+    )lua";
+    CHECK(vis_load_lua(engine, fontSource, sizeof(fontSource) - 1u, "fonts.lua") == VIS_RESULT_SUCCESS);
+    CHECK(vis_render(engine, 0.0f) == VIS_RESULT_SUCCESS);
+    CHECK(std::strcmp(vis_missing_fonts(engine), "Missing Family\nInner Family\n") == 0);
+    CHECK(std::strcmp(vis_missing_fonts(nullptr), "") == 0);
 
     vis_destroy(engine);
     if (failures) std::fprintf(stderr, "%d C API checks failed\n", failures);

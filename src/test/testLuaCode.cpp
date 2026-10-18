@@ -146,8 +146,7 @@ return s
                  "code needs at least one character that is not blank");
     _scriptError("local s=vis.scene{}; s:code{text='a', orientation='up'}; return s",
                  "text orientation must be 'billboard' or 'plane'");
-    _scriptError("local s=vis.scene{}; s:code{text='a', font='Missing'}; return s",
-                 "could not measure text: its font 'Missing' is not loaded");
+    _scriptLoads("local s=vis.scene{}; s:code{text='a', font='Missing'}; return s");
 }
 
 // A block pins its first baseline and keeps a world-unit pitch, including blank lines.

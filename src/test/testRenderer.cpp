@@ -29,7 +29,8 @@ static bool _says(const Renderer* renderer, const char* text)
 }
 
 #if defined(VIS_EXPECT_CPU)
-// No font is loaded in this process, so every text paint fails and names what it needs.
+// No font but the engine's default one is loaded in this process, so text in a font that is
+// not loaded is measured and drawn in the default font, and measuring it says so.
 static void _fontDiagnostics()
 {
     auto renderer = Renderer::gen(RenderEngine::Cpu);
@@ -48,15 +49,22 @@ static void _fontDiagnostics()
 
     CHECK(named->font("Missing Family") == Result::Success);
     CHECK(scene->add(named) == Result::Success);
-    CHECK(renderer->render(scene, 0.0f, surface) == Result::NonSupport);
-    CHECK(_says(renderer, "text needs the font 'Missing Family', which is not loaded"));
-    CHECK(_says(renderer, "Missing Family.ttf"));
+    CHECK(renderer->render(scene, 0.0f, surface) == Result::Success);
+    CHECK(renderer->diagnostic() == nullptr);
     BBox bounds;
-    CHECK(renderer->bounds(scene, named, 0.0f, bounds) == Result::NonSupport);
-    CHECK(_says(renderer, "'Missing Family'"));
+    CHECK(renderer->bounds(scene, named, 0.0f, bounds) == Result::Success);
+    CHECK(bounds.width > 0.0f && bounds.height > 0.0f);
     LayoutReport report;
-    CHECK(renderer->layout(scene, 0.0f, report) == Result::NonSupport);
-    CHECK(_says(renderer, "'Missing Family'"));
+    CHECK(renderer->layout(scene, 0.0f, report) == Result::Success);
+    TextExtent extent;
+    CHECK(scene->measure(named, extent) == Result::Success);
+    CHECK(extent.fallback && extent.width > 0.0f && extent.missing == 0u);
+    // The default font is Latin, Greek and signs; Hangul is left out, as a font without it leaves it.
+    CHECK(scene->measure(named, "θ ≤ π 한", extent) == Result::Success);
+    CHECK(extent.fallback && extent.missing == 1u && std::strcmp(extent.firstMissing, "한") == 0);
+    const char* fonts[2] = {};
+    CHECK(scene->missingFonts(fonts, 2u) == 1u && std::strcmp(fonts[0], "Missing Family") == 0);
+    CHECK(scene->missingFonts(fonts, 0u) == 0u && scene->missingFonts(nullptr, 2u) == 0u);
     CHECK(renderer->render(scene, -1.0f, surface) == Result::InvalidArguments);
     CHECK(renderer->diagnostic() == nullptr);
 

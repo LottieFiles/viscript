@@ -74,6 +74,18 @@ static inline void _scriptError(const char* source, const char* expected)
     delete scene;
 }
 
+// The script must load.
+static inline void _scriptLoads(const char* source)
+{
+    char error[512] = {};
+    Scene* scene = nullptr;
+    auto status = Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "loads.lua", &scene, error,
+                            sizeof(error));
+    CHECK(status == Result::Success && scene != nullptr);
+    if (status != Result::Success) std::fprintf(stderr, "  expected the script to load, got: %s\n", error);
+    delete scene;
+}
+
 static inline bool _same(Color first, Color second)
 {
     return first.r == second.r && first.g == second.g && first.b == second.b && first.a == second.a;

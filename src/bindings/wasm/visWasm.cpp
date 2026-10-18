@@ -70,6 +70,8 @@ struct Engine
     vis::Renderer* renderer = nullptr;
     vis::Surface surface;
     char error[1024] = {};
+    // Fonts the scene's texts name that are not loaded, one per line (see vis_missing_fonts).
+    char missingFonts[1024] = {};
     float renderTime = 0.0f;
     bool rendered = false;
     uint8_t* layoutReport = nullptr;
@@ -835,6 +837,28 @@ extern "C" VIS_KEEPALIVE VisResult vis_load_font(VisEngine handle, const char* n
     _clearLayoutReport(engine);
     engine->error[0] = '\0';
     return static_cast<VisResult>(result);
+}
+
+// The fonts the loaded scene's texts name that are not loaded, one per line: they are drawn in
+// the default font until the host loads fonts under those names and loads the scene again.
+extern "C" VIS_KEEPALIVE const char* vis_missing_fonts(VisEngine handle)
+{
+    auto engine = _engine(handle);
+    if (!engine) return "";
+    auto& list = engine->missingFonts;
+    list[0] = '\0';
+    const char* fonts[64];
+    auto count = engine->scene ? engine->scene->missingFonts(fonts, 64u) : 0u;
+    auto used = size_t{0};
+    for (auto i = 0u; i < count; i++) {
+        auto length = std::strlen(fonts[i]);
+        if (std::strchr(fonts[i], '\n') || used + length + 2u > sizeof(list)) continue;
+        std::memcpy(list + used, fonts[i], length);
+        used += length;
+        list[used++] = '\n';
+        list[used] = '\0';
+    }
+    return list;
 }
 
 extern "C" VIS_KEEPALIVE VisResult vis_load_asset(VisEngine handle, const char* name,

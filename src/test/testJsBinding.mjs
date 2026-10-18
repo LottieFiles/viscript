@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { inflateSync } from "node:zlib";
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -3605,7 +3605,7 @@ try {
     assert.equal(shapesResult.status, 0, shapesResult.stderr);
     assert.equal(JSON.parse(shapesResult.stdout).duration, 1);
 
-    // A measured text needs its font while the script runs.
+    // A measured text measures in its font while the script runs, or in the default font without it.
     const measuredPath = join(directory, "measured.lua");
     writeFileSync(measuredPath, measuredLua);
     const font = join(repoRoot, "src/examples/assets/Pretendard.ttf");
@@ -3632,8 +3632,7 @@ try {
     const measuredResult = spawnSync(cliPath, ["inspect", measuredPath, "--font", font, "--font", monoFont], { encoding: "utf8" });
     assert.equal(measuredResult.status, 0, measuredResult.stderr);
     const fontless = spawnSync(cliPath, ["inspect", measuredPath], { encoding: "utf8" });
-    assert.notEqual(fontless.status, 0);
-    assert.match(fontless.stderr, /could not measure text: its font 'Pretendard' is not loaded/);
+    assert.equal(fontless.status, 0, fontless.stderr);
 
     // Lua seeded alike draws the same numbers, the draws a range throws away included; the script
     // hands them back in its error, which the CLI reports whole up to 2 KiB.
@@ -3742,9 +3741,11 @@ try {
     writeFileSync(codedPath, codedLua);
     const codedResult = spawnSync(cliPath, ["inspect", codedPath, "--font", font, "--font", monoFont], { encoding: "utf8" });
     assert.equal(codedResult.status, 0, codedResult.stderr);
+    // Without its font, code is set in the default font, and the CLI says so.
     const missingCodeFont = spawnSync(cliPath, ["inspect", codedPath, "--font", font], { encoding: "utf8" });
-    assert.notEqual(missingCodeFont.status, 0);
-    assert.match(missingCodeFont.stderr, /font 'JetBrainsMono' is not loaded/);
+    assert.equal(missingCodeFont.status, 0, missingCodeFont.stderr);
+    assert.match(missingCodeFont.stderr, /the font 'JetBrainsMono' is not loaded, so its text is drawn in the default font/);
+    assert.doesNotMatch(missingCodeFont.stderr, /'Pretendard'/);
     const codedObjects = JSON.parse(codedResult.stdout).objects;
     assert.equal(codedObjects.filter((object) => object.type === "text").length, 16);
     const lastLine = codedObjects.find((object) => object.id === "listing/4").handle;
@@ -4512,14 +4513,16 @@ return root
         "return scene",
     ].join("\n"));
     const textPng = join(directory, "text.png");
+    // Text in a font that is not loaded is drawn in the default font, with a warning per font.
     const unfonted = spawnSync(cliPath, ["render", textPath, "-o", textPng], { encoding: "utf8" });
-    assert.equal(unfonted.status, 4);
-    assert.match(unfonted.stderr, /render failed: text needs the font 'Pretendard', which is not loaded/);
-    assert.match(unfonted.stderr, /no --font was given/);
+    assert.equal(unfonted.status, 0, unfonted.stderr);
+    assert.ok(existsSync(textPng));
+    assert.match(unfonted.stderr, /the font 'Pretendard' is not loaded/);
+    assert.match(unfonted.stderr, /the font 'Missing Family' is not loaded, so its text is drawn in the default font; pass its file, such as Missing Family\.ttf, with --font/);
     const misnamed = spawnSync(cliPath, ["layout", textPath, "--font", diagramFont], { encoding: "utf8" });
-    assert.equal(misnamed.status, 4);
-    assert.match(misnamed.stderr, /the font 'Missing Family', which is not loaded; load Missing Family\.ttf/);
-    assert.doesNotMatch(misnamed.stderr, /no --font was given/);
+    assert.equal(misnamed.status, 0, misnamed.stderr);
+    assert.match(misnamed.stderr, /the font 'Missing Family' is not loaded/);
+    assert.doesNotMatch(misnamed.stderr, /'Pretendard'/);
     const unreadable = spawnSync(cliPath, ["render", textPath, "--font", join(directory, "none.ttf")], {
         encoding: "utf8",
     });

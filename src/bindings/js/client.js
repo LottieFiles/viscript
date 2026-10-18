@@ -208,6 +208,13 @@ function rgba(value, label) {
     return ((red << 24) | (green << 16) | (blue << 8) | alpha) >>> 0;
 }
 
+// One WASM instance can host many engines. Fonts loaded through any of them are shared by all
+// while one of them is alive; pass the result to createVis as `module` to add an engine without
+// another instance.
+export function createVisModule(moduleOptions = {}) {
+    return createModule(moduleOptions);
+}
+
 export async function createVis(source, name = "scene.lua", moduleOptions = {}) {
     if (!moduleOptions || typeof moduleOptions !== "object" || Array.isArray(moduleOptions)) {
         throw new TypeError("viscript module options must be an object");
@@ -217,7 +224,8 @@ export async function createVis(source, name = "scene.lua", moduleOptions = {}) 
     if (renderEngineCode === undefined) {
         throw new TypeError("renderEngine must be 'cpu' or 'gl'");
     }
-    const module = await createModule(moduleOptions);
+    const {module: shared, ...options} = moduleOptions;
+    const module = shared ?? await createModule(options);
     if (typeof module._vis_create_with_engine !== "function"
         || typeof module._vis_render_engine_enabled !== "function"
         || typeof module._vis_render_engine !== "function") {
@@ -438,6 +446,10 @@ export async function createVis(source, name = "scene.lua", moduleOptions = {}) 
         }
     };
     const font = (name, data, mime = "ttf") => resource(module._vis_load_font, "Font", name, data, mime);
+    const missingFonts = () => {
+        assertAlive();
+        return module.UTF8ToString(module._vis_missing_fonts(engine)).split("\n").filter(Boolean);
+    };
     const asset = (name, data, mime) => resource(module._vis_load_asset, "Asset", name, data, mime);
     const audioExportNames = [
         "_vis_audio_supported",
@@ -991,6 +1003,7 @@ export async function createVis(source, name = "scene.lua", moduleOptions = {}) 
         intersects,
         layoutReport,
         font,
+        missingFonts,
         asset,
         ...(audio ? {audio} : {}),
         cameraInput,

@@ -30,6 +30,7 @@ const sources = {
     "LICENSE-Lua.txt": join(root, "licenses/LICENSE-Lua.txt"),
     "LICENSE-miniaudio.txt": join(root, "licenses/LICENSE-miniaudio.txt"),
     "NotoSansMath-OFL.txt": join(root, "src/core/renderer/tvg/NotoSansMath-OFL.txt"),
+    "PretendardStd-OFL.txt": join(root, "src/core/renderer/tvg/PretendardStd-OFL.txt"),
 };
 for (const [name, path] of Object.entries(sources)) {
     if (!existsSync(path)) throw new Error(`missing ${name}: ${path}`);

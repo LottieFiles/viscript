@@ -629,7 +629,15 @@ static Scene* _load(const char* path)
     detail::LuaHostContext context;
     auto status = detail::luaHostLoadFile(path, &scene, error, sizeof(error), context);
     if (status == Result::Success)
+    {
+        // Text in a font that is not loaded is drawn, and audited, in the default font.
+        const char* fonts[16];
+        auto count = scene->missingFonts(fonts, 16u);
+        for (auto i = 0u; i < count; i++)
+            std::fprintf(stderr, "viscript: the font '%s' is not loaded, so its text is drawn in the default "
+                         "font; pass its file, such as %s.ttf, with --font\n", fonts[i], fonts[i]);
         return scene;
+    }
     if (error[0])
         std::fprintf(stderr, "viscript: %s\n", error);
     else

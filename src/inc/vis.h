@@ -1475,6 +1475,8 @@ struct TextExtent
     // formatting characters such as joiners and variation selectors.
     uint32_t missing = 0;
     char firstMissing[5] = {};
+    // The text's font is not loaded, so it was measured in the default font, which draws it.
+    bool fallback = false;
 };
 
 // How a counting text writes its value (see Text::count).
@@ -1520,8 +1522,10 @@ struct Text final : Object
     const char* font() const noexcept;
     Result font(const char* value) noexcept;
     // Measures rendered lines without legacy font kerning. Fonts registered by Renderer::font
-    // are process-wide; a renderer that registered the font must remain alive.
-    // InsufficientCondition: unloaded font. InvalidArguments: unset font or size.
+    // are process-wide; a renderer that registered the font must remain alive. A font that is
+    // not loaded is measured, and drawn, as the default font the engine registers, "default",
+    // and output.fallback says so.
+    // InsufficientCondition: no font loaded at all. InvalidArguments: unset font or size.
     Result measure(TextExtent& output) const noexcept;
     // Sets value in the text's font and size as measure() sets the text's own string.
     Result measure(const char* value, TextExtent& output) const noexcept;
@@ -2155,7 +2159,7 @@ struct Scene
     Result update(Object* object) noexcept;
     // Measures detached or attached text in world units using authored or theme font/size.
     // Billboard pixels convert at the authored camera, at its target in perspective.
-    // InsufficientCondition: unloaded font (see Text::measure()).
+    // InsufficientCondition: no font loaded at all (see Text::measure()).
     Result measure(const Text* text, TextExtent& output) noexcept;
     // Measures a sample string in the same style and world units without changing text.
     Result measure(const Text* text, const char* sample, TextExtent& output) noexcept;
@@ -2427,6 +2431,11 @@ struct Scene
     Object* object(uint32_t id) const noexcept;
     Object* objectAt(uint32_t index) const noexcept;
     Object* object(const char* tag) const noexcept;
+    // Names the fonts that this scene's texts, and those of the scenes it shows in viewports
+    // and transitions, are set in but that are not loaded, each once and at most capacity of
+    // them; the default font draws those texts. The names live as long as the texts. Returns
+    // how many it names.
+    uint32_t missingFonts(const char** output, uint32_t capacity) const noexcept;
     uint32_t viewportCount() const noexcept;
     Scene* sceneAt(uint32_t index) const noexcept;
     bool viewportAt(uint32_t index, Viewport& viewport) const noexcept;
