@@ -207,6 +207,11 @@ directly will not work:
 cd my-page && python3 -m http.server
 ```
 
+For many scenes on one page, the shared player in [`tools/player/`](tools/player) adds what a
+page needs around the runtime: one render worker for every canvas, loading when a scene is
+seen, playback controls and light and dark colours. The documentation site and the Obsidian
+plugin use it.
+
 To rebuild the runtime from source, install Emscripten and run `scripts/wasm-bundle.sh`.
 It updates both copies: `tools/vscode/runtime/` and `tools/skill/vis-skills/assets/wasm/`.
 
@@ -243,6 +248,23 @@ your-project/
 ```
 
 See [`tools/vscode/README.md`](tools/vscode/README.md) for the manifest format and viewer controls.
+
+## Obsidian
+
+The plugin in [`tools/obsidian/`](tools/obsidian) plays scenes in notes. It draws
+```` ```viscript ```` (Lua) and ```` ```viscript-js ```` code blocks, embedded `.lua` files such
+as `![[orbit.lua|480|loop]]`, and `.lua` files opened in a tab of their own with the source
+below. Scenes with the `adaptive_vscode` theme follow the Obsidian theme. The plugin ships the
+themes' fonts, so scenes look the same on every device; other fonts come from a vault folder or
+Fontsource.
+
+```sh
+cd tools/obsidian
+npm ci && npm ci --prefix ../player
+node esbuild.config.mjs --vault /path/to/vault   # builds main.js and copies the plugin into the vault
+```
+
+See [`tools/obsidian/README.md`](tools/obsidian/README.md) for options, fonts and settings.
 
 ## Skills for AI agents
 
@@ -297,11 +319,12 @@ viscript is released under the [MIT License](LICENSE).
 | [Lua 5.4](https://www.lua.org) | MIT | Scene scripting |
 | [miniaudio](https://github.com/mackron/miniaudio) | Public Domain / MIT-0 | Audio module |
 | [Noto Sans Math](https://github.com/notofonts/math) | OFL 1.1 | Embedded TeX glyph outlines |
-| [Pretendard](https://github.com/orioncactus/pretendard) | OFL 1.1 | Bundled font |
+| [Pretendard](https://github.com/orioncactus/pretendard) | OFL 1.1 | Bundled font; a subset of Pretendard Std is the runtime's default font, and the docs site ships Pretendard Std |
 | [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) | OFL 1.1 | Bundled font |
-| [IBM Plex Sans KR](https://github.com/IBM/plex) | OFL 1.1 | Bundled font (runtime bundles) |
-| [Source Serif 4](https://github.com/adobe-fonts/source-serif) | OFL 1.1 | Bundled font (runtime bundles) |
+| [IBM Plex Sans KR](https://github.com/IBM/plex) | OFL 1.1 | Bundled font (runtime bundles and the Obsidian plugin) |
+| [Source Serif 4](https://github.com/adobe-fonts/source-serif) | OFL 1.1 | Bundled font (runtime bundles and the Obsidian plugin) |
 | [FFmpeg](https://ffmpeg.org) | LGPL/GPL | Optional MP4 export, run as an external program; not linked or distributed |
 
 The VS Code extension also bundles gifenc (MIT), Mediabunny (MPL-2.0) and Shiki (MIT);
-see [THIRD_PARTY_NOTICES](tools/vscode/THIRD_PARTY_NOTICES.md).
+see [THIRD_PARTY_NOTICES](tools/vscode/THIRD_PARTY_NOTICES.md). The Obsidian plugin also bundles
+CodeMirror's legacy modes (MIT); its `main.js` begins with every notice it needs.

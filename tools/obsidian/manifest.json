@@ -1,0 +1,10 @@
+{
+  "id": "viscript",
+  "name": "viscript",
+  "version": "0.1.0",
+  "minAppVersion": "1.13.0",
+  "description": "Play viscript scenes, animated explanations written in Lua or JavaScript, in your notes.",
+  "author": "LottieFiles",
+  "authorUrl": "https://github.com/LottieFiles/viscript",
+  "isDesktopOnly": false
+}

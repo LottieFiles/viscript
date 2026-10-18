@@ -2,7 +2,7 @@
 # Build the optimized WASM runtime and copy it into the two bundles the repository keeps:
 #   tools/vscode/runtime/            (VS Code Preview)
 #   tools/skill/vis-skills/assets/wasm/  (portable skill bundle)
-# The documentation site copies the skill's bundle when it builds.
+# The documentation site and the Obsidian plugin take the runtime from the skill's bundle.
 # Usage: scripts/wasm-bundle.sh [build-dir]   (requires emcc on PATH)
 set -eu
 

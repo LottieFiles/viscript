@@ -167,8 +167,8 @@ null>`, so providers carry over between the two. TrueType (`"ttf"`) and OpenType
 `THEME_FONTS` names the families the engine's themes set text in: `Pretendard` for text,
 `JetBrainsMono` for code, and `Source Serif 4` with `IBM Plex Sans KR` in `adaptive_vscode`. The
 documentation site serves Pretendard Std under `Pretendard`, and the full Pretendard once a scene
-shows Hangul. The Obsidian plugin answers with the fonts its settings choose, then the vault's
-font folder, installed fonts and Fontsource.
+shows Hangul. The Obsidian plugin ships all four, the files the VS Code extension ships, and
+answers other names from the vault's font folder and Fontsource.
 
 `fonts/sfnt.ts` reads a font's names, characters and whether it is monospaced, and splits a face
 out of a collection; `FontLibrary` indexes a host's font files by family and loads only the faces

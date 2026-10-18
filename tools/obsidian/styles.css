@@ -1,0 +1,215 @@
+/* viscript scenes: in notes (embeds and code blocks), in their own tabs and in the settings. */
+
+.viscript-scene {
+    position: relative;
+    max-width: 100%;
+}
+
+.viscript-scene[data-align="center"] {
+    margin-inline: auto;
+}
+
+.viscript-scene[data-align="right"] {
+    margin-inline-start: auto;
+}
+
+.internal-embed.viscript-embed {
+    display: block;
+}
+
+.viscript-stage {
+    position: relative;
+    overflow: hidden;
+    border-radius: var(--radius-m);
+}
+
+.viscript-canvas {
+    display: block;
+    width: 100%;
+    height: auto;
+    outline: none;
+    /* Its label is for screen readers; Obsidian would show it on hover. */
+    --no-tooltip: true;
+}
+
+.viscript-scene[data-state="loading"] .viscript-canvas {
+    background-color: var(--background-secondary);
+}
+
+.viscript-scene:not(.is-live) .viscript-canvas {
+    cursor: pointer;
+}
+
+.viscript-canvas:focus-visible {
+    box-shadow: 0 0 0 2px var(--background-modifier-border-focus);
+}
+
+/* The bar: play, the timeline and the time, over the scene's bottom edge or under it. */
+
+.viscript-bar {
+    display: flex;
+    align-items: center;
+    gap: var(--size-4-2);
+    padding: var(--size-4-1) var(--size-4-2);
+    color: var(--text-muted);
+}
+
+.viscript-scene[data-controls="hover"] .viscript-bar {
+    position: absolute;
+    inset: auto 0 0 0;
+    background-color: color-mix(in srgb, var(--background-primary) 82%, transparent);
+    opacity: 0;
+    transition: opacity 120ms ease-out;
+}
+
+.viscript-scene[data-controls="hover"] .viscript-stage:hover .viscript-bar,
+.viscript-scene[data-controls="hover"] .viscript-bar:focus-within {
+    opacity: 1;
+}
+
+/* Nothing hovers on a touch screen: the bar stays, under the scene. */
+@media (hover: none) {
+    .viscript-scene[data-controls="hover"] .viscript-bar {
+        position: static;
+        background-color: transparent;
+        opacity: 1;
+    }
+}
+
+.viscript-scene[data-controls="never"] .viscript-bar {
+    display: none;
+}
+
+.viscript-bar .clickable-icon {
+    flex: none;
+}
+
+.viscript-scrub {
+    flex: 1;
+    min-width: 0;
+}
+
+.viscript-time {
+    flex: none;
+    font-size: var(--font-ui-smaller);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+/* A still scene has no timeline, and a live one runs on its input. */
+.viscript-scene.is-still .viscript-play,
+.viscript-scene.is-still .viscript-scrub,
+.viscript-scene.is-still .viscript-time,
+.viscript-scene.is-live .viscript-scrub,
+.viscript-scene.is-live .viscript-time {
+    display: none;
+}
+
+.viscript-scene.is-still .viscript-bar {
+    justify-content: flex-end;
+}
+
+.viscript-scene.is-still:not(:has(.viscript-open)) .viscript-bar {
+    display: none;
+}
+
+/* Source that is not a scene, and errors. */
+
+.viscript-notice {
+    padding: var(--size-4-4) var(--size-4-3);
+    border: 1px dashed var(--background-modifier-border);
+    border-radius: var(--radius-m);
+    color: var(--text-muted);
+    font-size: var(--font-ui-small);
+    text-align: center;
+}
+
+.viscript-scene.is-empty .viscript-canvas,
+.viscript-scene.is-empty .viscript-bar {
+    display: none;
+}
+
+.viscript-error {
+    margin: var(--size-4-2) 0 0;
+    padding: var(--size-4-2) var(--size-4-3);
+    border-radius: var(--radius-s);
+    background-color: rgba(var(--color-red-rgb), 0.1);
+    color: var(--text-error);
+    font-family: var(--font-monospace);
+    font-size: var(--font-ui-small);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    user-select: text;
+}
+
+/* A scene that fills a pane: as large as fits, with the bar under it. */
+
+.viscript-scene[data-layout="pane"] {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.viscript-scene[data-layout="pane"] .viscript-stage {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 0;
+    border-radius: 0;
+}
+
+.viscript-scene[data-layout="pane"] .viscript-canvas {
+    flex: none;
+    max-width: 100%;
+    border-radius: var(--radius-m);
+}
+
+.viscript-scene[data-layout="pane"] .viscript-bar {
+    align-self: stretch;
+}
+
+.viscript-scene[data-layout="pane"] .viscript-error {
+    flex: none;
+    max-height: 40%;
+    overflow: auto;
+}
+
+/* The scene view: the scene above, its source below. */
+
+.viscript-view.view-content {
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    overflow: hidden;
+}
+
+.viscript-view-stage {
+    flex: 3 1 0;
+    min-height: 0;
+    padding: var(--size-4-3);
+}
+
+.viscript-view-source {
+    flex: 2 1 0;
+    min-height: 0;
+    overflow: hidden;
+    border-top: 1px solid var(--background-modifier-border);
+}
+
+.viscript-view.is-source-hidden .viscript-view-source {
+    display: none;
+}
+
+/* The font preview in the settings. */
+
+.viscript-preview-setting {
+    flex-wrap: wrap;
+}
+
+.viscript-preview {
+    flex-basis: 100%;
+    max-width: 720px;
+    margin-top: var(--size-4-2);
+}

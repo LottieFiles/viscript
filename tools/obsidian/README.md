@@ -1,0 +1,171 @@
+# viscript for Obsidian
+
+Plays viscript scenes, animated explanations written in Lua or JavaScript, in your notes: as
+code blocks, as embedded `.lua` files, and in a tab of their own with the source beside them.
+The viscript WebAssembly runtime draws them in a render worker through the shared player in
+[`tools/player`](../player), so notes stay responsive while scenes play.
+
+## Install
+
+Build the plugin from the checkout and copy it into a vault:
+
+```sh
+cd tools/obsidian
+npm ci && npm ci --prefix ../player
+npm run build                                  # main.js
+node esbuild.config.mjs --vault /path/to/vault # builds and copies it to the vault
+```
+
+The copy goes to `<vault>/.obsidian/plugins/viscript/` (`main.js`, `manifest.json`,
+`styles.css`). Turn it on under **Settings → Community plugins**. While working on the plugin,
+`npm run dev -- --vault /path/to/vault` rebuilds on every change; reload the plugin to see it.
+
+It needs Obsidian 1.13 or newer, on a computer, a phone or a tablet.
+
+## Scenes in notes
+
+A code block holds a scene. `viscript` and `viscript-lua` are Lua, and `viscript-js` is
+JavaScript; **Insert a scene code block** in the command palette starts one.
+
+````markdown
+```viscript loop
+local scene = vis.scene {
+    width = 640, height = 360, theme = "adaptive_vscode",
+    camera = {view = "2d", target = {0, 0}, height = 7},
+}
+local ball = scene:circle {center = {-3, 0}, radius = 0.5, fill = "accent"}
+scene:grow_from_center(ball, 0.6)
+scene:shift(ball, {6, 0}, 1.5)
+scene:wait(0.5)
+return scene
+```
+````
+
+A `.lua` file in the vault is embedded like an image, `![[orbit.lua]]`, and opens as a scene in
+its own tab with its source below. Edits there are saved to the file and redraw the scene, and
+every note that embeds the file follows. An error shows under the scene, with its
+line, until the source is fixed.
+
+Words after the code block's language, or in the embed's alias, set options:
+`![[orbit.lua|480|loop|Two circles]]`, ```` ```viscript-js center 520 ````.
+
+| Words | Option |
+|---|---|
+| `600` | Width in pixels; the scene keeps its proportions |
+| `loop`, `crossfade`, `once` or `stop` | What happens at the end |
+| `autoplay` or `play`, `paused` or `still` | Whether the scene plays as soon as it is seen |
+| `controls`, `nocontrols` | Always show the play bar, or hide it |
+| `left`, `center`, `right` | Alignment |
+| `interactive` | The scene takes pointer and key input, for scenes built to |
+
+Other words name the scene for screen readers, as an image's alt text does.
+
+Scenes with `theme = "adaptive_vscode"` take their colors from the Obsidian theme and follow it
+between light and dark. A click plays or pauses a scene; the play bar appears on hover, and on
+touch screens it stays under the scene. Scenes load when they scroll into view and let go of
+their memory when they leave it.
+
+Commands: **Insert a scene code block**, **Toggle autoplay**, **Reload all scenes** and
+**Look for fonts again**.
+
+## Fonts
+
+Scenes ask for fonts by name, as ThorVG's web players do. The plugin ships the fonts the
+engine's themes set text in, the files the VS Code extension ships: Pretendard for text, Korean
+included, JetBrains Mono NL for code, and Source Serif 4 with IBM Plex Sans KR for the
+`adaptive_vscode` theme. Fonts installed on the device are never used, so a scene draws the same
+on a computer, a phone or a tablet. A scene can also name another font, as
+`font = "Noto Serif KR"`. The plugin gives each name a font:
+
+- **Text font**: the bundled Pretendard, or another font by name.
+- **Code font**: the bundled JetBrains Mono NL, or another font by name.
+- **A font a scene names** is looked for in the font folder, by its name or its file's name,
+  then on [Fontsource](https://fontsource.org). Failing those, its text is drawn in the text font,
+  or in the code font for a name that reads as a monospaced font's, such as Fira Code; the scene
+  plays either way. The names the themes use always take the bundled fonts.
+- **Font folder**: a vault folder of fonts for scenes to name. It syncs with the vault, so your
+  other devices have the same fonts.
+- **Download fonts**, on unless you turn it off: a font that is not in the folder is downloaded
+  from Fontsource and saved in the font folder (`Fonts` if none is set, which then becomes the
+  font folder), so the next scene, and the vault on your other devices, find it there.
+
+Each text is drawn in one font, and letters the font lacks are left out, such as Korean in
+JetBrains Mono. TrueType and OpenType fonts both work (`.ttf`, `.otf`, and the collections
+`.ttc` and `.otc`). The settings show how many fonts were found and a preview of text and code as
+scenes draw them. A changed font setting, or a font added to the folder, loads the scenes again
+with their fonts.
+
+## JavaScript scenes
+
+A JavaScript scene is a program that runs when its note is shown. The plugin runs it in a
+sandbox: a hidden frame with no origin of its own, under a policy that refuses every network
+request, where each scene gets a new worker that goes once the scene is built, or after 10 seconds
+if it never is. From there the scene's code reaches neither Node nor Obsidian, its storage, your
+notes and files, the network, nor other scenes. What the scene builds comes back as Lua, which the
+render worker draws as it draws Lua scenes: inside the runtime, with no files, network or system.
+Where a system does not hold the sandbox's workers to that policy, JavaScript scenes are not run,
+and say so.
+
+## Network
+
+The plugin uses the network only to download fonts, and only while **Download fonts** is on: for
+a font a scene or the settings name that is not in the font folder, it asks Fontsource's API
+(`api.fontsource.org`) whether it has the font, and downloads the font's file from jsDelivr
+(`cdn.jsdelivr.net`). The requests carry the font's name and nothing else from your notes or
+settings. The fonts the themes use ship with the plugin and are never downloaded.
+
+Downloaded fonts are saved in the font folder and found there from then on. A download that fails
+leaves the text in the text font until **Look for fonts again**. With **Download fonts** off, the
+plugin stays off the network.
+
+## Other settings
+
+| Setting | |
+|---|---|
+| Autoplay | Play scenes as soon as they appear; scenes start paused when the system asks for reduced motion |
+| At the end | Replay, seamlessly where the scene loops, fading into the start or at once; or stop on the last frame |
+| Controls | The play bar on hover, always, or never |
+| Frame rate | Up to 60 frames a second (30 on phones), or 30, 24 or 15 |
+| Sharpness | Balanced, a little under the screen's resolution on dense screens, or Sharpest |
+| Render in a worker | Draw scenes off Obsidian's main thread |
+| Open .lua files as scenes | Open `.lua` files in the scene tab; takes effect when Obsidian next starts |
+
+## How it is built
+
+`main.js` is the whole plugin: the plugin itself, the render server and the WebAssembly
+runtime, the compiler JavaScript scenes run in, and the four bundled fonts, gzipped into the file
+and each unpacked when a scene first needs it, so nothing is downloaded to play scenes. The fonts,
+mostly their Korean letters, make up most of its 4 MB. It needs WebAssembly and
+`DecompressionStream`, which iPhones and iPads have from iOS 16.4. One render worker draws every
+scene, including those in popout windows and the settings window, and fonts load once into each
+runtime instance that scenes share.
+
+## Test
+
+```sh
+npm run check            # TypeScript
+npm test                 # option words, reading scene sources, which font each name gets
+npm run test:obsidian    # builds, then drives the Obsidian installed here
+```
+
+`test:obsidian` starts the installed Obsidian with a profile folder and a vault made for the run.
+It never opens your vaults, and it stops before changing anything if Obsidian opens another one.
+It checks reading view, Live Preview, embeds, the scene tab with editing and errors, both themes,
+the settings, the fonts each name gets, downloading fonts from Fontsource with and without a font
+folder set, the worker and the main thread, what JavaScript scenes can reach, and turning the
+plugin off and on; the downloads are skipped when Fontsource cannot be reached. Set `OBSIDIAN` to the executable if it is not in the
+usual place, and `E2E_DIR` to keep the vault and screenshots. Without Obsidian installed, the run
+is skipped.
+
+## Limits
+
+- Sounds that scenes start are not played.
+- The sandbox for JavaScript scenes is tested on the desktop app. On phones and tablets they run
+  only where the system holds the sandbox's workers to its policy.
+
+## Licenses
+
+The plugin is MIT-licensed, as viscript is. `main.js` also includes ThorVG (MIT), Lua (MIT),
+LodePNG (zlib), miniaudio (public domain or MIT-0), CodeMirror's legacy modes (MIT), and the
+fonts Pretendard, Pretendard Std, JetBrains Mono, Source Serif 4, IBM Plex Sans KR and Noto Sans
+Math (SIL Open Font License 1.1); their notices are at the top of `main.js`.
