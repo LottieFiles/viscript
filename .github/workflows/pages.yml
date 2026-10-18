@@ -7,12 +7,14 @@ on:
       - 'docs/**'
       - 'scripts/*page*.mjs'
       - 'tools/skill/vis-skills/references/**'
+      - 'tools/skill/vis-skills/assets/wasm/**'
       - '.github/workflows/pages.yml'
   pull_request:
     paths:
       - 'docs/**'
       - 'scripts/*page*.mjs'
       - 'tools/skill/vis-skills/references/**'
+      - 'tools/skill/vis-skills/assets/wasm/**'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 

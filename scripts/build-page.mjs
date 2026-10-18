@@ -1,6 +1,7 @@
-// Compile docs/page/content/**/*.mdx into ES modules the page shell imports.
+// Compile docs/page/content/**/*.mdx into ES modules the page shell imports, and copy the runtime
+// into docs/page/runtime/.
 // Usage: node scripts/build-page.mjs   (needs `npm ci` in docs/page)
-import {mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync} from "node:fs";
+import {cpSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync} from "node:fs";
 import {dirname, join, relative, resolve} from "node:path";
 import {fileURLToPath} from "node:url";
 
@@ -78,3 +79,9 @@ for (const file of files.sort()) {
 }
 writeFileSync(join(out, "manifest.js"), `export const DOCS = ${JSON.stringify(docs, null, 1)};\n`);
 console.log(`compiled ${files.length} mdx files`);
+
+// The runtime the page ships, which the repository keeps only in the skill's bundle.
+const runtime = join(page, "runtime");
+rmSync(runtime, {recursive: true, force: true});
+cpSync(resolve(page, "../../tools/skill/vis-skills/assets/wasm"), runtime, {recursive: true});
+console.log("copied the runtime into runtime/");

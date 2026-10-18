@@ -23,6 +23,7 @@ compile_commands.json
 # Local scratch (archived examples/templates)
 /.temp/
 
-# Website dependencies and MDX output (built in CI)
+# Website dependencies, MDX output and the runtime copied from the skill's bundle (built in CI)
 /docs/page/node_modules/
 /docs/page/build/
+/docs/page/runtime/

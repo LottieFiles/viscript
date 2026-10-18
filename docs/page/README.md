@@ -24,7 +24,8 @@ builds the MDX and deploys `docs/page` on matching pushes to `viscript`, or when
 manually run on that branch. Pull requests run the build and scene checks.
 
 `jsx-runtime.js` turns compiled MDX straight into DOM nodes; there is no framework.
-`favicon.svg` is the logo. `runtime/` is refreshed by `scripts/wasm-bundle.sh`.
+`favicon.svg` is the logo. `runtime/` is not tracked: `scripts/build-page.mjs` copies it from
+the skill's bundle (`tools/skill/vis-skills/assets/wasm/`, refreshed by `scripts/wasm-bundle.sh`).
 The homepage hero uses the embedding animation from `../assets/embed.lua` in
 `scenes/hero.js`: one Lua scene and renderer feeding Native app, Web page, and VS Code.
 Below it, three separate sections host the Interactive collection's bubble sort,

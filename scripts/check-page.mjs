@@ -1,5 +1,5 @@
 // Load and sample every published scene against the shipped WASM runtime.
-// Usage: node scripts/check-page.mjs
+// Usage: node scripts/check-page.mjs   (after scripts/build-page.mjs, which copies the runtime in)
 import assert from "node:assert/strict";
 import {readdirSync, readFileSync} from "node:fs";
 import {createHash} from "node:crypto";

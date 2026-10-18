@@ -1,8 +1,8 @@
 #!/bin/sh
-# Build the optimized WASM runtime and copy it into every in-repo consumer:
+# Build the optimized WASM runtime and copy it into the two bundles the repository keeps:
 #   tools/vscode/runtime/            (VS Code Preview)
 #   tools/skill/vis-skills/assets/wasm/  (portable skill bundle)
-#   docs/page/runtime/                 (GitHub Pages journal)
+# The documentation site copies the skill's bundle when it builds.
 # Usage: scripts/wasm-bundle.sh [build-dir]   (requires emcc on PATH)
 set -eu
 
@@ -32,5 +32,4 @@ fi
 
 node "$root/scripts/sync-wasm.mjs" "$build" \
     "$root/tools/vscode/runtime" \
-    "$root/tools/skill/vis-skills/assets/wasm" \
-    "$root/docs/page/runtime"
+    "$root/tools/skill/vis-skills/assets/wasm"
