@@ -8,9 +8,9 @@ import {COLLECTIONS} from "./scenes/collections.js";
 
 const h = (type, props, ...children) => jsx(type, {...props, children});
 
-export function Scene({code, js = null, editable = false, loop = false, interactive = false, name = "scene.lua"}) {
+export function Scene({code, js = null, editable = false, loop = false, interactive = false, name = "scene.lua", maxFps, quality}) {
   const host = h("div", {className: "scene"});
-  createPlayer(host, code, {js, editable, loop, interactive, name});
+  createPlayer(host, code, {js, editable, loop, interactive, name, maxFps, quality});
   return host;
 }
 
@@ -19,7 +19,7 @@ export const Hero = ({children}) => h("section", {className: "hero"},
     h("div", {className: "cta"},
       h("a", {className: "btn solid", href: "#/docs"}, "Get started"),
       h("a", {className: "btn", href: "#/examples"}, "Examples"))),
-  h("div", {className: "hero-stage"}, Scene({code: HERO, name: "hero.lua"})));
+  h("div", {className: "hero-stage"}, Scene({code: HERO, name: "hero.lua", maxFps: 20})));
 
 export const Feature = ({title, children}) => h("section", {className: "home-section"}, h("h2", {}, title), children);
 export const BubbleSortDemo = () => Scene({code: INTERACTIVE.episodes.find((e) => e.id === "sort-stepper").code,

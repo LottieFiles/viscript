@@ -125,7 +125,6 @@ pre { background: var(--panel); border: 1px solid var(--line); padding: 14px 16p
 .player.live .bar, .stage-frame.live .progress { display: none; }
 canvas.live { outline: none; touch-action: none; cursor: pointer; }
 canvas.live.input { cursor: crosshair; }
-canvas.ghost { position: absolute; left: 0; top: 0; width: 100%; height: auto; aspect-ratio: auto; pointer-events: none; opacity: 0; transition: opacity .7s ease; background: none !important; }
 .gallery .player { margin-top: 16px; grid-template-columns: 1fr; }
 .gallery .player .view { border-right: 0; border-bottom: 1px solid var(--line); }
 

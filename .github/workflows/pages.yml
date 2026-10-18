@@ -6,15 +6,19 @@ on:
     paths:
       - 'docs/**'
       - 'scripts/*page*.mjs'
+      - 'tools/player/**'
       - 'tools/skill/vis-skills/references/**'
       - 'tools/skill/vis-skills/assets/wasm/**'
+      - 'src/examples/assets/PretendardStd-*'
       - '.github/workflows/pages.yml'
   pull_request:
     paths:
       - 'docs/**'
       - 'scripts/*page*.mjs'
+      - 'tools/player/**'
       - 'tools/skill/vis-skills/references/**'
       - 'tools/skill/vis-skills/assets/wasm/**'
+      - 'src/examples/assets/PretendardStd-*'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
@@ -33,10 +37,12 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
-      - name: Compile MDX pages
+      - name: Check the player
+        run: npm ci --prefix tools/player && npm run check --prefix tools/player && npm test --prefix tools/player
+      - name: Compile MDX pages and build the player
         run: npm ci --prefix docs/page && node scripts/build-page.mjs
       - name: Verify documentation scenes and runtime
-        run: npm run check --prefix docs/page
+        run: npm run check --prefix docs/page && node --test scripts/page-resources.test.mjs
       - name: Drop build tooling from the site
         run: rm -rf docs/page/node_modules
       - uses: actions/upload-pages-artifact@v4

@@ -1,41 +1,10 @@
-// Live scene players: one WASM runtime per visible player, released when hidden.
-import {createVis, evaluateScene} from "./runtime/client.js";
+// Live scene players. The shared viscript player (tools/player, built into build/player/) draws
+// every scene in one render worker; this module adds the page's editor, controls, language switch
+// and light/dark adaptation.
+import {createCatalog, createRenderHost, fontTable, VisPlayer} from "./build/player/player.js";
+import {ASSETS, assetsFor, FONTS, FULL_PRETENDARD, needsFullPretendard} from "./resources.js";
 
 const $ = (s, root = document) => root.querySelector(s);
-const DPR = Math.min(2, Math.max(1, Math.round(devicePixelRatio || 1)));
-const BOOT = "local s = vis.scene {width = 16, height = 16}\nreturn s";
-
-// ---------- runtime pool ----------
-// Each visible player owns one WASM instance; hidden ones release theirs.
-const fonts = Promise.all([
-  ["Source Serif 4", "runtime/SourceSerif4-Semibold.ttf"],
-  ["IBM Plex Sans KR", "runtime/IBMPlexSansKR-SemiBold.ttf"],
-  ["Pretendard", "runtime/Pretendard.ttf"],
-  ["JetBrainsMono", "runtime/JetBrainsMono.ttf"],
-  ["CMUTypewriter-Regular", "assets/thorvg/CMUTypewriter-Regular.ttf"],
-  ["CMUSerif-Roman", "assets/thorvg/CMUSerif-Roman.ttf"],
-].map(async ([name, url]) => {
-  const response = await fetch(new URL(url, import.meta.url));
-  if (!response.ok) throw new Error(`Could not load font: ${url}`);
-  return [name, await response.arrayBuffer()];
-}));
-
-// Images that documentation scenes load with picture{asset = ...}.
-const assets = Promise.all([
-  ["earth.png", "assets/earth.png", "png"],
-].map(async ([name, url, mime]) => {
-  const response = await fetch(new URL(url, import.meta.url));
-  if (!response.ok) throw new Error(`Could not load asset: ${url}`);
-  return [name, await response.arrayBuffer(), mime];
-}));
-
-async function makeRuntime() {
-  const [fontData, assetData] = await Promise.all([fonts, assets]);
-  const rt = await createVis(BOOT, "boot.lua", {renderEngine: "cpu"});
-  for (const [name, bytes] of fontData) rt.font(name, bytes.slice(0), "ttf");
-  for (const [name, bytes, mime] of assetData) rt.asset(name, bytes.slice(0), mime);
-  return rt;
-}
 
 const players = new Set();
 
@@ -60,36 +29,48 @@ function themeAdapt(src) {
 export function retheme() {
   for (const p of players) p.retheme();
 }
-const observer = new IntersectionObserver((entries) => {
-  for (const e of entries) e.target.__player?.visible(e.isIntersecting);
-}, {rootMargin: "200px"});
 
-// Render at the integer pixel ratio just above the canvas's real device size, then resample to that exact size.
-// Browser zoom and small stages give non-integer scales; letting CSS stretch the raster aliases thin lines,
-// so we downscale ourselves with smoothing, halving first when the gap is large.
-const fitSrc = document.createElement("canvas"), fitTmp = document.createElement("canvas");
-function drawFit(rt, canvas, t, maxRatio = 3) {
-  const [lw, lh] = rt.size();
-  const w = Math.max(1, Math.round(canvas.clientWidth * (devicePixelRatio || 1)));
-  const h = Math.max(1, Math.round(w * lh / lw));
-  const ratio = Math.min(maxRatio, Math.max(1, Math.ceil(w / lw - 0.01)));
-  if (lw * ratio === w) { rt.draw(canvas, t, ratio); return; }
-  rt.draw(fitSrc, t, ratio);
-  let from = fitSrc, fw = fitSrc.width, fh = fitSrc.height;
-  const tc = fitTmp.getContext("2d");
-  while (fw / 2 >= w * 1.5) {
-    const nw = Math.round(fw / 2), nh = Math.round(fh / 2);
-    if (fitTmp.width < nw || fitTmp.height < nh) { fitTmp.width = Math.max(fitTmp.width, nw); fitTmp.height = Math.max(fitTmp.height, nh); }
-    tc.imageSmoothingQuality = "high";
-    tc.drawImage(from, 0, 0, fw, fh, 0, 0, nw, nh);
-    from = fitTmp; fw = nw; fh = nh;
-  }
-  if (canvas.width !== w) canvas.width = w;
-  if (canvas.height !== h) canvas.height = h;
-  const ctx = canvas.getContext("2d");
-  ctx.imageSmoothingQuality = "high";
-  ctx.drawImage(from, 0, 0, fw, fh, 0, 0, w, h);
+// ---------- rendering ----------
+// One render worker for the page, started by the first player that comes into view. It asks for
+// each font a scene sets text in by name; the runtime and the first fonts are preloaded by
+// index.html on routes that open on a figure.
+const url = (path) => new URL(path, import.meta.url);
+const fontsWith = (pretendard) => fontTable(Object.fromEntries([...FONTS].map(([name, path]) =>
+  [name, url(name === "Pretendard" ? pretendard : path)])));
+let renderHost = null, catalog = null, fonts = fontsWith(FONTS.get("Pretendard")), fullPretendard = false;
+function host() {
+  if (renderHost) return renderHost;
+  catalog = createCatalog({
+    assets: Object.fromEntries([...ASSETS].map(([name, {path, mime}]) => [name, {url: url(path), mime}])),
+    select: assetsFor,
+  });
+  renderHost = createRenderHost({
+    server: {url: url("build/player/player-worker.js")},
+    wasm: async () => {
+      const response = await fetch(url("runtime/vis-wasm.wasm"));
+      if (!response.ok) throw new Error(`runtime/vis-wasm.wasm (${response.status})`);
+      return response.arrayBuffer();
+    },
+    assets: catalog,
+    fonts: {fetch: (name, options) => fonts.fetch(name, options)},
+  });
+  return renderHost;
 }
+// The first scene with letters only the full Pretendard has switches "Pretendard" to it; scenes
+// loaded from then on get it, and the others keep Pretendard Std's identical glyphs until they
+// load again.
+function widenFonts(source) {
+  if (fullPretendard || !needsFullPretendard(source)) return;
+  fullPretendard = true;
+  fonts = fontsWith(FULL_PRETENDARD);
+  host().refreshFonts();
+}
+
+// CodeMirror measures itself, so an editor created out of view is refreshed when it shows.
+const editors = new WeakMap();
+const editorObserver = new IntersectionObserver((entries) => {
+  for (const entry of entries) if (entry.isIntersecting) editors.get(entry.target)?.refresh();
+});
 
 // Lua / JS choice is shared by every player and remembered.
 const langs = new Set();
@@ -109,17 +90,14 @@ export function setLang(next) {
 
 const STACK_LINES = 15;
 
-export function createPlayer(host, source, {js = null, editable = false, name = "scene.lua", onEnd = null, loop = false, interactive = false, clips = [], dark = false, maxRatio = 3} = {}) {
+export function createPlayer(el, source, {js = null, editable = false, name = "scene.lua", loop = false, interactive = false, clips = [], dark = false, maxRatio = 3, maxFps, quality = "auto"} = {}) {
   // dark: keep the authored dark palette in light mode (cinematic hero scenes)
   const adapt = dark ? (x) => x : themeAdapt;
   const originals = {lua: source, js};
   let mine = js && lang === "js" ? "js" : "lua";
-  let code = adapt(originals[mine]), rt = null, pending = null, t = 0, playing = !clips.length, last = 0, releaseTimer = 0, shown = false;
-  let activeClip = null;
-  // Interactive scenes queue input once per frame; UI controls also work without a retained runtime.
-  let live = false, events = [], consumed = true, buttons = 0;
+  let code = adapt(originals[mine]), activeClip = null, debounce = 0;
 
-  host.innerHTML = editable ? `
+  el.innerHTML = editable ? `
     <div class="view"><div class="canvas-wrap"><canvas></canvas></div>
       <div class="bar"><button class="pp" title="Play / pause">❚❚</button>
         <input type="range" aria-label="Scene time" min="0" max="1" step="0.001" value="0"><span class="t">0.00 / 0.00</span></div>
@@ -127,26 +105,49 @@ export function createPlayer(host, source, {js = null, editable = false, name = 
     <div class="code"><div class="code-head"><span class="file"></span>${js ? `<span class="langs"><button data-lang="js">JS</button><button data-lang="lua">Lua</button></span>` : ""}<button class="reset">reset</button></div>
       <div class="cm-wrap"></div></div>
     <pre class="err" role="alert" hidden></pre>` : `<canvas></canvas><div class="progress"></div><pre class="err" role="alert" hidden></pre>`;
-  host.classList.add(editable ? "player" : "stage-frame");
-  const canvas = $("canvas", host);
+  el.classList.add(editable ? "player" : "stage-frame");
+  const canvas = $("canvas", el);
   const fileName = () => mine === "js" ? name.replace(/\.lua$/, ".js") : name;
-  canvas.setAttribute("aria-label", name.replace(/\.lua$/, "").replace(/[-_]/g, " ") + " animation");
+  // Sized before the player hands the canvas to the render worker.
   canvas.width = 960; canvas.height = 540;
-  const err = $(".err", host), scrub = $("input", host), timeEl = $(".t", host), pp = $(".pp", host), bar = $(".progress", host);
+  const err = $(".err", el), scrub = $("input", el), timeEl = $(".t", el), pp = $(".pp", el), bar = $(".progress", el);
 
-  // restart without a cut: freeze the final frame on top and fade it into the replay underneath
-  const ghost = document.createElement("canvas");
-  ghost.setAttribute("aria-hidden", "true");
-  ghost.className = "ghost";
-  canvas.after(ghost);
-  const crossfade = () => {
-    ghost.width = canvas.width; ghost.height = canvas.height;
-    ghost.getContext("2d").drawImage(canvas, 0, 0);
-    ghost.style.transition = "none"; ghost.style.opacity = 1;
-    ghost.getBoundingClientRect();
-    ghost.style.transition = ""; ghost.style.opacity = 0;
+  // Sections play once and hold their last frame; whole scenes replay, the last frame dissolving
+  // over the restart, unless they loop seamlessly.
+  const player = new VisPlayer({
+    host: host(), canvas, resources: (text, language) => catalog.resources(text, language),
+    autoplay: !clips.length, end: loop ? "loop" : "crossfade", interactive, maxFps, quality, maxRatio,
+    label: name.replace(/\.lua$/, "").replace(/[-_]/g, " ") + " animation",
+  });
+  const load = () => {
+    widenFonts(code);
+    return player.load({source: code, language: mine, name: fileName()});
   };
-  const setPlaying = (p) => { playing = p; if (pp) pp.textContent = p ? "❚❚" : "▶"; };
+
+  const showError = (message) => { err.textContent = message; err.hidden = false; };
+  player.addEventListener("error", ({detail: {phase, message}}) => {
+    if (phase === "load" || phase === "runtime" || phase === "timeout") showError(message);
+    // A load error names the source line, a draw error does not: keep the load error visible.
+    else if (phase === "render") { if (err.hidden) showError(message); }
+    else showError(`Could not load this figure. ${message}`);
+  });
+  player.addEventListener("load", () => {
+    err.hidden = true;
+    const live = player.live;
+    player.canvas.classList.toggle("live", live);
+    player.canvas.classList.toggle("input", live && /ctx:(pointer|key|action)\(/.test(code));
+    el.classList.toggle("live", live);
+    // A scene shorter than the time shown starts over, outside any section.
+    if (!player.range) selectClip(null);
+  });
+  player.addEventListener("frame", ({detail: {time, duration}}) => {
+    if (scrub) { scrub.max = duration || 1; if (document.activeElement !== scrub) scrub.value = time; }
+    if (timeEl) timeEl.textContent = `${time.toFixed(2)} / ${duration.toFixed(2)}`;
+    if (bar) bar.style.width = duration > 0 ? `${Math.min(1, time / duration) * 100}%` : "0";
+  });
+  const showPlaying = () => { if (pp) pp.textContent = player.playing ? "❚❚" : "▶"; };
+  for (const type of ["statechange", "play", "pause", "stop", "complete"]) player.addEventListener(type, showPlaying);
+
   const clipButtons = clips.map((clip) => {
     const button = document.createElement("button");
     button.type = "button";
@@ -157,9 +158,7 @@ export function createPlayer(host, source, {js = null, editable = false, name = 
     Object.assign(button.style, {left: `${left * 100}%`, top: `${top * 100}%`, width: `${width * 100}%`, height: `${height * 100}%`});
     button.onclick = () => {
       selectClip(clip);
-      t = clip.range[0];
-      last = 0;
-      setPlaying(true);
+      player.playRange(...clip.range);
     };
     return button;
   });
@@ -174,98 +173,35 @@ export function createPlayer(host, source, {js = null, editable = false, name = 
     overlay.setAttribute("aria-label", "Animation sections");
     overlay.append(...clipButtons);
     canvas.parentElement.append(overlay);
-    setPlaying(false);
   }
-  const load = () => {
-    if (!rt) return;
-    try {
-      if (mine === "js") rt.load(evaluateScene(code, fileName()));
-      else rt.load(code, name);
-      live = Boolean(rt.input && (interactive || (rt.retainedLua && rt.beginInputFrame && rt.advanceRuntime)));
-      events = []; consumed = true; buttons = 0;
-      if (live && interactive) t = 0;
-      canvas.classList.toggle("live", live);
-      canvas.classList.toggle("input", live && /ctx:(pointer|key|action)\(/.test(code));
-      host.classList.toggle("live", live);
-      canvas.tabIndex = live ? 0 : -1;
-      const [w, h] = rt.size();
-      canvas.style.aspectRatio = `${w} / ${h}`;
-      if (t > rt.duration) { t = 0; selectClip(null); }
-      if (err) err.hidden = true;
-    } catch (e) {
-      if (err) { err.textContent = String(e.message || e); err.hidden = false; }
-      else console.error(e);
-    }
-  };
-  const ensure = () => {
-    if (rt || pending) return;
-    pending = makeRuntime().then((r) => { pending = null; if (!shown) { r.destroy(); return; } rt = r; load(); })
-      .catch((e) => {
-        pending = null;
-        err.textContent = "Could not load this figure. " + (e.message || e); err.hidden = false;
-      });
-  };
+  showPlaying();
 
   const api = {
-    visible(v) {
-      shown = v; clearTimeout(releaseTimer);
-      if (v) { ensure(); api.refresh?.(); }
-      else releaseTimer = setTimeout(() => { if (!shown && rt) { rt.destroy(); rt = null; } }, 2000);
-    },
-    tick(now) {
-      if (!rt || !shown) { last = now; return; }
-      const d = rt.duration;
-      if (playing && d > 0 && !(live && interactive)) {
-        t += (now - (last || now)) / 1000;
-        if (activeClip) {
-          const end = Math.min(activeClip.range[1], d);
-          if (t >= end) { t = end; setPlaying(false); }
-        }
-        else if (loop) { if (t >= d) t %= d; }  // seamless: the scene ends where it starts
-        // others replay at once, the last frame dissolving over the restart instead of holding
-        else if (t >= d) { if (onEnd?.()) return; t %= d; crossfade(); }
-      }
-      const dt = Math.min(0.1, (now - (last || now)) / 1000);
-      last = now;
-      if (live) {
-        try {
-          if (consumed) rt.beginInputFrame?.(rt.runtimeTime);
-          for (const e of events.splice(0)) rt.input({x: 0, y: 0, dx: 0, dy: 0, wheelX: 0, wheelY: 0, button: -1,
-            buttons, modifiers: 0, pointerId: 0, time: rt.runtimeTime, ...e});
-          const r = rt.advanceRuntime?.(dt);
-          consumed = !r || r.steps > 0;
-        } catch (e) {
-          live = false;
-          if (err) { err.textContent = String(e.message || e); err.hidden = false; }
-        }
-      }
-      try {
-        if (canvas.clientWidth) drawFit(rt, canvas, Math.min(t, d), maxRatio);
-      } catch { /* shown via load error */ }
-      if (scrub) { scrub.max = d || 1; if (document.activeElement !== scrub) scrub.value = Math.min(t, d); }
-      if (timeEl) timeEl.textContent = `${Math.min(t, d).toFixed(2)} / ${d.toFixed(2)}`;
-      if (bar) bar.style.width = d > 0 ? `${Math.min(1, t / d) * 100}%` : "0";
-    },
     retheme() { code = adapt(code); load(); },
-    destroy() { langs.delete(api.switchLang); clearTimeout(releaseTimer); observer.unobserve(host); players.delete(api); rt?.destroy(); rt = null; shown = false; },
+    destroy() {
+      langs.delete(api.switchLang); clearTimeout(debounce);
+      editorObserver.unobserve(el); players.delete(api);
+      player.destroy();
+    },
   };
 
   if (editable) {
     // long code would leave the canvas floating beside a tall editor: stack it below instead
     const lines = Math.max(...[source, js].filter(Boolean).map((c) => c.split("\n").length));
     if (lines >= STACK_LINES) {
-      host.classList.add("stacked");
-      $(".cm-wrap", host).style.height = `${Math.min(lines, 34) * 20 + 12}px`;
+      el.classList.add("stacked");
+      $(".cm-wrap", el).style.height = `${Math.min(lines, 34) * 20 + 12}px`;
     }
-    const cm = CodeMirror($(".cm-wrap", host), {value: code, mode: mine === "js" ? "javascript" : "lua", lineNumbers: true, indentUnit: 4, viewportMargin: Infinity});
-    let debounce = 0;
+    const cm = CodeMirror($(".cm-wrap", el), {value: code, mode: mine === "js" ? "javascript" : "lua", lineNumbers: true, indentUnit: 4, viewportMargin: Infinity});
     cm.on("change", () => { code = cm.getValue(); clearTimeout(debounce); debounce = setTimeout(() => {
-      t = 0; last = 0; selectClip(null); setPlaying(!clips.length); load();
+      player.clearRange(); selectClip(null); player.seek(0);
+      if (clips.length) player.pause(); else player.play();
+      load();
     }, 220); });
-    $(".reset", host).onclick = () => cm.setValue(adapt(originals[mine]));
+    $(".reset", el).onclick = () => cm.setValue(adapt(originals[mine]));
     const showLang = () => {
-      $(".file", host).textContent = `${fileName()} — live`;
-      for (const b of host.querySelectorAll(".langs button")) b.classList.toggle("on", b.dataset.lang === mine);
+      $(".file", el).textContent = `${fileName()} — live`;
+      for (const b of el.querySelectorAll(".langs button")) b.classList.toggle("on", b.dataset.lang === mine);
     };
     const switchLang = () => {
       const next = js && lang === "js" ? "js" : "lua";
@@ -275,71 +211,21 @@ export function createPlayer(host, source, {js = null, editable = false, name = 
       cm.setValue(adapt(originals[mine]));
       showLang();
     };
-    for (const b of host.querySelectorAll(".langs button")) b.onclick = () => setLang(b.dataset.lang);
+    for (const b of el.querySelectorAll(".langs button")) b.onclick = () => setLang(b.dataset.lang);
     langs.add(switchLang);
     api.switchLang = switchLang;
     showLang();
-    pp.onclick = () => {
-      if (activeClip && t >= Math.min(activeClip.range[1], rt?.duration ?? Infinity)) t = activeClip.range[0];
-      else if (rt && t >= rt.duration) t = 0;
-      last = 0;
-      setPlaying(!playing);
-    };
-    scrub.oninput = () => { t = +scrub.value; selectClip(null); setPlaying(false); };
-    api.refresh = () => cm.refresh();
+    pp.onclick = () => { if (player.playing) player.pause(); else player.play(); };
+    scrub.oninput = () => { player.clearRange(); selectClip(null); player.pause(); player.seek(+scrub.value); };
     api.retheme = () => cm.setValue(adapt(cm.getValue()));
+    editors.set(el, cm);
+    editorObserver.observe(el);
   }
-  // canvas -> logical scene pixels (top-left origin)
-  const at = (e) => {
-    const box = canvas.getBoundingClientRect(), [w, h] = rt ? rt.size() : [960, 540];
-    return {x: (e.clientX - box.left) * w / box.width, y: (e.clientY - box.top) * h / box.height};
-  };
-  const KEYS = new Set(["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", " ", "Enter", "Escape", "Shift", "Tab", "+", "-"]);
-  const keyOf = (e) => KEYS.has(e.key) ? e.key : /^[a-z0-9]$/i.test(e.key) ? e.key.toUpperCase() : null;
-  canvas.addEventListener("pointerdown", (e) => {
-    if (!live) return;
-    canvas.focus({preventScroll: true});
-    canvas.setPointerCapture(e.pointerId);
-    buttons = e.buttons;
-    events.push({type: "pointerdown", ...at(e), button: e.button});
-  });
-  canvas.addEventListener("pointermove", (e) => { if (live) events.push({type: "pointermove", ...at(e)}); });
-  canvas.addEventListener("pointerup", (e) => {
-    if (!live) return;
-    buttons = e.buttons;
-    events.push({type: "pointerup", ...at(e), button: e.button});
-  });
-  canvas.addEventListener("pointerleave", (e) => { if (live && !e.buttons) events.push({type: "pointermove", x: -1, y: -1}); });
-  canvas.addEventListener("pointercancel", () => { if (live) { buttons = 0; events.push({type: "pointercancel"}); } });
-  for (const type of ["keydown", "keyup"]) {
-    canvas.addEventListener(type, (e) => {
-      const key = keyOf(e);
-      if (!live || !key || e.metaKey || e.ctrlKey || e.altKey) return;
-      e.preventDefault();
-      if (type === "keydown" && e.repeat) return;
-      events.push({type, key});
-    });
-  }
-  canvas.addEventListener("blur", () => {
-    if (live && rt) {
-      events = []; buttons = 0;
-      try {
-        rt.input({type: "pointercancel", x: 0, y: 0, dx: 0, dy: 0, wheelX: 0, wheelY: 0, button: -1,
-          buttons: 0, modifiers: 0, pointerId: 0, time: rt.runtimeTime});
-        rt.releaseInput?.(rt.runtimeTime);
-      } catch { /* torn down */ }
-    }
-  });
-  host.__player = api;
+
   players.add(api);
-  observer.observe(host);
+  load();
   return api;
 }
-
-(function loop(now) {
-  for (const p of players) p.tick(now);
-  requestAnimationFrame(loop);
-})(0);
 
 export function destroyAll() {
   tabListeners.clear();

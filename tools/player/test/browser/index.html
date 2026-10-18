@@ -1,0 +1,54 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Player end-to-end</title>
+<style>
+  body { margin: 0; background: #808080; }
+  .stage { width: 480px; }
+  .spacer { height: 4000px; }
+</style>
+<div id="a" class="stage"></div>
+<div id="b" class="stage"></div>
+<div class="spacer"></div>
+<div id="far" class="stage"></div>
+<script type="module">
+  // Plays the documentation's scenes with the built player, as a page would; run.mjs drives it.
+  import {chainFonts, createRenderHost, createSandboxCompiler, fontTable, runtimeFonts, VisPlayer} from "/tools/player/dist/player.js";
+  import {HERO} from "/docs/page/scenes/hero.js";
+  import {INTERACTIVE} from "/docs/page/scenes/interactive.js";
+
+  const params = new URLSearchParams(location.search);
+  const runtime = "/tools/skill/vis-skills/assets/wasm/";
+  // The fonts, by name, as the documentation gives them; fontsAsked lists the names the render
+  // worker asked for, in order.
+  const fonts = chainFonts(fontTable({Pretendard: "/src/examples/assets/PretendardStd-Regular.ttf"}), runtimeFonts(runtime));
+  const fontsAsked = [];
+  // ?sandbox compiles JavaScript scenes in the sandbox, which stops them after ?compile milliseconds.
+  const compiler = params.has("sandbox") ? createSandboxCompiler({
+    code: await fetch("/tools/player/dist/player-compiler.js").then((response) => response.text()),
+    timeout: Number(params.get("compile") ?? 10000),
+  }) : undefined;
+  const host = createRenderHost({
+    server: {url: "/tools/player/dist/player-worker.js"},
+    wasm: () => fetch(runtime + "vis-wasm.wasm").then((response) => response.arrayBuffer()),
+    fonts: {fetch: (name, options) => (fontsAsked.push(name), fonts.fetch(name, options))},
+    mode: params.get("mode") ?? "auto",
+    hangTimeout: Number(params.get("hang") ?? 10000),
+    ...compiler ? {compiler} : {},
+  });
+  const events = [];
+  const players = {};
+  const scenes = {HERO, PATH: INTERACTIVE.episodes.find((episode) => episode.id === "shortest-path").code};
+  window.e2e = {
+    host, events, players, scenes, fontsAsked,
+    make(id, scene, options = {}) {
+      const player = new VisPlayer({host, container: document.getElementById(id), label: id, ...options});
+      for (const type of ["load", "play", "pause", "stop", "freeze", "complete", "loop", "error", "destroyed"]) {
+        player.addEventListener(type, (event) => events.push(`${id} ${type}${event.detail?.phase ? ` ${event.detail.phase}` : ""}`));
+      }
+      player.addEventListener("statechange", (event) => events.push(`${id} ${event.detail.state}`));
+      players[id] = player;
+      void player.load(scene);
+      return player.state;
+    },
+  };
+</script>

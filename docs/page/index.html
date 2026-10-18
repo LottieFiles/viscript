@@ -14,6 +14,13 @@
   <script>
     try { document.documentElement.dataset.theme = localStorage.getItem("viscript-theme") || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark"); }
     catch { /* keep dark */ }
+    // Home and Examples open on a live figure: fetch its runtime and default fonts alongside
+    // the page instead of after the module graph (player.js consumes these).
+    if (/^(#\/?)?(examples(\/.*)?)?$/.test(location.hash)) {
+      for (const href of ["runtime/vis-wasm.wasm", "runtime/PretendardStd-Regular.ttf", "runtime/JetBrainsMono.ttf"]) {
+        document.head.append(Object.assign(document.createElement("link"), {rel: "preload", as: "fetch", crossOrigin: "anonymous", href}));
+      }
+    }
   </script>
 </head>
 <body>

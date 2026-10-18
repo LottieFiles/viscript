@@ -12,11 +12,21 @@ A ` ```lua live ` fence becomes an editable player. MDX pages may use the
 components in `components.js`: `Scene`, `Hero`, `Feature`, `BubbleSortDemo`, `SkillsDemo`, `Gallery`.
 
 ```sh
-npm ci --prefix docs/page
-node scripts/build-page.mjs   # content/**/*.mdx -> build/*.js
+npm ci --prefix docs/page && npm ci --prefix tools/player
+node scripts/build-page.mjs   # content/**/*.mdx -> build/*.js, and the player -> build/player/
 npm run check --prefix docs/page  # render every scene and validate interactive playback ranges
+node --test scripts/page-resources.test.mjs  # the fonts and images the page offers
 python3 -m http.server -d docs/page
 ```
+
+Scenes play through the shared player in [`tools/player`](../../tools/player): one render
+worker draws every figure on the page, and `player.js` adds the editor, controls, language
+switch and light/dark colours on top. `resources.js` names the font the page registers under
+each name scenes set text in, and the images it offers. As in ThorVG's WebCanvas, the worker
+asks for a font when a scene first sets text in it; text in a font the page does not have is
+drawn in the engine's default font. "Pretendard" is Pretendard Std until a scene has letters
+only the full Pretendard has. The runtime and the first figures' fonts are preloaded by
+`index.html` on routes that open on a figure.
 
 For GitHub Pages, set **Settings → Pages → Build and deployment → Source** to
 **GitHub Actions**. The [Documentation workflow](../../.github/workflows/pages.yml)
@@ -25,7 +35,8 @@ manually run on that branch. Pull requests run the build and scene checks.
 
 `jsx-runtime.js` turns compiled MDX straight into DOM nodes; there is no framework.
 `favicon.svg` is the logo. `runtime/` is not tracked: `scripts/build-page.mjs` copies it from
-the skill's bundle (`tools/skill/vis-skills/assets/wasm/`, refreshed by `scripts/wasm-bundle.sh`).
+the skill's bundle (`tools/skill/vis-skills/assets/wasm/`, refreshed by `scripts/wasm-bundle.sh`),
+with Pretendard Std from `src/examples/assets/`.
 The homepage hero uses the embedding animation from `../assets/embed.lua` in
 `scenes/hero.js`: one Lua scene and renderer feeding Native app, Web page, and VS Code.
 Below it, three separate sections host the Interactive collection's bubble sort,

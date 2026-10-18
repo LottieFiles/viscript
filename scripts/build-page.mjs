@@ -1,6 +1,6 @@
-// Compile docs/page/content/**/*.mdx into ES modules the page shell imports, and copy the runtime
-// into docs/page/runtime/.
-// Usage: node scripts/build-page.mjs   (needs `npm ci` in docs/page)
+// Compile docs/page/content/**/*.mdx into ES modules the page shell imports, copy the runtime into
+// docs/page/runtime/, and build the shared player (tools/player) into docs/page/build/player/.
+// Usage: node scripts/build-page.mjs   (needs `npm ci` in docs/page and tools/player)
 import {cpSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync} from "node:fs";
 import {dirname, join, relative, resolve} from "node:path";
 import {fileURLToPath} from "node:url";
@@ -80,8 +80,15 @@ for (const file of files.sort()) {
 writeFileSync(join(out, "manifest.js"), `export const DOCS = ${JSON.stringify(docs, null, 1)};\n`);
 console.log(`compiled ${files.length} mdx files`);
 
-// The runtime the page ships, which the repository keeps only in the skill's bundle.
+// The runtime the page ships, which the repository keeps only in the skill's bundle, and Pretendard
+// Std, the page's "Pretendard" until a scene needs the full font.
 const runtime = join(page, "runtime");
 rmSync(runtime, {recursive: true, force: true});
 cpSync(resolve(page, "../../tools/skill/vis-skills/assets/wasm"), runtime, {recursive: true});
+cpSync(resolve(page, "../../src/examples/assets/PretendardStd-Regular.ttf"), join(runtime, "PretendardStd-Regular.ttf"));
 console.log("copied the runtime into runtime/");
+
+// The player and its render worker, with the runtime the page ships in runtime/.
+const {buildWeb} = await import("../tools/player/build.mjs");
+await buildWeb({outdir: join(out, "player"), runtimeDir: runtime});
+console.log("built the player into build/player");

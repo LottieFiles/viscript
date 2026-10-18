@@ -1,0 +1,24 @@
+{
+  "name": "@viscript/player",
+  "version": "0.1.0",
+  "description": "Plays viscript scenes on a canvas: a render worker running the WASM runtime and a main-thread player.",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./build": "./build.mjs"
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "check": "tsc -p . && tsc -p test",
+    "test": "node --test test/*.test.ts",
+    "test:browser": "node build.mjs && node test/browser/run.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "esbuild": "0.28.2",
+    "playwright-core": "1.63.0",
+    "typescript": "5.9.3"
+  }
+}
