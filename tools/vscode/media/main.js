@@ -33,6 +33,7 @@ import {adaptiveVscodeThemeKey, readAdaptiveVscodeTheme} from "./adaptive-theme.
 import {autoAdvanceSeriesTarget, seriesStepTarget} from "./series-step.mjs";
 import {createCanvasInputRouter, isHostKeyTarget} from "./canvas-input.mjs";
 import {advanceRetainedRuntime, sceneCanPlay} from "./retained-runtime.mjs";
+import {createFontCache, loadWithFonts} from "./scene-fonts.mjs";
 import {
     useVerticalWheelForHorizontalScroll,
     useVerticalWheelScrollChain,
@@ -130,10 +131,9 @@ function normalizedSourceContextLineCount(value) {
 let createVis;
 let runtime;
 let wasmBinary;
-let bodyFontBytes;
-let codeFontBytes;
-let headingFontBytes;
-let serifHeadingFontBytes;
+const sceneFonts = createFontCache(config.fonts);
+// The fonts each document's scene was given when it last loaded, registered before it loads again.
+const documentFonts = new Map();
 let pendingScene;
 let loadGeneration = 0;
 let playing = false;
@@ -208,27 +208,9 @@ function describeError(error) {
 async function boot() {
     try {
         ({createVis} = await import(config.client));
-        const [wasmResponse, fontResponse, codeFontResponse, headingFontResponse, serifHeadingFontResponse] = await Promise.all([
-            fetch(config.wasm),
-            fetch(config.font),
-            fetch(config.codeFont),
-            fetch(config.headingFont),
-            fetch(config.serifHeadingFont),
-        ]);
+        const wasmResponse = await fetch(config.wasm);
         if (!wasmResponse.ok) throw new Error(`Bundled WASM failed to load (${wasmResponse.status})`);
-        if (!fontResponse.ok) throw new Error(`Bundled font failed to load (${fontResponse.status})`);
-        if (!codeFontResponse.ok) throw new Error(`Bundled code font failed to load (${codeFontResponse.status})`);
-        if (!headingFontResponse.ok) {
-            throw new Error(`Bundled heading font failed to load (${headingFontResponse.status})`);
-        }
-        if (!serifHeadingFontResponse.ok) {
-            throw new Error(`Bundled serif heading font failed to load (${serifHeadingFontResponse.status})`);
-        }
         wasmBinary = new Uint8Array(await wasmResponse.arrayBuffer());
-        bodyFontBytes = new Uint8Array(await fontResponse.arrayBuffer());
-        codeFontBytes = new Uint8Array(await codeFontResponse.arrayBuffer());
-        headingFontBytes = new Uint8Array(await headingFontResponse.arrayBuffer());
-        serifHeadingFontBytes = new Uint8Array(await serifHeadingFontResponse.arrayBuffer());
         setStatus("RUNTIME READY", "ready");
         if (pendingScene) {
             const scene = pendingScene;
@@ -248,7 +230,7 @@ async function loadScene(scene, {themeRefresh = false} = {}) {
     syncSourceInspector(scene.sourceContexts, scene.activeSourceIndex, {preserveSelection: preserveSourceSelection});
     syncSeries(scene.series);
     descriptionContent.innerHTML = markdownToHtml(scene.description);
-    if (!createVis || !wasmBinary || !bodyFontBytes || !codeFontBytes || !headingFontBytes || !serifHeadingFontBytes) {
+    if (!createVis || !wasmBinary) {
         pendingScene = scene;
         setStatus("WAITING FOR RUNTIME", "loading");
         return;
@@ -266,10 +248,6 @@ async function loadScene(scene, {themeRefresh = false} = {}) {
         const hostTheme = readAdaptiveVscodeTheme();
         const hostThemeKey = adaptiveVscodeThemeKey(hostTheme);
         candidate.hostTheme(hostTheme);
-        candidate.font("Pretendard", bodyFontBytes, "ttf");
-        candidate.font("JetBrainsMono", codeFontBytes, "ttf");
-        candidate.font("IBM Plex Sans KR", headingFontBytes, "ttf");
-        candidate.font("Source Serif 4", serifHeadingFontBytes, "ttf");
         for (const asset of scene.assets) {
             const bytes = decodeBase64(asset.base64);
             if (asset.mime.startsWith("audio/")) {
@@ -278,11 +256,16 @@ async function loadScene(scene, {themeRefresh = false} = {}) {
                 candidate.asset(asset.name, bytes, asset.mime);
             }
         }
-        candidate.loadLua(scene.source, scene.fileName);
+        const load = (engine) => engine.loadLua(scene.source, scene.fileName);
+        const fonts = await loadWithFonts(candidate, load, sceneFonts, {
+            expected: documentFonts.get(scene.documentUri),
+            current: () => generation === loadGeneration,
+        });
         if (generation !== loadGeneration) {
             candidate.destroy();
             return;
         }
+        documentFonts.set(scene.documentUri, fonts);
 
         const previous = runtime;
         canvasInputRouter.cancel();

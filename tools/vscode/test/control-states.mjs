@@ -91,10 +91,11 @@ assert.match(inputRouter, /listen\(canvas, "contextmenu", \(event\) => \{\s*even
 assert.match(script, /contextMenu:\s*\(event\) => \{[\s\S]*playerMenuAnchor = \{x: event\.clientX, y: event\.clientY\};[\s\S]*syncPlayerMenuPlacement\(\);[\s\S]*playerMenu\.open = true;/);
 assert.match(inputRouter, /const result = dispatchPointer\("pointerdown"[\s\S]*if \(result\.capture\)[\s\S]*if \(result\.handled \|\| result\.capture \|\| result\.release\)[\s\S]*if \(runtime\.cameraMode !== "interactive"\) return;/);
 assert.match(script, /redraw:\s*\(\) => \{\s*syncCamera\(\);\s*if \(!playing\) draw\(\);/s);
-assert.match(script, /fetch\(config\.headingFont\)/);
-assert.match(script, /candidate\.font\("IBM Plex Sans KR", headingFontBytes, "ttf"\)/);
-assert.match(script, /fetch\(config\.serifHeadingFont\)/);
-assert.match(script, /candidate\.font\("Source Serif 4", serifHeadingFontBytes, "ttf"\)/);
+// The panel names every bundled font; the webview registers those a scene needs (scene-fonts.mjs).
+assert.match(html, /fonts: \{\s*"Pretendard": fontUri\.toString\(\),\s*"JetBrainsMono": codeFontUri\.toString\(\),\s*"IBM Plex Sans KR": headingFontUri\.toString\(\),\s*"Source Serif 4": serifHeadingFontUri\.toString\(\),\s*\}/);
+assert.match(script, /createFontCache\(config\.fonts\)/);
+assert.match(script, /loadWithFonts\(candidate, load, sceneFonts, \{\s*expected: documentFonts\.get\(scene\.documentUri\)/);
+assert.doesNotMatch(script, /candidate\.font\(/);
 assert.match(css, /\.document\s*\{[^}]*font-family:\s*"Source Serif 4",\s*"IBM Plex Sans KR",\s*var\(--font\)/s);
 assert.match(css, /--content-inline:\s*8px;/);
 assert.match(css, /--document-inline:\s*14px;/);

@@ -48,7 +48,8 @@ export const PALETTES = {
     },
 };
 
-// Font families and files, registered as the Viewer registers them.
+// Font families and files, by the names the Viewer registers them under. The Viewer registers
+// only those a scene sets text in, which draws the same as registering all of them here.
 const FONTS = [
     ["Pretendard", "Pretendard.ttf"],
     ["JetBrainsMono", "JetBrainsMono.ttf"],

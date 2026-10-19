@@ -18,6 +18,8 @@ type AssetPayload = {
 type ScenePayload = {
     type: "scene";
     sceneId: number;
+    // The webview remembers by it the fonts the document's scene needed.
+    documentUri: string;
     fileName: string;
     displayName: string;
     source: string;
@@ -503,6 +505,7 @@ export class PreviewPanel implements vscode.Disposable {
         const payload: ScenePayload = {
             type: "scene",
             sceneId: this.sceneId,
+            documentUri: document.uri.toString(),
             fileName: path.basename(document.fileName),
             displayName: this.previewContext?.title ?? path.basename(document.fileName),
             source,
@@ -996,10 +999,13 @@ export class PreviewPanel implements vscode.Disposable {
         const config = JSON.stringify({
             client: clientUri.toString(),
             wasm: wasmUri.toString(),
-            font: fontUri.toString(),
-            codeFont: codeFontUri.toString(),
-            headingFont: headingFontUri.toString(),
-            serifHeadingFont: serifHeadingFontUri.toString(),
+            // By the names scenes set text in; the webview fetches each when a scene first needs it.
+            fonts: {
+                "Pretendard": fontUri.toString(),
+                "JetBrainsMono": codeFontUri.toString(),
+                "IBM Plex Sans KR": headingFontUri.toString(),
+                "Source Serif 4": serifHeadingFontUri.toString(),
+            },
             autoPlayNext: this.context.globalState.get<boolean>(AUTO_PLAY_NEXT_STATE_KEY, false),
             forceCompactLayout: this.context.globalState.get<boolean>(FORCE_COMPACT_LAYOUT_STATE_KEY, false),
             sourceContextLineCount: sourceContextLineCount(
