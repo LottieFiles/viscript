@@ -20,33 +20,38 @@ struct ShiftInterval
     double maximum = 0.0;
 };
 
+// The coordinate along which ranks follow one another: x when they run left to right, y when
+// they run top to bottom.
+template<typename V>
+static auto& _primary(Direction direction, V& value) noexcept
+{
+    return direction == Direction::LeftToRight ? value.x : value.y;
+}
+
+// The other coordinate, along which a rank stacks its nodes.
+template<typename V>
+static auto& _secondary(Direction direction, V& value) noexcept
+{
+    return direction == Direction::LeftToRight ? value.y : value.x;
+}
+
 static bool _primaryOverlap(Direction direction, const NodeLayout& first,
                             const NodeLayout& second) noexcept
 {
-    return direction == Direction::LeftToRight
-               ? _axisOverlap(first.center.x, first.size.x, second.center.x,
-                              second.size.x)
-               : _axisOverlap(first.center.y, first.size.y, second.center.y,
-                              second.size.y);
+    return _axisOverlap(_primary(direction, first.center), _primary(direction, first.size),
+                        _primary(direction, second.center), _primary(direction, second.size));
 }
 
 static double _secondaryMinimum(Direction direction, const NodeLayout& node) noexcept
 {
-    return direction == Direction::LeftToRight
-               ? static_cast<double>(node.center.y) - node.size.y * 0.5
-               : static_cast<double>(node.center.x) - node.size.x * 0.5;
+    return static_cast<double>(_secondary(direction, node.center))
+           - _secondary(direction, node.size) * 0.5;
 }
 
 static double _secondaryMaximum(Direction direction, const NodeLayout& node) noexcept
 {
-    return direction == Direction::LeftToRight
-               ? static_cast<double>(node.center.y) + node.size.y * 0.5
-               : static_cast<double>(node.center.x) + node.size.x * 0.5;
-}
-
-static bool _layoutOverlap(const NodeLayout& first, const NodeLayout& second) noexcept
-{
-    return _boundsOverlap(first.center, first.size, second.center, second.size);
+    return static_cast<double>(_secondary(direction, node.center))
+           + _secondary(direction, node.size) * 0.5;
 }
 
 static double _floatResolution(float value) noexcept
@@ -60,10 +65,8 @@ static double _floatResolution(float value) noexcept
 static bool _secondarySeparated(Direction direction, const NodeLayout& first,
                                 const NodeLayout& second, float gap) noexcept
 {
-    auto firstCenter = direction == Direction::LeftToRight ? first.center.y
-                                                            : first.center.x;
-    auto secondCenter = direction == Direction::LeftToRight ? second.center.y
-                                                             : second.center.x;
+    auto firstCenter = _secondary(direction, first.center);
+    auto secondCenter = _secondary(direction, second.center);
     // Float centers cannot preserve gaps below their local ULP. Bounds overlap
     // remains invalid regardless of this spacing tolerance.
     auto tolerance = static_cast<double>(Epsilon) + _floatResolution(firstCenter)
@@ -86,7 +89,7 @@ static bool _rankSeparated(const Config& config, const NodeRecord* nodes,
     for (auto i = 0u; i < count; i++) {
         if (layouts[i].rank != rank || nodes[i].manualPosition) continue;
         if (previous != Node::Invalid) {
-            if (_layoutOverlap(layouts[previous], layouts[i])
+            if (_overlap(layouts[previous], layouts[i])
                 || !_secondarySeparated(config.direction, layouts[previous],
                                         layouts[i], config.nodeGap)) {
                 if (firstFailure) *firstFailure = previous;
@@ -100,7 +103,7 @@ static bool _rankSeparated(const Config& config, const NodeRecord* nodes,
                 || !_primaryOverlap(config.direction, layouts[i], layouts[j])) {
                 continue;
             }
-            if (_layoutOverlap(layouts[i], layouts[j])
+            if (_overlap(layouts[i], layouts[j])
                 || !_secondarySeparated(config.direction, layouts[i], layouts[j],
                                         config.nodeGap)) {
                 if (firstFailure) *firstFailure = i;
@@ -122,20 +125,12 @@ static bool _translateRank(const Config& config, const NodeRecord* nodes,
     std::memcpy(translated, layouts, sizeof(NodeLayout) * count);
     for (auto i = 0u; i < count; i++) {
         if (layouts[i].rank != rank || nodes[i].manualPosition) continue;
-        auto current = config.direction == Direction::LeftToRight
-                           ? static_cast<double>(layouts[i].center.y)
-                           : static_cast<double>(layouts[i].center.x);
-        auto moved = current + shift;
+        auto moved = static_cast<double>(_secondary(config.direction, layouts[i].center)) + shift;
         if (!std::isfinite(moved)
             || std::fabs(moved) > std::numeric_limits<float>::max()) {
             return false;
         }
-        auto rounded = static_cast<float>(moved);
-        if (config.direction == Direction::LeftToRight) {
-            translated[i].center.y = rounded;
-        } else {
-            translated[i].center.x = rounded;
-        }
+        _secondary(config.direction, translated[i].center) = static_cast<float>(moved);
     }
     return _rankSeparated(config, nodes, count, rank, translated, firstFailure,
                           secondFailure);
@@ -147,9 +142,7 @@ static bool _outwardBreakpoints(const Config& config, const NodeLayout* layouts,
 {
     auto limit = direction > 0 ? std::numeric_limits<float>::max()
                                : std::numeric_limits<float>::lowest();
-    auto current = config.direction == Direction::LeftToRight
-                       ? static_cast<double>(layouts[index].center.y)
-                       : static_cast<double>(layouts[index].center.x);
+    auto current = static_cast<double>(_secondary(config.direction, layouts[index].center));
     auto moved = current + shift;
     if (!std::isfinite(moved)
         || std::fabs(moved) > std::numeric_limits<float>::max()) {
@@ -198,20 +191,12 @@ static bool _separationAnchorShift(const Config& config,
                                    const NodeLayout& second, int direction,
                                    double& shift) noexcept
 {
-    auto firstCenter = config.direction == Direction::LeftToRight
-                           ? static_cast<double>(first.center.y)
-                           : static_cast<double>(first.center.x);
-    auto secondCenter = config.direction == Direction::LeftToRight
-                            ? static_cast<double>(second.center.y)
-                            : static_cast<double>(second.center.x);
+    auto firstCenter = static_cast<double>(_secondary(config.direction, first.center));
+    auto secondCenter = static_cast<double>(_secondary(config.direction, second.center));
     if (!(firstCenter > secondCenter)) return false;
 
-    auto firstSize = config.direction == Direction::LeftToRight
-                         ? static_cast<double>(first.size.y)
-                         : static_cast<double>(first.size.x);
-    auto secondSize = config.direction == Direction::LeftToRight
-                          ? static_cast<double>(second.size.y)
-                          : static_cast<double>(second.size.x);
+    auto firstSize = static_cast<double>(_secondary(config.direction, first.size));
+    auto secondSize = static_cast<double>(_secondary(config.direction, second.size));
     auto required = firstSize * 0.5 + secondSize * 0.5
                     + static_cast<double>(config.nodeGap);
     if (!std::isfinite(required) || required <= 0.0) return false;
@@ -495,7 +480,7 @@ static Result _reflowRanked(const Config& config, const NodeRecord* nodes,
     for (auto i = 0u; i < count; i++) {
         for (auto j = i + 1u; j < count; j++) {
             if (nodes[i].manualPosition && nodes[j].manualPosition) continue;
-            if (_layoutOverlap(layouts[i], layouts[j])) {
+            if (_overlap(layouts[i], layouts[j])) {
                 return Result::InvalidArguments;
             }
         }
@@ -567,21 +552,15 @@ Result layoutNodes(const Config& config, const NodeRecord* nodes, uint32_t nodeC
         auto maximumRank = 0u;
         for (auto i = 0u; i < nodeCount; i++) {
             maximumRank = layouts[i].rank > maximumRank ? layouts[i].rank : maximumRank;
-            auto primary = config.direction == Direction::LeftToRight
-                               ? layouts[i].size.x
-                               : layouts[i].size.y;
+            auto primary = _primary(config.direction, layouts[i].size);
             if (primary > rankSpan[layouts[i].rank]) rankSpan[layouts[i].rank] = primary;
         }
         for (auto rank = 0u; rank <= maximumRank; rank++) {
             if (rankSpan[rank] <= 0.0f) {
-                rankSpan[rank] = config.direction == Direction::LeftToRight
-                                     ? config.nodeSize.x
-                                     : config.nodeSize.y;
+                rankSpan[rank] = _primary(config.direction, config.nodeSize);
             }
             if (!rank) {
-                rankPosition[rank] = config.direction == Direction::LeftToRight
-                                         ? config.origin.x
-                                         : config.origin.y;
+                rankPosition[rank] = _primary(config.direction, config.origin);
             } else {
                 auto distance = rankSpan[rank - 1u] * 0.5f + config.rankGap
                                 + rankSpan[rank] * 0.5f;
@@ -596,33 +575,20 @@ Result layoutNodes(const Config& config, const NodeRecord* nodes, uint32_t nodeC
             auto automaticCount = 0u;
             for (auto i = 0u; i < nodeCount; i++) {
                 if (layouts[i].rank != rank || nodes[i].manualPosition) continue;
-                total += config.direction == Direction::LeftToRight
-                             ? layouts[i].size.y
-                             : layouts[i].size.x;
+                total += _secondary(config.direction, layouts[i].size);
                 automaticCount++;
             }
-            if (automaticCount > 1u) {
-                total += config.nodeGap * (automaticCount - 1u);
-            }
-            auto cursor = (config.direction == Direction::LeftToRight
-                               ? config.origin.y
-                               : config.origin.x)
-                          + total * 0.5f;
+            if (automaticCount > 1u) total += config.nodeGap * (automaticCount - 1u);
+            auto cursor = _secondary(config.direction, config.origin) + total * 0.5f;
             for (auto i = 0u; i < nodeCount; i++) {
                 if (layouts[i].rank != rank) continue;
                 if (nodes[i].manualPosition) {
                     layouts[i].center = nodes[i].position;
                     continue;
                 }
-                auto secondary = config.direction == Direction::LeftToRight
-                                     ? layouts[i].size.y
-                                     : layouts[i].size.x;
-                auto position = cursor - secondary * 0.5f;
-                if (config.direction == Direction::LeftToRight) {
-                    layouts[i].center = {rankPosition[rank], position};
-                } else {
-                    layouts[i].center = {position, rankPosition[rank]};
-                }
+                auto secondary = _secondary(config.direction, layouts[i].size);
+                _primary(config.direction, layouts[i].center) = rankPosition[rank];
+                _secondary(config.direction, layouts[i].center) = cursor - secondary * 0.5f;
                 cursor -= secondary + config.nodeGap;
             }
         }

@@ -465,10 +465,6 @@ Result validatePhysical(const IR& receipt, const LayoutReport& layout,
     for (auto i = 0u; i < receipt.edgeCount(); i++) {
         auto edge = Edge{i};
         auto spec = receipt.edgeAt(i);
-        if (!spec || spec->from.index >= receipt.nodeCount()
-            || spec->to.index >= receipt.nodeCount()) {
-            return Result::InvalidArguments;
-        }
         auto route = _visual(layout, scenePath, receipt.object(edge));
         if (!route.visual || route.visual->occluded || route.visual->opacity <= 0.0f
             || route.visual->paintBounds.width <= 0.0f
@@ -544,10 +540,6 @@ Result validatePhysical(const IR& receipt, const LayoutReport& layout,
         for (auto j = i + 1u; j < receipt.edgeCount(); j++) {
             auto relatedEdge = Edge{j};
             auto relatedSpec = receipt.edgeAt(j);
-            if (!relatedSpec || relatedSpec->from.index >= receipt.nodeCount()
-                || relatedSpec->to.index >= receipt.nodeCount()) {
-                return Result::InvalidArguments;
-            }
             auto related = _visual(layout, scenePath, receipt.object(relatedEdge));
             if (_hidden(related)) continue;
             BBox excluded[2];

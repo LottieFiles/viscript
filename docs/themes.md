@@ -87,7 +87,8 @@ scene:indicate(subject)
 `roundness`, from 0 to 0.5, is the share of a box's shorter side by which
 Theme-styled structural boxes round their corners. A Diagram without an explicit
 `corner` applies it to its node size, rounds zones 1.5 times as much, and draws
-terminal nodes as pills only when corners round. It is 0, square, in every preset;
+terminal nodes as pills only when corners round; a smaller node rounds at most into a
+pill. It is 0, square, in every preset;
 set it in a custom Theme to round them.
 
 JavaScript uses the same fields through `SceneConfig.theme`. C++ copies a `Theme`

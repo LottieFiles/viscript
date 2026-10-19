@@ -1,5 +1,6 @@
 // The diagram module's edge routing: orthogonal paths between ports that keep clear of nodes.
 #include <cmath>
+#include <initializer_list>
 
 #include "visDiagram.h"
 #include "visDiagramGeometry.h"
@@ -15,14 +16,6 @@ struct RouteBounds
     float maximumX = 0.0f;
     float maximumY = 0.0f;
     bool valid = false;
-};
-
-struct RouteChoice
-{
-    Vec2 points[Diagram::WaypointLimit + 4u];
-    float length = 0.0f;
-    uint32_t count = 0u;
-    uint32_t bends = 0u;
 };
 
 static uint32_t _simplify(Vec2* points, uint32_t count) noexcept
@@ -150,85 +143,67 @@ static RouteBounds _blockingBounds(const Vec2* points, uint32_t count,
     return bounds;
 }
 
-static uint32_t _elbow(const EdgeLayout& layout, float stub, bool horizontal,
-                       Vec2* output) noexcept
+// The search for a route around the nodes in an edge's way. It keeps the shortest route it is
+// given that is clear of the nodes, leaves and enters its ports outward and has room for its
+// arrowhead, and of two as long the one with fewer bends.
+struct RouteSearch
 {
-    auto from = layout.from + _outward(layout.fromPort) * stub;
-    auto to = layout.to + _outward(layout.toPort) * stub;
-    auto count = 0u;
-    output[count++] = layout.from;
-    output[count++] = from;
-    output[count++] = horizontal ? Vec2{to.x, from.y} : Vec2{from.x, to.y};
-    output[count++] = to;
-    output[count++] = layout.to;
-    return _simplify(output, count);
-}
+    const Config& config;
+    const EdgeRecord& edge;
+    const EdgeLayout& layout;
+    const NodeLayout* nodes;
+    uint32_t nodeCount;
+    float margin;
+    // The route kept: a corridor route has at most six points.
+    Vec2 points[6] = {};
+    float length = 0.0f;
+    uint32_t count = 0u;
+    uint32_t bends = 0u;
 
-static uint32_t _corridor(const EdgeLayout& layout, float fromStub, float toStub,
-                          float coordinate, bool horizontal,
-                          Vec2* output) noexcept
-{
-    auto from = layout.from + _outward(layout.fromPort) * fromStub;
-    auto to = layout.to + _outward(layout.toPort) * toStub;
-    auto count = 0u;
-    output[count++] = layout.from;
-    output[count++] = from;
-    output[count++] = horizontal ? Vec2{from.x, coordinate}
-                                 : Vec2{coordinate, from.y};
-    output[count++] = horizontal ? Vec2{to.x, coordinate}
-                                 : Vec2{coordinate, to.y};
-    output[count++] = to;
-    output[count++] = layout.to;
-    return _simplify(output, count);
-}
-
-static void _consider(const Config& config, const Vec2* points, uint32_t count,
-                      const EdgeLayout& layout, const NodeLayout* nodes,
-                      uint32_t nodeCount, const EdgeRecord& edge, float margin,
-                      RouteChoice& choice) noexcept
-{
-    if (!_routeClear(points, count, nodes, nodeCount, edge, margin)
-        || !_endpointDirections(points, count, layout)
-        || !_drawable(config, edge, Route::Orthogonal, points, count)) {
-        return;
+    void consider(const Vec2* route, uint32_t routeCount) noexcept
+    {
+        if (!_routeClear(route, routeCount, nodes, nodeCount, edge, margin)
+            || !_endpointDirections(route, routeCount, layout)
+            || !_drawable(config, edge, Route::Orthogonal, route, routeCount)) {
+            return;
+        }
+        auto routeLength = 0.0f;
+        for (auto i = 1u; i < routeCount; i++) routeLength += (route[i] - route[i - 1u]).length();
+        auto routeBends = routeCount > 2u ? routeCount - 2u : 0u;
+        if (count && routeLength > length - Epsilon) {
+            if (!_near(routeLength, length) || routeBends >= bends) return;
+        }
+        length = routeLength;
+        count = routeCount;
+        bends = routeBends;
+        for (auto i = 0u; i < routeCount; i++) points[i] = route[i];
     }
-    auto length = 0.0f;
-    for (auto i = 1u; i < count; i++) length += (points[i] - points[i - 1u]).length();
-    auto bends = count > 2u ? count - 2u : 0u;
-    if (choice.count && length > choice.length - Epsilon) {
-        if (!_near(length, choice.length) || bends >= choice.bends) return;
-    }
-    choice.length = length;
-    choice.count = count;
-    choice.bends = bends;
-    for (auto i = 0u; i < count; i++) choice.points[i] = points[i];
-}
 
-static void _considerBounds(const Config& config, const EdgeLayout& layout,
-                            const NodeLayout* nodes, uint32_t nodeCount,
-                            const EdgeRecord& edge, const RouteBounds& bounds,
-                            float fromStub, float toStub, float margin,
-                            RouteChoice& choice) noexcept
-{
-    if (!bounds.valid) return;
-    Vec2 points[Diagram::WaypointLimit + 4u];
-    auto gap = config.routeWidth + Epsilon * 2.0f;
-    auto consider = [&](bool horizontal) {
-        auto maximum = horizontal ? bounds.maximumY : bounds.maximumX;
-        auto minimum = horizontal ? bounds.minimumY : bounds.minimumX;
-        auto count = _corridor(layout, fromStub, toStub, maximum + gap,
-                               horizontal, points);
-        _consider(config, points, count, layout, nodes, nodeCount, edge, margin,
-                  choice);
-        count = _corridor(layout, fromStub, toStub, minimum - gap,
-                          horizontal, points);
-        _consider(config, points, count, layout, nodes, nodeCount, edge, margin,
-                  choice);
-    };
-    auto horizontal = config.direction == Direction::LeftToRight;
-    consider(horizontal);
-    consider(!horizontal);
-}
+    // Leaves each port by its stub and joins the stubs' ends along a corridor at coordinate: a
+    // horizontal one at that y, or a vertical one at that x.
+    void corridor(float fromStub, float toStub, float coordinate, bool horizontal) noexcept
+    {
+        auto from = layout.from + _outward(layout.fromPort) * fromStub;
+        auto to = layout.to + _outward(layout.toPort) * toStub;
+        Vec2 route[] = {layout.from, from,
+                        horizontal ? Vec2{from.x, coordinate} : Vec2{coordinate, from.y},
+                        horizontal ? Vec2{to.x, coordinate} : Vec2{coordinate, to.y},
+                        to, layout.to};
+        consider(route, _simplify(route, 6u));
+    }
+
+    // Corridors just past each side of bounds, the sides across the flow first.
+    void around(const RouteBounds& bounds, float fromStub, float toStub) noexcept
+    {
+        if (!bounds.valid) return;
+        auto gap = config.routeWidth + Epsilon * 2.0f;
+        auto horizontal = config.direction == Direction::LeftToRight;
+        for (auto along : {horizontal, !horizontal}) {
+            corridor(fromStub, toStub, (along ? bounds.maximumY : bounds.maximumX) + gap, along);
+            corridor(fromStub, toStub, (along ? bounds.minimumY : bounds.minimumX) - gap, along);
+        }
+    }
+};
 
 static float _outerStub(const Vec2& endpoint, Port port,
                         const RouteBounds& bounds, float gap,
@@ -245,10 +220,9 @@ static float _outerStub(const Vec2& endpoint, Port port,
     return std::fmax(minimum, distance);
 }
 
-uint32_t centerline(const Config& config, const EdgeRecord& edge,
-                            const EdgeLayout& layout, Route& route,
-                            const NodeLayout* nodes, uint32_t nodeCount,
-                            Vec2* output) noexcept
+uint32_t centerline(const Config& config, const EdgeRecord& edge, const EdgeLayout& layout,
+                    Route& route, const NodeLayout* nodes, uint32_t nodeCount,
+                    Vec2* output) noexcept
 {
     auto count = _initialRoute(config, edge, layout, route, output);
     if (edge.waypointCount || edge.route == Route::Straight) {
@@ -261,37 +235,28 @@ uint32_t centerline(const Config& config, const EdgeRecord& edge,
         && _drawable(config, edge, route, output, count)) {
         return count;
     }
+    // Elbows that turn where the source's stub ends, then corridors around the nodes in the
+    // way, then around all of them, with stubs that reach past them all.
+    RouteSearch search{config, edge, layout, nodes, nodeCount, margin};
     auto stub = std::fmax(margin, config.arrowLength + config.routeWidth);
-    RouteChoice choice;
-    Vec2 points[Diagram::WaypointLimit + 4u];
+    auto from = layout.from + _outward(layout.fromPort) * stub;
     auto horizontal = config.direction == Direction::LeftToRight;
-    auto candidateCount = _elbow(layout, stub, horizontal, points);
-    _consider(config, points, candidateCount, layout, nodes, nodeCount, edge,
-              margin, choice);
-    candidateCount = _elbow(layout, stub, !horizontal, points);
-    _consider(config, points, candidateCount, layout, nodes, nodeCount, edge,
-              margin, choice);
-
-    auto blocked = _blockingBounds(output, count, nodes, nodeCount, edge, margin);
-    _considerBounds(config, layout, nodes, nodeCount, edge, blocked, stub, stub,
-                    margin, choice);
+    for (auto along : {horizontal, !horizontal}) {
+        search.corridor(stub, stub, along ? from.y : from.x, along);
+    }
+    search.around(_blockingBounds(output, count, nodes, nodeCount, edge, margin), stub, stub);
     RouteBounds all;
     for (auto i = 0u; i < nodeCount; i++) _include(all, nodes[i], margin);
-    _considerBounds(config, layout, nodes, nodeCount, edge, all, stub, stub,
-                    margin, choice);
     auto gap = config.routeWidth + Epsilon * 2.0f;
     auto fromOuter = _outerStub(layout.from, layout.fromPort, all, gap, stub);
     auto toOuter = _outerStub(layout.to, layout.toPort, all, gap, stub);
-    _considerBounds(config, layout, nodes, nodeCount, edge, all, fromOuter, stub,
-                    margin, choice);
-    _considerBounds(config, layout, nodes, nodeCount, edge, all, stub, toOuter,
-                    margin, choice);
-    _considerBounds(config, layout, nodes, nodeCount, edge, all, fromOuter,
-                    toOuter, margin, choice);
-    if (!choice.count) return count;
-    for (auto i = 0u; i < choice.count; i++) output[i] = choice.points[i];
+    const float stubs[][2] = {{stub, stub}, {fromOuter, stub}, {stub, toOuter},
+                              {fromOuter, toOuter}};
+    for (auto& pair : stubs) search.around(all, pair[0], pair[1]);
+    if (!search.count) return count;
+    for (auto i = 0u; i < search.count; i++) output[i] = search.points[i];
     route = Route::Orthogonal;
-    return choice.count;
+    return search.count;
 }
 
 static Vec2 _normal(const Vec2& delta) noexcept
@@ -300,8 +265,7 @@ static Vec2 _normal(const Vec2& delta) noexcept
     return {-delta.y / length, delta.x / length};
 }
 
-Path* orthogonalPath(const Config& config, const Vec2* route,
-                             uint32_t count) noexcept
+Path* orthogonalPath(const Config& config, const Vec2* route, uint32_t count) noexcept
 {
     if (!axisAligned(route, count)) return nullptr;
     auto last = route[count - 1u] - route[count - 2u];
@@ -351,8 +315,7 @@ Path* orthogonalPath(const Config& config, const Vec2* route,
     return Path::gen(commands, commandCount, 1u);
 }
 
-Vec2 labelPoint(const Config& config, const Vec2* points,
-                        uint32_t count) noexcept
+Vec2 labelPoint(const Config& config, const Vec2* points, uint32_t count) noexcept
 {
     auto total = 0.0f;
     for (auto i = 1u; i < count; i++) total += (points[i] - points[i - 1u]).length();

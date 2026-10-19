@@ -32,13 +32,10 @@ static inline bool _axisOverlap(float firstCenter, float firstSize, float second
            > Epsilon;
 }
 
-static inline bool _boundsOverlap(const Vec2& firstCenter, const Vec2& firstSize,
-                                  const Vec2& secondCenter,
-                                  const Vec2& secondSize) noexcept
+static inline bool _overlap(const NodePlacement& first, const NodePlacement& second) noexcept
 {
-    return _axisOverlap(firstCenter.x, firstSize.x, secondCenter.x, secondSize.x)
-           && _axisOverlap(firstCenter.y, firstSize.y, secondCenter.y,
-                           secondSize.y);
+    return _axisOverlap(first.center.x, first.size.x, second.center.x, second.size.x)
+           && _axisOverlap(first.center.y, first.size.y, second.center.y, second.size.y);
 }
 
 // Narrows [first, last] to the part of origin + t * delta inside [minimum, maximum]. A delta

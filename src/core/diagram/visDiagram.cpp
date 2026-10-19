@@ -321,7 +321,7 @@ struct IR::Impl
         for (auto i = 0u; i < nodeCount; i++) {
             auto& target = nodes[i];
             if (!_copy(sourceNodes[i], target)) return Result::OutOfMemory;
-            nodePlacements[i] = {layouts[i].center, layouts[i].size, layouts[i].rank};
+            nodePlacements[i] = layouts[i];
             bytes += _bytes(target.id) + _bytes(target.label) + _bytes(target.detail);
         }
 
@@ -377,7 +377,7 @@ struct IR::Impl
         for (auto i = 0u; i < zoneCount; i++) {
             auto& target = zones[i];
             if (!_copy(sourceZones[i], target)) return Result::OutOfMemory;
-            zonePlacements[i] = {zoneLayouts[i].center, zoneLayouts[i].size};
+            zonePlacements[i] = zoneLayouts[i];
             bytes += _bytes(target.id) + _bytes(target.label)
                      + sizeof(Node) * target.memberCount;
         }
@@ -454,11 +454,6 @@ static bool _contains(const ZonePlacement& container, const NodePlacement& conte
     return _contains({container.center, container.size, 0u}, content);
 }
 
-static bool _overlap(const NodePlacement& first, const NodePlacement& second) noexcept
-{
-    return _boundsOverlap(first.center, first.size, second.center, second.size);
-}
-
 static bool _attached(const NodePlacement& node, const Vec2& point, Port port) noexcept
 {
     auto half = node.size * 0.5f;
@@ -482,6 +477,13 @@ static bool _attached(const NodePlacement& node, const Vec2& point, Port port) n
         case Port::Auto: break;
     }
     return false;
+}
+
+// The corner that rounds a box into a pill, half its shorter side, which is as round as a box
+// gets: a larger corner would make Rectangle::gen fail.
+static float _pill(const Vec2& size) noexcept
+{
+    return std::fmin(size.x, size.y) * 0.5f;
 }
 
 // Deletes the objects a failed step made but did not attach, children before their group.
@@ -540,12 +542,8 @@ struct Built::Impl
 
     ~Impl()
     {
-        if (root) {
-            if (zones && !zones->parent()) delete zones;
-            if (routes && !routes->parent()) delete routes;
-            if (nodes && !nodes->parent()) delete nodes;
-            if (annotations && !annotations->parent()) delete annotations;
-        }
+        // Once released, the groups belong to the root's new owner.
+        if (root) _discard({zones, routes, nodes, annotations});
         delete root;
     }
 };
@@ -599,7 +597,8 @@ struct Diagram::Impl
             auto maximum = placement.center + placement.size * 0.5f;
             auto zone = Group::gen();
             auto body = Rectangle::gen({placement.center.x, placement.center.y, 0.0f},
-                                       placement.size, corner * 1.5f);
+                                       placement.size,
+                                       std::fmin(corner * 1.5f, _pill(placement.size)));
             auto label = Text::gen(record.label, {minimum.x + config.zonePadding * 0.35f,
                                                   maximum.y - config.zonePadding * 0.55f, 0.0f});
             auto result = zone && body && label ? Result::Success : Result::OutOfMemory;
@@ -680,7 +679,7 @@ struct Diagram::Impl
             // A Terminal is a pill once corners round, and square like the rest otherwise.
             auto pill = record.kind == NodeKind::Terminal && corner > 0.0f;
             auto body = Rectangle::gen({center.x, center.y, 0.0f}, size,
-                                       pill ? std::fmin(size.x, size.y) * 0.5f : corner);
+                                       pill ? _pill(size) : std::fmin(corner, _pill(size)));
             auto labelPoint = record.detail ? Vec3{center.x, center.y + size.y * 0.27f, 0.0f}
                                             : Vec3{center.x, center.y, 0.0f};
             auto label = Text::gen(record.label, labelPoint);
@@ -934,103 +933,102 @@ IR::~IR()
 
 const Config& IR::config() const noexcept
 {
-    static const Config empty;
-    return pImpl ? pImpl->config : empty;
+    return pImpl->config;
 }
 
 uint32_t IR::nodeCount() const noexcept
 {
-    return pImpl ? pImpl->nodeCount : 0u;
+    return pImpl->nodeCount;
 }
 
 const NodeSpec* IR::nodeAt(uint32_t index) const noexcept
 {
-    return pImpl && index < pImpl->nodeCount ? pImpl->nodes + index : nullptr;
+    return index < pImpl->nodeCount ? pImpl->nodes + index : nullptr;
 }
 
 const NodePlacement* IR::nodePlacementAt(uint32_t index) const noexcept
 {
-    return pImpl && index < pImpl->nodeCount ? pImpl->nodePlacements + index : nullptr;
+    return index < pImpl->nodeCount ? pImpl->nodePlacements + index : nullptr;
 }
 
 uint32_t IR::edgeCount() const noexcept
 {
-    return pImpl ? pImpl->edgeCount : 0u;
+    return pImpl->edgeCount;
 }
 
 const EdgeSpec* IR::edgeAt(uint32_t index) const noexcept
 {
-    return pImpl && index < pImpl->edgeCount ? pImpl->edges + index : nullptr;
+    return index < pImpl->edgeCount ? pImpl->edges + index : nullptr;
 }
 
 const EdgePlacement* IR::edgePlacementAt(uint32_t index) const noexcept
 {
-    return pImpl && index < pImpl->edgeCount ? pImpl->edgePlacements + index : nullptr;
+    return index < pImpl->edgeCount ? pImpl->edgePlacements + index : nullptr;
 }
 
 uint32_t IR::zoneCount() const noexcept
 {
-    return pImpl ? pImpl->zoneCount : 0u;
+    return pImpl->zoneCount;
 }
 
 const ZoneSpec* IR::zoneAt(uint32_t index) const noexcept
 {
-    return pImpl && index < pImpl->zoneCount ? pImpl->zones + index : nullptr;
+    return index < pImpl->zoneCount ? pImpl->zones + index : nullptr;
 }
 
 const ZonePlacement* IR::zonePlacementAt(uint32_t index) const noexcept
 {
-    return pImpl && index < pImpl->zoneCount ? pImpl->zonePlacements + index : nullptr;
+    return index < pImpl->zoneCount ? pImpl->zonePlacements + index : nullptr;
 }
 
 const Object* IR::object(Node node) const noexcept
 {
-    return pImpl ? pImpl->view(node).object : nullptr;
+    return pImpl->view(node).object;
 }
 
 const Rectangle* IR::body(Node node) const noexcept
 {
-    return pImpl ? pImpl->view(node).body : nullptr;
+    return pImpl->view(node).body;
 }
 
 const Text* IR::label(Node node) const noexcept
 {
-    return pImpl ? pImpl->view(node).label : nullptr;
+    return pImpl->view(node).label;
 }
 
 const Text* IR::detail(Node node) const noexcept
 {
-    return pImpl ? pImpl->view(node).detail : nullptr;
+    return pImpl->view(node).detail;
 }
 
 const Object* IR::object(Edge edge) const noexcept
 {
-    return pImpl ? pImpl->view(edge).object : nullptr;
+    return pImpl->view(edge).object;
 }
 
 const Text* IR::label(Edge edge) const noexcept
 {
-    return pImpl ? pImpl->view(edge).label : nullptr;
+    return pImpl->view(edge).label;
 }
 
 const Object* IR::object(Zone zone) const noexcept
 {
-    return pImpl ? pImpl->view(zone).object : nullptr;
+    return pImpl->view(zone).object;
 }
 
 const Rectangle* IR::body(Zone zone) const noexcept
 {
-    return pImpl ? pImpl->view(zone).body : nullptr;
+    return pImpl->view(zone).body;
 }
 
 const Text* IR::label(Zone zone) const noexcept
 {
-    return pImpl ? pImpl->view(zone).label : nullptr;
+    return pImpl->view(zone).label;
 }
 
 size_t IR::byteSize() const noexcept
 {
-    return pImpl ? pImpl->bytes + sizeof(receipt_detail::DiagramRoot) - sizeof(Group) : 0u;
+    return pImpl->bytes + sizeof(receipt_detail::DiagramRoot) - sizeof(Group);
 }
 
 const IR* ir(const Object* root) noexcept
@@ -1068,12 +1066,8 @@ Result validate(const IR& receipt, ConstraintReport& report) noexcept
     report.pImpl->count = 0u;
 
     for (auto i = 0u; i < receipt.nodeCount(); i++) {
-        auto first = receipt.nodePlacementAt(i);
-        if (!first) return Result::InvalidArguments;
         for (auto j = i + 1u; j < receipt.nodeCount(); j++) {
-            auto second = receipt.nodePlacementAt(j);
-            if (!second) return Result::InvalidArguments;
-            if (!_overlap(*first, *second)) continue;
+            if (!_overlap(*receipt.nodePlacementAt(i), *receipt.nodePlacementAt(j))) continue;
             ConstraintIssue issue;
             issue.code = ConstraintCode::NodeOverlap;
             issue.node.index = i;
@@ -1085,14 +1079,8 @@ Result validate(const IR& receipt, ConstraintReport& report) noexcept
     for (auto i = 0u; i < receipt.edgeCount(); i++) {
         auto spec = receipt.edgeAt(i);
         auto placement = receipt.edgePlacementAt(i);
-        if (!spec || !placement || placement->centerlineCount < 2u
-            || !placement->centerline || spec->from.index >= receipt.nodeCount()
-            || spec->to.index >= receipt.nodeCount()) {
-            return Result::InvalidArguments;
-        }
         auto from = receipt.nodePlacementAt(spec->from.index);
         auto to = receipt.nodePlacementAt(spec->to.index);
-        if (!from || !to) return Result::InvalidArguments;
 
         // Reports a check that failed at the edge's source, or at its target when atTarget.
         auto endpoint = [&](ConstraintCode code, bool atTarget, Port port) {
@@ -1127,7 +1115,6 @@ Result validate(const IR& receipt, ConstraintReport& report) noexcept
         auto margin = _routeMargin(receipt.config());
         for (auto j = 0u; j < receipt.nodeCount(); j++) {
             auto node = receipt.nodePlacementAt(j);
-            if (!node) return Result::InvalidArguments;
             if (!_routeCrosses(line, placement->centerlineCount, node->center, node->size, margin,
                                j == spec->from.index, j == spec->to.index)) {
                 continue;
@@ -1140,31 +1127,20 @@ Result validate(const IR& receipt, ConstraintReport& report) noexcept
         }
     }
 
-    auto fullMinimum = 0.0f;
-    auto fullMaximum = 0.0f;
-    if (receipt.nodeCount()) {
-        auto first = receipt.nodePlacementAt(0u);
-        if (!first) return Result::InvalidArguments;
-        fullMinimum = first->center.x - first->size.x * 0.5f;
-        fullMaximum = first->center.x + first->size.x * 0.5f;
-        for (auto i = 1u; i < receipt.nodeCount(); i++) {
-            auto node = receipt.nodePlacementAt(i);
-            if (!node) return Result::InvalidArguments;
-            fullMinimum = std::fmin(fullMinimum, node->center.x - node->size.x * 0.5f);
-            fullMaximum = std::fmax(fullMaximum, node->center.x + node->size.x * 0.5f);
-        }
+    // The span of all nodes, which a full-width zone reaches across.
+    auto fullMinimum = std::numeric_limits<float>::infinity();
+    auto fullMaximum = -fullMinimum;
+    for (auto i = 0u; i < receipt.nodeCount(); i++) {
+        auto node = receipt.nodePlacementAt(i);
+        fullMinimum = std::fmin(fullMinimum, node->center.x - node->size.x * 0.5f);
+        fullMaximum = std::fmax(fullMaximum, node->center.x + node->size.x * 0.5f);
     }
     for (auto i = 0u; i < receipt.zoneCount(); i++) {
         auto spec = receipt.zoneAt(i);
         auto placement = receipt.zonePlacementAt(i);
-        if (!spec || !placement || !spec->members || !spec->memberCount) {
-            return Result::InvalidArguments;
-        }
         for (auto j = 0u; j < spec->memberCount; j++) {
             auto member = spec->members[j];
-            auto node = receipt.nodePlacementAt(member.index);
-            if (!node) return Result::InvalidArguments;
-            if (_contains(*placement, *node)) continue;
+            if (_contains(*placement, *receipt.nodePlacementAt(member.index))) continue;
             ConstraintIssue issue;
             issue.code = ConstraintCode::ZoneExcludesMember;
             issue.node = member;
@@ -1194,12 +1170,11 @@ Built::~Built()
 
 Group* Built::root() const noexcept
 {
-    return pImpl ? pImpl->root : nullptr;
+    return pImpl->root;
 }
 
 Group* Built::release() noexcept
 {
-    if (!pImpl) return nullptr;
     auto root = pImpl->root;
     pImpl->root = nullptr;
     return root;
@@ -1207,72 +1182,72 @@ Group* Built::release() noexcept
 
 Group* Built::zones() const noexcept
 {
-    return pImpl ? pImpl->zones : nullptr;
+    return pImpl->zones;
 }
 
 Group* Built::routes() const noexcept
 {
-    return pImpl ? pImpl->routes : nullptr;
+    return pImpl->routes;
 }
 
 Group* Built::nodes() const noexcept
 {
-    return pImpl ? pImpl->nodes : nullptr;
+    return pImpl->nodes;
 }
 
 Group* Built::annotations() const noexcept
 {
-    return pImpl ? pImpl->annotations : nullptr;
+    return pImpl->annotations;
 }
 
 Object* Built::object(Node node) const noexcept
 {
-    return pImpl ? pImpl->receipt->pImpl->view(node).object : nullptr;
+    return pImpl->receipt->pImpl->view(node).object;
 }
 
 Rectangle* Built::body(Node node) const noexcept
 {
-    return pImpl ? pImpl->receipt->pImpl->view(node).body : nullptr;
+    return pImpl->receipt->pImpl->view(node).body;
 }
 
 Text* Built::label(Node node) const noexcept
 {
-    return pImpl ? pImpl->receipt->pImpl->view(node).label : nullptr;
+    return pImpl->receipt->pImpl->view(node).label;
 }
 
 Text* Built::detail(Node node) const noexcept
 {
-    return pImpl ? pImpl->receipt->pImpl->view(node).detail : nullptr;
+    return pImpl->receipt->pImpl->view(node).detail;
 }
 
 Object* Built::object(Edge edge) const noexcept
 {
-    return pImpl ? pImpl->receipt->pImpl->view(edge).object : nullptr;
+    return pImpl->receipt->pImpl->view(edge).object;
 }
 
 Text* Built::label(Edge edge) const noexcept
 {
-    return pImpl ? pImpl->receipt->pImpl->view(edge).label : nullptr;
+    return pImpl->receipt->pImpl->view(edge).label;
 }
 
 Object* Built::object(Zone zone) const noexcept
 {
-    return pImpl ? pImpl->receipt->pImpl->view(zone).object : nullptr;
+    return pImpl->receipt->pImpl->view(zone).object;
 }
 
 Rectangle* Built::body(Zone zone) const noexcept
 {
-    return pImpl ? pImpl->receipt->pImpl->view(zone).body : nullptr;
+    return pImpl->receipt->pImpl->view(zone).body;
 }
 
 Text* Built::label(Zone zone) const noexcept
 {
-    return pImpl ? pImpl->receipt->pImpl->view(zone).label : nullptr;
+    return pImpl->receipt->pImpl->view(zone).label;
 }
 
 const IR* Built::ir() const noexcept
 {
-    return pImpl ? pImpl->receipt : nullptr;
+    return pImpl->receipt;
 }
 
 }  // namespace vis::diagram

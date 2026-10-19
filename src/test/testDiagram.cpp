@@ -1600,6 +1600,40 @@ static void themeCorners()
     CHECK(Diagram::gen(infinite) == nullptr);
 }
 
+// No box rounds past a pill. A node smaller than the node size the Theme's roundness applies
+// to, or a corner wider than the node, rounds by half its shorter side, as does its zone,
+// rather than failing to build.
+static void pillCorners()
+{
+    auto round = Theme::preset(ThemePreset::ProWhite);
+    round.roundness = 0.5f;
+    const float corners[] = {-1.0f, 10.0f};
+    for (auto corner : corners) {
+        vis::diagram::Config config;
+        config.layout = Layout::Manual;
+        config.corner = corner;
+        auto diagram = Diagram::gen(config);
+        CHECK(diagram);
+        if (!diagram) continue;
+        auto smallSpec = nodeSpec("small", "S");
+        smallSpec.manualPosition = true;
+        smallSpec.size = {1.0f, 0.4f};
+        Node small;
+        Zone zone;
+        CHECK(diagram->add(smallSpec, small) == Result::Success);
+        CHECK(diagram->add(zoneSpec("scope", nullptr, &small, 1u), zone) == Result::Success);
+        Built* built = nullptr;
+        CHECK(diagram->build(round, built) == Result::Success);
+        CHECK(built && near(built->body(small)->corner, 0.2f));
+        if (built) {
+            auto size = built->body(zone)->size;
+            CHECK(near(built->body(zone)->corner, std::fmin(size.x, size.y) * 0.5f));
+        }
+        delete built;
+        delete diagram;
+    }
+}
+
 // Structure is ink: every node kind is the Theme's foreground on its background and zones only
 // outline. Routes stay gray but for an error and a flowing directed edge, and labels match.
 static void restrainedColors()
@@ -2234,6 +2268,7 @@ int main()
     gridAndTimelineLayouts();
     manualCyclesAndKinds();
     themeCorners();
+    pillCorners();
     restrainedColors();
     labelGapIgnoresTheme();
     constraintDiagnostics();

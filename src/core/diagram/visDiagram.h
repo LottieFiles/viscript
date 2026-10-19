@@ -14,12 +14,9 @@ using NodeRecord = NodeSpec;
 using EdgeRecord = EdgeSpec;
 using ZoneRecord = ZoneSpec;
 
-struct NodeLayout
-{
-    Vec2 center;
-    Vec2 size;
-    uint32_t rank = 0;
-};
+// The layout places nodes and zones as the receipt reports them.
+using NodeLayout = NodePlacement;
+using ZoneLayout = ZonePlacement;
 
 struct EdgeLayout
 {
@@ -27,12 +24,6 @@ struct EdgeLayout
     Port toPort = Port::Auto;
     Vec2 from;
     Vec2 to;
-};
-
-struct ZoneLayout
-{
-    Vec2 center;
-    Vec2 size;
 };
 
 // The issues a report holds in the order its checks found them: the Impl of ConstraintReport
