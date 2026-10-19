@@ -3,58 +3,7 @@
 // The page prints each episode's title and blurb, so scenes carry no titles or caption bar:
 // t = 0 already shows the subject, motion carries the explanation, and at most one short
 // phrase sits beside the action for a beat (say), replacing itself in place.
-
-const PRELUDE = `local scene = vis.scene {
-    width = 960, height = 540, theme = "pro_black",
-    camera = {mode = "fixed", view = "2d", height = 6},
-}
-local C = {panel = "#14171f", line = "#3a4152", text = "#e6e8ee", mute = "#7d8596", bar = "#2a3142",
-           accent = "#6cb6ff", warn = "#e3b341", danger = "#ff7b72", ok = "#7ee787", alt = "#c8a7ff",
-           none = "#00000000"}
--- draw-order bands: guides < regions < edges < subjects < tokens < labels < transient focus
-local L = {guide = 1, region = 2, edge = 3, subject = 5, token = 6, label = 8, focus = 10}
-local function at(x, y) return {1, 0, 0, x, 0, 1, 0, y, 0, 0, 1, 0, 0, 0, 0, 1} end
-local function T(parent, id, s, x, y, size, color, align, layer)
-    return parent:text {id = id, text = s, point = {x, y}, size = size or 16, font = "Pretendard",
-                        color = color or C.text, align = align or {0.5, 0.5}, layer = layer or L.label}
-end
--- one short phrase beside the action; the next call fades it out and takes its place, say(nil) fades it
-local sayN, sayCur = 0, nil
-local function say(s, x, y, color, align)
-    if s == nil then
-        if sayCur then scene:fade_out(sayCur, {duration = 0.2}); sayCur = nil end
-        return
-    end
-    sayN = sayN + 1
-    local nxt = T(scene, "say:" .. sayN, s, x, y, 15, color or C.warn, align, L.focus)
-    if sayCur then scene:fade_out(sayCur, {duration = 0.15}) end
-    scene:fade_in(nxt, {duration = 0.2})
-    sayCur = nxt
-end
-local function together(...) scene:parallel(...) end
--- a token is one Group (box + label around {0,0}) that moves as a unit
-local function token(id, s, x, y, o)
-    o = o or {}
-    local layer = o.layer or L.token
-    local g = scene:group {id = id, matrix = at(x, y)}
-    local b
-    if o.circle then
-        b = g:circle {id = id .. ":box", center = {0, 0}, radius = o.circle, fill = o.fill or C.panel,
-                      stroke = o.stroke or C.accent, width = o.width or 2, layer = layer}
-    else
-        b = g:rectangle {id = id .. ":box", center = {0, 0}, size = o.size or {0.9, 0.48}, corner = 0.04,
-                         fill = o.fill or C.panel, stroke = o.stroke or C.accent, width = o.width or 1.5, layer = layer}
-    end
-    local t = T(g, id .. ":label", s, 0, 0, o.text or 15, o.color or C.text, nil, layer + 2)
-    return {g = g, b = b, t = t, x = x, y = y, v = s}
-end
--- descriptor that carries a token to (x, y); call it when the move is scheduled
-local function toward(o, x, y, arc)
-    local d = {target = o.g, shift = {x - o.x, y - o.y}, arc = arc}
-    o.x, o.y = x, y
-    return d
-end
-`;
+import {PRELUDE} from "./prelude.js";
 
 // ---------------------------------------------------------------- sorting helpers
 const BARS = `
@@ -1019,48 +968,6 @@ end
 if not hit then
     together(function() scene:play({target = B[i], stroke = C.danger}, 0.3) end,
              function() say("not in the table", sx, sy - 0.55, C.danger) end)
-end
-scene:wait(2.4)
-return scene`;
-
-
-// Overview teaser: 16 bars merge-sorted bottom-up, no code panel.
-export const ALGO_TEASER = `local scene = vis.scene {
-    width = 960, height = 540, theme = "pro_black",
-    camera = {mode = "fixed", view = "2d", height = 6},
-}
-local vals = {9, 3, 14, 6, 1, 12, 7, 16, 4, 11, 2, 15, 8, 13, 5, 10}
-local n, x0, x1, base = #vals, -4.8, 4.8, -2.3
-local w = (x1 - x0) / n
-local B = {}
-for i, v in ipairs(vals) do
-    local h = v / 16 * 4.4
-    B[i] = scene:rectangle {id = "bar:" .. i, center = {x0 + (i - 0.5) * w, base + h / 2}, size = {w * 0.7, h},
-                            fill = "#2a3142", stroke = "#00000000", layer = 5}
-end
-scene:wait(0.4)
-local width = 1
-while width < n do
-    for lo = 1, n, 2 * width do
-        local mid, hi = math.min(lo + width - 1, n), math.min(lo + 2 * width - 1, n)
-        if mid < hi then
-            local items = {}
-            for k = lo, hi do items[#items + 1] = {b = B[k], v = vals[k], from = k} end
-            table.sort(items, function(a, b) if a.v == b.v then return a.from < b.from end return a.v < b.v end)
-            local moves, tint, back = {}, {}, {}
-            for k, it in ipairs(items) do
-                local to = lo + k - 1
-                tint[#tint + 1] = {target = it.b, fill = width >= n / 2 and "#7ee787" or "#6cb6ff"}
-                if to ~= it.from then moves[#moves + 1] = {target = it.b, shift = {(to - it.from) * w, 0}, arc = -0.8} end
-                B[to] = it.b; vals[to] = it.v
-                back[#back + 1] = {target = it.b, fill = "#2a3142"}
-            end
-            scene:play(tint, 0.12)
-            if #moves > 0 then scene:play(moves, 0.32, "smooth") end
-            if width < n / 2 then scene:play(back, 0.12) end
-        end
-    end
-    width = width * 2
 end
 scene:wait(2.4)
 return scene`;

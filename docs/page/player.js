@@ -90,12 +90,10 @@ export function setLang(next) {
 
 const STACK_LINES = 15;
 
-export function createPlayer(el, source, {js = null, editable = false, name = "scene.lua", loop = false, interactive = false, clips = [], dark = false, maxRatio = 3, maxFps, quality = "auto"} = {}) {
-  // dark: keep the authored dark palette in light mode (cinematic hero scenes)
-  const adapt = dark ? (x) => x : themeAdapt;
+export function createPlayer(el, source, {js = null, editable = false, name = "scene.lua", loop = false, interactive = false, clips = [], maxRatio = 3, maxFps, quality = "auto"} = {}) {
   const originals = {lua: source, js};
   let mine = js && lang === "js" ? "js" : "lua";
-  let code = adapt(originals[mine]), activeClip = null, debounce = 0;
+  let code = themeAdapt(originals[mine]), debounce = 0;
 
   el.innerHTML = editable ? `
     <div class="view"><div class="canvas-wrap"><canvas></canvas></div>
@@ -162,10 +160,7 @@ export function createPlayer(el, source, {js = null, editable = false, name = "s
     };
     return button;
   });
-  const selectClip = (clip) => {
-    activeClip = clip;
-    clipButtons.forEach((button, i) => button.setAttribute("aria-pressed", String(clips[i] === clip)));
-  };
+  const selectClip = (clip) => clipButtons.forEach((button, i) => button.setAttribute("aria-pressed", String(clips[i] === clip)));
   if (clips.length) {
     const overlay = document.createElement("div");
     overlay.className = "scene-clips";
@@ -177,7 +172,7 @@ export function createPlayer(el, source, {js = null, editable = false, name = "s
   showPlaying();
 
   const api = {
-    retheme() { code = adapt(code); load(); },
+    retheme() { code = themeAdapt(code); load(); },
     destroy() {
       langs.delete(api.switchLang); clearTimeout(debounce);
       editorObserver.unobserve(el); players.delete(api);
@@ -198,7 +193,7 @@ export function createPlayer(el, source, {js = null, editable = false, name = "s
       if (clips.length) player.pause(); else player.play();
       load();
     }, 220); });
-    $(".reset", el).onclick = () => cm.setValue(adapt(originals[mine]));
+    $(".reset", el).onclick = () => cm.setValue(themeAdapt(originals[mine]));
     const showLang = () => {
       $(".file", el).textContent = `${fileName()} — live`;
       for (const b of el.querySelectorAll(".langs button")) b.classList.toggle("on", b.dataset.lang === mine);
@@ -208,7 +203,7 @@ export function createPlayer(el, source, {js = null, editable = false, name = "s
       if (next === mine) return;
       mine = next;
       cm.setOption("mode", mine === "js" ? "javascript" : "lua");
-      cm.setValue(adapt(originals[mine]));
+      cm.setValue(themeAdapt(originals[mine]));
       showLang();
     };
     for (const b of el.querySelectorAll(".langs button")) b.onclick = () => setLang(b.dataset.lang);
@@ -217,7 +212,7 @@ export function createPlayer(el, source, {js = null, editable = false, name = "s
     showLang();
     pp.onclick = () => { if (player.playing) player.pause(); else player.play(); };
     scrub.oninput = () => { player.clearRange(); selectClip(null); player.pause(); player.seek(+scrub.value); };
-    api.retheme = () => cm.setValue(adapt(cm.getValue()));
+    api.retheme = () => cm.setValue(themeAdapt(cm.getValue()));
     editors.set(el, cm);
     editorObserver.observe(el);
   }

@@ -50,14 +50,13 @@ const liveScenes = () => (tree) => {
     };
     walk(tree);
 };
-// Minimal `key: value` frontmatter.
+// Minimal `key: value` frontmatter: the key ends at the first colon, and the value keeps any others.
 const frontmatter = (text) => {
     const m = text.match(/^---\n([\s\S]*?)\n---\n/);
     if (!m) return [{}, text];
-    const meta = Object.fromEntries(m[1].split("\n").map((l) => l.split(/:\s*/, 2)).map(([k, ...v]) => [k.trim(), l2(v)]));
+    const meta = Object.fromEntries(m[1].split("\n").map((l) => l.split(":")).map(([k, ...v]) => [k.trim(), v.join(":").trim()]));
     return [meta, text.slice(m[0].length)];
 };
-const l2 = (v) => v.join(": ").trim();
 
 const files = [];
 const scan = (dir) => readdirSync(dir, {withFileTypes: true}).forEach((e) =>
@@ -72,7 +71,6 @@ for (const file of files.sort()) {
     const target = join(out, id + ".js");
     let code = String(await compile(body, {jsxImportSource: "@page", remarkPlugins: [remarkGfm, liveScenes, codeTabs], rehypePlugins: [[rehypeHighlight, {plainText: ["text"]}]]}));
     code = code.replace('"@page/jsx-runtime"', JSON.stringify(relative(dirname(target), join(page, "jsx-runtime.js")).replace(/^(?!\.)/, "./")));
-    code += `\nexport const meta = ${JSON.stringify(meta)};\n`;
     mkdirSync(dirname(target), {recursive: true});
     writeFileSync(target, code);
     if (id.startsWith("docs/")) docs.push({id: id.slice(5).replace(/^[\d.]+-/, ""), file: id, ...meta});

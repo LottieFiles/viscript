@@ -1,51 +1,7 @@
 // JavaScript versions of the "diagrams" examples, keyed by episode id.
+import {PRELUDE as SHARED} from "./prelude.js";
 
-const PRELUDE = `const scene = vis.scene({
-    width: 960, height: 540, theme: "pro_black",
-    camera: {mode: "fixed", view: "2d", height: 6},
-});
-const C = {panel: "#14171f", line: "#3a4152", text: "#e6e8ee", mute: "#7d8596", bar: "#2a3142",
-           accent: "#6cb6ff", warn: "#e3b341", danger: "#ff7b72", ok: "#7ee787", alt: "#c8a7ff",
-           none: "#00000000"};
-// draw-order bands: guides < regions < edges < subjects < tokens < labels < transient focus
-const L = {guide: 1, region: 2, edge: 3, subject: 5, token: 6, label: 8, focus: 10};
-const at = (x, y) => [1, 0, 0, x, 0, 1, 0, y, 0, 0, 1, 0, 0, 0, 0, 1];
-const T = (parent, id, s, x, y, size = 16, color = C.text, align = [0.5, 0.5], layer = L.label) =>
-    parent.text({id, text: s, point: [x, y], size, font: "Pretendard", color, align, layer});
-// one short phrase beside the action; the next call fades it out and takes its place, say(null) fades it
-let sayN = 0, sayCur = null;
-function say(s, x, y, color = C.warn, align) {
-    if (s == null) {
-        if (sayCur) { scene.fadeOut(sayCur, {duration: 0.2}); sayCur = null; }
-        return;
-    }
-    sayN++;
-    const next = T(scene, "say:" + sayN, s, x, y, 15, color, align, L.focus);
-    if (sayCur) scene.fadeOut(sayCur, {duration: 0.15});
-    scene.fadeIn(next, {duration: 0.2});
-    sayCur = next;
-}
-const together = (...tracks) => scene.parallel(...tracks);
-// a token is one Group (box + label around [0, 0]) that moves as a unit
-function token(id, s, x, y, o = {}) {
-    const layer = o.layer ?? L.token;
-    const g = scene.group({id, matrix: at(x, y)});
-    const b = o.circle
-        ? g.circle({id: id + ":box", center: [0, 0], radius: o.circle, fill: o.fill ?? C.panel,
-                    stroke: o.stroke ?? C.accent, width: o.width ?? 2, layer})
-        : g.rectangle({id: id + ":box", center: [0, 0], size: o.size ?? [0.9, 0.48], corner: 0.04,
-                       fill: o.fill ?? C.panel, stroke: o.stroke ?? C.accent, width: o.width ?? 1.5, layer});
-    const t = T(g, id + ":label", s, 0, 0, o.text ?? 15, o.color ?? C.text, undefined, layer + 2);
-    return {g, b, t, x, y, v: s};
-}
-// descriptor that carries a token to (x, y); call it when the move is scheduled
-function toward(o, x, y, arc) {
-    const d = {target: o.g, shift: [x - o.x, y - o.y]};
-    if (arc !== undefined) d.arc = arc;
-    o.x = x; o.y = y;
-    return d;
-}
-const go = (o, x, y, d = 0.45, arc) => scene.play(toward(o, x, y, arc), d, "smooth");
+const PRELUDE = SHARED + `const go = (o, x, y, d = 0.45, arc) => scene.play(toward(o, x, y, arc), d, "smooth");
 `;
 
 const DIAGRAM = `
