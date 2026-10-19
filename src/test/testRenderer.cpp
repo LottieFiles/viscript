@@ -129,7 +129,7 @@ static void _layoutJson()
         delete untagged;
         return;
     }
-    tagged->tag("q\"b\\c\n\x01\xc3\xa9\xff");
+    tagged->tag("q\"b\\c\n\x01\xc3\xa9\xff\xed\xa0\x80\xf0\x9f\x98\x80");
     CHECK(scene->add(tagged) == Result::Success);
     CHECK(scene->add(untagged) == Result::Success);
     LayoutReport report;
@@ -138,7 +138,7 @@ static void _layoutJson()
     CHECK(layoutJson(report, scene, json));
     auto text = reinterpret_cast<const char*>(json.data);
     CHECK(text && std::strncmp(text, "{\"time\":0,\"padding\":2,", 22) == 0);
-    CHECK(text && std::strstr(text, "\"id\":\"q\\\"b\\\\c\\n\\u0001\xc3\xa9\\u00ff\"") != nullptr);
+    CHECK(text && std::strstr(text, "\"id\":\"q\\\"b\\\\c\\n\\u0001\xc3\xa9\\u00ff\\u00ed\\u00a0\\u0080\xf0\x9f\x98\x80\"") != nullptr);
     CHECK(text && std::strstr(text, "\"id\":null") != nullptr);
     delete scene;
     delete renderer;

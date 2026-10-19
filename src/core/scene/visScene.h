@@ -690,6 +690,22 @@ struct SceneSequence
         return live ? std::fmin(stage.scene->duration(), std::fmax(0.0f, parentTime - stage.start))
                     : stage.scene->duration();
     }
+
+    // The index of the stage shown at parentTime, from begin on, or count for none, and progress
+    // into the transition after it, 0 while the stage shows whole: until its end, the last one
+    // ever after, and until the transition after it has begun.
+    uint32_t stage(float parentTime, float& progress) const noexcept
+    {
+        for (auto i = 0u; i < count; i++) {
+            progress = 0.0f;
+            if (parentTime < stages[i].end || i + 1u == count) return i;
+            auto& transition = transitions[i];
+            if (parentTime >= transition.end) continue;
+            progress = (parentTime - transition.begin) / (transition.end - transition.begin);
+            return i;
+        }
+        return count;
+    }
 };
 
 struct SceneMarker

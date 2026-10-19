@@ -13,34 +13,24 @@ namespace vis
 
 static constexpr auto _epsilon = 1.0e-6f;
 
+// Whether a float holds value: it is finite and in range, which a NaN fails to compare, and it
+// does not round to zero unless it is zero or a point's coordinate, which zero stands for well.
+static bool _fits(double value, bool point = false) noexcept
+{
+    constexpr auto limit = static_cast<double>(std::numeric_limits<float>::max());
+    return std::fabs(value) <= limit && (point || value == 0.0 || static_cast<float>(value) != 0.0f);
+}
+
+// value as a float, or NaN when one does not hold it.
 static float _narrow(double value) noexcept
 {
-    auto limit = static_cast<double>(std::numeric_limits<float>::max());
-    if (!std::isfinite(value) || std::fabs(value) > limit) return std::numeric_limits<float>::quiet_NaN();
-    auto output = static_cast<float>(value);
-    return value != 0.0 && output == 0.0f ? std::numeric_limits<float>::quiet_NaN() : output;
+    return _fits(value) ? static_cast<float>(value) : std::numeric_limits<float>::quiet_NaN();
 }
 
-static bool _narrow(double x, double y, double z, Vec3& output) noexcept
+// x, y and z as floats; false, leaving output, when one does not hold them.
+static bool _narrow(double x, double y, double z, Vec3& output, bool point = false) noexcept
 {
-    auto limit = static_cast<double>(std::numeric_limits<float>::max());
-    if (!std::isfinite(x) || !std::isfinite(y) || !std::isfinite(z) || std::fabs(x) > limit || std::fabs(y) > limit || std::fabs(z) > limit) {
-        return false;
-    }
-    auto narrowedX = static_cast<float>(x);
-    auto narrowedY = static_cast<float>(y);
-    auto narrowedZ = static_cast<float>(z);
-    if ((x != 0.0 && narrowedX == 0.0f) || (y != 0.0 && narrowedY == 0.0f) || (z != 0.0 && narrowedZ == 0.0f)) return false;
-    output = {narrowedX, narrowedY, narrowedZ};
-    return true;
-}
-
-static bool _narrowPoint(double x, double y, double z, Vec3& output) noexcept
-{
-    auto limit = static_cast<double>(std::numeric_limits<float>::max());
-    if (!std::isfinite(x) || !std::isfinite(y) || !std::isfinite(z) || std::fabs(x) > limit || std::fabs(y) > limit || std::fabs(z) > limit) {
-        return false;
-    }
+    if (!_fits(x, point) || !_fits(y, point) || !_fits(z, point)) return false;
     output = {static_cast<float>(x), static_cast<float>(y), static_cast<float>(z)};
     return true;
 }
@@ -246,18 +236,10 @@ Vec3 Mat4::operator*(const Vec3& v) const noexcept
     auto y = static_cast<double>(e[4]) * v.x + static_cast<double>(e[5]) * v.y + static_cast<double>(e[6]) * v.z + e[7];
     auto z = static_cast<double>(e[8]) * v.x + static_cast<double>(e[9]) * v.y + static_cast<double>(e[10]) * v.z + e[11];
     auto w = static_cast<double>(e[12]) * v.x + static_cast<double>(e[13]) * v.y + static_cast<double>(e[14]) * v.z + e[15];
-    if (!std::isfinite(w) || w == 0.0) {
-        auto invalid = std::numeric_limits<float>::quiet_NaN();
-        return {invalid, invalid, invalid};
-    }
-    x /= w;
-    y /= w;
-    z /= w;
-    auto output = Vec3{};
-    if (!_narrow(x, y, z, output)) {
-        auto invalid = std::numeric_limits<float>::quiet_NaN();
-        return {invalid, invalid, invalid};
-    }
+    // A point at infinity, or one that a float cannot hold, is NaN.
+    constexpr auto invalid = std::numeric_limits<float>::quiet_NaN();
+    auto output = Vec3{invalid, invalid, invalid};
+    if (std::isfinite(w) && w != 0.0) _narrow(x / w, y / w, z / w, output);
     return output;
 }
 
@@ -350,7 +332,8 @@ bool Camera::segment(Vec3& from, Vec3& to) const noexcept
     else if (depthB > far) t1 = (far - depthA) / depthDelta;
     if (t0 > t1) return false;
 
-    return _narrowPoint(ax + dx * t0, ay + dy * t0, az + dz * t0, from) && _narrowPoint(ax + dx * t1, ay + dy * t1, az + dz * t1, to);
+    return _narrow(ax + dx * t0, ay + dy * t0, az + dz * t0, from, true)
+           && _narrow(ax + dx * t1, ay + dy * t1, az + dz * t1, to, true);
 }
 
 AnimCurve AnimCurve::preset(AnimCurvePreset preset, float strength) noexcept

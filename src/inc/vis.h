@@ -2400,9 +2400,8 @@ struct Renderer
     Result sample(const Scene* scene, float time, const Vec2& position,
                   const Object* const* candidates, uint32_t count,
                   PixelSample& output, uint32_t pixelRatio = 1u) noexcept;
-    Result render(const Scene* scene, float time, Surface& surface) noexcept;
     Result render(const Scene* scene, float time, Surface& surface,
-                  uint32_t pixelRatio) noexcept;
+                  uint32_t pixelRatio = 1u) noexcept;
 
 private:
     struct Impl;

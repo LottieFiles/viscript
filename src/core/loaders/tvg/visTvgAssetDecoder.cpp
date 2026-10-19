@@ -59,8 +59,7 @@ static Result _draw(tvg::Picture* picture, uint32_t width, uint32_t height, uint
     auto canvas = tvg::SwCanvas::gen();
     auto drawn = canvas && picture->size(static_cast<float>(width), static_cast<float>(height)) == tvg::Result::Success
               && canvas->target(pixels, width, width, height, tvg::ColorSpace::ABGR8888S) == tvg::Result::Success
-              && canvas->add(picture) == tvg::Result::Success && canvas->update() == tvg::Result::Success
-              && canvas->draw(true) == tvg::Result::Success && canvas->sync() == tvg::Result::Success;
+              && canvas->add(picture) == tvg::Result::Success && renderer::tvgDraw(canvas);
     delete canvas;
     if (!drawn) {
         delete[] pixels;

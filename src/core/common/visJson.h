@@ -9,35 +9,10 @@
 #include <cstring>
 
 #include "visGrow.h"
+#include "visString.h"
 
 namespace vis
 {
-
-// The length of the well-formed UTF-8 sequence at value, or 0.
-static inline uint32_t utf8Sequence(const uint8_t* value, size_t remaining)
-{
-    auto continuation = [](uint8_t byte) {
-        return byte >= 0x80 && byte <= 0xbf;
-    };
-    if (remaining >= 2 && value[0] >= 0xc2 && value[0] <= 0xdf && continuation(value[1])) return 2;
-    if (remaining >= 3 && value[0] == 0xe0 && value[1] >= 0xa0 && value[1] <= 0xbf && continuation(value[2])) return 3;
-    if (remaining < 3) return 0;
-    if (((value[0] >= 0xe1 && value[0] <= 0xec) || (value[0] >= 0xee && value[0] <= 0xef)) && continuation(value[1]) && continuation(value[2])) {
-        return 3;
-    }
-    if (value[0] == 0xed && value[1] >= 0x80 && value[1] <= 0x9f && continuation(value[2])) return 3;
-    if (remaining < 4) return 0;
-    if (value[0] == 0xf0 && value[1] >= 0x90 && value[1] <= 0xbf && continuation(value[2]) && continuation(value[3])) {
-        return 4;
-    }
-    if (value[0] >= 0xf1 && value[0] <= 0xf3 && continuation(value[1]) && continuation(value[2]) && continuation(value[3])) {
-        return 4;
-    }
-    if (value[0] == 0xf4 && value[1] >= 0x80 && value[1] <= 0x8f && continuation(value[2]) && continuation(value[3])) {
-        return 4;
-    }
-    return 0;
-}
 
 struct JsonBuffer
 {

@@ -77,6 +77,15 @@ int main()
         target.id = static_cast<int32_t>(context.fbo);
         target.width = context.width;
         target.height = context.height;
+        // A frame needs a scene, a time from zero on, and a context's framebuffer of the scene's size.
+        auto wrong = target;
+        wrong.height++;
+        CHECK(renderer->render(scene, 0.0f, wrong) == Result::InvalidArguments);
+        wrong = target;
+        wrong.context = nullptr;
+        CHECK(renderer->render(scene, 0.0f, wrong) == Result::InvalidArguments);
+        CHECK(renderer->render(nullptr, 0.0f, target) == Result::InvalidArguments);
+        CHECK(renderer->render(scene, -1.0f, target) == Result::InvalidArguments);
         CHECK(renderer->render(scene, 0.0f, target) == Result::Success);
 
         auto bytes = new (std::nothrow) uint8_t[static_cast<size_t>(context.width) * context.height * 4];

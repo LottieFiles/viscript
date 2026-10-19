@@ -44,6 +44,9 @@ Result tvgFont(TvgDiagnostic& diagnostic, const char* path) noexcept;
 Result tvgFont(TvgDiagnostic& diagnostic, const char* name, const void* data, uint32_t size,
                const char* mime) noexcept;
 bool tvgSuccess(tvg::Result result) noexcept;
+// Updates canvas and draws it over a cleared target, waiting for the drawing; false when ThorVG
+// fails a step.
+bool tvgDraw(tvg::Canvas* canvas) noexcept;
 void tvgRelease(tvg::Paint* paint) noexcept;
 bool tvgAdd(tvg::Scene* scene, tvg::Paint* paint) noexcept;
 tvg::Paint* tvgPaint(const DrawCommand& command) noexcept;
@@ -54,7 +57,8 @@ bool tvgVisible(const DrawCommand& command) noexcept;
 RetainedTree* tvgRetainedGen() noexcept;
 void tvgRetainedFree(RetainedTree* tree) noexcept;
 void tvgRetainedReset(RetainedTree* tree) noexcept;
-Result tvgRetainedSync(RetainedTree* tree, tvg::Canvas* canvas, const Scene* scene,
+// Brings the tree on canvas to scene at time, drawn scale pixels a unit, and draws the canvas.
+Result tvgRetainedDraw(RetainedTree* tree, tvg::Canvas* canvas, const Scene* scene,
                        float time, float scale) noexcept;
 bool tvgInit() noexcept;
 void tvgTerm() noexcept;

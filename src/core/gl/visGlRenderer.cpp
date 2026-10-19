@@ -36,11 +36,10 @@ Renderer::Renderer() noexcept
 
 Renderer::~Renderer()
 {
-    if (pImpl) {
-        renderer::tvgRetainedFree(pImpl->tree);
-        delete pImpl->canvas;
-    }
-    if (pImpl && pImpl->initialized) renderer::tvgTerm();
+    if (!pImpl) return;
+    renderer::tvgRetainedFree(pImpl->tree);
+    delete pImpl->canvas;
+    if (pImpl->initialized) renderer::tvgTerm();
     delete pImpl;
 }
 
@@ -73,14 +72,12 @@ Result Renderer::render(const Scene* scene, float time, const Target& target) no
 {
     if (!pImpl) return Result::InvalidArguments;
     renderer::TvgDiagnosis diagnosis(pImpl->diagnostic);
-    if (!pImpl->initialized || !scene || !std::isfinite(time) || time < 0.0f) {
-        return Result::InvalidArguments;
-    }
-    if (!target.context || target.id < 0 || !target.width || !target.height) {
-        return Result::InvalidArguments;
-    }
+    if (!pImpl->initialized || !scene || !std::isfinite(time) || time < 0.0f) return Result::InvalidArguments;
+    // A scene is never empty, so neither is a target of its size.
     auto& config = scene->config();
-    if (target.width != config.width || target.height != config.height) return Result::InvalidArguments;
+    if (!target.context || target.id < 0 || target.width != config.width || target.height != config.height) {
+        return Result::InvalidArguments;
+    }
     if (!pImpl->canvas || pImpl->antialiasing != config.antialiasing) {
         renderer::tvgRetainedReset(pImpl->tree);
         delete pImpl->canvas;
@@ -102,12 +99,7 @@ Result Renderer::render(const Scene* scene, float time, const Target& target) no
         pImpl->target = target;
         pImpl->targeted = true;
     }
-    auto result = renderer::tvgRetainedSync(pImpl->tree, pImpl->canvas, scene, time, 1.0f);
-    if (result != Result::Success) return result;
-    if (!renderer::tvgSuccess(pImpl->canvas->update())) return Result::Unknown;
-    if (!renderer::tvgSuccess(pImpl->canvas->draw(true))) return Result::Unknown;
-    if (!renderer::tvgSuccess(pImpl->canvas->sync())) return Result::Unknown;
-    return Result::Success;
+    return renderer::tvgRetainedDraw(pImpl->tree, pImpl->canvas, scene, time, 1.0f);
 }
 
 }  // namespace vis::gl

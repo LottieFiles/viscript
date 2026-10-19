@@ -145,7 +145,7 @@ static Result _sampleFamily(tvg::SwCanvas* canvas, Surface& surface,
         return Result::Unknown;
     }
     auto result = Result::Success;
-    if (!renderer::tvgSuccess(canvas->update()) || !renderer::tvgSuccess(canvas->draw(true)) || !renderer::tvgSuccess(canvas->sync())) {
+    if (!renderer::tvgDraw(canvas)) {
         result = Result::Unknown;
     } else {
         auto rgba = reinterpret_cast<const uint8_t*>(surface.data());
@@ -165,8 +165,7 @@ static Result _sampleFamily(tvg::SwCanvas* canvas, Surface& surface,
                     auto paint = paints[i - 1u].paint;
                     if (!paint->intersects(0, 0, 1, 1)) continue;
                     surface.data()[0] = 0u;
-                    if (!renderer::tvgSuccess(paint->visible(true)) || !renderer::tvgSuccess(canvas->update())
-                        || !renderer::tvgSuccess(canvas->draw(true)) || !renderer::tvgSuccess(canvas->sync())) {
+                    if (!renderer::tvgSuccess(paint->visible(true)) || !renderer::tvgDraw(canvas)) {
                         result = Result::Unknown;
                         break;
                     }
@@ -890,25 +889,14 @@ Result Renderer::layout(const Scene* scene, float time, LayoutReport& output,
         {
             auto sequence = entry.scene->pImpl->sequence;
             if (!sequence || entry.time < sequence->begin) return Result::Success;
-            for (auto i = 0u; i < sequence->count; i++) {
-                // A stage shows whole until its end, the last one ever after, and until the
-                // transition after it has begun.
-                auto progress = 0.0f;
-                if (entry.time >= sequence->stages[i].end && i + 1u < sequence->count) {
-                    auto& transition = sequence->transitions[i];
-                    if (entry.time >= transition.end) continue;
-                    progress = (entry.time - transition.begin) / (transition.end - transition.begin);
-                }
-                if (progress <= 0.0f) {
-                    LayoutEntry child(sequence->stages[i].scene, sequence->time(i, entry.time),
-                                      LayoutSceneKind::Transition, entry.descendantsOpacity,
-                                      entry.descendantsKind);
-                    auto result = mount(entry, child, sequence->viewport, i);
-                    return result == Result::Success ? stage(child) : result;
-                }
-                return cross(entry, *sequence, i, progress);
-            }
-            return Result::Unknown;
+            auto progress = 0.0f;
+            auto i = sequence->stage(entry.time, progress);
+            if (i >= sequence->count) return Result::Unknown;
+            if (progress > 0.0f) return cross(entry, *sequence, i, progress);
+            LayoutEntry child(sequence->stages[i].scene, sequence->time(i, entry.time),
+                              LayoutSceneKind::Transition, entry.descendantsOpacity, entry.descendantsKind);
+            auto result = mount(entry, child, sequence->viewport, i);
+            return result == Result::Success ? stage(child) : result;
         }
 
         // Mounts stages i and i + 1 of sequence, that of the scene of entry, through the
@@ -1182,13 +1170,7 @@ Result Renderer::layout(const Scene* scene, float time, LayoutReport& output,
     return result;
 }
 
-Result Renderer::render(const Scene* scene, float time, Surface& surface) noexcept
-{
-    return render(scene, time, surface, 1u);
-}
-
-Result Renderer::render(const Scene* scene, float time, Surface& surface,
-                          uint32_t pixelRatio) noexcept
+Result Renderer::render(const Scene* scene, float time, Surface& surface, uint32_t pixelRatio) noexcept
 {
     if (!pImpl) return Result::InvalidArguments;
     renderer::TvgDiagnosis diagnosis(pImpl->diagnostic);
@@ -1226,13 +1208,7 @@ Result Renderer::render(const Scene* scene, float time, Surface& surface,
         pImpl->height = surface.height();
     }
 
-    result = renderer::tvgRetainedSync(pImpl->tree, pImpl->canvas, scene, time,
-                                       static_cast<float>(pixelRatio));
-    if (result != Result::Success) return result;
-    if (!renderer::tvgSuccess(pImpl->canvas->update())) return Result::Unknown;
-    if (!renderer::tvgSuccess(pImpl->canvas->draw(true))) return Result::Unknown;
-    if (!renderer::tvgSuccess(pImpl->canvas->sync())) return Result::Unknown;
-    return Result::Success;
+    return renderer::tvgRetainedDraw(pImpl->tree, pImpl->canvas, scene, time, static_cast<float>(pixelRatio));
 }
 
 }  // namespace vis

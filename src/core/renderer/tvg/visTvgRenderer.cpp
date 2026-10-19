@@ -21,7 +21,6 @@
 #include "visTvgRenderer.h"
 #include "visScene.h"
 #include "../../common/visGrow.h"
-#include "../../common/visJson.h"
 #include "../../common/visString.h"
 
 namespace vis
@@ -2215,31 +2214,12 @@ struct RendererBuilder
     {
         auto sequence = scene->pImpl->sequence;
         if (!sequence || time < sequence->begin) return Result::Success;
-        const Scene* stageScene = nullptr;
-        const Scene* nextScene = nullptr;
-        const SceneTransition* clip = nullptr;
         auto progress = 0.0f;
-        auto index = 0u;
-        for (auto i = 0u; i < sequence->count; i++) {
-            index = i;
-            auto& stage = sequence->stages[i];
-            if (time < stage.end || i + 1u >= sequence->count) {
-                stageScene = stage.scene;
-                break;
-            }
-            auto& transition = sequence->transitions[i];
-            if (time >= transition.end) continue;
-            progress = (time - transition.begin) / (transition.end - transition.begin);
-            if (progress <= 0.0f) {
-                stageScene = stage.scene;
-            } else {
-                stageScene = stage.scene;
-                nextScene = sequence->stages[i + 1u].scene;
-                clip = &transition;
-            }
-            break;
-        }
-        if (!stageScene) return Result::Unknown;
+        auto index = sequence->stage(time, progress);
+        if (index >= sequence->count) return Result::Unknown;
+        auto stageScene = sequence->stages[index].scene;
+        auto clip = progress > 0.0f ? &sequence->transitions[index] : nullptr;
+        auto nextScene = clip ? sequence->stages[index + 1u].scene : nullptr;
         auto fromTime = sequence->time(index, time);
         auto toTime = nextScene ? sequence->time(index + 1u, time) : 0.0f;
         if (clip && clip->kind != TransitionKind::Match) {
@@ -2479,6 +2459,11 @@ bool tvgSuccess(tvg::Result result) noexcept
     return _success(result);
 }
 
+bool tvgDraw(tvg::Canvas* canvas) noexcept
+{
+    return _success(canvas->update()) && _success(canvas->draw(true)) && _success(canvas->sync());
+}
+
 void tvgRelease(tvg::Paint* paint) noexcept
 {
     _release(paint);
@@ -2514,11 +2499,13 @@ void tvgRetainedReset(RetainedTree* tree) noexcept
     if (tree) tree->reset();
 }
 
-Result tvgRetainedSync(RetainedTree* tree, tvg::Canvas* canvas, const Scene* scene,
+Result tvgRetainedDraw(RetainedTree* tree, tvg::Canvas* canvas, const Scene* scene,
                        float time, float scale) noexcept
 {
     if (!tree || !canvas) return Result::InvalidArguments;
-    return tree->sync(canvas, scene, time, scale);
+    auto result = tree->sync(canvas, scene, time, scale);
+    if (result != Result::Success) return result;
+    return tvgDraw(canvas) ? Result::Success : Result::Unknown;
 }
 
 // Measures a text as _text() sets it: the advances of every line, the box the outlines cover,

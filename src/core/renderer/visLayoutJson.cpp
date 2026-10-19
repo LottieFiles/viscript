@@ -54,6 +54,16 @@ static bool _index(JsonBuffer& json, uint32_t index)
     return index == UINT32_MAX ? json.append("null") : json.format("%u", index);
 }
 
+// A member that follows others in an object: name, and a list of the count items write(i) appends.
+template<typename Write>
+static bool _list(JsonBuffer& json, const char* name, uint32_t count, Write write)
+{
+    auto written = json.format(",\"%s\":[", name);
+    for (auto i = 0u; written && i < count; i++)
+        written = (!i || json.append(",")) && write(i);
+    return written && json.append("]");
+}
+
 static bool _scene(JsonBuffer& json, const LayoutScene& scene, uint32_t index)
 {
     return json.format("{\"index\":%u,\"path\":", index) && json.string(scene.path)
@@ -107,15 +117,12 @@ static bool _visual(JsonBuffer& json, const LayoutVisual& visual, uint32_t index
 
 static bool _path(JsonBuffer& json, const LayoutPath& path, uint32_t index)
 {
-    auto written = json.format("{\"index\":%u,\"visual\":%u,\"paintBounds\":", index, path.visual)
-                && _box(json, path.paintBounds)
-                && json.format(",\"strokeWidth\":%.9g,\"closed\":%s,\"filled\":%s,\"stroked\":%s,\"points\":[",
-                               path.strokeWidth, _bool(path.closed), _bool(path.filled), _bool(path.stroked));
-    for (auto i = 0u; written && i < path.count; i++) {
-        written = (!i || json.append(","))
-               && json.format("{\"x\":%.9g,\"y\":%.9g}", path.points[i].x, path.points[i].y);
-    }
-    return written && json.append("]}");
+    auto point = [&](uint32_t i) { return json.format("{\"x\":%.9g,\"y\":%.9g}", path.points[i].x, path.points[i].y); };
+    return json.format("{\"index\":%u,\"visual\":%u,\"paintBounds\":", index, path.visual)
+        && _box(json, path.paintBounds)
+        && json.format(",\"strokeWidth\":%.9g,\"closed\":%s,\"filled\":%s,\"stroked\":%s", path.strokeWidth,
+                       _bool(path.closed), _bool(path.filled), _bool(path.stroked))
+        && _list(json, "points", path.count, point) && json.append("}");
 }
 
 static bool _collision(JsonBuffer& json, const LayoutCollision& collision)
@@ -140,26 +147,21 @@ static bool _containment(JsonBuffer& json, const LayoutContainment& containment)
 bool layoutJson(const LayoutReport& report, const Scene* root, JsonBuffer& json) noexcept
 {
     auto& config = root->config();
-    auto written = json.format("{\"time\":%.9g,\"padding\":%.9g,\"width\":%u,\"height\":%u,\"scenes\":[",
-                               report.time(), report.padding(), config.width, config.height);
-    for (auto i = 0u; written && i < report.sceneCount(); i++)
-        written = (!i || json.append(",")) && _scene(json, *report.sceneAt(i), i);
-    written = written && json.append("],\"objects\":[");
-    for (auto i = 0u; written && i < report.objectCount(); i++)
-        written = (!i || json.append(",")) && _object(json, report, *report.objectAt(i), i);
-    written = written && json.append("],\"visuals\":[");
-    for (auto i = 0u; written && i < report.visualCount(); i++)
-        written = (!i || json.append(",")) && _visual(json, *report.visualAt(i), i);
-    written = written && json.append("],\"paths\":[");
-    for (auto i = 0u; written && i < report.pathCount(); i++)
-        written = (!i || json.append(",")) && _path(json, *report.pathAt(i), i);
-    written = written && json.append("],\"collisions\":[");
-    for (auto i = 0u; written && i < report.collisionCount(); i++)
-        written = (!i || json.append(",")) && _collision(json, *report.collisionAt(i));
-    written = written && json.append("],\"containments\":[");
-    for (auto i = 0u; written && i < report.containmentCount(); i++)
-        written = (!i || json.append(",")) && _containment(json, *report.containmentAt(i));
-    return written && json.append("]}");
+    auto scene = [&](uint32_t i) { return _scene(json, *report.sceneAt(i), i); };
+    auto object = [&](uint32_t i) { return _object(json, report, *report.objectAt(i), i); };
+    auto visual = [&](uint32_t i) { return _visual(json, *report.visualAt(i), i); };
+    auto path = [&](uint32_t i) { return _path(json, *report.pathAt(i), i); };
+    auto collision = [&](uint32_t i) { return _collision(json, *report.collisionAt(i)); };
+    auto containment = [&](uint32_t i) { return _containment(json, *report.containmentAt(i)); };
+    return json.format("{\"time\":%.9g,\"padding\":%.9g,\"width\":%u,\"height\":%u", report.time(),
+                       report.padding(), config.width, config.height)
+        && _list(json, "scenes", report.sceneCount(), scene)
+        && _list(json, "objects", report.objectCount(), object)
+        && _list(json, "visuals", report.visualCount(), visual)
+        && _list(json, "paths", report.pathCount(), path)
+        && _list(json, "collisions", report.collisionCount(), collision)
+        && _list(json, "containments", report.containmentCount(), containment)
+        && json.append("}");
 }
 
 }  // namespace vis
