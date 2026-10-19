@@ -327,28 +327,31 @@ static int _sampleArea(lua_State* lua)
 
 static int _cameraMove(lua_State* lua)
 {
-    return _result(lua, _panel(lua)->cameraMove(_vec2(lua, 2, "camera move")));
+    return _result(lua, _panel(lua)->camera(CameraAction::Pan, _vec2(lua, 2, "camera move")));
 }
 
 static int _cameraOrbit(lua_State* lua)
 {
-    return _result(lua, _panel(lua)->cameraOrbit(_vec2(lua, 2, "camera orbit")));
+    auto delta = _vec2(lua, 2, "camera orbit");
+    return _result(lua, _panel(lua)->camera(CameraAction::Orbit, delta));
 }
 
 static int _cameraZoom(lua_State* lua)
 {
-    return _result(lua, _panel(lua)->cameraZoom(_number(lua, 2, "camera zoom")));
+    auto delta = _number(lua, 2, "camera zoom");
+    return _result(lua, _panel(lua)->camera(CameraAction::Zoom, {0.0f, delta}));
 }
 
 static int _cameraReset(lua_State* lua)
 {
-    return _result(lua, _panel(lua)->cameraReset());
+    return _result(lua, _panel(lua)->camera(CameraAction::Reset));
 }
 
 static int _cameraView(lua_State* lua)
 {
     auto view = _enum(lua, 2, "camera view", CAMERA_VIEWS);
-    return _result(lua, _panel(lua)->cameraView(view));
+    auto action = view == CameraView::TwoD ? CameraAction::View2D : CameraAction::View3D;
+    return _result(lua, _panel(lua)->camera(action));
 }
 
 static int _newPanel(lua_State* lua)

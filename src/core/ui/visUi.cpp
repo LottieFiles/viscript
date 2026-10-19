@@ -939,31 +939,6 @@ Result Panel::camera(CameraAction action, const Vec2& delta) noexcept
     return pImpl->camera.act(action, delta);
 }
 
-Result Panel::cameraMove(const Vec2& delta) noexcept
-{
-    return camera(CameraAction::Pan, delta);
-}
-
-Result Panel::cameraOrbit(const Vec2& delta) noexcept
-{
-    return camera(CameraAction::Orbit, delta);
-}
-
-Result Panel::cameraZoom(float delta) noexcept
-{
-    return camera(CameraAction::Zoom, {0.0f, delta});
-}
-
-Result Panel::cameraReset() noexcept
-{
-    return camera(CameraAction::Reset, {});
-}
-
-Result Panel::cameraView(CameraView view) noexcept
-{
-    return pImpl->camera.view(view);
-}
-
 Result Panel::modifyObject(const Object* object, float time, Mat4& model, float& opacity,
                            float& progress, void* data) noexcept
 {

@@ -654,35 +654,7 @@ extern "C" VIS_KEEPALIVE VisResult vis_camera(VisEngine handle, VisCameraAction 
     if (!engine->scene || action < VIS_CAMERA_PAN || action > VIS_CAMERA_SET_3D) {
         return _error(engine, vis::Result::InvalidArguments);
     }
-#if defined(VIS_INPUT)
-    if (!engine->input || engine->scene->config().cameraMode != vis::CameraMode::Interactive) {
-        return _error(engine, vis::Result::InsufficientCondition);
-    }
-    vis::Result result;
-    switch (action) {
-        case VIS_CAMERA_PAN: result = engine->input->cameraMove({x, y}); break;
-        case VIS_CAMERA_ORBIT: result = engine->input->cameraOrbit({x, y}); break;
-        case VIS_CAMERA_ZOOM: result = engine->input->cameraZoom(y); break;
-        case VIS_CAMERA_RESET: result = engine->input->cameraReset(); break;
-        case VIS_CAMERA_SET_2D: result = engine->input->cameraView(vis::CameraView::TwoD); break;
-        case VIS_CAMERA_SET_3D: result = engine->input->cameraView(vis::CameraView::ThreeD); break;
-    }
-#elif defined(VIS_UI)
-    if (!engine->panel || engine->scene->config().cameraMode != vis::CameraMode::Interactive) {
-        return _error(engine, vis::Result::InsufficientCondition);
-    }
-    vis::Result result;
-    switch (action) {
-        case VIS_CAMERA_PAN: result = engine->panel->cameraMove({x, y}); break;
-        case VIS_CAMERA_ORBIT: result = engine->panel->cameraOrbit({x, y}); break;
-        case VIS_CAMERA_ZOOM: result = engine->panel->cameraZoom(y); break;
-        case VIS_CAMERA_RESET: result = engine->panel->cameraReset(); break;
-        case VIS_CAMERA_SET_2D: result = engine->panel->cameraView(vis::CameraView::TwoD); break;
-        case VIS_CAMERA_SET_3D: result = engine->panel->cameraView(vis::CameraView::ThreeD); break;
-    }
-#else
     auto result = engine->scene->cameraInput({static_cast<vis::CameraAction>(action), {x, y}});
-#endif
     if (result != vis::Result::Success) return _error(engine, result);
     engine->rendered = false;
     _clearLayoutReport(engine);

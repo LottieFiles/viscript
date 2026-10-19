@@ -222,12 +222,6 @@ struct Controller final : Group
     InputResult input(const InputEvent& event) noexcept;
     InputResult release(float time) noexcept;
 
-    Result cameraMove(const Vec2& delta) noexcept;
-    Result cameraOrbit(const Vec2& delta) noexcept;
-    Result cameraZoom(float delta) noexcept;
-    Result cameraReset() noexcept;
-    Result cameraView(CameraView view) noexcept;
-
 private:
     struct Impl;
 
@@ -238,7 +232,6 @@ private:
     static Result modifyCamera(float time, Camera& camera, CameraView& view,
                                void* data) noexcept;
     static Result modifyInput(const CameraInput& input, void* data) noexcept;
-    Result camera(CameraAction action, const Vec2& delta) noexcept;
 
     Impl* pImpl = nullptr;
 };

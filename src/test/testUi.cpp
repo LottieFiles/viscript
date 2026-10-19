@@ -843,10 +843,10 @@ static void cameraBindings(Renderer* renderer)
     BBox moved;
     BBox restored;
     CHECK(renderer->bounds(scene, box, 0.5f, timeline) == Result::Success);
-    CHECK(panel->cameraMove({0.1f, 0.0f}) == Result::Success);
+    CHECK(panel->camera(CameraAction::Pan, {0.1f, 0.0f}) == Result::Success);
     CHECK(renderer->bounds(scene, box, 0.5f, moved) == Result::Success);
     CHECK(std::fabs(moved.center().x - timeline.center().x) > 1.0f);
-    CHECK(panel->cameraReset() == Result::Success);
+    CHECK(panel->camera(CameraAction::Reset) == Result::Success);
     CHECK(renderer->bounds(scene, box, 0.5f, restored) == Result::Success);
     CHECK(_near(restored.center().x, timeline.center().x, 0.1f));
 

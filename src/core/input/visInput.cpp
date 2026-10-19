@@ -369,36 +369,6 @@ InputResult Controller::release(float time) noexcept
     return released;
 }
 
-Result Controller::camera(CameraAction action, const Vec2& delta) noexcept
-{
-    return pImpl->camera.act(action, delta);
-}
-
-Result Controller::cameraMove(const Vec2& delta) noexcept
-{
-    return camera(CameraAction::Pan, delta);
-}
-
-Result Controller::cameraOrbit(const Vec2& delta) noexcept
-{
-    return camera(CameraAction::Orbit, delta);
-}
-
-Result Controller::cameraZoom(float delta) noexcept
-{
-    return camera(CameraAction::Zoom, {0.0f, delta});
-}
-
-Result Controller::cameraReset() noexcept
-{
-    return camera(CameraAction::Reset, {});
-}
-
-Result Controller::cameraView(CameraView view) noexcept
-{
-    return pImpl->camera.view(view);
-}
-
 Result Controller::modifyObject(const Object* object, float time, Mat4& model, float&,
                                 float&, void* data) noexcept
 {
@@ -428,7 +398,7 @@ Result Controller::modifyCamera(float time, Camera& camera, CameraView& view,
 
 Result Controller::modifyInput(const CameraInput& input, void* data) noexcept
 {
-    return static_cast<Controller*>(data)->camera(input.action, input.delta);
+    return static_cast<Controller*>(data)->pImpl->camera.act(input.action, input.delta);
 }
 
 }  // namespace vis::input

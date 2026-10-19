@@ -208,12 +208,8 @@ struct Panel final : UIObject
     Result states(Button* control, Object* hover, Object* pressed = nullptr) noexcept;
     // Transparent miss returns InsufficientCondition. Errors commit no marker/color selection.
     Result sampler(SampleCallback callback, void* data = nullptr) noexcept;
-
-    Result cameraMove(const Vec2& delta) noexcept;
-    Result cameraOrbit(const Vec2& delta) noexcept;
-    Result cameraZoom(float delta) noexcept;
-    Result cameraReset() noexcept;
-    Result cameraView(CameraView view) noexcept;
+    // Moves the camera as a button bound to action and delta does when pressed.
+    Result camera(CameraAction action, const Vec2& delta = {}) noexcept;
 
 private:
     struct Impl;
@@ -230,7 +226,6 @@ private:
     bool registered(const UIObject* control) const noexcept;
     void invalidate(UIObject* control) noexcept;
     void resetInteraction() noexcept override;
-    Result camera(CameraAction action, const Vec2& delta) noexcept;
 
     Impl* pImpl = nullptr;
     friend struct UIObject;

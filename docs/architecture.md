@@ -100,8 +100,9 @@ resulting visual state.
 - Lua Runtime retains an explicitly registered fixed-step callback. Successful
   updates commit Object overlays and sound events for the host to consume.
 
-Hosts dispatch pointer events to UI, then forward unhandled events to Input. They
-advance simulation clocks and provide audio transport separately. A normal Lua load
+Hosts dispatch pointer events to UI, then forward unhandled events to Input, and
+send camera input to `Scene::cameraInput`, which the first UI or Input module on the
+Scene takes. They advance simulation clocks and provide audio transport separately. A normal Lua load
 releases its VM after construction; `vis.runtime` retains it with the Scene.
 
 See [States](states.md), [Audio](audio.md), and [Modules](modules.md).

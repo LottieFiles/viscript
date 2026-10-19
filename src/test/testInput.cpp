@@ -549,10 +549,10 @@ static void camera()
     CHECK(scene && controller);
     if (scene && controller) {
         CHECK(scene->cameraInput({CameraAction::Pan, {0.1f, 0.0f}}) == Result::Success);
-        CHECK(controller->cameraView(CameraView::ThreeD) == Result::Success);
-        CHECK(controller->cameraOrbit({0.1f, -0.05f}) == Result::Success);
-        CHECK(controller->cameraZoom(-0.1f) == Result::Success);
-        CHECK(controller->cameraReset() == Result::Success);
+        CHECK(scene->cameraInput({CameraAction::View3D, {}}) == Result::Success);
+        CHECK(scene->cameraInput({CameraAction::Orbit, {0.1f, -0.05f}}) == Result::Success);
+        CHECK(scene->cameraInput({CameraAction::Zoom, {0.0f, -0.1f}}) == Result::Success);
+        CHECK(scene->cameraInput({CameraAction::Reset, {}}) == Result::Success);
     }
     delete scene;
 }
