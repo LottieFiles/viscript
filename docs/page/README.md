@@ -5,7 +5,7 @@ A thin HTML shell (`index.html`, `app.js`) that renders MDX pages. Three routes:
 | Route | Source |
 |---|---|
 | Home `#/` | `content/index.mdx` |
-| Docs `#/docs/<id>` | `content/docs/NN-<id>.mdx` (frontmatter: `title`, `group`, `summary`) |
+| Docs `#/docs/<id>` | `content/docs/NN-<id>.mdx` (frontmatter: `title`, `group`, `parent`) |
 | Examples `#/examples/<id>` | `content/examples.mdx` + `scenes/collections.js` |
 
 A ` ```lua live ` fence becomes an editable player. MDX pages may use the
