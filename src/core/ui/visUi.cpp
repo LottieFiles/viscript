@@ -4,7 +4,7 @@
 #include <new>
 
 #include "vis_ui.h"
-#include "../common/visCamera.h"
+#include "../common/visControl.h"
 #include "../common/visFinite.h"
 #include "../common/visRetarget.h"
 
@@ -15,18 +15,6 @@ namespace
 {
 
 uint8_t RuntimeKey = 0u;
-
-static float _clamp01(float value) noexcept
-{
-    return _clamp(value, 0.0f, 1.0f);
-}
-
-static bool _valid(const BBox& bounds) noexcept
-{
-    return std::isfinite(bounds.x) && std::isfinite(bounds.y)
-           && std::isfinite(bounds.width) && std::isfinite(bounds.height)
-           && bounds.width > 0.0f && bounds.height > 0.0f;
-}
 
 static bool _valid(const InputEvent& event) noexcept
 {
@@ -42,28 +30,10 @@ static bool _valid(const UITransform& transform) noexcept
            && std::isfinite(transform.progress) && transform.progress >= 0.0f;
 }
 
-static bool _contains(const BBox& bounds, const Vec2& point) noexcept
-{
-    return point.x >= bounds.x && point.x <= bounds.x + bounds.width
-           && point.y >= bounds.y && point.y <= bounds.y + bounds.height;
-}
-
-static bool _family(const Object* first, const Object* second) noexcept
-{
-    if (!first || !second) return false;
-    for (auto object = first; object; object = object->parent()) {
-        if (object == second) return true;
-    }
-    for (auto object = second; object; object = object->parent()) {
-        if (object == first) return true;
-    }
-    return false;
-}
-
 static UITransform _lerp(const UITransform& from, const UITransform& to,
                          float progress) noexcept
 {
-    progress = _clamp01(progress);
+    progress = clamp01(progress);
     UITransform output;
     output.shift = from.shift + (to.shift - from.shift) * progress;
     output.scale = from.scale + (to.scale - from.scale) * progress;
@@ -100,8 +70,8 @@ static bool _compose(const UITransform& transform, Mat4& model, float& opacity,
                  * Mat4::rotateX(transform.rotation.x)
                  * Mat4::scale(transform.scale);
     model = local * model;
-    opacity = _clamp01(opacity * transform.opacity);
-    progress = _clamp01(progress * transform.progress);
+    opacity = clamp01(opacity * transform.opacity);
+    progress = clamp01(progress * transform.progress);
     return _finite(model) && std::isfinite(opacity) && std::isfinite(progress);
 }
 
@@ -131,7 +101,7 @@ const BBox& UIObject::region() const noexcept
 
 Result UIObject::region(const BBox& bounds) noexcept
 {
-    if (!_valid(bounds)) return Result::InvalidArguments;
+    if (!validRegion(bounds)) return Result::InvalidArguments;
     uiRegion = bounds;
     return Result::Success;
 }
@@ -168,7 +138,7 @@ Button::Button(Object* visual, const BBox& region, Callback callback, void* data
 Button* Button::gen(Object* visual, const BBox& region, Callback callback,
                     void* data) noexcept
 {
-    if (!_valid(region)) return nullptr;
+    if (!validRegion(region)) return nullptr;
     return new (std::nothrow) Button(visual, region, callback, data);
 }
 
@@ -197,7 +167,7 @@ InputResult Button::input(const InputEvent& event) noexcept
     if (!uiEnabled) return {};
     switch (event.kind) {
         case InputKind::PointerDown:
-            if (event.button != 0 || !_contains(uiRegion, event.position)) return {};
+            if (event.button != 0 || !contains(uiRegion, event.position)) return {};
             isPressed = true;
             return {true, true, true, false};
         case InputKind::PointerMove:
@@ -205,7 +175,7 @@ InputResult Button::input(const InputEvent& event) noexcept
         case InputKind::PointerUp: {
             if (!isPressed) return {};
             isPressed = false;
-            auto activate = _contains(uiRegion, event.position);
+            auto activate = contains(uiRegion, event.position);
             if (activate) {
                 if (toggleMode) toggleValue = !toggleValue;
                 uiRevision++;
@@ -223,14 +193,15 @@ InputResult Button::input(const InputEvent& event) noexcept
 Slider::Slider(Object* visual, const BBox& region, SliderAxis axis, float value,
                Callback callback, void* data) noexcept
     : UIObject(visual, region), callback(callback), callbackData(data), sliderAxis(axis),
-      sliderValue(_clamp01(value))
+      sliderValue(clamp01(value))
 {
 }
 
 Slider* Slider::gen(Object* visual, const BBox& region, SliderAxis axis, float value,
                     Callback callback, void* data) noexcept
 {
-    if (!_valid(region) || static_cast<uint8_t>(axis) > static_cast<uint8_t>(SliderAxis::Vertical)
+    if (!validRegion(region)
+        || static_cast<uint8_t>(axis) > static_cast<uint8_t>(SliderAxis::Vertical)
         || !std::isfinite(value)) {
         return nullptr;
     }
@@ -250,7 +221,7 @@ float Slider::value() const noexcept
 Slider& Slider::value(float value) noexcept
 {
     if (!std::isfinite(value)) return *this;
-    auto clamped = _clamp01(value);
+    auto clamped = clamp01(value);
     if (clamped != sliderValue) {
         sliderValue = clamped;
         uiRevision++;
@@ -268,7 +239,7 @@ bool Slider::update(const InputEvent& event) noexcept
     auto next = sliderAxis == SliderAxis::Horizontal
                     ? (event.position.x - uiRegion.x) / uiRegion.width
                     : 1.0f - (event.position.y - uiRegion.y) / uiRegion.height;
-    next = _clamp01(next);
+    next = clamp01(next);
     if (next == sliderValue) return false;
     sliderValue = next;
     uiRevision++;
@@ -286,7 +257,7 @@ InputResult Slider::input(const InputEvent& event) noexcept
     if (!uiEnabled) return {};
     switch (event.kind) {
         case InputKind::PointerDown:
-            if (event.button != 0 || !_contains(uiRegion, event.position)) return {};
+            if (event.button != 0 || !contains(uiRegion, event.position)) return {};
             isDragging = true;
             update(event);
             return {true, true, true, false};
@@ -322,11 +293,11 @@ SampleArea::~SampleArea()
 SampleArea* SampleArea::gen(const Object* const* targets, uint32_t count,
                             const BBox& region) noexcept
 {
-    if (!targets || !count || count > TargetLimit || !_valid(region)) return nullptr;
+    if (!targets || !count || count > TargetLimit || !validRegion(region)) return nullptr;
     for (auto i = 0u; i < count; i++) {
         if (!targets[i]) return nullptr;
         for (auto j = 0u; j < i; j++) {
-            if (_family(targets[i], targets[j])) return nullptr;
+            if (family(targets[i], targets[j])) return nullptr;
         }
     }
     auto area = new (std::nothrow) SampleArea(targets, count, region);
@@ -389,7 +360,7 @@ InputResult SampleArea::input(const InputEvent& event) noexcept
     if (!uiEnabled) return {};
     switch (event.kind) {
         case InputKind::PointerDown:
-            if (event.button != 0 || !_contains(uiRegion, event.position)) return {};
+            if (event.button != 0 || !contains(uiRegion, event.position)) return {};
             isPressed = true;
             return {true, false, true, false};
         case InputKind::PointerMove:
@@ -397,11 +368,11 @@ InputResult SampleArea::input(const InputEvent& event) noexcept
         case InputKind::PointerUp:
             if (!isPressed) return {};
             isPressed = false;
-            if (_contains(uiRegion, event.position)) {
+            if (contains(uiRegion, event.position)) {
                 requestPosition = event.position;
                 requestValue = {
-                    _clamp01((event.position.x - uiRegion.x) / uiRegion.width),
-                    _clamp01((event.position.y - uiRegion.y) / uiRegion.height),
+                    clamp01((event.position.x - uiRegion.x) / uiRegion.width),
+                    clamp01((event.position.y - uiRegion.y) / uiRegion.height),
                 };
                 uiRevision++;
             }
@@ -444,7 +415,6 @@ struct Panel::Impl
         Vec3 markerOrigin;
         Vec3 markerX;
         Vec3 markerY;
-        uint32_t revision = 0;
         bool active = false;
     };
 
@@ -460,10 +430,7 @@ struct Panel::Impl
     uint32_t capturedPointer = 0;
     bool pendingRedraw = false;
     bool pendingRelease = false;
-    Vec2 move;
-    Vec2 orbit;
-    float zoom = 0.0f;
-    int8_t view = -1;
+    CameraDrive camera;
     SampleCallback sample = nullptr;
     void* sampleData = nullptr;
 
@@ -499,6 +466,29 @@ struct Panel::Impl
         bindings = grown;
         bindingCapacity = capacity;
         return true;
+    }
+
+    // Whether object can take a transform: the scene's own, nested with no sample marker or
+    // swatch.
+    bool bindable(const Object* object) const noexcept
+    {
+        if (!object || !scene || scene->object(object->id()) != object) return false;
+        for (auto i = 0u; i < bindingCount; i++) {
+            auto& binding = bindings[i];
+            if (binding.kind == BindingKind::SampleArea
+                && (family(object, binding.object) || family(object, binding.swatch))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    Result add(const Binding& binding) noexcept
+    {
+        if (bindingCount >= BindingLimit) return Result::InsufficientCondition;
+        if (!growBindings()) return Result::OutOfMemory;
+        bindings[bindingCount++] = binding;
+        return Result::Success;
     }
 };
 
@@ -555,26 +545,26 @@ bool Panel::registered(const UIObject* control) const noexcept
 Result Panel::add(UIObject* control) noexcept
 {
     if (!pImpl || !control || control == this || control->uiPanel || registered(control)
-        || !_valid(control->region())) {
+        || !validRegion(control->region())) {
         return Result::InvalidArguments;
     }
     if (control->visual()) {
         for (auto i = 0u; i < pImpl->bindingCount; i++) {
             auto& binding = pImpl->bindings[i];
             if (binding.kind == Impl::BindingKind::ButtonStates) {
-                if (_family(control->visual(), binding.object)
-                    || _family(control->visual(), binding.hover)
-                    || _family(control->visual(), binding.pressed)) {
+                if (family(control->visual(), binding.object)
+                    || family(control->visual(), binding.hover)
+                    || family(control->visual(), binding.pressed)) {
                     return Result::InvalidArguments;
                 }
             } else if (binding.kind == Impl::BindingKind::SampleArea) {
-                if (_family(control->visual(), binding.object)
-                    || _family(control->visual(), binding.swatch)) {
+                if (family(control->visual(), binding.object)
+                    || family(control->visual(), binding.swatch)) {
                     return Result::InvalidArguments;
                 }
                 auto area = static_cast<SampleArea*>(binding.control);
                 for (auto j = 0u; j < area->sampleTargetCount; j++) {
-                    if (_family(control->visual(), area->sampleTargets[j])) {
+                    if (family(control->visual(), area->sampleTargets[j])) {
                         return Result::InvalidArguments;
                     }
                 }
@@ -661,7 +651,7 @@ InputResult Panel::input(const InputEvent& event) noexcept
     auto hit = [this, &event]() -> UIObject* {
         for (auto i = pImpl->controlCount; i > 0u; i--) {
             auto candidate = pImpl->controls[i - 1u];
-            if (candidate->enabled() && _contains(candidate->region(), event.position)) {
+            if (candidate->enabled() && contains(candidate->region(), event.position)) {
                 return candidate;
             }
         }
@@ -674,8 +664,7 @@ InputResult Panel::input(const InputEvent& event) noexcept
         if (target) target->uiHovered = true;
         result.redraw = true;
     };
-    auto activate = [this, &result, &event](UIObject* target, uint32_t revision) {
-        if (target->uiRevision == revision) return;
+    auto activate = [this, &result, &event](UIObject* target) {
         for (auto i = 0u; i < pImpl->bindingCount; i++) {
             auto& binding = pImpl->bindings[i];
             if (binding.control != target) continue;
@@ -710,11 +699,9 @@ InputResult Panel::input(const InputEvent& event) noexcept
                                  AnimCurve::preset(AnimCurvePreset::Smooth),
                                  pImpl->scene->duration(), _buttonLerp);
                 binding.active = true;
-                binding.revision = target->uiRevision;
                 result.redraw = true;
             } else if (binding.kind == Impl::BindingKind::SampleArea) {
                 auto area = static_cast<SampleArea*>(target);
-                binding.revision = target->uiRevision;
                 if (!pImpl->sample) continue;
                 PixelSample sample;
                 auto resolved = pImpl->sample(pImpl->scene, event.time,
@@ -748,21 +735,35 @@ InputResult Panel::input(const InputEvent& event) noexcept
             }
         }
     };
+    // Gives target this event, then runs the bindings of a control the event changed.
+    auto send = [&event, &merge, &activate, &consumePending](UIObject* target) {
+        auto revision = target->uiRevision;
+        merge(target->input(event));
+        if (target->uiRevision != revision) activate(target);
+        consumePending();
+    };
+    // Ends target's interaction with this event turned into a cancel.
+    auto cancel = [&event, &merge](UIObject* target) {
+        auto cancelled = event;
+        cancelled.kind = InputKind::PointerCancel;
+        merge(target->input(cancelled));
+    };
+    // Lets the captured control go; a forced release is the panel's to report.
+    auto release = [this, &result](bool forced) {
+        pImpl->captured = nullptr;
+        pImpl->capturedPointer = 0;
+        result.capture = false;
+        if (!forced) return;
+        result.handled = true;
+        result.release = true;
+    };
 
     if (!uiEnabled) {
         if (pImpl->captured) {
-            auto cancel = event;
-            cancel.kind = InputKind::PointerCancel;
-            merge(pImpl->captured->input(cancel));
-            pImpl->captured = nullptr;
-            pImpl->capturedPointer = 0;
-            result.handled = true;
-            result.capture = false;
-            result.release = true;
+            cancel(pImpl->captured);
+            release(true);
         } else if (pImpl->hovered) {
-            auto cancel = event;
-            cancel.kind = InputKind::PointerCancel;
-            merge(pImpl->hovered->input(cancel));
+            cancel(pImpl->hovered);
         }
         hover(nullptr);
         return result;
@@ -772,60 +773,34 @@ InputResult Panel::input(const InputEvent& event) noexcept
         if (event.pointer != pImpl->capturedPointer) return result;
         auto target = pImpl->captured;
         if (!target->enabled()) {
-            auto cancel = event;
-            cancel.kind = InputKind::PointerCancel;
-            merge(target->input(cancel));
-            pImpl->captured = nullptr;
-            pImpl->capturedPointer = 0;
+            cancel(target);
+            release(true);
             hover(nullptr);
-            result.handled = true;
-            result.capture = false;
-            result.release = true;
             return result;
         }
         if (event.kind == InputKind::PointerMove) {
-            hover(_contains(target->region(), event.position) ? target : nullptr);
+            hover(contains(target->region(), event.position) ? target : nullptr);
         }
-        auto revision = target->uiRevision;
-        merge(target->input(event));
-        activate(target, revision);
-        consumePending();
+        send(target);
         if (result.capture) pImpl->capturedPointer = event.pointer;
         if (result.release || event.kind == InputKind::PointerCancel) {
-            pImpl->captured = nullptr;
-            pImpl->capturedPointer = 0;
-            result.capture = false;
-            if (event.kind == InputKind::PointerCancel) {
-                result.handled = true;
-                result.release = true;
-            }
+            release(event.kind == InputKind::PointerCancel);
             hover(event.kind == InputKind::PointerUp ? hit() : nullptr);
         }
         return result;
     }
 
-    if (event.kind == InputKind::PointerCancel) {
-        if (pImpl->hovered) merge(pImpl->hovered->input(event));
-        hover(nullptr);
+    if (event.kind != InputKind::PointerMove && event.kind != InputKind::PointerDown
+        && event.kind != InputKind::PointerCancel) {
         return result;
     }
-
-    if (event.kind != InputKind::PointerMove && event.kind != InputKind::PointerDown) {
-        return result;
-    }
-    auto target = hit();
-    if (pImpl->hovered != target && pImpl->hovered) {
-        auto cancel = event;
-        cancel.kind = InputKind::PointerCancel;
-        merge(pImpl->hovered->input(cancel));
-    }
+    // A cancel leaves the hovered control as a move onto no control does.
+    auto target = event.kind == InputKind::PointerCancel ? nullptr : hit();
+    if (pImpl->hovered && pImpl->hovered != target) cancel(pImpl->hovered);
     hover(target);
     if (!target) return result;
 
-    auto revision = target->uiRevision;
-    merge(target->input(event));
-    activate(target, revision);
-    consumePending();
+    send(target);
     if (!target->enabled() && result.capture) {
         result.handled = true;
         result.capture = false;
@@ -845,51 +820,35 @@ Result Panel::bind(Button* control, CameraAction action, const Vec2& delta) noex
         || !_finite(delta)) {
         return Result::InvalidArguments;
     }
-    if (pImpl->bindingCount >= BindingLimit) return Result::InsufficientCondition;
-    if (!pImpl->growBindings()) return Result::OutOfMemory;
-    auto& binding = pImpl->bindings[pImpl->bindingCount++];
+    Impl::Binding binding;
     binding.kind = Impl::BindingKind::ButtonCamera;
     binding.control = control;
     binding.action = action;
     binding.delta = delta;
-    binding.revision = control->uiRevision;
-    return Result::Success;
+    return pImpl->add(binding);
 }
 
 Result Panel::bind(Button* control, Object* object, const UITransform& transform,
                    float duration) noexcept
 {
-    if (!pImpl || !registered(control) || control->toggleMode || !object
-        || !_valid(transform)
-        || !std::isfinite(duration) || duration < 0.0f
-        || !pImpl->scene || pImpl->scene->object(object->id()) != object) {
+    if (!pImpl || !registered(control) || control->toggleMode || !_valid(transform)
+        || !std::isfinite(duration) || duration < 0.0f || !pImpl->bindable(object)) {
         return Result::InvalidArguments;
     }
-    for (auto i = 0u; i < pImpl->bindingCount; i++) {
-        auto& binding = pImpl->bindings[i];
-        if (binding.kind == Impl::BindingKind::SampleArea
-            && (_family(object, binding.object) || _family(object, binding.swatch))) {
-            return Result::InvalidArguments;
-        }
-    }
-    if (pImpl->bindingCount >= BindingLimit) return Result::InsufficientCondition;
-    if (!pImpl->growBindings()) return Result::OutOfMemory;
-    auto& binding = pImpl->bindings[pImpl->bindingCount++];
+    Impl::Binding binding;
     binding.kind = Impl::BindingKind::ButtonObject;
     binding.control = control;
     binding.object = object;
     binding.to = transform;
     binding.duration = duration;
-    binding.revision = control->uiRevision;
-    return Result::Success;
+    return pImpl->add(binding);
 }
 
 Result Panel::toggle(Button* control, Object* object, const UITransform& off,
                      const UITransform& on, bool value, float duration) noexcept
 {
-    if (!pImpl || !registered(control) || !object || !_valid(off) || !_valid(on)
-        || !std::isfinite(duration) || duration < 0.0f || !pImpl->scene
-        || pImpl->scene->object(object->id()) != object) {
+    if (!pImpl || !registered(control) || !_valid(off) || !_valid(on)
+        || !std::isfinite(duration) || duration < 0.0f || !pImpl->bindable(object)) {
         return Result::InvalidArguments;
     }
     for (auto i = 0u; i < pImpl->bindingCount; i++) {
@@ -900,22 +859,8 @@ Result Panel::toggle(Button* control, Object* object, const UITransform& off,
                 || binding.kind == Impl::BindingKind::ButtonToggle)) {
             return Result::InvalidArguments;
         }
-        if (binding.kind == Impl::BindingKind::SampleArea
-            && (_family(object, binding.object) || _family(object, binding.swatch))) {
-            return Result::InvalidArguments;
-        }
     }
-    if (pImpl->bindingCount >= BindingLimit) return Result::InsufficientCondition;
-    if (!pImpl->growBindings()) return Result::OutOfMemory;
-    for (auto i = 0u; i < pImpl->bindingCount; i++) {
-        auto& binding = pImpl->bindings[i];
-        if ((binding.kind == Impl::BindingKind::ButtonObject
-            || binding.kind == Impl::BindingKind::ButtonToggle)
-            && binding.object == object) {
-            binding.active = false;
-        }
-    }
-    auto& binding = pImpl->bindings[pImpl->bindingCount++];
+    Impl::Binding binding;
     binding.kind = Impl::BindingKind::ButtonToggle;
     binding.control = control;
     binding.object = object;
@@ -925,8 +870,18 @@ Result Panel::toggle(Button* control, Object* object, const UITransform& off,
     binding.to = binding.from;
     detail::retargetSet(binding.transition, binding.from);
     binding.duration = duration;
-    binding.revision = control->uiRevision;
     binding.active = true;
+    auto result = pImpl->add(binding);
+    if (result != Result::Success) return result;
+    // The toggle shows its object from now on, over the bindings before it.
+    for (auto i = 0u; i + 1u < pImpl->bindingCount; i++) {
+        auto& other = pImpl->bindings[i];
+        if ((other.kind == Impl::BindingKind::ButtonObject
+            || other.kind == Impl::BindingKind::ButtonToggle)
+            && other.object == object) {
+            other.active = false;
+        }
+    }
     control->toggleMode = true;
     control->toggleValue = value;
     return Result::Success;
@@ -935,27 +890,17 @@ Result Panel::toggle(Button* control, Object* object, const UITransform& off,
 Result Panel::bind(Slider* control, Object* object, const UITransform& from,
                    const UITransform& to) noexcept
 {
-    if (!pImpl || !registered(control) || !object || !_valid(from) || !_valid(to)
-        || !pImpl->scene || pImpl->scene->object(object->id()) != object) {
+    if (!pImpl || !registered(control) || !_valid(from) || !_valid(to)
+        || !pImpl->bindable(object)) {
         return Result::InvalidArguments;
     }
-    for (auto i = 0u; i < pImpl->bindingCount; i++) {
-        auto& binding = pImpl->bindings[i];
-        if (binding.kind == Impl::BindingKind::SampleArea
-            && (_family(object, binding.object) || _family(object, binding.swatch))) {
-            return Result::InvalidArguments;
-        }
-    }
-    if (pImpl->bindingCount >= BindingLimit) return Result::InsufficientCondition;
-    if (!pImpl->growBindings()) return Result::OutOfMemory;
-    auto& binding = pImpl->bindings[pImpl->bindingCount++];
+    Impl::Binding binding;
     binding.kind = Impl::BindingKind::SliderObject;
     binding.control = control;
     binding.object = object;
     binding.from = from;
     binding.to = to;
-    binding.revision = control->uiRevision;
-    return Result::Success;
+    return pImpl->add(binding);
 }
 
 Result Panel::bind(SampleArea* control, const SampleBinding& sample) noexcept
@@ -970,19 +915,19 @@ Result Panel::bind(SampleArea* control, const SampleBinding& sample) noexcept
     };
     for (auto i = 0u; i < control->sampleTargetCount; i++) {
         auto target = control->sampleTargets[i];
-        if (!owned(target) || _family(target, this)
-            || _family(target, sample.marker) || _family(target, sample.swatch)) {
+        if (!owned(target) || family(target, this)
+            || family(target, sample.marker) || family(target, sample.swatch)) {
             return Result::InvalidArguments;
         }
     }
-    if ((sample.marker && (!owned(sample.marker) || _family(sample.marker, this)
+    if ((sample.marker && (!owned(sample.marker) || family(sample.marker, this)
                            || (sample.marker->childCount()
                                && sample.marker->type() != Type::Group)))
         || (sample.swatch && (!owned(sample.swatch)
-                              || _family(sample.swatch, this)
+                              || family(sample.swatch, this)
                               || sample.swatch->type() != Type::Rectangle
                               || sample.swatch->style.gradient.enabled()))
-        || _family(sample.marker, sample.swatch)) {
+        || family(sample.marker, sample.swatch)) {
         return Result::InvalidArguments;
     }
     Object* faces[] = {sample.marker, sample.swatch};
@@ -990,12 +935,12 @@ Result Panel::bind(SampleArea* control, const SampleBinding& sample) noexcept
         auto other = pImpl->controls[i];
         if (!other->visual()) continue;
         for (auto j = 0u; j < control->sampleTargetCount; j++) {
-            if (_family(control->sampleTargets[j], other->visual())) {
+            if (family(control->sampleTargets[j], other->visual())) {
                 return Result::InvalidArguments;
             }
         }
         for (auto face : faces) {
-            if (_family(face, other->visual())) return Result::InvalidArguments;
+            if (family(face, other->visual())) return Result::InvalidArguments;
         }
     }
     for (auto i = 0u; i < pImpl->bindingCount; i++) {
@@ -1007,7 +952,7 @@ Result Panel::bind(SampleArea* control, const SampleBinding& sample) noexcept
         if (binding.kind == Impl::BindingKind::ButtonStates) {
             for (auto j = 0u; j < control->sampleTargetCount; j++) {
                 for (auto object : bound) {
-                    if (_family(control->sampleTargets[j], object)) {
+                    if (family(control->sampleTargets[j], object)) {
                         return Result::InvalidArguments;
                     }
                 }
@@ -1015,29 +960,27 @@ Result Panel::bind(SampleArea* control, const SampleBinding& sample) noexcept
         }
         for (auto face : faces) {
             for (auto object : bound) {
-                if (_family(face, object)) return Result::InvalidArguments;
+                if (family(face, object)) return Result::InvalidArguments;
             }
         }
         if (binding.kind == Impl::BindingKind::SampleArea) {
             auto area = static_cast<SampleArea*>(binding.control);
             for (auto j = 0u; j < control->sampleTargetCount; j++) {
-                if (_family(control->sampleTargets[j], binding.object)
-                    || _family(control->sampleTargets[j], binding.swatch)) {
+                if (family(control->sampleTargets[j], binding.object)
+                    || family(control->sampleTargets[j], binding.swatch)) {
                     return Result::InvalidArguments;
                 }
             }
             for (auto j = 0u; j < area->sampleTargetCount; j++) {
                 for (auto face : faces) {
-                    if (_family(face, area->sampleTargets[j])) {
+                    if (family(face, area->sampleTargets[j])) {
                         return Result::InvalidArguments;
                     }
                 }
             }
         }
     }
-    if (pImpl->bindingCount >= BindingLimit) return Result::InsufficientCondition;
-    if (!pImpl->growBindings()) return Result::OutOfMemory;
-    auto& binding = pImpl->bindings[pImpl->bindingCount++];
+    Impl::Binding binding;
     binding.kind = Impl::BindingKind::SampleArea;
     binding.control = control;
     binding.object = sample.marker;
@@ -1045,8 +988,7 @@ Result Panel::bind(SampleArea* control, const SampleBinding& sample) noexcept
     binding.markerOrigin = sample.markerOrigin;
     binding.markerX = sample.markerX;
     binding.markerY = sample.markerY;
-    binding.revision = control->uiRevision;
-    return Result::Success;
+    return pImpl->add(binding);
 }
 
 Result Panel::sampler(SampleCallback callback, void* data) noexcept
@@ -1071,14 +1013,14 @@ Result Panel::states(Button* control, Object* hover, Object* pressed) noexcept
             return Result::InvalidArguments;
         }
         for (auto j = i + 1u; j < 3u; j++) {
-            if (_family(faces[i], faces[j])) return Result::InvalidArguments;
+            if (family(faces[i], faces[j])) return Result::InvalidArguments;
         }
     }
     for (auto i = 0u; i < pImpl->controlCount; i++) {
         auto other = pImpl->controls[i];
         if (other == control || !other->visual()) continue;
         for (auto face : faces) {
-            if (_family(face, other->visual())) return Result::InvalidArguments;
+            if (family(face, other->visual())) return Result::InvalidArguments;
         }
     }
     Impl::Binding* current = nullptr;
@@ -1087,11 +1029,11 @@ Result Panel::states(Button* control, Object* hover, Object* pressed) noexcept
         if (binding.kind == Impl::BindingKind::SampleArea) {
             auto area = static_cast<SampleArea*>(binding.control);
             for (auto face : faces) {
-                if (_family(face, binding.object) || _family(face, binding.swatch)) {
+                if (family(face, binding.object) || family(face, binding.swatch)) {
                     return Result::InvalidArguments;
                 }
                 for (auto j = 0u; j < area->sampleTargetCount; j++) {
-                    if (_family(face, area->sampleTargets[j])) {
+                    if (family(face, area->sampleTargets[j])) {
                         return Result::InvalidArguments;
                     }
                 }
@@ -1106,7 +1048,7 @@ Result Panel::states(Button* control, Object* hover, Object* pressed) noexcept
         Object* otherFaces[] = {binding.object, binding.hover, binding.pressed};
         for (auto face : faces) {
             for (auto other : otherFaces) {
-                if (_family(face, other)) return Result::InvalidArguments;
+                if (family(face, other)) return Result::InvalidArguments;
             }
         }
     }
@@ -1116,41 +1058,18 @@ Result Panel::states(Button* control, Object* hover, Object* pressed) noexcept
         current->pressed = pressed;
         return Result::Success;
     }
-    if (pImpl->bindingCount >= BindingLimit) return Result::InsufficientCondition;
-    if (!pImpl->growBindings()) return Result::OutOfMemory;
-    auto& binding = pImpl->bindings[pImpl->bindingCount++];
+    Impl::Binding binding;
     binding.kind = Impl::BindingKind::ButtonStates;
     binding.control = control;
     binding.object = normal;
     binding.hover = hover;
     binding.pressed = pressed;
-    return Result::Success;
+    return pImpl->add(binding);
 }
 
 Result Panel::camera(CameraAction action, const Vec2& delta) noexcept
 {
-    if (!pImpl || !_finite(delta)
-        || static_cast<uint8_t>(action) > static_cast<uint8_t>(CameraAction::View3D)) {
-        return Result::InvalidArguments;
-    }
-    if (action == CameraAction::Reset) return cameraReset();
-    if (action == CameraAction::View2D) return cameraView(CameraView::TwoD);
-    if (action == CameraAction::View3D) return cameraView(CameraView::ThreeD);
-    auto bounded = Vec2{_clamp(delta.x, -4.0f, 4.0f), _clamp(delta.y, -4.0f, 4.0f)};
-    if (action == CameraAction::Pan) {
-        auto next = pImpl->move + bounded;
-        if (!_finite(next)) return Result::InvalidArguments;
-        pImpl->move = next;
-    } else if (action == CameraAction::Orbit) {
-        auto next = pImpl->orbit + bounded;
-        if (!_finite(next)) return Result::InvalidArguments;
-        pImpl->orbit = next;
-    } else {
-        auto next = pImpl->zoom + bounded.y;
-        if (!std::isfinite(next)) return Result::InvalidArguments;
-        pImpl->zoom = next;
-    }
-    return Result::Success;
+    return pImpl ? pImpl->camera.act(action, delta) : Result::InvalidArguments;
 }
 
 Result Panel::cameraMove(const Vec2& delta) noexcept
@@ -1170,21 +1089,12 @@ Result Panel::cameraZoom(float delta) noexcept
 
 Result Panel::cameraReset() noexcept
 {
-    if (!pImpl) return Result::InvalidArguments;
-    pImpl->move = {};
-    pImpl->orbit = {};
-    pImpl->zoom = 0.0f;
-    pImpl->view = -1;
-    return Result::Success;
+    return camera(CameraAction::Reset, {});
 }
 
 Result Panel::cameraView(CameraView view) noexcept
 {
-    if (!pImpl || (view != CameraView::TwoD && view != CameraView::ThreeD)) {
-        return Result::InvalidArguments;
-    }
-    pImpl->view = view == CameraView::TwoD ? 0 : 1;
-    return Result::Success;
+    return pImpl ? pImpl->camera.view(view) : Result::InvalidArguments;
 }
 
 Result Panel::modifyObject(const Object* object, float time, Mat4& model, float& opacity,
@@ -1274,21 +1184,7 @@ Result Panel::modifyCamera(float time, Camera& camera, CameraView& view, void* d
     if (!panel || !panel->pImpl || !std::isfinite(time) || time < 0.0f) {
         return Result::InvalidArguments;
     }
-    auto& impl = *panel->pImpl;
-    if (impl.view >= 0) {
-        auto result = _cameraAction(camera, view,
-                                    impl.view == 0 ? CameraAction::View2D
-                                                   : CameraAction::View3D,
-                                    {});
-        if (result != Result::Success) return result;
-    }
-    auto result = _cameraAction(camera, view, CameraAction::Orbit, impl.orbit);
-    if (result != Result::Success) return result;
-    result = _cameraAction(camera, view, CameraAction::Zoom, {0.0f, impl.zoom});
-    if (result != Result::Success) return result;
-    result = _cameraAction(camera, view, CameraAction::Pan, impl.move);
-    if (result != Result::Success) return result;
-    return _validCamera(camera, view) ? Result::Success : Result::InvalidArguments;
+    return panel->pImpl->camera.apply(camera, view);
 }
 
 Result Panel::modifyInput(const CameraInput& input, void* data) noexcept

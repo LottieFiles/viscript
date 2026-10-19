@@ -5,6 +5,7 @@
 #include <new>
 
 #include "vis_input.h"
+#include "visInputEvent.h"
 #include "../common/visFinite.h"
 
 namespace vis::input
@@ -13,35 +14,11 @@ namespace vis::input
 namespace
 {
 
-constexpr auto KeyCount = static_cast<uint32_t>(Key::Tab) + 1u;
-
 enum struct Source : uint8_t
 {
     Key = 0,
     Pointer
 };
-
-static bool _key(Key key) noexcept
-{
-    return key != Key::Unknown && static_cast<uint32_t>(key) < KeyCount;
-}
-
-static bool _event(const InputEvent& event) noexcept
-{
-    if (static_cast<uint8_t>(event.kind) > static_cast<uint8_t>(InputKind::KeyUp)
-        || !_finite(event.position) || !_finite(event.delta) || !_finite(event.wheel)
-        || !std::isfinite(event.time) || event.time < 0.0f) {
-        return false;
-    }
-    if (event.kind == InputKind::KeyDown || event.kind == InputKind::KeyUp) {
-        return _key(event.key);
-    }
-    if ((event.kind == InputKind::PointerDown || event.kind == InputKind::PointerUp)
-        && (event.button < 0 || event.button >= 32)) {
-        return false;
-    }
-    return true;
-}
 
 static uint32_t _length(const char* value) noexcept
 {
@@ -68,14 +45,6 @@ struct State::Impl
     uint32_t pointerCount = 0u;
 
     PointerState* pointer(uint32_t id) noexcept
-    {
-        for (auto i = 0u; i < pointerCount; i++) {
-            if (pointers[i].pointer == id) return pointers + i;
-        }
-        return nullptr;
-    }
-
-    const PointerState* pointer(uint32_t id) const noexcept
     {
         for (auto i = 0u; i < pointerCount; i++) {
             if (pointers[i].pointer == id) return pointers + i;
@@ -127,7 +96,7 @@ Result State::begin(float time) noexcept
 
 Result State::input(const InputEvent& event) noexcept
 {
-    if (!pImpl || !_event(event)) return Result::InvalidArguments;
+    if (!pImpl || !validEvent(event)) return Result::InvalidArguments;
     pImpl->time = event.time;
     if (event.kind == InputKind::KeyDown || event.kind == InputKind::KeyUp) {
         auto& state = pImpl->keys[static_cast<uint32_t>(event.key)];
@@ -189,7 +158,7 @@ Result State::release(float time) noexcept
 
 Result State::key(Key key, DigitalState& state) const noexcept
 {
-    if (!pImpl || !_key(key)) return Result::InvalidArguments;
+    if (!pImpl || !validKey(key)) return Result::InvalidArguments;
     state = pImpl->keys[static_cast<uint32_t>(key)];
     return Result::Success;
 }
@@ -311,7 +280,7 @@ ActionMap* ActionMap::gen() noexcept
 
 Result ActionMap::key(const char* action, Key key, const Vec2& value) noexcept
 {
-    if (!pImpl || !_key(key)) return Result::InvalidArguments;
+    if (!pImpl || !validKey(key)) return Result::InvalidArguments;
     return pImpl->bind(action, Source::Key, key, 0u, 0u, value);
 }
 
@@ -399,8 +368,8 @@ Result ActionMap::state(const State* input, const char* action,
     sampled.value = {_clamp(sampled.value.x), _clamp(sampled.value.y)};
     sampled.delta = sampled.value - sampled.previous;
     sampled.down = current;
-    sampled.pressed = (!previous && current) || (!previous && !current && pressed);
-    sampled.released = (previous && !current) || (!previous && !current && released);
+    sampled.pressed = !previous && (current || pressed);
+    sampled.released = !current && (previous || released);
     state = sampled;
     return Result::Success;
 }

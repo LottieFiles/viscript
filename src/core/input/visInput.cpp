@@ -4,7 +4,8 @@
 #include <new>
 
 #include "vis_input.h"
-#include "../common/visCamera.h"
+#include "visInputEvent.h"
+#include "../common/visControl.h"
 #include "../common/visFinite.h"
 #include "../common/visRetarget.h"
 
@@ -16,51 +17,6 @@ namespace
 
 constexpr uint32_t ShortcutModifiers = 2u | 4u | 8u;
 uint8_t RuntimeKey = 0u;
-
-static float _clamp01(float value) noexcept
-{
-    return _clamp(value, 0.0f, 1.0f);
-}
-
-static bool _valid(const BBox& bounds) noexcept
-{
-    return std::isfinite(bounds.x) && std::isfinite(bounds.y)
-           && std::isfinite(bounds.width) && std::isfinite(bounds.height)
-           && bounds.width > 0.0f && bounds.height > 0.0f;
-}
-
-static bool _contains(const BBox& bounds, const Vec2& point) noexcept
-{
-    return point.x >= bounds.x && point.x <= bounds.x + bounds.width
-           && point.y >= bounds.y && point.y <= bounds.y + bounds.height;
-}
-
-static bool _valid(const InputEvent& event) noexcept
-{
-    if (static_cast<uint8_t>(event.kind) > static_cast<uint8_t>(InputKind::KeyUp)
-        || !_finite(event.position) || !_finite(event.delta) || !_finite(event.wheel)
-        || !std::isfinite(event.time) || event.time < 0.0f) {
-        return false;
-    }
-    if ((event.kind == InputKind::KeyDown || event.kind == InputKind::KeyUp)
-        && (event.key == Key::Unknown
-            || static_cast<uint8_t>(event.key) > static_cast<uint8_t>(Key::Tab))) {
-        return false;
-    }
-    return true;
-}
-
-static bool _family(const Object* first, const Object* second) noexcept
-{
-    if (!first || !second) return false;
-    for (auto object = first; object; object = object->parent()) {
-        if (object == second) return true;
-    }
-    for (auto object = second; object; object = object->parent()) {
-        if (object == first) return true;
-    }
-    return false;
-}
 
 static float _angle(float current, float target) noexcept
 {
@@ -123,10 +79,7 @@ struct Controller::Impl
     uint32_t keyCapacity = 0u;
     uint32_t triggerCount = 0u;
     uint32_t triggerCapacity = 0u;
-    Vec2 move;
-    Vec2 orbit;
-    float zoom = 0.0f;
-    int8_t view = -1;
+    CameraDrive camera;
 
     ~Impl()
     {
@@ -199,6 +152,35 @@ struct Controller::Impl
             if (states[i].object == object) return i;
         }
         return UINT32_MAX;
+    }
+
+    // Checks what a pointer follow and a key move share: a target of the scene's own apart from
+    // the controller, a period, room under the binding limit and no pointer follow on target.
+    Result admit(const Object* target, float period, const Object* controller) const noexcept
+    {
+        if (!scene || !target || !std::isfinite(period) || period < 0.0f
+            || scene->object(target->id()) != target || family(target, controller)) {
+            return Result::InvalidArguments;
+        }
+        if (pointerCount + keyCount + triggerCount >= BindingLimit) {
+            return Result::InsufficientCondition;
+        }
+        for (auto i = 0u; i < pointerCount; i++) {
+            if (pointers[i].config.target == target) return Result::InsufficientCondition;
+        }
+        return Result::Success;
+    }
+
+    // The state that moves target, added at origin for a target with none; UINT32_MAX when the
+    // states cannot grow.
+    uint32_t track(Object* target, const Vec3& origin) noexcept
+    {
+        auto index = find(target);
+        if (index != UINT32_MAX) return index;
+        if (!growStates()) return UINT32_MAX;
+        states[stateCount].object = target;
+        states[stateCount].origin = origin;
+        return stateCount++;
     }
 
     float elapsed(float time, float started) const noexcept
@@ -345,86 +327,46 @@ State* Controller::state() const noexcept
 
 Result Controller::pointerFollow(const PointerFollow& binding) noexcept
 {
-    if (!pImpl || !pImpl->scene || !binding.target || !_valid(binding.region)
-        || !_finite(binding.targetOrigin) || !_finite(binding.mapOrigin)
-        || !_finite(binding.mapX) || !_finite(binding.mapY)
-        || !std::isfinite(binding.period) || binding.period < 0.0f
-        || !std::isfinite(binding.angleOffset)
-        || pImpl->scene->object(binding.target->id()) != binding.target
-        || _family(binding.target, this)) {
+    if (!pImpl || !validRegion(binding.region) || !_finite(binding.targetOrigin)
+        || !_finite(binding.mapOrigin) || !_finite(binding.mapX) || !_finite(binding.mapY)
+        || !std::isfinite(binding.angleOffset)) {
         return Result::InvalidArguments;
     }
-    if (pImpl->pointerCount + pImpl->keyCount + pImpl->triggerCount >= BindingLimit) {
-        return Result::InsufficientCondition;
-    }
-    for (auto i = 0u; i < pImpl->pointerCount; i++) {
-        if (pImpl->pointers[i].config.target == binding.target) {
-            return Result::InsufficientCondition;
-        }
-    }
+    auto result = pImpl->admit(binding.target, binding.period, this);
+    if (result != Result::Success) return result;
     for (auto i = 0u; i < pImpl->keyCount; i++) {
-        if (pImpl->keys[i].config.target == binding.target) {
-            return Result::InsufficientCondition;
-        }
+        if (pImpl->keys[i].config.target == binding.target) return Result::InsufficientCondition;
     }
-    auto state = pImpl->find(binding.target);
-    auto addState = state == UINT32_MAX;
-    if (!pImpl->growPointers() || (addState && !pImpl->growStates())) {
-        return Result::OutOfMemory;
-    }
-    if (addState) {
-        state = pImpl->stateCount++;
-        pImpl->states[state].object = binding.target;
-        pImpl->states[state].origin = binding.targetOrigin;
-    }
-    auto& pointer = pImpl->pointers[pImpl->pointerCount++];
-    pointer.config = binding;
-    pointer.state = state;
+    if (!pImpl->growPointers()) return Result::OutOfMemory;
+    auto state = pImpl->track(binding.target, binding.targetOrigin);
+    if (state == UINT32_MAX) return Result::OutOfMemory;
+    pImpl->pointers[pImpl->pointerCount++] = {binding, state};
     return Result::Success;
 }
 
 Result Controller::keyMove(const KeyMove& binding) noexcept
 {
-    if (!pImpl || !pImpl->scene || !binding.target || binding.key == Key::Unknown
-        || static_cast<uint8_t>(binding.key) > static_cast<uint8_t>(Key::Tab)
-        || !_finite(binding.shift) || !std::isfinite(binding.period) || binding.period < 0.0f
-        || pImpl->scene->object(binding.target->id()) != binding.target
-        || _family(binding.target, this)) {
+    if (!pImpl || !validKey(binding.key) || !_finite(binding.shift)) {
         return Result::InvalidArguments;
     }
-    if (pImpl->pointerCount + pImpl->keyCount + pImpl->triggerCount >= BindingLimit) {
-        return Result::InsufficientCondition;
-    }
-    for (auto i = 0u; i < pImpl->pointerCount; i++) {
-        if (pImpl->pointers[i].config.target == binding.target) {
-            return Result::InsufficientCondition;
-        }
-    }
+    auto result = pImpl->admit(binding.target, binding.period, this);
+    if (result != Result::Success) return result;
     for (auto i = 0u; i < pImpl->keyCount; i++) {
         auto& candidate = pImpl->keys[i].config;
         if (candidate.target == binding.target && candidate.key == binding.key) {
             return Result::InsufficientCondition;
         }
     }
-    auto state = pImpl->find(binding.target);
-    auto addState = state == UINT32_MAX;
-    if (!pImpl->growKeys() || (addState && !pImpl->growStates())) {
-        return Result::OutOfMemory;
-    }
-    if (addState) {
-        state = pImpl->stateCount++;
-        pImpl->states[state].object = binding.target;
-    }
-    auto& key = pImpl->keys[pImpl->keyCount++];
-    key.config = binding;
-    key.state = state;
+    if (!pImpl->growKeys()) return Result::OutOfMemory;
+    auto state = pImpl->track(binding.target, {});
+    if (state == UINT32_MAX) return Result::OutOfMemory;
+    pImpl->keys[pImpl->keyCount++] = {binding, state};
     return Result::Success;
 }
 
 Result Controller::keyTrigger(const KeyTriggerBinding& binding) noexcept
 {
-    if (!pImpl || !pImpl->scene || binding.key == Key::Unknown
-        || static_cast<uint8_t>(binding.key) > static_cast<uint8_t>(Key::Tab)
+    if (!pImpl || !pImpl->scene || !validKey(binding.key)
         || static_cast<uint8_t>(binding.trigger) > static_cast<uint8_t>(KeyTrigger::Up)
         || !binding.callback) {
         return Result::InvalidArguments;
@@ -439,10 +381,7 @@ Result Controller::keyTrigger(const KeyTriggerBinding& binding) noexcept
 
 Result Controller::keyState(Key key, KeyState& state) const noexcept
 {
-    if (!pImpl || key == Key::Unknown
-        || static_cast<uint8_t>(key) > static_cast<uint8_t>(Key::Tab)) {
-        return Result::InvalidArguments;
-    }
+    if (!pImpl || !validKey(key)) return Result::InvalidArguments;
     DigitalState input;
     auto result = pImpl->inputState->key(key, input);
     if (result != Result::Success) return result;
@@ -454,7 +393,7 @@ Result Controller::keyState(Key key, KeyState& state) const noexcept
 
 InputResult Controller::input(const InputEvent& event) noexcept
 {
-    if (!pImpl || !_valid(event)) return {false, false, Result::InvalidArguments};
+    if (!pImpl || !validEvent(event)) return {false, false, Result::InvalidArguments};
     InputResult result;
     if (event.kind == InputKind::KeyDown && event.modifiers & ShortcutModifiers) {
         return result;
@@ -468,26 +407,26 @@ InputResult Controller::input(const InputEvent& event) noexcept
         result.status = pImpl->inputState->input(event);
         if (result.status != Result::Success) return result;
     }
-    if (event.kind == InputKind::PointerMove) {
+    if (event.kind == InputKind::PointerMove || event.kind == InputKind::PointerCancel) {
         for (auto i = 0u; i < pImpl->pointerCount; i++) {
             auto& binding = pImpl->pointers[i];
             auto& config = binding.config;
-            auto inside = _contains(config.region, event.position);
-            if (!inside) {
+            auto& state = pImpl->states[binding.state];
+            // A cancel leaves every region.
+            if (event.kind == InputKind::PointerCancel
+                || !contains(config.region, event.position)) {
                 if (!binding.hovered) continue;
                 binding.hovered = false;
                 result.handled = true;
                 if (!config.resetOnLeave) continue;
-                auto& state = pImpl->states[binding.state];
                 pImpl->transition(state, event.time, {}, {}, config.period);
                 result.redraw = true;
                 continue;
             }
             binding.hovered = true;
-            auto u = _clamp01((event.position.x - config.region.x) / config.region.width);
-            auto v = _clamp01((event.position.y - config.region.y) / config.region.height);
+            auto u = clamp01((event.position.x - config.region.x) / config.region.width);
+            auto v = clamp01((event.position.y - config.region.y) / config.region.height);
             auto mapped = config.mapOrigin + config.mapX * u + config.mapY * v;
-            auto& state = pImpl->states[binding.state];
             Vec3 currentShift;
             Vec3 currentRotation;
             pImpl->sample(state, event.time, currentShift, currentRotation);
@@ -503,18 +442,7 @@ InputResult Controller::input(const InputEvent& event) noexcept
             result.handled = true;
             result.redraw = true;
         }
-    } else if (event.kind == InputKind::PointerCancel) {
-        for (auto i = 0u; i < pImpl->pointerCount; i++) {
-            auto& binding = pImpl->pointers[i];
-            if (!binding.hovered) continue;
-            binding.hovered = false;
-            result.handled = true;
-            if (!binding.config.resetOnLeave) continue;
-            auto& state = pImpl->states[binding.state];
-            pImpl->transition(state, event.time, {}, {}, binding.config.period);
-            result.redraw = true;
-        }
-    } else if (event.kind == InputKind::KeyDown || event.kind == InputKind::KeyUp) {
+    } else if (keyEvent) {
         auto moved = pImpl->hasMove(event.key);
         auto triggered = pImpl->hasTrigger(event.key);
         if (event.kind == InputKind::KeyDown) {
@@ -561,8 +489,7 @@ InputResult Controller::release(float time) noexcept
         return {false, false, Result::InvalidArguments};
     }
     InputResult released;
-    for (auto value = static_cast<uint8_t>(Key::ArrowLeft);
-         value <= static_cast<uint8_t>(Key::Tab); value++) {
+    for (auto value = static_cast<uint32_t>(Key::ArrowLeft); value < KeyCount; value++) {
         auto key = static_cast<Key>(value);
         DigitalState state;
         if (pImpl->inputState->key(key, state) != Result::Success || !state.down) continue;
@@ -588,28 +515,7 @@ InputResult Controller::release(float time) noexcept
 
 Result Controller::camera(CameraAction action, const Vec2& delta) noexcept
 {
-    if (!pImpl || !_finite(delta)
-        || static_cast<uint8_t>(action) > static_cast<uint8_t>(CameraAction::View3D)) {
-        return Result::InvalidArguments;
-    }
-    if (action == CameraAction::Reset) return cameraReset();
-    if (action == CameraAction::View2D) return cameraView(CameraView::TwoD);
-    if (action == CameraAction::View3D) return cameraView(CameraView::ThreeD);
-    auto bounded = Vec2{_clamp(delta.x, -4.0f, 4.0f), _clamp(delta.y, -4.0f, 4.0f)};
-    if (action == CameraAction::Pan) {
-        auto next = pImpl->move + bounded;
-        if (!_finite(next)) return Result::InvalidArguments;
-        pImpl->move = next;
-    } else if (action == CameraAction::Orbit) {
-        auto next = pImpl->orbit + bounded;
-        if (!_finite(next)) return Result::InvalidArguments;
-        pImpl->orbit = next;
-    } else {
-        auto next = pImpl->zoom + bounded.y;
-        if (!std::isfinite(next)) return Result::InvalidArguments;
-        pImpl->zoom = next;
-    }
-    return Result::Success;
+    return pImpl ? pImpl->camera.act(action, delta) : Result::InvalidArguments;
 }
 
 Result Controller::cameraMove(const Vec2& delta) noexcept
@@ -629,21 +535,12 @@ Result Controller::cameraZoom(float delta) noexcept
 
 Result Controller::cameraReset() noexcept
 {
-    if (!pImpl) return Result::InvalidArguments;
-    pImpl->move = {};
-    pImpl->orbit = {};
-    pImpl->zoom = 0.0f;
-    pImpl->view = -1;
-    return Result::Success;
+    return camera(CameraAction::Reset, {});
 }
 
 Result Controller::cameraView(CameraView view) noexcept
 {
-    if (!pImpl || (view != CameraView::TwoD && view != CameraView::ThreeD)) {
-        return Result::InvalidArguments;
-    }
-    pImpl->view = view == CameraView::TwoD ? 0 : 1;
-    return Result::Success;
+    return pImpl ? pImpl->camera.view(view) : Result::InvalidArguments;
 }
 
 Result Controller::modifyObject(const Object* object, float time, Mat4& model, float&,
@@ -679,21 +576,7 @@ Result Controller::modifyCamera(float time, Camera& camera, CameraView& view,
     if (!controller || !controller->pImpl || !std::isfinite(time) || time < 0.0f) {
         return Result::InvalidArguments;
     }
-    auto& impl = *controller->pImpl;
-    if (impl.view >= 0) {
-        auto result = _cameraAction(camera, view,
-                                    impl.view == 0 ? CameraAction::View2D
-                                                   : CameraAction::View3D,
-                                    {});
-        if (result != Result::Success) return result;
-    }
-    auto result = _cameraAction(camera, view, CameraAction::Orbit, impl.orbit);
-    if (result != Result::Success) return result;
-    result = _cameraAction(camera, view, CameraAction::Zoom, {0.0f, impl.zoom});
-    if (result != Result::Success) return result;
-    result = _cameraAction(camera, view, CameraAction::Pan, impl.move);
-    if (result != Result::Success) return result;
-    return _validCamera(camera, view) ? Result::Success : Result::InvalidArguments;
+    return controller->pImpl->camera.apply(camera, view);
 }
 
 Result Controller::modifyInput(const CameraInput& input, void* data) noexcept

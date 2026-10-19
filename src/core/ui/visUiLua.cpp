@@ -1,6 +1,5 @@
 // The Lua binding of the UI module: panels with buttons, sliders, toggles, sample areas and
 // camera controls.
-#include <cmath>
 #include <cstring>
 
 extern "C" {
@@ -242,6 +241,19 @@ static int _addResult(lua_State* lua, Result result)
     return 1;
 }
 
+// Adds a control just made to the panel; one that is not added is freed before the error.
+template<typename Control>
+static Control* _add(lua_State* lua, Panel* panel, Control* control, const char* name)
+{
+    if (!control) luaL_error(lua, "could not allocate %s", name);
+    auto result = panel->add(control);
+    if (result != Result::Success) {
+        delete control;
+        luaL_error(lua, "%s", vis::result(result));
+    }
+    return control;
+}
+
 static int _button(lua_State* lua)
 {
     auto panel = _panel(lua);
@@ -265,7 +277,7 @@ static int _button(lua_State* lua)
     Object* target = nullptr;
     UITransform transform;
     auto duration = _fieldNumber(lua, 2, "duration", 0.0f);
-    if (!std::isfinite(duration) || duration < 0.0f) {
+    if (duration < 0.0f) {
         return luaL_error(lua, "button duration must be a finite non-negative number");
     }
     if (hasCamera) {
@@ -286,15 +298,9 @@ static int _button(lua_State* lua)
         transform = _fieldTransform(lua, 2, "transform");
     }
     auto delta = _fieldVec2(lua, 2, "delta");
-    auto control = Button::gen(visual, region);
-    if (!control) return luaL_error(lua, "could not allocate button");
-    auto result = panel->add(control);
-    if (result != Result::Success) {
-        delete control;
-        return luaL_error(lua, "%s", vis::result(result));
-    }
-    if (hasCamera) result = panel->bind(control, action, delta);
-    else result = panel->bind(control, target, transform, duration);
+    auto control = _add(lua, panel, Button::gen(visual, region), "button");
+    auto result = hasCamera ? panel->bind(control, action, delta)
+                            : panel->bind(control, target, transform, duration);
     if (result == Result::Success && (hover || pressed)) {
         result = panel->states(control, hover, pressed);
     }
@@ -368,13 +374,8 @@ static int _slider(lua_State* lua)
         bindings[0].from = _fieldTransform(lua, 2, "from");
         bindings[0].to = _fieldTransform(lua, 2, "to");
     }
-    auto control = Slider::gen(visual, region, axis, initial);
-    if (!control) return luaL_error(lua, "could not allocate slider");
-    auto result = panel->add(control);
-    if (result != Result::Success) {
-        delete control;
-        return luaL_error(lua, "%s", vis::result(result));
-    }
+    auto control = _add(lua, panel, Slider::gen(visual, region, axis, initial), "slider");
+    auto result = Result::Success;
     for (auto i = 0u; i < bindingCount; i++) {
         result = panel->bind(control, bindings[i].target, bindings[i].from,
                              bindings[i].to);
@@ -405,18 +406,12 @@ static int _toggleButton(lua_State* lua)
     auto on = _fieldTransform(lua, 2, "on");
     auto value = _fieldBool(lua, 2, "value", false);
     auto duration = _fieldNumber(lua, 2, "duration", 0.0f);
-    if (!std::isfinite(duration) || duration < 0.0f) {
+    if (duration < 0.0f) {
         return luaL_error(lua,
                           "toggle_button duration must be a finite non-negative number");
     }
-    auto control = Button::gen(visual, region);
-    if (!control) return luaL_error(lua, "could not allocate toggle_button");
-    auto result = panel->add(control);
-    if (result != Result::Success) {
-        delete control;
-        return luaL_error(lua, "%s", vis::result(result));
-    }
-    result = panel->toggle(control, target, off, on, value, duration);
+    auto control = _add(lua, panel, Button::gen(visual, region), "toggle_button");
+    auto result = panel->toggle(control, target, off, on, value, duration);
     if (result == Result::Success && (hover || pressed)) {
         result = panel->states(control, hover, pressed);
     }
@@ -461,15 +456,9 @@ static int _sampleArea(lua_State* lua)
     binding.markerX = _fieldVec3(lua, 2, "marker_x");
     binding.markerY = _fieldVec3(lua, 2, "marker_y");
 
-    auto control = SampleArea::gen(targets, static_cast<uint32_t>(targetCount), region);
-    if (!control) return luaL_error(lua, "could not allocate sample_area");
-    auto result = panel->add(control);
-    if (result != Result::Success) {
-        delete control;
-        return luaL_error(lua, "%s", vis::result(result));
-    }
-    result = panel->bind(control, binding);
-    return _addResult(lua, result);
+    auto count = static_cast<uint32_t>(targetCount);
+    auto control = _add(lua, panel, SampleArea::gen(targets, count, region), "sample_area");
+    return _addResult(lua, panel->bind(control, binding));
 }
 
 static int _cameraMove(lua_State* lua)
@@ -495,9 +484,11 @@ static int _cameraReset(lua_State* lua)
 static int _cameraView(lua_State* lua)
 {
     auto value = luaL_checkstring(lua, 2);
-    if (std::strcmp(value, "2d") == 0) return _addResult(lua, _panel(lua)->cameraView(CameraView::TwoD));
-    if (std::strcmp(value, "3d") == 0) return _addResult(lua, _panel(lua)->cameraView(CameraView::ThreeD));
-    return luaL_error(lua, "camera view must be '2d' or '3d'");
+    if (std::strcmp(value, "2d") != 0 && std::strcmp(value, "3d") != 0) {
+        return luaL_error(lua, "camera view must be '2d' or '3d'");
+    }
+    auto view = value[0] == '2' ? CameraView::TwoD : CameraView::ThreeD;
+    return _addResult(lua, _panel(lua)->cameraView(view));
 }
 
 static int _newPanel(lua_State* lua)
