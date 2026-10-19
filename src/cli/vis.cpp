@@ -13,6 +13,7 @@
 #endif
 #include "visLuaHost.h"
 #include "visCliCommon.h"
+#include "../core/renderer/visLayoutJson.h"
 #if defined(VIS_AUDIO) && !defined(_WIN32)
 #include <unistd.h>
 #include "vis_audio.h"
@@ -466,153 +467,6 @@ static bool _layoutScene(const Scene* scene, Renderer* renderer, float time, flo
     return true;
 }
 
-static const char* _layoutKind(LayoutSceneKind kind)
-{
-    switch (kind) {
-        case LayoutSceneKind::Root: return "root";
-        case LayoutSceneKind::Viewport: return "viewport";
-        case LayoutSceneKind::Transition: return "transition";
-        case LayoutSceneKind::View: return "view";
-    }
-    return "unknown";
-}
-
-static void _layoutReport(const LayoutReport& report, const Scene* root)
-{
-    std::printf("{\"width\":%u,\"height\":%u,\"scenes\":[",
-                root->config().width, root->config().height);
-    for (auto i = 0u; i < report.sceneCount(); i++) {
-        auto scene = report.sceneAt(i);
-        if (i) std::putchar(',');
-        std::printf("{\"index\":%u,\"path\":", i);
-        _json(scene->path);
-        std::fputs(",\"kind\":", stdout);
-        _json(_layoutKind(scene->kind));
-        std::fputs(",\"parent\":", stdout);
-        if (scene->parent == UINT32_MAX) std::fputs("null", stdout);
-        else std::printf("%u", scene->parent);
-        std::printf(",\"depth\":%u,\"bounds\":", scene->depth);
-        _bbox(scene->bounds);
-        std::fputs(",\"clipBounds\":", stdout);
-        _bbox(scene->clipBounds);
-        std::printf(",\"scale\":{\"x\":%.6g,\"y\":%.6g},\"clipped\":%s,\"stretched\":%s}",
-                    scene->scaleX, scene->scaleY, scene->clipped ? "true" : "false",
-                    scene->stretched ? "true" : "false");
-    }
-    std::fputs("],\"objects\":[", stdout);
-    for (auto i = 0u; i < report.objectCount(); i++) {
-        auto item = report.objectAt(i);
-        auto object = item->object;
-        auto scene = report.sceneAt(item->scene);
-        if (i) std::putchar(',');
-        std::printf("{\"index\":%u,\"scene\":%u,\"scenePath\":", i, item->scene);
-        _json(scene->path);
-        std::printf(",\"handle\":%u,\"id\":", object->id());
-        _json(object->tag());
-        std::fputs(",\"parent\":", stdout);
-        if (item->parent == UINT32_MAX) std::fputs("null", stdout);
-        else std::printf("%u", item->parent);
-        std::fputs(",\"type\":", stdout);
-        _json(type(object->type()));
-        auto typeset = object->type() == Type::Group && static_cast<const Group*>(object)->typeset;
-        std::printf(",\"typeset\":%s,\"layer\":%d,\"paintBounds\":", typeset ? "true" : "false", item->layer);
-        if (item->paintBounds.width > 0.0f && item->paintBounds.height > 0.0f) {
-            _bbox(item->paintBounds);
-        } else {
-            std::fputs("null", stdout);
-        }
-        std::fputs(",\"familyBounds\":", stdout);
-        if (item->familyBounds.width > 0.0f && item->familyBounds.height > 0.0f) {
-            _bbox(item->familyBounds);
-        } else {
-            std::fputs("null", stdout);
-        }
-        std::fputs(",\"visibleBounds\":", stdout);
-        if (item->visible) _bbox(item->visibleBounds);
-        else std::fputs("null", stdout);
-        std::fputs(",\"visibleFamilyBounds\":", stdout);
-        if (item->familyVisible) _bbox(item->visibleFamilyBounds);
-        else std::fputs("null", stdout);
-        std::fputs(",\"clipBounds\":", stdout);
-        _bbox(item->clipBounds);
-        auto painted = item->paintBounds.width > 0.0f && item->paintBounds.height > 0.0f;
-        auto familyPainted = item->familyBounds.width > 0.0f && item->familyBounds.height > 0.0f;
-        std::printf(",\"visible\":%s,\"familyVisible\":%s,\"clipped\":%s,\"familyClipped\":%s,\"outside\":%s,\"familyOutside\":%s}",
-                    item->visible ? "true" : "false", item->familyVisible ? "true" : "false",
-                    item->clipped ? "true" : "false", item->familyClipped ? "true" : "false",
-                    painted && !item->visible ? "true" : "false",
-                    familyPainted && !item->familyVisible ? "true" : "false");
-    }
-    std::fputs("],\"visuals\":[", stdout);
-    for (auto i = 0u; i < report.visualCount(); i++) {
-        auto visual = report.visualAt(i);
-        if (i) std::putchar(',');
-        std::printf("{\"index\":%u,\"object\":%u,\"counterpart\":", i, visual->object);
-        if (visual->counterpart == UINT32_MAX) std::fputs("null", stdout);
-        else std::printf("%u", visual->counterpart);
-        std::fputs(",\"occluder\":", stdout);
-        if (visual->occluder == UINT32_MAX) std::fputs("null", stdout);
-        else std::printf("%u", visual->occluder);
-        std::fputs(",\"kind\":", stdout);
-        _json(_visualKind(visual->kind));
-        std::printf(",\"layer\":%d,\"paintBounds\":", visual->layer);
-        auto painted = visual->paintBounds.width > 0.0f && visual->paintBounds.height > 0.0f;
-        if (painted) _bbox(visual->paintBounds);
-        else std::fputs("null", stdout);
-        std::fputs(",\"visibleBounds\":", stdout);
-        if (visual->visible) _bbox(visual->visibleBounds);
-        else std::fputs("null", stdout);
-        std::fputs(",\"clipBounds\":", stdout);
-        _bbox(visual->clipBounds);
-        std::printf(",\"opacity\":%.6g,\"visible\":%s,\"clipped\":%s,\"occluded\":%s}",
-                    visual->opacity, visual->visible ? "true" : "false",
-                    visual->clipped ? "true" : "false",
-                    visual->occluded ? "true" : "false");
-    }
-    std::fputs("],\"paths\":[", stdout);
-    for (auto i = 0u; i < report.pathCount(); i++) {
-        auto path = report.pathAt(i);
-        if (i) std::putchar(',');
-        std::printf("{\"index\":%u,\"visual\":%u,\"paintBounds\":", i, path->visual);
-        _bbox(path->paintBounds);
-        std::printf(",\"strokeWidth\":%.6g,\"closed\":%s,\"filled\":%s,"
-                    "\"stroked\":%s,\"points\":[",
-                    path->strokeWidth, path->closed ? "true" : "false",
-                    path->filled ? "true" : "false", path->stroked ? "true" : "false");
-        for (auto j = 0u; j < path->count; j++) {
-            if (j) std::putchar(',');
-            std::printf("{\"x\":%.6g,\"y\":%.6g}", path->points[j].x,
-                        path->points[j].y);
-        }
-        std::putchar(']');
-        std::putchar('}');
-    }
-    std::fputs("],\"collisions\":[", stdout);
-    for (auto i = 0u; i < report.collisionCount(); i++) {
-        auto collision = report.collisionAt(i);
-        if (i) std::putchar(',');
-        std::printf("{\"first\":%u,\"second\":%u,\"kind\":\"%s\",\"overlap\":",
-                    collision->first, collision->second,
-                    collision->overlapping ? "overlap" : "insufficient-gap");
-        if (collision->overlapping) _bbox(collision->overlap);
-        else std::fputs("null", stdout);
-        std::printf(",\"clearance\":{\"x\":%.6g,\"y\":%.6g},\"separation\":{\"x\":%.6g,\"y\":%.6g}}",
-                    collision->clearance.x, collision->clearance.y,
-                    collision->separation.x, collision->separation.y);
-    }
-    std::fputs("],\"containments\":[", stdout);
-    for (auto i = 0u; i < report.containmentCount(); i++) {
-        auto containment = report.containmentAt(i);
-        if (i) std::putchar(',');
-        std::printf("{\"container\":%u,\"content\":%u,\"depth\":%u,\"inset\":%.6g,\"contained\":%s,\"overflow\":{\"left\":%.6g,\"top\":%.6g,\"right\":%.6g,\"bottom\":%.6g}}",
-                    containment->container, containment->content, containment->depth,
-                    containment->inset, containment->contained ? "true" : "false",
-                    containment->overflowLeft, containment->overflowTop,
-                    containment->overflowRight, containment->overflowBottom);
-    }
-    std::fputs("]}", stdout);
-}
-
 static int _layout(int argc, char** argv)
 {
     if (argc < 3) {
@@ -645,10 +499,11 @@ static int _layout(int argc, char** argv)
     std::fputs("{\"source\":", stdout);
     _json(source);
     std::printf(",\"time\":%.6g,\"padding\":%.6g,\"scene\":", time, padding);
-    auto success = _layoutScene(scene, renderer, time, padding);
+    JsonBuffer json;
+    auto success = _layoutScene(scene, renderer, time, padding) && layoutJson(report, scene, json);
     if (success) {
         std::fputs(",\"report\":", stdout);
-        _layoutReport(report, scene);
+        std::fwrite(json.data, 1, json.size, stdout);
         std::fputs("}\n", stdout);
     }
     else std::fprintf(stderr, "viscript: layout inspection failed: out of memory\n");

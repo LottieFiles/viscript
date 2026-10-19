@@ -12,6 +12,7 @@
 #include "visCliCommon.h"
 #include "visSaver.h"
 #include "../core/common/visGrow.h"
+#include "../core/renderer/visLayoutJson.h"
 #ifdef VIS_DIAGRAM
 #include "vis_diagram.h"
 #endif
@@ -1496,7 +1497,7 @@ static void _evidence(const VisualEvidence& evidence)
         return;
     }
     std::fputs("{\"kind\":", stdout);
-    _json(_visualKind(evidence.kind));
+    _json(layoutVisualKind(evidence.kind));
     std::fputs(",\"counterpartScenePath\":", stdout);
     _json(evidence.counterpartScope.path);
     std::fputs(",\"counterpart\":", stdout);

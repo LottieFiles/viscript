@@ -3,6 +3,7 @@
 #include <type_traits>
 
 #include "vis.h"
+#include "visLayoutJson.h"
 #include "testCheck.h"
 
 using namespace vis;
@@ -88,6 +89,38 @@ static void _savingArguments()
     delete renderer;
 }
 
+// The layout report's JSON stays UTF-8: a tag keeps its whole sequences, its quotes,
+// backslashes and control characters are escaped, and so are the bytes of malformed UTF-8,
+// which a Diagram ID may hold. An object without a tag has a null ID.
+static void _layoutJson()
+{
+    auto renderer = Renderer::gen();
+    auto scene = Scene::gen();
+    auto tagged = Rectangle::gen({-1.0f, 0.0f, 0.0f});
+    auto untagged = Rectangle::gen({1.0f, 0.0f, 0.0f});
+    CHECK(renderer && scene && tagged && untagged);
+    if (!renderer || !scene || !tagged || !untagged) {
+        delete renderer;
+        delete scene;
+        delete tagged;
+        delete untagged;
+        return;
+    }
+    tagged->tag("q\"b\\c\n\x01\xc3\xa9\xff");
+    CHECK(scene->add(tagged) == Result::Success);
+    CHECK(scene->add(untagged) == Result::Success);
+    LayoutReport report;
+    JsonBuffer json;
+    CHECK(renderer->layout(scene, 0.0f, report, 2.0f) == Result::Success);
+    CHECK(layoutJson(report, scene, json));
+    auto text = reinterpret_cast<const char*>(json.data);
+    CHECK(text && std::strncmp(text, "{\"time\":0,\"padding\":2,", 22) == 0);
+    CHECK(text && std::strstr(text, "\"id\":\"q\\\"b\\\\c\\n\\u0001\xc3\xa9\\u00ff\"") != nullptr);
+    CHECK(text && std::strstr(text, "\"id\":null") != nullptr);
+    delete scene;
+    delete renderer;
+}
+
 int main()
 {
     auto renderer = Renderer::gen();
@@ -102,6 +135,7 @@ int main()
     delete renderer;
     _savingArguments();
     _fontDiagnostics();
+    _layoutJson();
 
     return report();
 }

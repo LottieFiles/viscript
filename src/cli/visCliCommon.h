@@ -13,6 +13,7 @@
 
 #include "vis.h"
 #include "visLuaHost.h"
+#include "../core/common/visJson.h"
 
 // A positive decimal that fits uint32_t, or with allowZero a non-negative one.
 static inline bool _uint(const char* value, uint32_t& output, bool allowZero = false)
@@ -56,32 +57,6 @@ static inline bool _option(int argc, char** argv, int& i, const char* name, floa
     return true;
 }
 
-// The length of the well-formed UTF-8 sequence at value, or 0.
-static inline uint32_t _utf8(const unsigned char* value, size_t remaining)
-{
-    auto continuation = [](unsigned char byte) {
-        return byte >= 0x80 && byte <= 0xbf;
-    };
-    if (remaining >= 2 && value[0] >= 0xc2 && value[0] <= 0xdf && continuation(value[1])) return 2;
-    if (remaining >= 3 && value[0] == 0xe0 && value[1] >= 0xa0 && value[1] <= 0xbf && continuation(value[2])) return 3;
-    if (remaining < 3) return 0;
-    if (((value[0] >= 0xe1 && value[0] <= 0xec) || (value[0] >= 0xee && value[0] <= 0xef)) && continuation(value[1]) && continuation(value[2])) {
-        return 3;
-    }
-    if (value[0] == 0xed && value[1] >= 0x80 && value[1] <= 0x9f && continuation(value[2])) return 3;
-    if (remaining < 4) return 0;
-    if (value[0] == 0xf0 && value[1] >= 0x90 && value[1] <= 0xbf && continuation(value[2]) && continuation(value[3])) {
-        return 4;
-    }
-    if (value[0] >= 0xf1 && value[0] <= 0xf3 && continuation(value[1]) && continuation(value[2]) && continuation(value[3])) {
-        return 4;
-    }
-    if (value[0] == 0xf4 && value[1] >= 0x80 && value[1] <= 0x8f && continuation(value[2]) && continuation(value[3])) {
-        return 4;
-    }
-    return 0;
-}
-
 // Writes size bytes of text to stdout as a JSON string: quoted, with control characters and
 // malformed UTF-8 escaped.
 static inline void _jsonString(const char* value, size_t size)
@@ -119,7 +94,7 @@ static inline void _jsonString(const char* value, size_t size)
                 } else if (byte < 0x80) {
                     std::putchar(byte);
                     cursor++;
-                } else if (auto size = _utf8(cursor, static_cast<size_t>(end - cursor))) {
+                } else if (auto size = vis::utf8Sequence(cursor, static_cast<size_t>(end - cursor))) {
                     std::fwrite(cursor, 1, size, stdout);
                     cursor += size;
                 } else {
@@ -143,17 +118,6 @@ static inline void _bbox(const vis::BBox& bounds)
 {
     std::printf("{\"x\":%.6g,\"y\":%.6g,\"width\":%.6g,\"height\":%.6g}", bounds.x, bounds.y, bounds.width,
                 bounds.height);
-}
-
-static inline const char* _visualKind(vis::LayoutVisualKind kind)
-{
-    switch (kind) {
-        case vis::LayoutVisualKind::Stable: return "stable";
-        case vis::LayoutVisualKind::Morph: return "morph";
-        case vis::LayoutVisualKind::FadeOut: return "fade-out";
-        case vis::LayoutVisualKind::FadeIn: return "fade-in";
-    }
-    return "unknown";
 }
 
 // Plain words for a failure that nothing explained more precisely.

@@ -52,7 +52,10 @@ endif
 # build condition, dependencies, cpp args, extra include directories.
 cpp_tests = [
     {'name': 'math', 'exe': 'testMath', 'when': true},
-    {'name': 'renderer', 'exe': 'testRenderer', 'when': true},
+    {
+        'name': 'renderer', 'exe': 'testRenderer', 'when': true,
+        'inc': [include_directories('../core/renderer')],
+    },
 ]
 if diagram_enabled
     cpp_tests += {

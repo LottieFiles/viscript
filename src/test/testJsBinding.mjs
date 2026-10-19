@@ -3558,6 +3558,16 @@ try {
     };
     const layoutAt = (path, time, fonts = []) =>
         JSON.parse(cli(["layout", path, "--time", String(time), ...fonts]).stdout);
+    // A report's numbers keep a float's 9 digits, so what the floats only approximate is compared
+    // at 6.
+    const rounded = (value) => {
+        if (typeof value === "number") return Number(value.toPrecision(6));
+        if (Array.isArray(value)) return value.map(rounded);
+        if (value && typeof value === "object") {
+            return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, rounded(entry)]));
+        }
+        return value;
+    };
     const refusal = (name, source) => {
         const result = spawnSync(cliPath, ["inspect", writeScript(name, source)], { encoding: "utf8" });
         assert.notEqual(result.status, 0);
@@ -4199,7 +4209,7 @@ return root
     const stagePaths = fading.scenes.slice(1).map((entry) => entry.path);
     assert.deepEqual(stagePaths, ["root/transition:0", "root/transition:1"]);
     for (const entry of fading.scenes.slice(1)) {
-        assert.deepEqual(entry.bounds, { x: 20, y: 20, width: 160, height: 60 });
+        assert.deepEqual(rounded(entry.bounds), { x: 20, y: 20, width: 160, height: 60 });
     }
     const arriving = fading.visuals.find((visual) => visual.kind === "fade-in");
     assert.ok(arriving && arriving.counterpart === null && Math.abs(arriving.opacity - 64 / 255) < 1e-4);
@@ -4209,7 +4219,7 @@ return root
     // viewport down and pushed the outgoing one as far.
     const sliding = layoutAt(writeScript("slide.lua", slideLua), 0.25).report.scenes.slice(1);
     assert.deepEqual(
-        sliding.map((entry) => entry.bounds),
+        sliding.map((entry) => rounded(entry.bounds)),
         [
             { x: 20, y: 35, width: 160, height: 60 },
             { x: 20, y: -25, width: 160, height: 60 },
@@ -4236,9 +4246,9 @@ return root
     for (const [index, { objectLua, areaLua }] of exactZooms.entries()) {
         const reports = [objectLua, areaLua].map((source, form) =>
             layoutAt(writeScript(`exact-zoom-${index}-${form}.lua`, source), 0.5).report);
-        assert.deepEqual(reports[0].scenes, reports[1].scenes);
-        assert.deepEqual(reports[0].visuals, reports[1].visuals);
-        assert.deepEqual(reports[0].paths, reports[1].paths);
+        assert.deepEqual(rounded(reports[0].scenes), rounded(reports[1].scenes));
+        assert.deepEqual(rounded(reports[0].visuals), rounded(reports[1].visuals));
+        assert.deepEqual(rounded(reports[0].paths), rounded(reports[1].paths));
     }
 
     const { path: viewportPath, scene: inspectedViewport } = inspectScript("viewport.lua", viewportLua);
