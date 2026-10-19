@@ -30,7 +30,7 @@ static Panel* _panel(lua_State* lua)
 
 static Vec2 _vec2(lua_State* lua, int index, const char* name)
 {
-    luaL_checktype(lua, index, LUA_TTABLE);
+    _checkTable(lua, index, name);
     index = lua_absindex(lua, index);
     Vec2 value;
     if (_has(lua, index, "x") || _has(lua, index, "y")) {
@@ -80,7 +80,7 @@ static UITransform _transform(lua_State* lua, int index, const char* name)
 {
     UITransform value;
     if (lua_isnil(lua, index)) return value;
-    luaL_checktype(lua, index, LUA_TTABLE);
+    _checkTable(lua, index, name);
     index = lua_absindex(lua, index);
     static const char* const options[] = {
         "shift", "scale", "rotation", "opacity", "progress", nullptr,
@@ -211,7 +211,7 @@ static int _slider(lua_State* lua)
                 lua, "slider target/from/to cannot be combined with bindings");
         }
         lua_getfield(lua, 2, "bindings");
-        luaL_checktype(lua, -1, LUA_TTABLE);
+        _checkTable(lua, -1, "slider bindings");
         auto list = lua_absindex(lua, -1);
         auto count = lua_rawlen(lua, list);
         if (!count || count > Panel::BindingLimit) {
@@ -224,7 +224,7 @@ static int _slider(lua_State* lua)
         };
         for (auto i = 0u; i < bindingCount; i++) {
             lua_rawgeti(lua, list, i + 1u);
-            luaL_checktype(lua, -1, LUA_TTABLE);
+            _checkTable(lua, -1, "a slider binding");
             auto binding = lua_absindex(lua, -1);
             _options(lua, binding, "UI config", bindingOptions);
             bindings[i].target = _fieldObject(lua, binding, "target", scene);
@@ -294,7 +294,7 @@ static int _sampleArea(lua_State* lua)
     auto scene = panel->scene();
     auto region = _fieldPointerRegion(lua, 2);
     lua_getfield(lua, 2, "targets");
-    luaL_checktype(lua, -1, LUA_TTABLE);
+    _checkTable(lua, -1, "sample_area targets");
     auto targetCount = lua_rawlen(lua, -1);
     if (!targetCount || targetCount > SampleArea::TargetLimit) {
         return luaL_error(lua, "sample_area targets must contain between 1 and %d objects",

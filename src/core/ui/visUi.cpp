@@ -27,8 +27,8 @@ static bool _valid(const InputEvent& event) noexcept
 static bool _valid(const UITransform& transform) noexcept
 {
     return _finite(transform.shift) && _finite(transform.scale) && _finite(transform.rotation)
-           && std::isfinite(transform.opacity) && transform.opacity >= 0.0f
-           && std::isfinite(transform.progress) && transform.progress >= 0.0f;
+           && transform.opacity >= 0.0f && transform.opacity <= 1.0f
+           && transform.progress >= 0.0f && transform.progress <= 1.0f;
 }
 
 static UITransform _lerp(const UITransform& from, const UITransform& to,
@@ -74,6 +74,31 @@ static void _compose(const UITransform& transform, Mat4& model, float& opacity,
     model = local * model;
     opacity = clamp01(opacity * transform.opacity);
     progress = clamp01(progress * transform.progress);
+}
+
+// Takes event into pressed, the press state of a control in region, and returns what the
+// control reports: a primary-button down in the region begins a press and captures the pointer,
+// moves while it lasts are handled, and the up or a cancel ends it and lets the pointer go. A
+// press redraws as it begins and ends; a disabled control takes only a cancel.
+static InputResult _press(const InputEvent& event, const BBox& region, bool enabled,
+                          bool& pressed) noexcept
+{
+    if (event.kind == InputKind::PointerCancel) {
+        if (!pressed) return {};
+        pressed = false;
+        return {true, true, false, true};
+    }
+    if (!enabled) return {};
+    if (event.kind == InputKind::PointerDown) {
+        if (event.button != 0 || !contains(region, event.position)) return {};
+        pressed = true;
+        return {true, true, true, false};
+    }
+    if (!pressed) return {};
+    if (event.kind == InputKind::PointerMove) return {true, false, false, false};
+    if (event.kind != InputKind::PointerUp) return {};
+    pressed = false;
+    return {true, true, false, true};
 }
 
 }  // namespace
@@ -160,35 +185,15 @@ bool Button::toggled() const noexcept
 
 InputResult Button::input(const InputEvent& event) noexcept
 {
-    if (event.kind == InputKind::PointerCancel) {
-        auto release = isPressed;
-        isPressed = false;
-        return {release, release, false, release};
+    auto result = _press(event, uiRegion, uiEnabled, isPressed);
+    // An up in the region activates the button.
+    if (result.release && event.kind == InputKind::PointerUp
+        && contains(uiRegion, event.position)) {
+        if (toggleMode) toggleValue = !toggleValue;
+        uiRevision++;
+        if (callback) callback(this, event, callbackData);
     }
-    if (!uiEnabled) return {};
-    switch (event.kind) {
-        case InputKind::PointerDown:
-            if (event.button != 0 || !contains(uiRegion, event.position)) return {};
-            isPressed = true;
-            return {true, true, true, false};
-        case InputKind::PointerMove:
-            return isPressed ? InputResult{true, false, false, false} : InputResult{};
-        case InputKind::PointerUp: {
-            if (!isPressed) return {};
-            isPressed = false;
-            auto activate = contains(uiRegion, event.position);
-            if (activate) {
-                if (toggleMode) toggleValue = !toggleValue;
-                uiRevision++;
-                if (callback) callback(this, event, callbackData);
-            }
-            return {true, true, false, true};
-        }
-        case InputKind::PointerCancel: break;
-        case InputKind::Wheel:
-        case InputKind::KeyDown: break;
-    }
-    return {};
+    return result;
 }
 
 Slider::Slider(Object* visual, const BBox& region, SliderAxis axis, float value,
@@ -250,31 +255,12 @@ bool Slider::update(const InputEvent& event) noexcept
 
 InputResult Slider::input(const InputEvent& event) noexcept
 {
-    if (event.kind == InputKind::PointerCancel) {
-        if (!isDragging) return {};
-        isDragging = false;
-        return {true, true, false, true};
-    }
-    if (!uiEnabled) return {};
-    switch (event.kind) {
-        case InputKind::PointerDown:
-            if (event.button != 0 || !contains(uiRegion, event.position)) return {};
-            isDragging = true;
-            update(event);
-            return {true, true, true, false};
-        case InputKind::PointerMove:
-            if (!isDragging) return {};
-            return {true, update(event), false, false};
-        case InputKind::PointerUp:
-            if (!isDragging) return {};
-            update(event);
-            isDragging = false;
-            return {true, true, false, true};
-        case InputKind::PointerCancel: break;
-        case InputKind::Wheel:
-        case InputKind::KeyDown: break;
-    }
-    return {};
+    auto result = _press(event, uiRegion, uiEnabled, isDragging);
+    // The value follows the pointer from the down to the up; a move redraws when it changes it.
+    if (!result.handled || event.kind == InputKind::PointerCancel) return result;
+    auto changed = update(event);
+    if (event.kind == InputKind::PointerMove) result.redraw = changed;
+    return result;
 }
 
 SampleArea::SampleArea(const Object* const* targets, uint32_t count,
@@ -353,36 +339,19 @@ void SampleArea::resolve(const PixelSample& sample) noexcept
 
 InputResult SampleArea::input(const InputEvent& event) noexcept
 {
-    if (event.kind == InputKind::PointerCancel) {
-        auto release = isPressed;
-        isPressed = false;
-        return {release, false, false, release};
+    auto result = _press(event, uiRegion, uiEnabled, isPressed);
+    // The press does not show; an up in the region asks for a sample where it is.
+    result.redraw = false;
+    if (result.release && event.kind == InputKind::PointerUp
+        && contains(uiRegion, event.position)) {
+        requestPosition = event.position;
+        requestValue = {
+            clamp01((event.position.x - uiRegion.x) / uiRegion.width),
+            clamp01((event.position.y - uiRegion.y) / uiRegion.height),
+        };
+        uiRevision++;
     }
-    if (!uiEnabled) return {};
-    switch (event.kind) {
-        case InputKind::PointerDown:
-            if (event.button != 0 || !contains(uiRegion, event.position)) return {};
-            isPressed = true;
-            return {true, false, true, false};
-        case InputKind::PointerMove:
-            return isPressed ? InputResult{true, false, false, false} : InputResult{};
-        case InputKind::PointerUp:
-            if (!isPressed) return {};
-            isPressed = false;
-            if (contains(uiRegion, event.position)) {
-                requestPosition = event.position;
-                requestValue = {
-                    clamp01((event.position.x - uiRegion.x) / uiRegion.width),
-                    clamp01((event.position.y - uiRegion.y) / uiRegion.height),
-                };
-                uiRevision++;
-            }
-            return {true, false, false, true};
-        case InputKind::PointerCancel: break;
-        case InputKind::Wheel:
-        case InputKind::KeyDown: break;
-    }
-    return {};
+    return result;
 }
 
 struct Panel::Impl
@@ -407,10 +376,9 @@ struct Panel::Impl
         Object* swatch = nullptr;
         CameraAction action = CameraAction::Pan;
         Vec2 delta;
+        // A slider's ends or a toggle's off and on; a button's transform is in to alone.
         UITransform from;
         UITransform to;
-        UITransform off;
-        UITransform on;
         detail::Retarget<UITransform> transition;
         float duration = 0.0f;
         Vec3 markerOrigin;
@@ -435,25 +403,78 @@ struct Panel::Impl
     SampleCallback sample = nullptr;
     void* sampleData = nullptr;
 
+    // What an object is to the panel: the visual of a control, a face of a button's states, the
+    // marker or swatch of a sample area, a candidate it samples, or the target of a transform.
+    enum struct Role : uint8_t
+    {
+        Visual,
+        Face,
+        Output,
+        Candidate,
+        Target
+    };
+
     ~Impl()
     {
         delete[] controls;
         delete[] bindings;
     }
 
-    // Whether object can take a transform: the scene's own, nested with no sample marker or
-    // swatch.
-    bool bindable(const Object* object) const noexcept
+    // Whether objects in roles first and second may not nest: visuals, faces, outputs and
+    // candidates exclude one another, save that two visuals or two candidates may nest, and
+    // transform targets exclude only outputs.
+    static bool exclusive(Role first, Role second) noexcept
     {
-        if (!object || scene->object(object->id()) != object) return false;
+        if (first == Role::Target || second == Role::Target) {
+            return first == Role::Output || second == Role::Output;
+        }
+        return first != second || first == Role::Face || first == Role::Output;
+    }
+
+    // Whether object, in role, nests with an object that the controls and bindings hold in a
+    // role that excludes it; except is a control whose own objects do not count.
+    bool overlaps(const Object* object, Role role,
+                  const UIObject* except = nullptr) const noexcept
+    {
+        auto clash = [object, role](const Object* held, Role part) {
+            return exclusive(role, part) && family(object, held);
+        };
+        for (auto i = 0u; i < controlCount; i++) {
+            if (controls[i] != except && clash(controls[i]->visual(), Role::Visual)) return true;
+        }
         for (auto i = 0u; i < bindingCount; i++) {
             auto& binding = bindings[i];
-            if (binding.kind == BindingKind::SampleArea
-                && (family(object, binding.object) || family(object, binding.swatch))) {
-                return false;
+            if (binding.control == except) continue;
+            if (binding.kind == BindingKind::ButtonStates) {
+                if (clash(binding.object, Role::Face) || clash(binding.hover, Role::Face)
+                    || clash(binding.pressed, Role::Face)) {
+                    return true;
+                }
+            } else if (binding.kind == BindingKind::SampleArea) {
+                if (clash(binding.object, Role::Output) || clash(binding.swatch, Role::Output)) {
+                    return true;
+                }
+                auto area = static_cast<const SampleArea*>(binding.control);
+                for (auto j = 0u; j < area->targetCount(); j++) {
+                    if (clash(area->targetAt(j), Role::Candidate)) return true;
+                }
+            } else if (clash(binding.object, Role::Target)) {
+                return true;
             }
         }
-        return true;
+        return false;
+    }
+
+    // Whether object is one of the scene's own.
+    bool owned(const Object* object) const noexcept
+    {
+        return object && scene->object(object->id()) == object;
+    }
+
+    // Whether object can take a transform: the scene's own, nested with no sample output.
+    bool bindable(const Object* object) const noexcept
+    {
+        return owned(object) && !overlaps(object, Role::Target);
     }
 
     Result add(const Binding& binding) noexcept
@@ -512,31 +533,9 @@ bool Panel::registered(const UIObject* control) const noexcept
 
 Result Panel::add(UIObject* control) noexcept
 {
-    if (!control || control == this || control->uiPanel || !validRegion(control->region())) {
+    if (!control || control == this || control->uiPanel || !validRegion(control->region())
+        || pImpl->overlaps(control->visual(), Impl::Role::Visual)) {
         return Result::InvalidArguments;
-    }
-    if (control->visual()) {
-        for (auto i = 0u; i < pImpl->bindingCount; i++) {
-            auto& binding = pImpl->bindings[i];
-            if (binding.kind == Impl::BindingKind::ButtonStates) {
-                if (family(control->visual(), binding.object)
-                    || family(control->visual(), binding.hover)
-                    || family(control->visual(), binding.pressed)) {
-                    return Result::InvalidArguments;
-                }
-            } else if (binding.kind == Impl::BindingKind::SampleArea) {
-                if (family(control->visual(), binding.object)
-                    || family(control->visual(), binding.swatch)) {
-                    return Result::InvalidArguments;
-                }
-                auto area = static_cast<SampleArea*>(binding.control);
-                for (auto j = 0u; j < area->sampleTargetCount; j++) {
-                    if (family(control->visual(), area->sampleTargets[j])) {
-                        return Result::InvalidArguments;
-                    }
-                }
-            }
-        }
     }
     if (pImpl->controlCount >= ControlLimit) return Result::InsufficientCondition;
     if (!grow(pImpl->controls, pImpl->controlCount, pImpl->controlCapacity, 1u, 8u)) {
@@ -596,7 +595,7 @@ void Panel::resetInteraction() noexcept
 
 InputResult Panel::input(const InputEvent& event) noexcept
 {
-    if (!_valid(event)) return {};
+    if (!_valid(event)) return {false, false, false, false, nullptr, Result::InvalidArguments};
     InputResult result;
     auto consumePending = [this, &result]() {
         result.handled = result.handled || pImpl->pendingRelease;
@@ -655,15 +654,11 @@ InputResult Panel::input(const InputEvent& event) noexcept
                         candidate.active = false;
                     }
                 }
-                binding.from = current;
-                if (binding.kind == Impl::BindingKind::ButtonToggle) {
-                    auto button = static_cast<Button*>(target);
-                    binding.to = button->toggleValue ? binding.on : binding.off;
-                }
+                auto off = binding.kind == Impl::BindingKind::ButtonToggle
+                        && !static_cast<Button*>(target)->toggleValue;
                 detail::retargetSet(binding.transition, current);
-                detail::retarget(binding.transition, binding.to, event.time,
-                                 binding.duration,
-                                 AnimCurve::preset(AnimCurvePreset::Smooth),
+                detail::retarget(binding.transition, off ? binding.from : binding.to, event.time,
+                                 binding.duration, AnimCurve::preset(AnimCurvePreset::Smooth),
                                  pImpl->scene->duration(), _buttonLerp);
                 binding.active = true;
                 result.redraw = true;
@@ -679,10 +674,6 @@ InputResult Panel::input(const InputEvent& event) noexcept
                 if (resolved == Result::InsufficientCondition) continue;
                 if (resolved != Result::Success) {
                     result.status = resolved;
-                    continue;
-                }
-                if (!sample.object) {
-                    result.status = Result::InvalidArguments;
                     continue;
                 }
                 auto candidate = false;
@@ -818,12 +809,10 @@ Result Panel::toggle(Button* control, Object* object, const UITransform& off,
         || !std::isfinite(duration) || duration < 0.0f || !pImpl->bindable(object)) {
         return Result::InvalidArguments;
     }
+    // A toggle is all a button does, though it may still change faces.
     for (auto i = 0u; i < pImpl->bindingCount; i++) {
         auto& binding = pImpl->bindings[i];
-        if (binding.control == control
-            && (binding.kind == Impl::BindingKind::ButtonCamera
-                || binding.kind == Impl::BindingKind::ButtonObject
-                || binding.kind == Impl::BindingKind::ButtonToggle)) {
+        if (binding.control == control && binding.kind != Impl::BindingKind::ButtonStates) {
             return Result::InvalidArguments;
         }
     }
@@ -831,11 +820,9 @@ Result Panel::toggle(Button* control, Object* object, const UITransform& off,
     binding.kind = Impl::BindingKind::ButtonToggle;
     binding.control = control;
     binding.object = object;
-    binding.off = off;
-    binding.on = on;
-    binding.from = value ? on : off;
-    binding.to = binding.from;
-    detail::retargetSet(binding.transition, binding.from);
+    binding.from = off;
+    binding.to = on;
+    detail::retargetSet(binding.transition, value ? on : off);
     binding.duration = duration;
     binding.active = true;
     auto result = pImpl->add(binding);
@@ -871,78 +858,30 @@ Result Panel::bind(Slider* control, Object* object, const UITransform& from,
 
 Result Panel::bind(SampleArea* control, const SampleBinding& sample) noexcept
 {
+    auto marker = sample.marker;
+    auto swatch = sample.swatch;
     if (!registered(control) || !_finite(sample.markerOrigin) || !_finite(sample.markerX)
-        || !_finite(sample.markerY)) {
+        || !_finite(sample.markerY) || family(marker, swatch)
+        || (marker && marker->childCount() && marker->type() != Type::Group)
+        || (swatch && (swatch->type() != Type::Rectangle || swatch->style.gradient.enabled()))) {
         return Result::InvalidArguments;
     }
-    auto owned = [this](const Object* object) {
-        return object && pImpl->scene->object(object->id()) == object;
-    };
+    // A sample area takes one binding.
+    for (auto i = 0u; i < pImpl->bindingCount; i++) {
+        if (pImpl->bindings[i].control == control) return Result::InvalidArguments;
+    }
     for (auto i = 0u; i < control->sampleTargetCount; i++) {
         auto target = control->sampleTargets[i];
-        if (!owned(target) || family(target, this)
-            || family(target, sample.marker) || family(target, sample.swatch)) {
+        if (!pImpl->owned(target) || family(target, this) || family(target, marker)
+            || family(target, swatch) || pImpl->overlaps(target, Impl::Role::Candidate)) {
             return Result::InvalidArguments;
         }
     }
-    if ((sample.marker && (!owned(sample.marker) || family(sample.marker, this)
-                           || (sample.marker->childCount()
-                               && sample.marker->type() != Type::Group)))
-        || (sample.swatch && (!owned(sample.swatch)
-                              || family(sample.swatch, this)
-                              || sample.swatch->type() != Type::Rectangle
-                              || sample.swatch->style.gradient.enabled()))
-        || family(sample.marker, sample.swatch)) {
-        return Result::InvalidArguments;
-    }
-    Object* faces[] = {sample.marker, sample.swatch};
-    for (auto i = 0u; i < pImpl->controlCount; i++) {
-        auto other = pImpl->controls[i];
-        if (!other->visual()) continue;
-        for (auto j = 0u; j < control->sampleTargetCount; j++) {
-            if (family(control->sampleTargets[j], other->visual())) {
-                return Result::InvalidArguments;
-            }
-        }
-        for (auto face : faces) {
-            if (family(face, other->visual())) return Result::InvalidArguments;
-        }
-    }
-    for (auto i = 0u; i < pImpl->bindingCount; i++) {
-        auto& binding = pImpl->bindings[i];
-        if (binding.control == control && binding.kind == Impl::BindingKind::SampleArea) {
+    const Object* outputs[] = {marker, swatch};
+    for (auto output : outputs) {
+        if (output && (!pImpl->owned(output) || family(output, this)
+                       || pImpl->overlaps(output, Impl::Role::Output))) {
             return Result::InvalidArguments;
-        }
-        Object* bound[] = {binding.object, binding.hover, binding.pressed, binding.swatch};
-        if (binding.kind == Impl::BindingKind::ButtonStates) {
-            for (auto j = 0u; j < control->sampleTargetCount; j++) {
-                for (auto object : bound) {
-                    if (family(control->sampleTargets[j], object)) {
-                        return Result::InvalidArguments;
-                    }
-                }
-            }
-        }
-        for (auto face : faces) {
-            for (auto object : bound) {
-                if (family(face, object)) return Result::InvalidArguments;
-            }
-        }
-        if (binding.kind == Impl::BindingKind::SampleArea) {
-            auto area = static_cast<SampleArea*>(binding.control);
-            for (auto j = 0u; j < control->sampleTargetCount; j++) {
-                if (family(control->sampleTargets[j], binding.object)
-                    || family(control->sampleTargets[j], binding.swatch)) {
-                    return Result::InvalidArguments;
-                }
-            }
-            for (auto j = 0u; j < area->sampleTargetCount; j++) {
-                for (auto face : faces) {
-                    if (family(face, area->sampleTargets[j])) {
-                        return Result::InvalidArguments;
-                    }
-                }
-            }
         }
     }
     Impl::Binding binding;
@@ -971,54 +910,12 @@ Result Panel::states(Button* control, Object* hover, Object* pressed) noexcept
     Object* faces[] = {normal, hover, pressed};
     for (auto i = 0u; i < 3u; i++) {
         if (!faces[i]) continue;
-        if (pImpl->scene->object(faces[i]->id()) != faces[i]) {
+        if (!pImpl->owned(faces[i]) || pImpl->overlaps(faces[i], Impl::Role::Face, control)) {
             return Result::InvalidArguments;
         }
         for (auto j = i + 1u; j < 3u; j++) {
             if (family(faces[i], faces[j])) return Result::InvalidArguments;
         }
-    }
-    for (auto i = 0u; i < pImpl->controlCount; i++) {
-        auto other = pImpl->controls[i];
-        if (other == control || !other->visual()) continue;
-        for (auto face : faces) {
-            if (family(face, other->visual())) return Result::InvalidArguments;
-        }
-    }
-    Impl::Binding* current = nullptr;
-    for (auto i = 0u; i < pImpl->bindingCount; i++) {
-        auto& binding = pImpl->bindings[i];
-        if (binding.kind == Impl::BindingKind::SampleArea) {
-            auto area = static_cast<SampleArea*>(binding.control);
-            for (auto face : faces) {
-                if (family(face, binding.object) || family(face, binding.swatch)) {
-                    return Result::InvalidArguments;
-                }
-                for (auto j = 0u; j < area->sampleTargetCount; j++) {
-                    if (family(face, area->sampleTargets[j])) {
-                        return Result::InvalidArguments;
-                    }
-                }
-            }
-            continue;
-        }
-        if (binding.kind != Impl::BindingKind::ButtonStates) continue;
-        if (binding.control == control) {
-            current = &binding;
-            continue;
-        }
-        Object* otherFaces[] = {binding.object, binding.hover, binding.pressed};
-        for (auto face : faces) {
-            for (auto other : otherFaces) {
-                if (family(face, other)) return Result::InvalidArguments;
-            }
-        }
-    }
-    if (current) {
-        current->object = normal;
-        current->hover = hover;
-        current->pressed = pressed;
-        return Result::Success;
     }
     Impl::Binding binding;
     binding.kind = Impl::BindingKind::ButtonStates;
@@ -1026,6 +923,14 @@ Result Panel::states(Button* control, Object* hover, Object* pressed) noexcept
     binding.object = normal;
     binding.hover = hover;
     binding.pressed = pressed;
+    // The faces take the place of those the button had.
+    for (auto i = 0u; i < pImpl->bindingCount; i++) {
+        auto& current = pImpl->bindings[i];
+        if (current.control == control && current.kind == binding.kind) {
+            current = binding;
+            return Result::Success;
+        }
+    }
     return pImpl->add(binding);
 }
 

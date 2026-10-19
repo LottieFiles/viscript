@@ -53,11 +53,15 @@ struct CallbackState
     uint32_t sliders = 0;
     float sliderValue = 0.0f;
     bool toggleValue = false;
+    // Whether the control was still pressed when it last called back.
+    bool pressed = false;
 };
 
-static void buttonCallback(Button*, const InputEvent&, void* data) noexcept
+static void buttonCallback(Button* button, const InputEvent&, void* data) noexcept
 {
-    static_cast<CallbackState*>(data)->buttons++;
+    auto state = static_cast<CallbackState*>(data);
+    state->buttons++;
+    state->pressed = button->pressed();
 }
 
 static void toggleCallback(Button* button, const InputEvent&, void* data) noexcept
@@ -67,11 +71,12 @@ static void toggleCallback(Button* button, const InputEvent&, void* data) noexce
     state->toggleValue = button->toggled();
 }
 
-static void sliderCallback(Slider*, float value, const InputEvent&, void* data) noexcept
+static void sliderCallback(Slider* slider, float value, const InputEvent&, void* data) noexcept
 {
     auto state = static_cast<CallbackState*>(data);
     state->sliders++;
     state->sliderValue = value;
+    state->pressed = slider->dragging();
 }
 
 struct PointerProbe final : UIObject
@@ -178,8 +183,13 @@ static void controls()
           && panel->controlAt(3u) == vertical && panel->controlAt(4u) == nullptr);
     CHECK(panel->add(button) == Result::InvalidArguments);
 
+    // An event the panel cannot read is refused and moves nothing.
+    auto nan = std::numeric_limits<float>::quiet_NaN();
+    auto result = panel->input(pointer(InputKind::PointerMove, nan, 25.0f));
+    CHECK(result.status == Result::InvalidArguments && !result.handled && !result.redraw);
+
     // Passive motion hovers only the last overlapping control and never activates it.
-    auto result = panel->input(pointer(InputKind::PointerMove, 25.0f, 25.0f));
+    result = panel->input(pointer(InputKind::PointerMove, 25.0f, 25.0f));
     CHECK(!result.handled && result.redraw && top->hovered() && !button->hovered());
     result = panel->input(pointer(InputKind::PointerMove, 25.0f, 25.0f));
     CHECK(!result.handled && !result.redraw && top->hovered());
@@ -193,7 +203,7 @@ static void controls()
     CHECK(result.handled && result.capture && result.redraw && top->pressed());
     result = panel->input(pointer(InputKind::PointerUp, 25.0f, 25.0f));
     CHECK(result.handled && result.release && top->hovered() && !top->pressed());
-    CHECK(state.buttons == 1u);
+    CHECK(state.buttons == 1u && !state.pressed);
 
     // A disabled top control is transparent to hit testing.
     top->enabled(false);
@@ -239,12 +249,16 @@ static void controls()
     CHECK(result.redraw && !button->hovered());
     panel->enabled(true);
 
+    // A slider calls back as the down, the moves and the up change its value; like a button's,
+    // its press has ended when the up calls back.
     result = panel->input(pointer(InputKind::PointerDown, 25.0f, 70.0f, 6u));
     CHECK(result.capture && horizontal->dragging() && _near(horizontal->value(), 0.25f));
+    CHECK(state.pressed);
     result = panel->input(pointer(InputKind::PointerMove, 160.0f, 70.0f, 6u));
-    CHECK(result.handled && _near(horizontal->value(), 1.0f));
+    CHECK(result.handled && _near(horizontal->value(), 1.0f) && state.pressed);
     result = panel->input(pointer(InputKind::PointerUp, -20.0f, 70.0f, 6u));
     CHECK(result.release && !horizontal->dragging() && _near(horizontal->value(), 0.0f));
+    CHECK(_near(state.sliderValue, 0.0f) && !state.pressed);
 
     result = panel->input(pointer(InputKind::PointerDown, 130.0f, 75.0f, 7u));
     CHECK(result.capture && vertical->dragging() && _near(vertical->value(), 0.25f));
@@ -371,6 +385,13 @@ static void objectBindings(Renderer* renderer)
     CHECK(transitionMid.center().x > transitionStart.center().x
           && transitionMid.center().x < transitionEnd.center().x);
     CHECK(panel->bind(animated, box, animatedTarget, -0.1f) == Result::InvalidArguments);
+    // Opacity and progress end at one.
+    UITransform over;
+    over.opacity = 1.5f;
+    CHECK(panel->bind(animated, box, over) == Result::InvalidArguments);
+    over.opacity = 1.0f;
+    over.progress = 2.0f;
+    CHECK(panel->bind(slider, box, from, over) == Result::InvalidArguments);
 
     delete scene;
 }
@@ -1093,6 +1114,34 @@ return scene
                  "ui-sample-targets.lua:4: sample_area targets must contain between 1 and 64 objects");
 }
 
+// A value that must be a table and is not stops the script with the name of the option.
+static void luaTables()
+{
+    static constexpr const char* cases[][2] = {
+        {"panel:button { visual = visual, region = region, camera = 'move', delta = 'up' }",
+         "delta must be a table, got string"},
+        {"panel:button { visual = visual, region = region, target = visual, transform = 1 }",
+         "transform must be a table, got number"},
+        {"panel:slider { visual = visual, region = region, bindings = 'all' }",
+         "slider bindings must be a table, got string"},
+        {"panel:slider { visual = visual, region = region, bindings = { 1 } }",
+         "a slider binding must be a table, got number"},
+        {"panel:sample_area { region = region }", "sample_area targets must be a table, got nil"},
+    };
+    for (auto& entry : cases) {
+        char source[512];
+        std::snprintf(source, sizeof(source), R"(
+local scene = vis.scene { width = 32, height = 32 }
+local visual = scene:rectangle { size = { 1, 1 } }
+local region = { 0, 0, 1, 1 }
+local panel = vis.ui.panel(scene)
+%s
+return scene
+        )", entry[0]);
+        _scriptError(source, "ui-table.lua", entry[1]);
+    }
+}
+
 int main()
 {
     pointerPosition();
@@ -1100,6 +1149,7 @@ int main()
     limits();
     luaBindings();
     luaLimits();
+    luaTables();
     auto renderer = Renderer::gen();
     CHECK(renderer != nullptr);
     if (renderer) {
