@@ -1,17 +1,14 @@
 // viscript audit: samples a scene over its duration and reports text that leaves the canvas or
 // its container, overlaps, occluded scenes and diagram issues, less the allowances the options
 // grant.
-#include <cerrno>
 #include <cmath>
 #include <cstdio>
-#include <cstdlib>
 #include <cstring>
 #include <limits>
 #include <new>
 
 #include "vis.h"
 #include "visAudit.h"
-#include "visLuaHost.h"
 #include "visCliCommon.h"
 #include "visSaver.h"
 #ifdef VIS_DIAGRAM
@@ -152,7 +149,47 @@ enum struct IssueCode : uint8_t
     DiagramSampledRouteRouteCollision,
     DiagramSampledRouteCanvasOverflow,
 #endif
+    Count,
 };
+
+// The code a report gives each IssueCode and the repair it suggests, in the order of the enum.
+static constexpr const char* ISSUES[][2] = {
+    {"missing_text_id", "assign-stable-id"},
+    {"duplicate_id", "make-id-unique"},
+    {"canvas_overflow", "move-or-reflow-content"},
+    {"text_gap", "separate-text"},
+    {"containment_overflow", "grow-container-or-wrap-text"},
+    {"container_not_visible", "align-container-visibility"},
+    {"invalid_container_type", "use-rectangle-container"},
+    {"missing_containment_owner", "declare-containment-or-uncontained"},
+    {"unmatched_containment", "fix-containment-ids"},
+    {"unmatched_uncontained", "fix-uncontained-id"},
+    {"never_visible_text", "register-font-or-fix-visibility"},
+    {"missing_glyphs", "use-a-font-with-these-glyphs"},
+    {"plane_text_size", "give-plane-text-size-in-world-units"},
+    {"viewport_stretch", "match-viewport-aspect-or-reflow"},
+    {"text_occluded", "remove-occluder-or-allow-scene-occlusion"},
+    {"duplicate_occluded_scene_allowance", "remove-duplicate-occlusion-allowance"},
+    {"unmatched_occluded_scene_allowance", "fix-occluded-scene-path"},
+    {"unused_occluded_scene_allowance", "remove-stale-occlusion-allowance"},
+    {"duplicate_overlap_allowance", "remove-duplicate-overlap-allowance"},
+    {"unmatched_overlap_allowance", "fix-overlap-scene-path-or-id"},
+    {"unused_overlap_allowance", "remove-stale-overlap-allowance"},
+#ifdef VIS_DIAGRAM
+    {"diagram_node_overlap", "separate-diagram-nodes"},
+    {"diagram_route_crosses_node", "reroute-or-move-diagram-node"},
+    {"diagram_edge_endpoint_detached", "reattach-diagram-edge"},
+    {"diagram_edge_port_mismatch", "correct-diagram-port-or-route"},
+    {"diagram_zone_excludes_member", "grow-diagram-zone-or-fix-membership"},
+    {"diagram_full_width_zone_mismatch", "align-full-width-diagram-zone"},
+    {"diagram_edge_endpoint_direction", "align-diagram-route-with-port"},
+    {"diagram_sampled_route_node_collision", "reroute-or-adjust-diagram-motion"},
+    {"diagram_sampled_route_label_collision", "move-diagram-label-or-reroute"},
+    {"diagram_sampled_route_route_collision", "separate-diagram-route-corridors"},
+    {"diagram_sampled_route_canvas_overflow", "move-diagram-route-inside-canvas"},
+#endif
+};
+static_assert(sizeof(ISSUES) / sizeof(ISSUES[0]) == static_cast<size_t>(IssueCode::Count), "words for every issue");
 
 struct Subject
 {
@@ -216,6 +253,23 @@ struct Issue
     float viewHeight = 0.0f;
 };
 
+// Makes room for one more value after count, doubling the capacity or starting it at first.
+template<typename T>
+static bool _grow(T*& values, uint32_t count, uint32_t& capacity, uint32_t first) noexcept
+{
+    if (count < capacity) return true;
+    auto nextCapacity = capacity ? capacity * 2u : first;
+    if (nextCapacity < capacity) return false;
+    auto next = new (std::nothrow) T[nextCapacity];
+    if (!next) return false;
+    for (auto i = 0u; i < count; i++)
+        next[i] = values[i];
+    delete[] values;
+    values = next;
+    capacity = nextCapacity;
+    return true;
+}
+
 struct IssueList
 {
     Issue* values = nullptr;
@@ -225,22 +279,6 @@ struct IssueList
     ~IssueList()
     {
         delete[] values;
-    }
-
-    bool grow() noexcept
-    {
-        auto nextCapacity = capacity ? capacity * 2u : 32u;
-        if (nextCapacity < capacity)
-            return false;
-        auto next = new (std::nothrow) Issue[nextCapacity];
-        if (!next)
-            return false;
-        for (auto i = 0u; i < count; i++)
-            next[i] = values[i];
-        delete[] values;
-        values = next;
-        capacity = nextCapacity;
-        return true;
     }
 };
 
@@ -265,33 +303,17 @@ struct TextList
 
     TextRecord* find(const Scene* scene, const Object* object, const char* path) const noexcept
     {
-        for (auto i = 0u; i < count; i++)
-        {
+        for (auto i = 0u; i < count; i++) {
             auto& value = values[i];
-            if (value.scene == scene && value.object == object && value.path == path)
-                return values + i;
+            if (value.scene == scene && value.object == object && value.path == path) return values + i;
         }
         return nullptr;
     }
 
     TextRecord* add(const Scene* scene, const Object* object, const char* path) noexcept
     {
-        if (auto value = find(scene, object, path))
-            return value;
-        if (count == capacity)
-        {
-            auto nextCapacity = capacity ? capacity * 2u : 32u;
-            if (nextCapacity < capacity)
-                return nullptr;
-            auto next = new (std::nothrow) TextRecord[nextCapacity];
-            if (!next)
-                return nullptr;
-            for (auto i = 0u; i < count; i++)
-                next[i] = values[i];
-            delete[] values;
-            values = next;
-            capacity = nextCapacity;
-        }
+        if (auto value = find(scene, object, path)) return value;
+        if (!_grow(values, count, capacity, 32u)) return nullptr;
         auto value = values + count++;
         *value = {scene, object, path, false};
         return value;
@@ -319,12 +341,9 @@ struct ScenePathList
 
     const char* find(const Scene* scene, const char* value) const noexcept
     {
-        if (!value)
-            return nullptr;
-        for (auto i = 0u; i < count; i++)
-        {
-            if (values[i].scene == scene && std::strcmp(values[i].value, value) == 0)
-                return values[i].value;
+        if (!value) return nullptr;
+        for (auto i = 0u; i < count; i++) {
+            if (values[i].scene == scene && std::strcmp(values[i].value, value) == 0) return values[i].value;
         }
         return nullptr;
     }
@@ -332,26 +351,11 @@ struct ScenePathList
     bool remember(const Scene* scene, const char* value, const char*& output) noexcept
     {
         output = find(scene, value);
-        if (output || !value)
-            return true;
-        if (count == capacity)
-        {
-            auto nextCapacity = capacity ? capacity * 2u : 16u;
-            if (nextCapacity < capacity)
-                return false;
-            auto next = new (std::nothrow) ScenePath[nextCapacity];
-            if (!next)
-                return false;
-            for (auto i = 0u; i < count; i++)
-                next[i] = values[i];
-            delete[] values;
-            values = next;
-            capacity = nextCapacity;
-        }
+        if (output || !value) return true;
+        if (!_grow(values, count, capacity, 16u)) return false;
         auto size = std::strlen(value);
         auto copy = new (std::nothrow) char[size + 1u];
-        if (!copy)
-            return false;
+        if (!copy) return false;
         std::memcpy(copy, value, size + 1u);
         values[count++] = {scene, copy};
         output = copy;
@@ -378,8 +382,7 @@ struct DiagramList
 
     ~DiagramList()
     {
-        for (auto i = 0u; i < count; i++)
-        {
+        for (auto i = 0u; i < count; i++) {
             delete values[i].constraints;
             delete values[i].physical;
         }
@@ -388,37 +391,20 @@ struct DiagramList
 
     bool contains(const diagram::IR* receipt, const Scene* scene) const noexcept
     {
-        for (auto i = 0u; i < count; i++)
-        {
-            if (values[i].receipt == receipt && values[i].scene == scene)
-                return true;
+        for (auto i = 0u; i < count; i++) {
+            if (values[i].receipt == receipt && values[i].scene == scene) return true;
         }
         return false;
     }
 
+    // Adds a record for a diagram the list does not contain yet.
     DiagramRecord* add(const diagram::IR* receipt, const Scene* scene, const char* path,
                        const Object* root) noexcept
     {
-        if (contains(receipt, scene))
-            return values;
-        if (count == capacity)
-        {
-            auto nextCapacity = capacity ? capacity * 2u : 8u;
-            if (nextCapacity < capacity)
-                return nullptr;
-            auto next = new (std::nothrow) DiagramRecord[nextCapacity];
-            if (!next)
-                return nullptr;
-            for (auto i = 0u; i < count; i++)
-                next[i] = values[i];
-            delete[] values;
-            values = next;
-            capacity = nextCapacity;
-        }
+        if (!_grow(values, count, capacity, 8u)) return nullptr;
         auto constraints = new (std::nothrow) diagram::ConstraintReport;
         auto physical = new (std::nothrow) diagram::PhysicalConstraintReport;
-        if (!constraints || !physical)
-        {
+        if (!constraints || !physical) {
             delete constraints;
             delete physical;
             return nullptr;
@@ -467,209 +453,27 @@ static bool _operand(const char* value)
     return value && value[0] && !(value[0] == '-' && value[1] == '-');
 }
 
-#ifdef VIS_DIAGRAM
-static bool _reserveContainments(Options& options, uint32_t additional) noexcept
-{
-    if (additional > UINT32_MAX - options.containmentCount)
-        return false;
-    auto required = options.containmentCount + additional;
-    if (required <= options.containmentCapacity)
-        return true;
-    auto nextCapacity = options.containmentCapacity ? options.containmentCapacity : 8u;
-    while (nextCapacity < required)
-    {
-        if (nextCapacity > UINT32_MAX / 2u)
-        {
-            nextCapacity = required;
-            break;
-        }
-        nextCapacity *= 2u;
-    }
-    auto next = new (std::nothrow) Containment[nextCapacity];
-    if (!next)
-        return false;
-    for (auto i = 0u; i < options.containmentCount; i++)
-        next[i] = options.containments[i];
-    delete[] options.containments;
-    options.containments = next;
-    options.containmentCapacity = nextCapacity;
-    return true;
-}
-
-static bool _appendContainment(Options& options, const Containment& containment) noexcept
-{
-    if (!_reserveContainments(options, 1u))
-        return false;
-    options.containments[options.containmentCount++] = containment;
-    return true;
-}
-#endif
+// The writer of C strings from visCliCommon.h, which the overload for slices would hide.
+using ::_json;
 
 static void _json(Slice value)
 {
     _jsonString(value.data, value.size);
 }
 
-static void _json(const char* value)
-{
-    if (value)
-        _json(_slice(value));
-    else
-        std::fputs("null", stdout);
-}
-
 static const char* _code(IssueCode code)
 {
-    switch (code)
-    {
-    case IssueCode::MissingTextId:
-        return "missing_text_id";
-    case IssueCode::DuplicateId:
-        return "duplicate_id";
-    case IssueCode::CanvasOverflow:
-        return "canvas_overflow";
-    case IssueCode::TextGap:
-        return "text_gap";
-    case IssueCode::ContainmentOverflow:
-        return "containment_overflow";
-    case IssueCode::ContainerNotVisible:
-        return "container_not_visible";
-    case IssueCode::InvalidContainerType:
-        return "invalid_container_type";
-    case IssueCode::MissingContainmentOwner:
-        return "missing_containment_owner";
-    case IssueCode::UnmatchedContainment:
-        return "unmatched_containment";
-    case IssueCode::UnmatchedUncontained:
-        return "unmatched_uncontained";
-    case IssueCode::NeverVisibleText:
-        return "never_visible_text";
-    case IssueCode::MissingGlyphs:
-        return "missing_glyphs";
-    case IssueCode::PlaneTextSize:
-        return "plane_text_size";
-    case IssueCode::ViewportStretch:
-        return "viewport_stretch";
-    case IssueCode::TextOccluded:
-        return "text_occluded";
-    case IssueCode::DuplicateOccludedSceneAllowance:
-        return "duplicate_occluded_scene_allowance";
-    case IssueCode::UnmatchedOccludedSceneAllowance:
-        return "unmatched_occluded_scene_allowance";
-    case IssueCode::UnusedOccludedSceneAllowance:
-        return "unused_occluded_scene_allowance";
-    case IssueCode::DuplicateOverlapAllowance:
-        return "duplicate_overlap_allowance";
-    case IssueCode::UnmatchedOverlapAllowance:
-        return "unmatched_overlap_allowance";
-    case IssueCode::UnusedOverlapAllowance:
-        return "unused_overlap_allowance";
-#ifdef VIS_DIAGRAM
-    case IssueCode::DiagramNodeOverlap:
-        return "diagram_node_overlap";
-    case IssueCode::DiagramRouteCrossesNode:
-        return "diagram_route_crosses_node";
-    case IssueCode::DiagramEdgeEndpointDetached:
-        return "diagram_edge_endpoint_detached";
-    case IssueCode::DiagramEdgePortMismatch:
-        return "diagram_edge_port_mismatch";
-    case IssueCode::DiagramZoneExcludesMember:
-        return "diagram_zone_excludes_member";
-    case IssueCode::DiagramFullWidthZoneMismatch:
-        return "diagram_full_width_zone_mismatch";
-    case IssueCode::DiagramEdgeEndpointDirection:
-        return "diagram_edge_endpoint_direction";
-    case IssueCode::DiagramSampledRouteNodeCollision:
-        return "diagram_sampled_route_node_collision";
-    case IssueCode::DiagramSampledRouteLabelCollision:
-        return "diagram_sampled_route_label_collision";
-    case IssueCode::DiagramSampledRouteRouteCollision:
-        return "diagram_sampled_route_route_collision";
-    case IssueCode::DiagramSampledRouteCanvasOverflow:
-        return "diagram_sampled_route_canvas_overflow";
-#endif
-    }
-    return "unknown";
+    return ISSUES[static_cast<uint8_t>(code)][0];
 }
 
 static const char* _repair(IssueCode code)
 {
-    switch (code)
-    {
-    case IssueCode::MissingTextId:
-        return "assign-stable-id";
-    case IssueCode::DuplicateId:
-        return "make-id-unique";
-    case IssueCode::CanvasOverflow:
-        return "move-or-reflow-content";
-    case IssueCode::TextGap:
-        return "separate-text";
-    case IssueCode::ContainmentOverflow:
-        return "grow-container-or-wrap-text";
-    case IssueCode::ContainerNotVisible:
-        return "align-container-visibility";
-    case IssueCode::InvalidContainerType:
-        return "use-rectangle-container";
-    case IssueCode::MissingContainmentOwner:
-        return "declare-containment-or-uncontained";
-    case IssueCode::UnmatchedContainment:
-        return "fix-containment-ids";
-    case IssueCode::UnmatchedUncontained:
-        return "fix-uncontained-id";
-    case IssueCode::NeverVisibleText:
-        return "register-font-or-fix-visibility";
-    case IssueCode::MissingGlyphs:
-        return "use-a-font-with-these-glyphs";
-    case IssueCode::PlaneTextSize:
-        return "give-plane-text-size-in-world-units";
-    case IssueCode::ViewportStretch:
-        return "match-viewport-aspect-or-reflow";
-    case IssueCode::TextOccluded:
-        return "remove-occluder-or-allow-scene-occlusion";
-    case IssueCode::DuplicateOccludedSceneAllowance:
-        return "remove-duplicate-occlusion-allowance";
-    case IssueCode::UnmatchedOccludedSceneAllowance:
-        return "fix-occluded-scene-path";
-    case IssueCode::UnusedOccludedSceneAllowance:
-        return "remove-stale-occlusion-allowance";
-    case IssueCode::DuplicateOverlapAllowance:
-        return "remove-duplicate-overlap-allowance";
-    case IssueCode::UnmatchedOverlapAllowance:
-        return "fix-overlap-scene-path-or-id";
-    case IssueCode::UnusedOverlapAllowance:
-        return "remove-stale-overlap-allowance";
-#ifdef VIS_DIAGRAM
-    case IssueCode::DiagramNodeOverlap:
-        return "separate-diagram-nodes";
-    case IssueCode::DiagramRouteCrossesNode:
-        return "reroute-or-move-diagram-node";
-    case IssueCode::DiagramEdgeEndpointDetached:
-        return "reattach-diagram-edge";
-    case IssueCode::DiagramEdgePortMismatch:
-        return "correct-diagram-port-or-route";
-    case IssueCode::DiagramZoneExcludesMember:
-        return "grow-diagram-zone-or-fix-membership";
-    case IssueCode::DiagramFullWidthZoneMismatch:
-        return "align-full-width-diagram-zone";
-    case IssueCode::DiagramEdgeEndpointDirection:
-        return "align-diagram-route-with-port";
-    case IssueCode::DiagramSampledRouteNodeCollision:
-        return "reroute-or-adjust-diagram-motion";
-    case IssueCode::DiagramSampledRouteLabelCollision:
-        return "move-diagram-label-or-reroute";
-    case IssueCode::DiagramSampledRouteRouteCollision:
-        return "separate-diagram-route-corridors";
-    case IssueCode::DiagramSampledRouteCanvasOverflow:
-        return "move-diagram-route-inside-canvas";
-#endif
-    }
-    return "review-layout";
+    return ISSUES[static_cast<uint8_t>(code)][1];
 }
 
 static bool _subjectEqual(const Subject& first, const Subject& second)
 {
-    if (first.object || second.object)
-        return first.object == second.object;
+    if (first.object || second.object) return first.object == second.object;
     return _equal(first.authoredId, second.authoredId);
 }
 
@@ -686,18 +490,14 @@ static Issue* _record(IssueList& issues, IssueCode code, Scope scope, Subject su
                       float score = 1.0f)
 {
     Issue* issue = nullptr;
-    for (auto i = 0u; i < issues.count; i++)
-    {
-        if (_sameIssue(issues.values[i], code, scope, subject, relatedScope, related))
-        {
+    for (auto i = 0u; i < issues.count; i++) {
+        if (_sameIssue(issues.values[i], code, scope, subject, relatedScope, related)) {
             issue = issues.values + i;
             break;
         }
     }
-    if (!issue)
-    {
-        if (issues.count == issues.capacity && !issues.grow())
-            return nullptr;
+    if (!issue) {
+        if (!_grow(issues.values, issues.count, issues.capacity, 32u)) return nullptr;
         issue = issues.values + issues.count++;
         *issue = {};
         issue->code = code;
@@ -713,10 +513,8 @@ static Issue* _record(IssueList& issues, IssueCode code, Scope scope, Subject su
         issue->score = score;
         return issue;
     }
-    if (sample.valid)
-        issue->last = sample;
-    if (score > issue->score)
-    {
+    if (sample.valid) issue->last = sample;
+    if (score > issue->score) {
         issue->worst = sample;
         issue->actual = actual;
         issue->required = required;
@@ -733,12 +531,10 @@ static bool _painted(const LayoutVisual* visual)
 // The world height the camera shows at its target, or zero when the camera does not say.
 static float _viewHeight(const Camera& camera)
 {
-    if (camera.projection == Projection::Orthographic)
-        return camera.orthoHeight > 0.0f ? camera.orthoHeight : 0.0f;
+    if (camera.projection == Projection::Orthographic) return camera.orthoHeight > 0.0f ? camera.orthoHeight : 0.0f;
     auto dx = camera.eye.x - camera.target.x, dy = camera.eye.y - camera.target.y, dz = camera.eye.z - camera.target.z;
     auto distance = std::sqrt(dx * dx + dy * dy + dz * dz);
-    if (!(distance > 0.0f) || !(camera.fov > 0.0f))
-        return 0.0f;
+    if (!(distance > 0.0f) || !(camera.fov > 0.0f)) return 0.0f;
     return 2.0f * distance * std::tan(0.5f * camera.fov);
 }
 
@@ -764,10 +560,8 @@ static float _axisClearance(float first, float firstSize, float second, float se
 {
     auto firstEnd = first + firstSize;
     auto secondEnd = second + secondSize;
-    if (firstEnd <= second)
-        return second - firstEnd;
-    if (secondEnd <= first)
-        return first - secondEnd;
+    if (firstEnd <= second) return second - firstEnd;
+    if (secondEnd <= first) return first - secondEnd;
     return -std::fmin(firstEnd, secondEnd) + std::fmax(first, second);
 }
 
@@ -779,12 +573,9 @@ static float _gap(const BBox& first, const BBox& second, Vec2& separation, float
     };
     auto horizontal = required - clearance.x;
     auto vertical = required - clearance.y;
-    if (horizontal <= vertical)
-    {
+    if (horizontal <= vertical) {
         separation.x = second.center().x < first.center().x ? -horizontal : horizontal;
-    }
-    else
-    {
+    } else {
         separation.y = second.center().y < first.center().y ? -vertical : vertical;
     }
     return std::fmax(clearance.x, clearance.y);
@@ -812,16 +603,14 @@ static bool _sameOverlap(const AllowedOverlap& first, const AllowedOverlap& seco
 static uint32_t _textIdentities(const LayoutReport& report, const LayoutVisual* visual, uint32_t (&indices)[2])
 {
     auto count = 0u;
-    if (!visual || visual->object >= report.objectCount())
-        return count;
+    if (!visual || visual->object >= report.objectCount()) return count;
     auto primary = report.objectAt(visual->object);
-    if (primary->object->type() == Type::Text)
-        indices[count++] = visual->object;
-    if (visual->kind == LayoutVisualKind::Morph && visual->counterpart < report.objectCount())
-    {
+    if (primary->object->type() == Type::Text) indices[count++] = visual->object;
+    if (visual->kind == LayoutVisualKind::Morph && visual->counterpart < report.objectCount()) {
         auto counterpart = report.objectAt(visual->counterpart);
-        if (counterpart->object->type() == Type::Text && visual->counterpart != visual->object)
+        if (counterpart->object->type() == Type::Text && visual->counterpart != visual->object) {
             indices[count++] = visual->counterpart;
+        }
     }
     return count;
 }
@@ -837,15 +626,11 @@ static uint32_t _parentIndex(const LayoutReport& report, uint32_t index)
 static bool _typeset(const LayoutReport& report, uint32_t first, uint32_t second)
 {
     auto count = report.objectCount();
-    for (auto group = _parentIndex(report, first); group < count; group = _parentIndex(report, group))
-    {
+    for (auto group = _parentIndex(report, first); group < count; group = _parentIndex(report, group)) {
         auto object = report.objectAt(group)->object;
-        if (!object || object->type() != Type::Group || !static_cast<const Group*>(object)->typeset)
-            continue;
-        for (auto other = _parentIndex(report, second); other < count; other = _parentIndex(report, other))
-        {
-            if (other == group)
-                return true;
+        if (!object || object->type() != Type::Group || !static_cast<const Group*>(object)->typeset) continue;
+        for (auto other = _parentIndex(report, second); other < count; other = _parentIndex(report, other)) {
+            if (other == group) return true;
         }
     }
     return false;
@@ -857,8 +642,7 @@ static bool _handoff(const LayoutReport& report, uint32_t first, uint32_t second
 {
     auto a = report.objectAt(first);
     auto b = report.objectAt(second);
-    if (a->scene != b->scene)
-        return false;
+    if (a->scene != b->scene) return false;
     auto scene = report.sceneAt(a->scene);
     return scene->scene && scene->scene->handoff(a->object, b->object, scene->time);
 }
@@ -869,23 +653,20 @@ static bool _allowed(Options& options, const LayoutReport& report, const LayoutV
     uint32_t firstIndices[2] = {};
     uint32_t secondIndices[2] = {};
     if (!_textIdentities(report, first, firstIndices) ||
-        !_textIdentities(report, second, secondIndices))
-    {
+        !_textIdentities(report, second, secondIndices)) {
         return false;
     }
     auto firstObject = report.objectAt(firstIndices[0]);
     auto secondObject = report.objectAt(secondIndices[0]);
     auto firstPath = report.sceneAt(firstObject->scene)->path;
     auto secondPath = report.sceneAt(secondObject->scene)->path;
-    for (auto allowance = 0u; allowance < options.allowedOverlapCount; allowance++)
-    {
+    for (auto allowance = 0u; allowance < options.allowedOverlapCount; allowance++) {
         auto& pair = options.allowedOverlaps[allowance];
         auto forward = _endpoint(pair.firstPath, pair.firstId, firstPath, firstObject->object) &&
                        _endpoint(pair.secondPath, pair.secondId, secondPath, secondObject->object);
         auto reverse = _endpoint(pair.firstPath, pair.firstId, secondPath, secondObject->object) &&
                        _endpoint(pair.secondPath, pair.secondId, firstPath, firstObject->object);
-        if (forward || reverse)
-        {
+        if (forward || reverse) {
             pair.used = true;
             return true;
         }
@@ -899,19 +680,16 @@ static const LayoutObject* _find(const LayoutReport& report, uint32_t scene, Sli
     const LayoutObject* found = nullptr;
     index = UINT32_MAX;
     auto count = 0u;
-    for (auto i = 0u; i < report.objectCount(); i++)
-    {
+    for (auto i = 0u; i < report.objectCount(); i++) {
         auto object = report.objectAt(i);
         auto tag = object->object->tag();
-        if (object->scene == scene && tag && _equal(id, tag))
-        {
+        if (object->scene == scene && tag && _equal(id, tag)) {
             found = object;
             index = i;
             count++;
         }
     }
-    if (matches)
-        *matches = count;
+    if (matches) *matches = count;
     return found;
 }
 
@@ -919,18 +697,15 @@ static const Object* _find(const Scene* scene, Slice id, uint32_t* matches = nul
 {
     const Object* found = nullptr;
     auto count = 0u;
-    for (auto i = 0u; i < scene->count(); i++)
-    {
+    for (auto i = 0u; i < scene->count(); i++) {
         auto object = scene->objectAt(i);
         auto tag = object->tag();
-        if (tag && _equal(id, tag))
-        {
+        if (tag && _equal(id, tag)) {
             found = object;
             count++;
         }
     }
-    if (matches)
-        *matches = count;
+    if (matches) *matches = count;
     return found;
 }
 
@@ -940,16 +715,34 @@ static char* _childPath(const char* parent, const char* kind, uint32_t index)
     char suffix[48];
     auto suffixSize = std::snprintf(suffix, sizeof(suffix), "/%s:%u", kind, index);
     if (suffixSize < 0 || static_cast<size_t>(suffixSize) >= sizeof(suffix) ||
-        parentSize > std::numeric_limits<size_t>::max() - static_cast<size_t>(suffixSize) - 1u)
-    {
+        parentSize > std::numeric_limits<size_t>::max() - static_cast<size_t>(suffixSize) - 1u) {
         return nullptr;
     }
     auto path = new (std::nothrow) char[parentSize + static_cast<size_t>(suffixSize) + 1u];
-    if (!path)
-        return nullptr;
+    if (!path) return nullptr;
     std::memcpy(path, parent, parentSize);
     std::memcpy(path + parentSize, suffix, static_cast<size_t>(suffixSize) + 1u);
     return path;
+}
+
+// Remembers the path the layout report gives scene, calls visit with the scene and that path, and
+// walks the viewports and then the transitions it plays the same way. Stops at the first failure.
+template<typename Visit>
+static Result _walk(const Scene* scene, const char* authoredPath, ScenePathList& paths, const Visit& visit)
+{
+    if (!scene || !authoredPath) return Result::InvalidArguments;
+    const char* path = nullptr;
+    if (!paths.remember(scene, authoredPath, path)) return Result::OutOfMemory;
+    auto status = visit(scene, path);
+    auto viewports = scene->viewportCount();
+    for (auto i = 0u; status == Result::Success && i < viewports + scene->transitionCount(); i++) {
+        auto viewport = i < viewports;
+        auto childPath = _childPath(path, viewport ? "viewport" : "transition", viewport ? i : i - viewports);
+        if (!childPath) return Result::OutOfMemory;
+        status = _walk(viewport ? scene->sceneAt(i) : scene->transitionAt(i - viewports), childPath, paths, visit);
+        delete[] childPath;
+    }
+    return status;
 }
 
 static Scope _scope(const LayoutReport& report, const ScenePathList& paths, uint32_t scene)
@@ -975,22 +768,17 @@ static Subject _subject(Slice id)
 static bool _evidence(const LayoutReport& report, const ScenePathList& paths, const LayoutVisual* visual,
                       uint32_t identity, VisualEvidence& evidence)
 {
-    if (!visual || identity >= report.objectCount())
-        return false;
+    if (!visual || identity >= report.objectCount()) return false;
     evidence = {};
     evidence.kind = visual->kind;
     evidence.valid = true;
     auto counterpart = visual->counterpart;
-    if (visual->kind == LayoutVisualKind::Morph && identity == visual->counterpart)
-        counterpart = visual->object;
-    if (counterpart == UINT32_MAX)
-        return true;
-    if (counterpart >= report.objectCount())
-        return false;
+    if (visual->kind == LayoutVisualKind::Morph && identity == visual->counterpart) counterpart = visual->object;
+    if (counterpart == UINT32_MAX) return true;
+    if (counterpart >= report.objectCount()) return false;
     auto object = report.objectAt(counterpart);
     evidence.counterpartScope = _scope(report, paths, object->scene);
-    if (!evidence.counterpartScope.path)
-        return false;
+    if (!evidence.counterpartScope.path) return false;
     evidence.counterpart = _subject(object->object);
     return true;
 }
@@ -1002,17 +790,13 @@ static bool _visualApplies(const LayoutVisual* visual, uint32_t object)
 
 static bool _markPainted(const LayoutReport& report, const ScenePathList& paths, uint32_t object, TextList& texts)
 {
-    if (object >= report.objectCount())
-        return false;
+    if (object >= report.objectCount()) return false;
     auto item = report.objectAt(object);
-    if (item->object->type() != Type::Text)
-        return true;
+    if (item->object->type() != Type::Text) return true;
     auto scope = _scope(report, paths, item->scene);
-    if (!scope.path)
-        return false;
+    if (!scope.path) return false;
     auto record = texts.find(scope.scene, item->object, scope.path);
-    if (!record)
-        return false;
+    if (!record) return false;
     record->painted = true;
     return true;
 }
@@ -1020,15 +804,11 @@ static bool _markPainted(const LayoutReport& report, const ScenePathList& paths,
 static const LayoutVisual* _visualFor(const LayoutReport& report, uint32_t object)
 {
     const LayoutVisual* found = nullptr;
-    for (auto i = 0u; i < report.visualCount(); i++)
-    {
+    for (auto i = 0u; i < report.visualCount(); i++) {
         auto visual = report.visualAt(i);
-        if (_visualApplies(visual, object))
-        {
-            if (_painted(visual) && visual->visible)
-                return visual;
-            if (!found || (_painted(visual) && !_painted(found)))
-                found = visual;
+        if (_visualApplies(visual, object)) {
+            if (_painted(visual) && visual->visible) return visual;
+            if (!found || (_painted(visual) && !_painted(found))) found = visual;
         }
     }
     return found;
@@ -1039,93 +819,33 @@ static bool _containmentApplies(const Containment& containment, const char* path
     return !containment.generated || _equal(containment.scenePath, path);
 }
 
+// Whether the ledger accounts for the text id at path: with a containment that applies there or
+// an allowance to stay uncontained.
+static bool _covered(const Options& options, const char* id, const char* path)
+{
+    if (!id) return false;
+    for (auto i = 0u; i < options.containmentCount; i++) {
+        if (_containmentApplies(options.containments[i], path) && _equal(options.containments[i].text, id)) return true;
+    }
+    for (auto i = 0u; i < options.allowedTextCount; i++) {
+        if (_equal(options.allowedTexts[i].id, id)) return true;
+    }
+    return false;
+}
+
 #ifdef VIS_DIAGRAM
-static bool _hasUserPolicy(const Options& options, const char* id)
-{
-    if (!id)
-        return false;
-    for (auto i = 0u; i < options.containmentCount; i++)
-    {
-        if (!options.containments[i].generated && _equal(options.containments[i].text, id))
-            return true;
-    }
-    for (auto i = 0u; i < options.allowedTextCount; i++)
-    {
-        if (_equal(options.allowedTexts[i].id, id))
-            return true;
-    }
-    return false;
-}
-
-static bool _hasGeneratedPolicy(const Options& options, const char* path, const char* id)
-{
-    if (!path || !id)
-        return false;
-    for (auto i = 0u; i < options.containmentCount; i++)
-    {
-        auto& containment = options.containments[i];
-        if (containment.generated && _equal(containment.scenePath, path) && _equal(containment.text, id))
-            return true;
-    }
-    return false;
-}
-
 static IssueCode _diagramIssueCode(diagram::ConstraintCode code)
 {
-    switch (code)
-    {
-    case diagram::ConstraintCode::NodeOverlap:
-        return IssueCode::DiagramNodeOverlap;
-    case diagram::ConstraintCode::RouteCrossesNode:
-        return IssueCode::DiagramRouteCrossesNode;
-    case diagram::ConstraintCode::EdgeEndpointDetached:
-        return IssueCode::DiagramEdgeEndpointDetached;
-    case diagram::ConstraintCode::EdgePortMismatch:
-        return IssueCode::DiagramEdgePortMismatch;
-    case diagram::ConstraintCode::ZoneExcludesMember:
-        return IssueCode::DiagramZoneExcludesMember;
-    case diagram::ConstraintCode::FullWidthZoneMismatch:
-        return IssueCode::DiagramFullWidthZoneMismatch;
-    case diagram::ConstraintCode::EdgeEndpointDirection:
-        return IssueCode::DiagramEdgeEndpointDirection;
+    switch (code) {
+        case diagram::ConstraintCode::NodeOverlap: return IssueCode::DiagramNodeOverlap;
+        case diagram::ConstraintCode::RouteCrossesNode: return IssueCode::DiagramRouteCrossesNode;
+        case diagram::ConstraintCode::EdgeEndpointDetached: return IssueCode::DiagramEdgeEndpointDetached;
+        case diagram::ConstraintCode::EdgePortMismatch: return IssueCode::DiagramEdgePortMismatch;
+        case diagram::ConstraintCode::ZoneExcludesMember: return IssueCode::DiagramZoneExcludesMember;
+        case diagram::ConstraintCode::FullWidthZoneMismatch: return IssueCode::DiagramFullWidthZoneMismatch;
+        case diagram::ConstraintCode::EdgeEndpointDirection: return IssueCode::DiagramEdgeEndpointDirection;
     }
     return IssueCode::DiagramNodeOverlap;
-}
-
-static Subject _diagramSubject(const diagram::IR& receipt, diagram::Node node)
-{
-    if (auto object = receipt.object(node))
-        return _subject(object);
-    if (node && node.index < receipt.nodeCount())
-    {
-        if (auto spec = receipt.nodeAt(node.index))
-            return _subject(_slice(spec->id));
-    }
-    return {};
-}
-
-static Subject _diagramSubject(const diagram::IR& receipt, diagram::Edge edge)
-{
-    if (auto object = receipt.object(edge))
-        return _subject(object);
-    if (edge && edge.index < receipt.edgeCount())
-    {
-        if (auto spec = receipt.edgeAt(edge.index))
-            return _subject(_slice(spec->id));
-    }
-    return {};
-}
-
-static Subject _diagramSubject(const diagram::IR& receipt, diagram::Zone zone)
-{
-    if (auto object = receipt.object(zone))
-        return _subject(object);
-    if (zone && zone.index < receipt.zoneCount())
-    {
-        if (auto spec = receipt.zoneAt(zone.index))
-            return _subject(_slice(spec->id));
-    }
-    return {};
 }
 
 static Slice _diagramId(const diagram::IR& receipt, diagram::Node node)
@@ -1146,6 +866,14 @@ static Slice _diagramId(const diagram::IR& receipt, diagram::Zone zone)
     return _slice(spec ? spec->id : nullptr);
 }
 
+// The object a node, an edge or a zone made, or its id when it made none.
+template<typename Entity>
+static Subject _diagramSubject(const diagram::IR& receipt, Entity entity)
+{
+    if (auto object = receipt.object(entity)) return _subject(object);
+    return _subject(_diagramId(receipt, entity));
+}
+
 static void _diagramProvenance(Issue& issue, const diagram::IR& receipt,
                                const char* provenance, const char* entityKind,
                                Slice entityId, const char* relatedKind = nullptr,
@@ -1163,10 +891,8 @@ static bool _addDiagramContainment(Options& options, const char* path, const dia
                                    const char* entityKind, const char* entityId, const char* role,
                                    const Text* text, const Rectangle* body)
 {
-    if (!text || !body || !text->tag() || !body->tag())
-        return true;
-    if (_hasUserPolicy(options, text->tag()) || _hasGeneratedPolicy(options, path, text->tag()))
-        return true;
+    if (!text || !body || !text->tag() || !body->tag()) return true;
+    if (_covered(options, text->tag(), path)) return true;
     Containment containment;
     containment.text = _slice(text->tag());
     containment.panel = _slice(body->tag());
@@ -1177,34 +903,35 @@ static bool _addDiagramContainment(Options& options, const char* path, const dia
     containment.role = _slice(role);
     containment.inset = options.panelInset;
     containment.generated = true;
-    return _appendContainment(options, containment);
+    if (!_grow(options.containments, options.containmentCount, options.containmentCapacity, 8u)) return false;
+    options.containments[options.containmentCount++] = containment;
+    return true;
 }
 
 static bool _addDiagramPolicies(Options& options, const char* path, const diagram::IR& receipt)
 {
-    for (auto i = 0u; i < receipt.nodeCount(); i++)
-    {
+    for (auto i = 0u; i < receipt.nodeCount(); i++) {
         auto node = diagram::Node{i};
         auto spec = receipt.nodeAt(i);
-        if (!spec)
-            return false;
+        if (!spec) return false;
         if (!_addDiagramContainment(options, path, receipt, "node", spec->id, "label", receipt.label(node),
-                                    receipt.body(node)))
+                                    receipt.body(node))) {
             return false;
+        }
         if (receipt.detail(node) &&
             !_addDiagramContainment(options, path, receipt, "node", spec->id, "detail", receipt.detail(node),
-                                    receipt.body(node)))
+                                    receipt.body(node))) {
             return false;
+        }
     }
-    for (auto i = 0u; i < receipt.zoneCount(); i++)
-    {
+    for (auto i = 0u; i < receipt.zoneCount(); i++) {
         auto zone = diagram::Zone{i};
         auto spec = receipt.zoneAt(i);
-        if (!spec)
-            return false;
+        if (!spec) return false;
         if (!_addDiagramContainment(options, path, receipt, "zone", spec->id, "label", receipt.label(zone),
-                                    receipt.body(zone)))
+                                    receipt.body(zone))) {
             return false;
+        }
     }
     return true;
 }
@@ -1214,57 +941,53 @@ static bool _addDiagramIssues(const DiagramRecord& diagramRecord, IssueList& iss
     auto& receipt = *diagramRecord.receipt;
     auto scope = Scope{diagramRecord.scene, diagramRecord.path};
     Sample structural;
-    for (auto i = 0u; i < diagramRecord.constraints->count(); i++)
-    {
+    for (auto i = 0u; i < diagramRecord.constraints->count(); i++) {
         auto constraint = diagramRecord.constraints->issueAt(i);
-        if (!constraint)
-            return false;
+        if (!constraint) return false;
         Subject subject;
         Subject related;
         const char* entityKind = nullptr;
         const char* relatedKind = nullptr;
         Slice entityId;
         Slice relatedId;
-        switch (constraint->code)
-        {
-        case diagram::ConstraintCode::NodeOverlap:
-            subject = _diagramSubject(receipt, constraint->node);
-            related = _diagramSubject(receipt, constraint->relatedNode);
-            entityKind = "node";
-            relatedKind = "node";
-            entityId = _diagramId(receipt, constraint->node);
-            relatedId = _diagramId(receipt, constraint->relatedNode);
-            break;
-        case diagram::ConstraintCode::RouteCrossesNode:
-        case diagram::ConstraintCode::EdgeEndpointDetached:
-        case diagram::ConstraintCode::EdgePortMismatch:
-        case diagram::ConstraintCode::EdgeEndpointDirection:
-            subject = _diagramSubject(receipt, constraint->edge);
-            related = _diagramSubject(receipt, constraint->node);
-            entityKind = "edge";
-            relatedKind = "node";
-            entityId = _diagramId(receipt, constraint->edge);
-            relatedId = _diagramId(receipt, constraint->node);
-            break;
-        case diagram::ConstraintCode::ZoneExcludesMember:
-            subject = _diagramSubject(receipt, constraint->zone);
-            related = _diagramSubject(receipt, constraint->node);
-            entityKind = "zone";
-            relatedKind = "node";
-            entityId = _diagramId(receipt, constraint->zone);
-            relatedId = _diagramId(receipt, constraint->node);
-            break;
-        case diagram::ConstraintCode::FullWidthZoneMismatch:
-            subject = _diagramSubject(receipt, constraint->zone);
-            entityKind = "zone";
-            entityId = _diagramId(receipt, constraint->zone);
-            break;
+        switch (constraint->code) {
+            case diagram::ConstraintCode::NodeOverlap:
+                subject = _diagramSubject(receipt, constraint->node);
+                related = _diagramSubject(receipt, constraint->relatedNode);
+                entityKind = "node";
+                relatedKind = "node";
+                entityId = _diagramId(receipt, constraint->node);
+                relatedId = _diagramId(receipt, constraint->relatedNode);
+                break;
+            case diagram::ConstraintCode::RouteCrossesNode:
+            case diagram::ConstraintCode::EdgeEndpointDetached:
+            case diagram::ConstraintCode::EdgePortMismatch:
+            case diagram::ConstraintCode::EdgeEndpointDirection:
+                subject = _diagramSubject(receipt, constraint->edge);
+                related = _diagramSubject(receipt, constraint->node);
+                entityKind = "edge";
+                relatedKind = "node";
+                entityId = _diagramId(receipt, constraint->edge);
+                relatedId = _diagramId(receipt, constraint->node);
+                break;
+            case diagram::ConstraintCode::ZoneExcludesMember:
+                subject = _diagramSubject(receipt, constraint->zone);
+                related = _diagramSubject(receipt, constraint->node);
+                entityKind = "zone";
+                relatedKind = "node";
+                entityId = _diagramId(receipt, constraint->zone);
+                relatedId = _diagramId(receipt, constraint->node);
+                break;
+            case diagram::ConstraintCode::FullWidthZoneMismatch:
+                subject = _diagramSubject(receipt, constraint->zone);
+                entityKind = "zone";
+                entityId = _diagramId(receipt, constraint->zone);
+                break;
         }
         auto issue = _record(issues, _diagramIssueCode(constraint->code), scope, subject,
                              related.object || related.authoredId.data ? scope : Scope{},
                              related, structural);
-        if (!issue)
-            return false;
+        if (!issue) return false;
         _diagramProvenance(*issue, receipt, "diagram-ir", entityKind, entityId,
                            relatedKind, relatedId);
     }
@@ -1273,38 +996,25 @@ static bool _addDiagramIssues(const DiagramRecord& diagramRecord, IssueList& iss
 
 static IssueCode _diagramPhysicalIssueCode(diagram::PhysicalConstraintCode code)
 {
-    switch (code)
-    {
-    case diagram::PhysicalConstraintCode::RouteNodeCollision:
-        return IssueCode::DiagramSampledRouteNodeCollision;
-    case diagram::PhysicalConstraintCode::RouteLabelCollision:
-        return IssueCode::DiagramSampledRouteLabelCollision;
-    case diagram::PhysicalConstraintCode::RouteRouteCollision:
-        return IssueCode::DiagramSampledRouteRouteCollision;
-    case diagram::PhysicalConstraintCode::RouteCanvasOverflow:
-        return IssueCode::DiagramSampledRouteCanvasOverflow;
+    switch (code) {
+        case diagram::PhysicalConstraintCode::RouteNodeCollision: return IssueCode::DiagramSampledRouteNodeCollision;
+        case diagram::PhysicalConstraintCode::RouteLabelCollision: return IssueCode::DiagramSampledRouteLabelCollision;
+        case diagram::PhysicalConstraintCode::RouteRouteCollision: return IssueCode::DiagramSampledRouteRouteCollision;
+        case diagram::PhysicalConstraintCode::RouteCanvasOverflow: return IssueCode::DiagramSampledRouteCanvasOverflow;
     }
     return IssueCode::DiagramSampledRouteNodeCollision;
 }
 
 static const char* _diagramPhysicalEntityKind(diagram::PhysicalEntityKind kind)
 {
-    switch (kind)
-    {
-    case diagram::PhysicalEntityKind::None:
-        return nullptr;
-    case diagram::PhysicalEntityKind::NodeBody:
-        return "node-body";
-    case diagram::PhysicalEntityKind::NodeLabel:
-        return "node-label";
-    case diagram::PhysicalEntityKind::NodeDetail:
-        return "node-detail";
-    case diagram::PhysicalEntityKind::EdgeRoute:
-        return "edge-route";
-    case diagram::PhysicalEntityKind::EdgeLabel:
-        return "edge-label";
-    case diagram::PhysicalEntityKind::ZoneLabel:
-        return "zone-label";
+    switch (kind) {
+        case diagram::PhysicalEntityKind::None: return nullptr;
+        case diagram::PhysicalEntityKind::NodeBody: return "node-body";
+        case diagram::PhysicalEntityKind::NodeLabel: return "node-label";
+        case diagram::PhysicalEntityKind::NodeDetail: return "node-detail";
+        case diagram::PhysicalEntityKind::EdgeRoute: return "edge-route";
+        case diagram::PhysicalEntityKind::EdgeLabel: return "edge-label";
+        case diagram::PhysicalEntityKind::ZoneLabel: return "zone-label";
     }
     return nullptr;
 }
@@ -1312,22 +1022,14 @@ static const char* _diagramPhysicalEntityKind(diagram::PhysicalEntityKind kind)
 static Subject _diagramPhysicalSubject(const diagram::IR& receipt,
                                        const diagram::PhysicalConstraintIssue& issue)
 {
-    switch (issue.relatedKind)
-    {
-    case diagram::PhysicalEntityKind::None:
-        return {};
-    case diagram::PhysicalEntityKind::NodeBody:
-        return _subject(receipt.body(issue.node));
-    case diagram::PhysicalEntityKind::NodeLabel:
-        return _subject(receipt.label(issue.node));
-    case diagram::PhysicalEntityKind::NodeDetail:
-        return _subject(receipt.detail(issue.node));
-    case diagram::PhysicalEntityKind::EdgeRoute:
-        return _subject(receipt.object(issue.relatedEdge));
-    case diagram::PhysicalEntityKind::EdgeLabel:
-        return _subject(receipt.label(issue.relatedEdge));
-    case diagram::PhysicalEntityKind::ZoneLabel:
-        return _subject(receipt.label(issue.zone));
+    switch (issue.relatedKind) {
+        case diagram::PhysicalEntityKind::None: return {};
+        case diagram::PhysicalEntityKind::NodeBody: return _subject(receipt.body(issue.node));
+        case diagram::PhysicalEntityKind::NodeLabel: return _subject(receipt.label(issue.node));
+        case diagram::PhysicalEntityKind::NodeDetail: return _subject(receipt.detail(issue.node));
+        case diagram::PhysicalEntityKind::EdgeRoute: return _subject(receipt.object(issue.relatedEdge));
+        case diagram::PhysicalEntityKind::EdgeLabel: return _subject(receipt.label(issue.relatedEdge));
+        case diagram::PhysicalEntityKind::ZoneLabel: return _subject(receipt.label(issue.zone));
     }
     return {};
 }
@@ -1336,34 +1038,25 @@ static Result _auditDiagramSample(const LayoutReport& layout, const Options& opt
                                   const Sample& sample, IssueList& issues,
                                   const DiagramList& diagrams, bool& failed)
 {
-    for (auto i = 0u; i < diagrams.count; i++)
-    {
+    for (auto i = 0u; i < diagrams.count; i++) {
         auto& record = diagrams.values[i];
         auto& receipt = *record.receipt;
         auto status = diagram::validatePhysical(receipt, layout, record.path,
                                                 options.diagramRouteGap,
                                                 options.canvasInset, *record.physical);
-        if (status != Result::Success)
-            return status;
+        if (status != Result::Success) return status;
         auto scope = Scope{record.scene, record.path};
-        for (auto j = 0u; j < record.physical->count(); j++)
-        {
+        for (auto j = 0u; j < record.physical->count(); j++) {
             auto physical = record.physical->issueAt(j);
-            if (!physical)
-                return Result::Unknown;
+            if (!physical) return Result::Unknown;
             auto subject = _diagramSubject(receipt, physical->edge);
             auto related = _diagramPhysicalSubject(receipt, *physical);
             Slice relatedId;
-            if (physical->node)
-            {
+            if (physical->node) {
                 relatedId = _diagramId(receipt, physical->node);
-            }
-            else if (physical->relatedEdge)
-            {
+            } else if (physical->relatedEdge) {
                 relatedId = _diagramId(receipt, physical->relatedEdge);
-            }
-            else if (physical->zone)
-            {
+            } else if (physical->zone) {
                 relatedId = _diagramId(receipt, physical->zone);
             }
             auto score = std::fmax(0.0f, physical->required - physical->actual);
@@ -1372,10 +1065,8 @@ static Result _auditDiagramSample(const LayoutReport& layout, const Options& opt
                                  related.object || related.authoredId.data ? scope : Scope{},
                                  related, sample, physical->actual,
                                  physical->required, score);
-            if (!issue)
-                return Result::OutOfMemory;
-            if (issue->worst.index == sample.index && issue->worst.final == sample.final)
-            {
+            if (!issue) return Result::OutOfMemory;
+            if (issue->worst.index == sample.index && issue->worst.final == sample.final) {
                 issue->subjectBounds = physical->routeBounds;
                 issue->relatedBounds = physical->relatedBounds;
                 issue->measured = true;
@@ -1390,68 +1081,24 @@ static Result _auditDiagramSample(const LayoutReport& layout, const Options& opt
     return Result::Success;
 }
 
-static Result _discoverDiagrams(const Scene* scene, const char* authoredPath, Options& options,
-                                IssueList& issues, ScenePathList& paths, DiagramList& diagrams)
+// Records the diagrams of a scene, the issues of their IR and the containments of their labels.
+static Result _discoverDiagrams(const Scene* scene, const char* path, Options& options, IssueList& issues,
+                                DiagramList& diagrams)
 {
-    if (!scene || !authoredPath)
-        return Result::InvalidArguments;
-    const char* path = nullptr;
-    if (!paths.remember(scene, authoredPath, path))
-        return Result::OutOfMemory;
-    for (auto i = 0u; i < scene->count(); i++)
-    {
+    for (auto i = 0u; i < scene->count(); i++) {
         auto receipt = diagram::ir(scene->objectAt(i));
-        if (!receipt || diagrams.contains(receipt, scene))
-            continue;
+        if (!receipt || diagrams.contains(receipt, scene)) continue;
         auto record = diagrams.add(receipt, scene, path, scene->objectAt(i));
-        if (!record)
-            return Result::OutOfMemory;
+        if (!record) return Result::OutOfMemory;
         auto status = diagram::validate(*receipt, *record->constraints);
-        if (status != Result::Success)
-            return status;
-        if (!_addDiagramPolicies(options, path, *receipt) || !_addDiagramIssues(*record, issues))
+        if (status != Result::Success) return status;
+        if (!_addDiagramPolicies(options, path, *receipt) || !_addDiagramIssues(*record, issues)) {
             return Result::OutOfMemory;
-    }
-    for (auto i = 0u; i < scene->viewportCount(); i++)
-    {
-        auto childPath = _childPath(path, "viewport", i);
-        if (!childPath)
-            return Result::OutOfMemory;
-        auto status = _discoverDiagrams(scene->sceneAt(i), childPath, options, issues, paths, diagrams);
-        delete[] childPath;
-        if (status != Result::Success)
-            return status;
-    }
-    for (auto i = 0u; i < scene->transitionCount(); i++)
-    {
-        auto childPath = _childPath(path, "transition", i);
-        if (!childPath)
-            return Result::OutOfMemory;
-        auto status = _discoverDiagrams(scene->transitionAt(i), childPath, options, issues, paths, diagrams);
-        delete[] childPath;
-        if (status != Result::Success)
-            return status;
+        }
     }
     return Result::Success;
 }
 #endif
-
-static bool _covered(const Options& options, const char* id, const char* path)
-{
-    if (!id)
-        return false;
-    for (auto i = 0u; i < options.containmentCount; i++)
-    {
-        if (_containmentApplies(options.containments[i], path) && _equal(options.containments[i].text, id))
-            return true;
-    }
-    for (auto i = 0u; i < options.allowedTextCount; i++)
-    {
-        if (_equal(options.allowedTexts[i].id, id))
-            return true;
-    }
-    return false;
-}
 
 static bool _containmentTextMatched(const Containment& containment)
 {
@@ -1471,10 +1118,8 @@ static bool _containmentMatched(const Containment& containment)
 static bool _occlusionAllowed(Options& options, const char* path)
 {
     auto allowed = false;
-    for (auto i = 0u; i < options.allowedOccludedSceneCount; i++)
-    {
-        if (_equal(options.allowedOccludedScenes[i].path, path))
-        {
+    for (auto i = 0u; i < options.allowedOccludedSceneCount; i++) {
+        if (_equal(options.allowedOccludedScenes[i].path, path)) {
             options.allowedOccludedScenes[i].used = true;
             allowed = true;
         }
@@ -1482,39 +1127,29 @@ static bool _occlusionAllowed(Options& options, const char* path)
     return allowed;
 }
 
-static bool _inventory(const Scene* scene, const char* authoredPath, Options& options, IssueList& issues,
-                       TextList& texts, ScenePathList& paths)
+// Takes stock of the texts and ids of a scene and checks the containments that apply to it.
+static bool _inventory(const Scene* scene, const char* path, Options& options, IssueList& issues, TextList& texts,
+                       ScenePathList& paths)
 {
-    if (!scene || !authoredPath)
-        return false;
-    const char* path = nullptr;
-    if (!paths.remember(scene, authoredPath, path))
-        return false;
     Scope scope = {scene, path};
     Sample structural;
 
-    for (auto i = 0u; i < options.allowedOccludedSceneCount; i++)
-    {
-        if (_equal(options.allowedOccludedScenes[i].path, path))
-            options.allowedOccludedScenes[i].matched = true;
+    for (auto i = 0u; i < options.allowedOccludedSceneCount; i++) {
+        if (_equal(options.allowedOccludedScenes[i].path, path)) options.allowedOccludedScenes[i].matched = true;
     }
 
-    for (auto i = 0u; i < scene->count(); i++)
-    {
+    for (auto i = 0u; i < scene->count(); i++) {
         auto object = scene->objectAt(i);
-        if (object->type() == Type::Text)
-        {
-            if (!texts.add(scene, object, path))
-                return false;
-            if (!object->tag())
-            {
-                if (!_record(issues, IssueCode::MissingTextId, scope, _subject(object), {}, {}, structural))
+        if (object->type() == Type::Text) {
+            if (!texts.add(scene, object, path)) return false;
+            if (!object->tag()) {
+                if (!_record(issues, IssueCode::MissingTextId, scope, _subject(object), {}, {}, structural)) {
                     return false;
-            }
-            else if (options.requireLedger && !_covered(options, object->tag(), path))
-            {
-                if (!_record(issues, IssueCode::MissingContainmentOwner, scope, _subject(object), {}, {}, structural))
+                }
+            } else if (options.requireLedger && !_covered(options, object->tag(), path)) {
+                if (!_record(issues, IssueCode::MissingContainmentOwner, scope, _subject(object), {}, {}, structural)) {
                     return false;
+                }
             }
             // A character the font has no glyph for vanishes from the frame without an error.
             // A text whose string changes shows only characters of the strings it changes
@@ -1522,26 +1157,20 @@ static bool _inventory(const Scene* scene, const char* authoredPath, Options& op
             auto text = static_cast<const Text*>(object);
             auto stringCount = text->texts(nullptr, 0u);
             auto strings = new (std::nothrow) const char*[stringCount];
-            if (!strings)
-                return false;
+            if (!strings) return false;
             text->texts(strings, stringCount);
             uint32_t missing = 0u;
             char firstMissing[5] = {};
-            for (auto s = 0u; s < stringCount; s++)
-            {
+            for (auto s = 0u; s < stringCount; s++) {
                 TextExtent extent;
-                if (text->measure(strings[s], extent) != Result::Success || !extent.missing)
-                    continue;
-                if (!missing)
-                    std::memcpy(firstMissing, extent.firstMissing, sizeof(firstMissing));
+                if (text->measure(strings[s], extent) != Result::Success || !extent.missing) continue;
+                if (!missing) std::memcpy(firstMissing, extent.firstMissing, sizeof(firstMissing));
                 missing += extent.missing;
             }
             delete[] strings;
-            if (missing)
-            {
+            if (missing) {
                 auto issue = _record(issues, IssueCode::MissingGlyphs, scope, _subject(object), {}, {}, structural);
-                if (!issue)
-                    return false;
+                if (!issue) return false;
                 issue->missing = missing;
                 std::memcpy(issue->firstMissing, firstMissing, sizeof(issue->firstMissing));
             }
@@ -1549,111 +1178,77 @@ static bool _inventory(const Scene* scene, const char* authoredPath, Options& op
             // size written in points on plane text makes an em taller than the whole view,
             // which covers the frame with one glyph.
             auto viewHeight = _viewHeight(scene->config().camera);
-            if (text->orientation == TextOrientation::Plane && viewHeight > 0.0f && text->size > viewHeight)
-            {
+            if (text->orientation == TextOrientation::Plane && viewHeight > 0.0f && text->size > viewHeight) {
                 auto issue = _record(issues, IssueCode::PlaneTextSize, scope, _subject(object), {}, {}, structural,
                                      text->size, viewHeight, text->size - viewHeight);
-                if (!issue)
-                    return false;
+                if (!issue) return false;
                 issue->planeEm = text->size;
                 issue->viewHeight = viewHeight;
             }
-            for (auto allowed = 0u; allowed < options.allowedTextCount; allowed++)
-            {
-                if (object->tag() && _equal(options.allowedTexts[allowed].id, object->tag()))
+            for (auto allowed = 0u; allowed < options.allowedTextCount; allowed++) {
+                if (object->tag() && _equal(options.allowedTexts[allowed].id, object->tag())) {
                     options.allowedTexts[allowed].matched = true;
+                }
             }
-            for (auto allowed = 0u; allowed < options.allowedOverlapCount; allowed++)
-            {
+            for (auto allowed = 0u; allowed < options.allowedOverlapCount; allowed++) {
                 auto& overlap = options.allowedOverlaps[allowed];
-                if (object->tag() && _equal(overlap.firstPath, path) && _equal(overlap.firstId, object->tag()))
+                if (object->tag() && _equal(overlap.firstPath, path) && _equal(overlap.firstId, object->tag())) {
                     overlap.firstMatched = true;
-                if (object->tag() && _equal(overlap.secondPath, path) && _equal(overlap.secondId, object->tag()))
+                }
+                if (object->tag() && _equal(overlap.secondPath, path) && _equal(overlap.secondId, object->tag())) {
                     overlap.secondMatched = true;
+                }
             }
         }
         auto tag = object->tag();
-        if (!tag)
-            continue;
-        for (auto j = i + 1u; j < scene->count(); j++)
-        {
+        if (!tag) continue;
+        for (auto j = i + 1u; j < scene->count(); j++) {
             auto other = scene->objectAt(j);
-            if (other->tag() && std::strcmp(tag, other->tag()) == 0)
-            {
+            if (other->tag() && std::strcmp(tag, other->tag()) == 0) {
                 if (!_record(issues, IssueCode::DuplicateId, scope, _subject(object), scope, _subject(other),
-                             structural))
-                {
+                             structural)) {
                     return false;
                 }
             }
         }
     }
 
-    for (auto constraint = 0u; constraint < options.containmentCount; constraint++)
-    {
+    for (auto constraint = 0u; constraint < options.containmentCount; constraint++) {
         auto& containment = options.containments[constraint];
-        if (!_containmentApplies(containment, path))
-            continue;
+        if (!_containmentApplies(containment, path)) continue;
         uint32_t textMatches = 0u;
         uint32_t panelMatches = 0u;
         auto text = _find(scene, containment.text, &textMatches);
         auto panel = _find(scene, containment.panel, &panelMatches);
-        if (!textMatches)
-            continue;
+        if (!textMatches) continue;
         containment.textSeen = true;
-        if (textMatches != 1u || text->type() != Type::Text)
-            containment.textInvalid = true;
-        if (panelMatches != 1u || panel->type() != Type::Rectangle)
-            containment.panelInvalid = true;
-        if (textMatches != 1u)
-            continue;
-        if (panelMatches != 1u)
-        {
+        if (textMatches != 1u || text->type() != Type::Text) containment.textInvalid = true;
+        if (panelMatches != 1u || panel->type() != Type::Rectangle) containment.panelInvalid = true;
+        if (textMatches != 1u) continue;
+        if (panelMatches != 1u) {
             if (!_record(issues, IssueCode::UnmatchedContainment, scope, _subject(text), scope,
-                         _subject(containment.panel), structural))
+                         _subject(containment.panel), structural)) {
                 return false;
+            }
             continue;
         }
-        if (text->type() != Type::Text || panel->type() != Type::Rectangle)
-        {
+        if (text->type() != Type::Text || panel->type() != Type::Rectangle) {
             if (!_record(issues, IssueCode::InvalidContainerType, scope, _subject(text), scope, _subject(panel),
-                         structural))
+                         structural)) {
                 return false;
+            }
         }
     }
 
-    for (auto i = 0u; i < scene->viewportCount(); i++)
-    {
-        auto childPath = _childPath(path, "viewport", i);
-        if (!childPath)
-            return false;
-        auto result = _inventory(scene->sceneAt(i), childPath, options, issues, texts, paths);
-        delete[] childPath;
-        if (!result)
-            return false;
-    }
-    for (auto i = 0u; i < scene->transitionCount(); i++)
-    {
-        auto childPath = _childPath(path, "transition", i);
-        if (!childPath)
-            return false;
-        auto result = _inventory(scene->transitionAt(i), childPath, options, issues, texts, paths);
-        delete[] childPath;
-        if (!result)
-            return false;
-    }
     // A view draws this scene's own objects again, so it adds a scene path to the report and
     // nothing to take stock of; an opaque view names that path when it hides a text.
-    for (auto i = 0u; i < scene->viewCount(); i++)
-    {
+    for (auto i = 0u; i < scene->viewCount(); i++) {
         auto childPath = _childPath(path, "view", i);
-        if (!childPath)
-            return false;
+        if (!childPath) return false;
         const char* viewPath = nullptr;
         auto result = paths.remember(scene, childPath, viewPath);
         delete[] childPath;
-        if (!result)
-            return false;
+        if (!result) return false;
     }
     return true;
 }
@@ -1662,20 +1257,15 @@ static bool _auditSample(const LayoutReport& report, Options& options, const Sam
                          TextList& texts, const ScenePathList& paths, bool& failed)
 {
     failed = false;
-    for (auto i = 0u; i < report.sceneCount(); i++)
-    {
+    for (auto i = 0u; i < report.sceneCount(); i++) {
         auto item = report.sceneAt(i);
         auto scope = _scope(report, paths, i);
-        if (!scope.path)
-            return false;
-        if (item->stretched && !options.allowViewportStretch)
-        {
+        if (!scope.path) return false;
+        if (item->stretched && !options.allowViewportStretch) {
             auto issue = _record(issues, IssueCode::ViewportStretch, scope, {}, {}, {}, sample,
                                  std::fabs(item->scaleX - item->scaleY), 0.0f, std::fabs(item->scaleX - item->scaleY));
-            if (!issue)
-                return false;
-            if (issue->worst.index == sample.index && issue->worst.final == sample.final)
-            {
+            if (!issue) return false;
+            if (issue->worst.index == sample.index && issue->worst.final == sample.final) {
                 issue->scaleX = item->scaleX;
                 issue->scaleY = item->scaleY;
                 issue->hasScale = true;
@@ -1684,47 +1274,33 @@ static bool _auditSample(const LayoutReport& report, Options& options, const Sam
         }
     }
 
-    for (auto i = 0u; i < report.visualCount(); i++)
-    {
+    for (auto i = 0u; i < report.visualCount(); i++) {
         auto visual = report.visualAt(i);
         uint32_t identities[2] = {};
         auto identityCount = _textIdentities(report, visual, identities);
-        if (!identityCount)
-            continue;
+        if (!identityCount) continue;
         auto item = report.objectAt(identities[0]);
         auto object = item->object;
         auto scope = _scope(report, paths, item->scene);
-        if (!scope.path)
-            return false;
-        if (_painted(visual))
-        {
-            for (auto identity = 0u; identity < identityCount; identity++)
-            {
-                if (!_markPainted(report, paths, identities[identity], texts))
-                    return false;
+        if (!scope.path) return false;
+        if (_painted(visual)) {
+            for (auto identity = 0u; identity < identityCount; identity++) {
+                if (!_markPainted(report, paths, identities[identity], texts)) return false;
             }
-            if (visual->occluded)
-            {
-                if (visual->occluder >= report.sceneCount())
-                    return false;
+            if (visual->occluded) {
+                if (visual->occluder >= report.sceneCount()) return false;
                 auto occluderScope = _scope(report, paths, visual->occluder);
-                if (!occluderScope.path)
-                    return false;
-                for (auto identity = 0u; identity < identityCount; identity++)
-                {
+                if (!occluderScope.path) return false;
+                for (auto identity = 0u; identity < identityCount; identity++) {
                     auto identityItem = report.objectAt(identities[identity]);
                     auto identityScope = _scope(report, paths, identityItem->scene);
-                    if (!identityScope.path)
-                        return false;
-                    if (_occlusionAllowed(options, identityScope.path))
-                        continue;
+                    if (!identityScope.path) return false;
+                    if (_occlusionAllowed(options, identityScope.path)) continue;
                     auto issue = _record(issues, IssueCode::TextOccluded, identityScope,
                                          _subject(identityItem->object), occluderScope, {}, sample);
-                    if (!issue)
-                        return false;
+                    if (!issue) return false;
                     if (issue->worst.index == sample.index && issue->worst.final == sample.final &&
-                        !_evidence(report, paths, visual, identities[identity], issue->visual))
-                    {
+                        !_evidence(report, paths, visual, identities[identity], issue->visual)) {
                         return false;
                     }
                     failed = true;
@@ -1732,30 +1308,24 @@ static bool _auditSample(const LayoutReport& report, Options& options, const Sam
                 continue;
             }
             auto actual = _clearance(visual->paintBounds, visual->clipBounds);
-            if (!visual->visible || visual->clipped || actual < options.canvasInset)
-            {
+            if (!visual->visible || visual->clipped || actual < options.canvasInset) {
                 auto score = std::fmax(0.0f, options.canvasInset - actual);
                 auto issue = _record(issues, IssueCode::CanvasOverflow, scope, _subject(object), {}, {}, sample, actual,
                                      options.canvasInset, score);
-                if (!issue)
-                    return false;
-                if (issue->worst.index == sample.index && issue->worst.final == sample.final)
-                {
+                if (!issue) return false;
+                if (issue->worst.index == sample.index && issue->worst.final == sample.final) {
                     issue->subjectBounds = visual->paintBounds;
                     issue->relatedBounds = visual->clipBounds;
                     issue->measured = true;
                     _overflow(visual->paintBounds, visual->clipBounds, options.canvasInset, *issue);
-                    if (!_evidence(report, paths, visual, identities[0], issue->visual))
-                        return false;
+                    if (!_evidence(report, paths, visual, identities[0], issue->visual)) return false;
                 }
                 failed = true;
             }
         }
 
-        if (!visual->visible || visual->occluded || !_painted(visual))
-            continue;
-        for (auto j = i + 1u; j < report.visualCount(); j++)
-        {
+        if (!visual->visible || visual->occluded || !_painted(visual)) continue;
+        for (auto j = i + 1u; j < report.visualCount(); j++) {
             auto otherVisual = report.visualAt(j);
             uint32_t otherIdentities[2] = {};
             auto otherIdentityCount = _textIdentities(report, otherVisual, otherIdentities);
@@ -1764,30 +1334,25 @@ static bool _auditSample(const LayoutReport& report, Options& options, const Sam
                 !visual->paintBounds.intersects(otherVisual->paintBounds, options.textGap) ||
                 _typeset(report, identities[0], otherIdentities[0]) ||
                 _handoff(report, identities[0], otherIdentities[0]) ||
-                _allowed(options, report, visual, otherVisual))
-            {
+                _allowed(options, report, visual, otherVisual)) {
                 continue;
             }
             auto other = report.objectAt(otherIdentities[0]);
             auto otherScope = _scope(report, paths, other->scene);
-            if (!otherScope.path)
-                return false;
+            if (!otherScope.path) return false;
             Vec2 separation;
             auto actual = _gap(visual->paintBounds, otherVisual->paintBounds, separation, options.textGap);
             auto issue = _record(issues, IssueCode::TextGap, scope, _subject(object), otherScope,
                                  _subject(other->object), sample, actual, options.textGap, options.textGap - actual);
-            if (!issue)
-                return false;
-            if (issue->worst.index == sample.index && issue->worst.final == sample.final)
-            {
+            if (!issue) return false;
+            if (issue->worst.index == sample.index && issue->worst.final == sample.final) {
                 issue->subjectBounds = visual->paintBounds;
                 issue->relatedBounds = otherVisual->paintBounds;
                 issue->separation = separation;
                 issue->measured = true;
                 issue->hasSeparation = true;
                 if (!_evidence(report, paths, visual, identities[0], issue->visual) ||
-                    !_evidence(report, paths, otherVisual, otherIdentities[0], issue->relatedVisual))
-                {
+                    !_evidence(report, paths, otherVisual, otherIdentities[0], issue->relatedVisual)) {
                     return false;
                 }
             }
@@ -1795,16 +1360,12 @@ static bool _auditSample(const LayoutReport& report, Options& options, const Sam
         }
     }
 
-    for (auto constraint = 0u; constraint < options.containmentCount; constraint++)
-    {
+    for (auto constraint = 0u; constraint < options.containmentCount; constraint++) {
         auto& containment = options.containments[constraint];
-        for (auto sceneIndex = 0u; sceneIndex < report.sceneCount(); sceneIndex++)
-        {
+        for (auto sceneIndex = 0u; sceneIndex < report.sceneCount(); sceneIndex++) {
             auto scope = _scope(report, paths, sceneIndex);
-            if (!scope.path)
-                return false;
-            if (!_containmentApplies(containment, scope.path))
-                continue;
+            if (!scope.path) return false;
+            if (!_containmentApplies(containment, scope.path)) continue;
             uint32_t textMatches = 0u;
             uint32_t panelMatches = 0u;
             uint32_t textIndex = UINT32_MAX;
@@ -1812,50 +1373,39 @@ static bool _auditSample(const LayoutReport& report, Options& options, const Sam
             auto text = _find(report, sceneIndex, containment.text, textIndex, &textMatches);
             auto panel = _find(report, sceneIndex, containment.panel, panelIndex, &panelMatches);
             if (textMatches != 1u || panelMatches != 1u || text->object->type() != Type::Text ||
-                panel->object->type() != Type::Rectangle)
-            {
+                panel->object->type() != Type::Rectangle) {
                 continue;
             }
             auto textVisual = _visualFor(report, textIndex);
-            if (!textVisual || textVisual->occluded || !_painted(textVisual))
-                continue;
+            if (!textVisual || textVisual->occluded || !_painted(textVisual)) continue;
             auto panelVisual = _visualFor(report, panelIndex);
             if (!panelVisual || !panelVisual->visible || panelVisual->clipped || panelVisual->occluded ||
-                !_painted(panelVisual))
-            {
+                !_painted(panelVisual)) {
                 auto issue = _record(issues, IssueCode::ContainerNotVisible, scope, _subject(text->object), scope,
                                      _subject(panel->object), sample);
-                if (!issue)
-                {
-                    return false;
-                }
-                if (issue->worst.index == sample.index && issue->worst.final == sample.final)
-                {
-                    if (!_evidence(report, paths, textVisual, textIndex, issue->visual))
+                if (!issue) return false;
+                if (issue->worst.index == sample.index && issue->worst.final == sample.final) {
+                    if (!_evidence(report, paths, textVisual, textIndex, issue->visual)) return false;
+                    if (panelVisual && !_evidence(report, paths, panelVisual, panelIndex, issue->relatedVisual)) {
                         return false;
-                    if (panelVisual && !_evidence(report, paths, panelVisual, panelIndex, issue->relatedVisual))
-                        return false;
+                    }
                 }
                 failed = true;
                 continue;
             }
             auto actual = _clearance(textVisual->paintBounds, panelVisual->paintBounds);
-            if (actual < containment.inset)
-            {
+            if (actual < containment.inset) {
                 auto issue =
                     _record(issues, IssueCode::ContainmentOverflow, scope, _subject(text->object), scope,
                             _subject(panel->object), sample, actual, containment.inset, containment.inset - actual);
-                if (!issue)
-                    return false;
-                if (issue->worst.index == sample.index && issue->worst.final == sample.final)
-                {
+                if (!issue) return false;
+                if (issue->worst.index == sample.index && issue->worst.final == sample.final) {
                     issue->subjectBounds = textVisual->paintBounds;
                     issue->relatedBounds = panelVisual->paintBounds;
                     issue->measured = true;
                     _overflow(textVisual->paintBounds, panelVisual->paintBounds, containment.inset, *issue);
                     if (!_evidence(report, paths, textVisual, textIndex, issue->visual) ||
-                        !_evidence(report, paths, panelVisual, panelIndex, issue->relatedVisual))
-                    {
+                        !_evidence(report, paths, panelVisual, panelIndex, issue->relatedVisual)) {
                         return false;
                     }
                 }
@@ -1869,104 +1419,68 @@ static bool _auditSample(const LayoutReport& report, Options& options, const Sam
 static bool _finish(Options& options, IssueList& issues, const TextList& texts)
 {
     Sample structural;
-    for (auto i = 0u; i < texts.count; i++)
-    {
+    for (auto i = 0u; i < texts.count; i++) {
         // A text its scene never shows, as a piece a match from a copy lets go of at once, is
         // not missing from the frames.
         auto& text = texts.values[i];
         if (!text.painted && text.scene->shows(text.object) &&
             !_record(issues, IssueCode::NeverVisibleText, {text.scene, text.path}, _subject(text.object), {}, {},
-                     structural))
+                     structural)) {
             return false;
+        }
     }
-    for (auto i = 0u; i < options.containmentCount; i++)
-    {
+    for (auto i = 0u; i < options.containmentCount; i++) {
         auto& containment = options.containments[i];
         auto scope = containment.generated ? Scope{nullptr, containment.scenePath.data} : Scope{};
         if (!containment.textSeen &&
             !_record(issues, IssueCode::UnmatchedContainment, scope, _subject(containment.text), scope,
-                     _subject(containment.panel), structural))
+                     _subject(containment.panel), structural)) {
             return false;
-    }
-    if (options.requireLedger)
-    {
-        for (auto i = 0u; i < options.allowedTextCount; i++)
-        {
-            if (!options.allowedTexts[i].matched && !_record(issues, IssueCode::UnmatchedUncontained, {},
-                                                             _subject(options.allowedTexts[i].id), {}, {}, structural))
-                return false;
         }
     }
-    for (auto i = 0u; i < options.allowedOverlapCount; i++)
-    {
-        auto& allowed = options.allowedOverlaps[i];
-        auto firstScope = Scope{nullptr, allowed.firstPath.data};
-        auto secondScope = Scope{nullptr, allowed.secondPath.data};
-        if (allowed.duplicate)
-        {
-            auto alreadyReported = false;
-            for (auto previous = 0u; previous < i; previous++)
-            {
-                if (_sameOverlap(allowed, options.allowedOverlaps[previous]))
-                {
-                    alreadyReported = true;
-                    break;
-                }
+    if (options.requireLedger) {
+        for (auto i = 0u; i < options.allowedTextCount; i++) {
+            if (!options.allowedTexts[i].matched &&
+                !_record(issues, IssueCode::UnmatchedUncontained, {}, _subject(options.allowedTexts[i].id), {}, {},
+                         structural)) {
+                return false;
             }
-            if (alreadyReported)
-                continue;
-            if (!_record(issues, IssueCode::DuplicateOverlapAllowance, firstScope, _subject(allowed.firstId),
-                         secondScope, _subject(allowed.secondId), structural))
-                return false;
         }
-        else if (!allowed.firstMatched || !allowed.secondMatched)
-        {
-            if (!_record(issues, IssueCode::UnmatchedOverlapAllowance, firstScope, _subject(allowed.firstId),
-                         secondScope, _subject(allowed.secondId), structural))
-                return false;
+    }
+    for (auto i = 0u; i < options.allowedOverlapCount; i++) {
+        auto& allowed = options.allowedOverlaps[i];
+        auto code = IssueCode::UnusedOverlapAllowance;
+        if (allowed.duplicate) {
+            // The first of the allowances for one pair reports them all.
+            auto reported = false;
+            for (auto previous = 0u; previous < i && !reported; previous++)
+                reported = _sameOverlap(allowed, options.allowedOverlaps[previous]);
+            if (reported) continue;
+            code = IssueCode::DuplicateOverlapAllowance;
+        } else if (!allowed.firstMatched || !allowed.secondMatched) {
+            code = IssueCode::UnmatchedOverlapAllowance;
+        } else if (allowed.used) {
+            continue;
         }
-        else if (!allowed.used &&
-                 !_record(issues, IssueCode::UnusedOverlapAllowance, firstScope, _subject(allowed.firstId),
-                          secondScope, _subject(allowed.secondId), structural))
-        {
+        if (!_record(issues, code, {nullptr, allowed.firstPath.data}, _subject(allowed.firstId),
+                     {nullptr, allowed.secondPath.data}, _subject(allowed.secondId), structural)) {
             return false;
         }
     }
-    for (auto i = 0u; i < options.allowedOccludedSceneCount; i++)
-    {
+    for (auto i = 0u; i < options.allowedOccludedSceneCount; i++) {
         auto& allowed = options.allowedOccludedScenes[i];
-        if (allowed.duplicate)
-        {
-            if (!_record(issues, IssueCode::DuplicateOccludedSceneAllowance, {}, _subject(allowed.path), {}, {},
-                         structural))
-                return false;
-        }
-        else if (!allowed.matched &&
-                 !_record(issues, IssueCode::UnmatchedOccludedSceneAllowance, {}, _subject(allowed.path), {}, {},
-                          structural))
-        {
-            return false;
-        }
-        else if (allowed.matched && !allowed.used &&
-                 !_record(issues, IssueCode::UnusedOccludedSceneAllowance, {}, _subject(allowed.path), {}, {},
-                          structural))
-        {
-            return false;
-        }
+        auto code = IssueCode::UnusedOccludedSceneAllowance;
+        if (allowed.duplicate) code = IssueCode::DuplicateOccludedSceneAllowance;
+        else if (!allowed.matched) code = IssueCode::UnmatchedOccludedSceneAllowance;
+        else if (allowed.used) continue;
+        if (!_record(issues, code, {}, _subject(allowed.path), {}, {}, structural)) return false;
     }
     return true;
 }
 
-static void _bbox(const BBox& bounds)
-{
-    std::printf("{\"x\":%.6g,\"y\":%.6g,\"width\":%.6g,\"height\":%.6g}", bounds.x, bounds.y, bounds.width,
-                bounds.height);
-}
-
 static void _sample(const Sample& sample)
 {
-    if (!sample.valid)
-    {
+    if (!sample.valid) {
         std::fputs("null", stdout);
         return;
     }
@@ -1977,58 +1491,41 @@ static void _sample(const Sample& sample)
 static void _subject(const Subject& subject)
 {
     std::putchar('{');
-    if (subject.object)
-    {
+    if (subject.object) {
         std::printf("\"handle\":%u,\"id\":", subject.object->id());
         _json(subject.object->tag());
         std::fputs(",\"type\":", stdout);
         _json(type(subject.object->type()));
-    }
-    else
-    {
+    } else {
         std::fputs("\"handle\":null,\"id\":", stdout);
-        if (subject.authoredId.data)
-            _json(subject.authoredId);
-        else
-            std::fputs("null", stdout);
+        if (subject.authoredId.data) _json(subject.authoredId);
+        else std::fputs("null", stdout);
         std::fputs(",\"type\":null", stdout);
     }
     std::putchar('}');
 }
 
-static const char* _kind(LayoutVisualKind kind)
-{
-    switch (kind)
-    {
-    case LayoutVisualKind::Stable:
-        return "stable";
-    case LayoutVisualKind::Morph:
-        return "morph";
-    case LayoutVisualKind::FadeOut:
-        return "fade-out";
-    case LayoutVisualKind::FadeIn:
-        return "fade-in";
-    }
-    return "unknown";
-}
-
 static void _evidence(const VisualEvidence& evidence)
 {
-    if (!evidence.valid)
-    {
+    if (!evidence.valid) {
         std::fputs("null", stdout);
         return;
     }
     std::fputs("{\"kind\":", stdout);
-    _json(_kind(evidence.kind));
+    _json(_visualKind(evidence.kind));
     std::fputs(",\"counterpartScenePath\":", stdout);
     _json(evidence.counterpartScope.path);
     std::fputs(",\"counterpart\":", stdout);
-    if (evidence.counterpart.object || evidence.counterpart.authoredId.data)
-        _subject(evidence.counterpart);
-    else
-        std::fputs("null", stdout);
+    if (evidence.counterpart.object || evidence.counterpart.authoredId.data) _subject(evidence.counterpart);
+    else std::fputs("null", stdout);
     std::putchar('}');
+}
+
+// The thresholds, which the report gives on their own and again in its policy.
+static void _thresholds(const Options& options)
+{
+    std::printf(",\"thresholds\":{\"textGap\":%.6g,\"canvasInset\":%.6g,\"panelInset\":%.6g,\"diagramRouteGap\":%.6g}",
+                options.textGap, options.canvasInset, options.panelInset, options.diagramRouteGap);
 }
 
 static void _policy(const Options& options)
@@ -2036,22 +1533,17 @@ static void _policy(const Options& options)
     std::fputs("{\"font\":{\"path\":", stdout);
     _json(options.fonts[0]);
     std::fputs(",\"paths\":[", stdout);
-    for (auto i = 0u; i < options.fontCount; i++)
-    {
-        if (i)
-            std::putchar(',');
+    for (auto i = 0u; i < options.fontCount; i++) {
+        if (i) std::putchar(',');
         _json(options.fonts[i]);
     }
-    std::printf("]},\"thresholds\":{\"textGap\":%.6g,\"canvasInset\":%.6g,"
-                "\"panelInset\":%.6g,\"diagramRouteGap\":%.6g},"
-                "\"containmentLedger\":{\"required\":%s,\"relationships\":[",
-                options.textGap, options.canvasInset, options.panelInset,
-                options.diagramRouteGap, options.requireLedger ? "true" : "false");
-    for (auto i = 0u; i < options.containmentCount; i++)
-    {
+    std::fputs("]}", stdout);
+    _thresholds(options);
+    std::printf(",\"containmentLedger\":{\"required\":%s,\"relationships\":[",
+                options.requireLedger ? "true" : "false");
+    for (auto i = 0u; i < options.containmentCount; i++) {
         auto& containment = options.containments[i];
-        if (i)
-            std::putchar(',');
+        if (i) std::putchar(',');
         std::fputs("{\"textId\":", stdout);
         _json(containment.text);
         std::fputs(",\"panelId\":", stdout);
@@ -2060,8 +1552,7 @@ static void _policy(const Options& options)
                     containment.inset, _containmentTextMatched(containment) ? "true" : "false",
                     _containmentPanelMatched(containment) ? "true" : "false",
                     _containmentMatched(containment) ? "true" : "false");
-        if (containment.generated)
-        {
+        if (containment.generated) {
             std::fputs(",\"provenance\":{\"kind\":\"diagram-ir\",\"scenePath\":", stdout);
             _json(containment.scenePath);
             std::fputs(",\"diagramId\":", stdout);
@@ -2077,21 +1568,17 @@ static void _policy(const Options& options)
         std::putchar('}');
     }
     std::fputs("],\"uncontained\":[", stdout);
-    for (auto i = 0u; i < options.allowedTextCount; i++)
-    {
+    for (auto i = 0u; i < options.allowedTextCount; i++) {
         auto& allowed = options.allowedTexts[i];
-        if (i)
-            std::putchar(',');
+        if (i) std::putchar(',');
         std::fputs("{\"id\":", stdout);
         _json(allowed.id);
         std::printf(",\"matched\":%s}", allowed.matched ? "true" : "false");
     }
     std::fputs("]},\"textOverlapAllowances\":[", stdout);
-    for (auto i = 0u; i < options.allowedOverlapCount; i++)
-    {
+    for (auto i = 0u; i < options.allowedOverlapCount; i++) {
         auto& allowed = options.allowedOverlaps[i];
-        if (i)
-            std::putchar(',');
+        if (i) std::putchar(',');
         std::fputs("{\"first\":{\"scenePath\":", stdout);
         _json(allowed.firstPath);
         std::fputs(",\"id\":", stdout);
@@ -2107,11 +1594,9 @@ static void _policy(const Options& options)
                     allowed.used ? "true" : "false", allowed.duplicate ? "true" : "false");
     }
     std::fputs("],\"occludedSceneAllowances\":[", stdout);
-    for (auto i = 0u; i < options.allowedOccludedSceneCount; i++)
-    {
+    for (auto i = 0u; i < options.allowedOccludedSceneCount; i++) {
         auto& allowed = options.allowedOccludedScenes[i];
-        if (i)
-            std::putchar(',');
+        if (i) std::putchar(',');
         std::fputs("{\"scenePath\":", stdout);
         _json(allowed.path);
         std::printf(",\"matched\":%s,\"used\":%s,\"duplicate\":%s}",
@@ -2124,116 +1609,79 @@ static void _policy(const Options& options)
 #ifdef VIS_DIAGRAM
 static const char* _diagramDirection(diagram::Direction direction)
 {
-    switch (direction)
-    {
-    case diagram::Direction::LeftToRight:
-        return "left-to-right";
-    case diagram::Direction::TopToBottom:
-        return "top-to-bottom";
+    switch (direction) {
+        case diagram::Direction::LeftToRight: return "left-to-right";
+        case diagram::Direction::TopToBottom: return "top-to-bottom";
     }
     return "unknown";
 }
 
 static const char* _diagramLayout(diagram::Layout layout)
 {
-    switch (layout)
-    {
-    case diagram::Layout::Ranked:
-        return "ranked";
-    case diagram::Layout::Manual:
-        return "manual";
-    case diagram::Layout::Grid:
-        return "grid";
-    case diagram::Layout::Timeline:
-        return "timeline";
+    switch (layout) {
+        case diagram::Layout::Ranked: return "ranked";
+        case diagram::Layout::Manual: return "manual";
+        case diagram::Layout::Grid: return "grid";
+        case diagram::Layout::Timeline: return "timeline";
     }
     return "unknown";
 }
 
 static const char* _diagramNodeKind(diagram::NodeKind kind)
 {
-    switch (kind)
-    {
-    case diagram::NodeKind::Default:
-        return "default";
-    case diagram::NodeKind::State:
-        return "state";
-    case diagram::NodeKind::Decision:
-        return "decision";
-    case diagram::NodeKind::Terminal:
-        return "terminal";
-    case diagram::NodeKind::Entity:
-        return "entity";
-    case diagram::NodeKind::Cell:
-        return "cell";
-    case diagram::NodeKind::Task:
-        return "task";
-    case diagram::NodeKind::Evidence:
-        return "evidence";
+    switch (kind) {
+        case diagram::NodeKind::Default: return "default";
+        case diagram::NodeKind::State: return "state";
+        case diagram::NodeKind::Decision: return "decision";
+        case diagram::NodeKind::Terminal: return "terminal";
+        case diagram::NodeKind::Entity: return "entity";
+        case diagram::NodeKind::Cell: return "cell";
+        case diagram::NodeKind::Task: return "task";
+        case diagram::NodeKind::Evidence: return "evidence";
     }
     return "unknown";
 }
 
 static const char* _diagramEdgeKind(diagram::EdgeKind kind)
 {
-    switch (kind)
-    {
-    case diagram::EdgeKind::Directed:
-        return "directed";
-    case diagram::EdgeKind::Relation:
-        return "relation";
-    case diagram::EdgeKind::Return:
-        return "return";
-    case diagram::EdgeKind::Error:
-        return "error";
-    case diagram::EdgeKind::Optional:
-        return "optional";
+    switch (kind) {
+        case diagram::EdgeKind::Directed: return "directed";
+        case diagram::EdgeKind::Relation: return "relation";
+        case diagram::EdgeKind::Return: return "return";
+        case diagram::EdgeKind::Error: return "error";
+        case diagram::EdgeKind::Optional: return "optional";
     }
     return "unknown";
 }
 
 static const char* _diagramRoute(diagram::Route route)
 {
-    switch (route)
-    {
-    case diagram::Route::Auto:
-        return "auto";
-    case diagram::Route::Straight:
-        return "straight";
-    case diagram::Route::Orthogonal:
-        return "orthogonal";
+    switch (route) {
+        case diagram::Route::Auto: return "auto";
+        case diagram::Route::Straight: return "straight";
+        case diagram::Route::Orthogonal: return "orthogonal";
     }
     return "unknown";
 }
 
 static const char* _diagramPort(diagram::Port port)
 {
-    switch (port)
-    {
-    case diagram::Port::Auto:
-        return "auto";
-    case diagram::Port::Left:
-        return "left";
-    case diagram::Port::Right:
-        return "right";
-    case diagram::Port::Top:
-        return "top";
-    case diagram::Port::Bottom:
-        return "bottom";
+    switch (port) {
+        case diagram::Port::Auto: return "auto";
+        case diagram::Port::Left: return "left";
+        case diagram::Port::Right: return "right";
+        case diagram::Port::Top: return "top";
+        case diagram::Port::Bottom: return "bottom";
     }
     return "unknown";
 }
 
 static const char* _diagramEndpoint(diagram::EdgeEndpoint endpoint)
 {
-    switch (endpoint)
-    {
-    case diagram::EdgeEndpoint::None:
-        return "none";
-    case diagram::EdgeEndpoint::From:
-        return "from";
-    case diagram::EdgeEndpoint::To:
-        return "to";
+    switch (endpoint) {
+        case diagram::EdgeEndpoint::None: return "none";
+        case diagram::EdgeEndpoint::From: return "from";
+        case diagram::EdgeEndpoint::To: return "to";
     }
     return "unknown";
 }
@@ -2245,8 +1693,7 @@ static void _diagramVec(const Vec2& value)
 
 static void _diagramBinding(const Object* object)
 {
-    if (!object)
-    {
+    if (!object) {
         std::fputs("null", stdout);
         return;
     }
@@ -2257,44 +1704,24 @@ static void _diagramBinding(const Object* object)
     std::putchar('}');
 }
 
-static void _diagramNodeId(const diagram::IR& receipt, diagram::Node node)
-{
-    auto spec = node && node.index < receipt.nodeCount() ? receipt.nodeAt(node.index) : nullptr;
-    _json(spec ? spec->id : nullptr);
-}
-
-static void _diagramEdgeId(const diagram::IR& receipt, diagram::Edge edge)
-{
-    auto spec = edge && edge.index < receipt.edgeCount() ? receipt.edgeAt(edge.index) : nullptr;
-    _json(spec ? spec->id : nullptr);
-}
-
-static void _diagramZoneId(const diagram::IR& receipt, diagram::Zone zone)
-{
-    auto spec = zone && zone.index < receipt.zoneCount() ? receipt.zoneAt(zone.index) : nullptr;
-    _json(spec ? spec->id : nullptr);
-}
-
 static void _diagramConstraints(const DiagramRecord& record)
 {
     auto& receipt = *record.receipt;
     auto& constraints = *record.constraints;
     std::printf("{\"valid\":%s,\"issues\":[", constraints.count() ? "false" : "true");
-    for (auto i = 0u; i < constraints.count(); i++)
-    {
+    for (auto i = 0u; i < constraints.count(); i++) {
         auto issue = constraints.issueAt(i);
-        if (i)
-            std::putchar(',');
+        if (i) std::putchar(',');
         std::fputs("{\"code\":", stdout);
         _json(_code(_diagramIssueCode(issue->code)));
         std::fputs(",\"nodeId\":", stdout);
-        _diagramNodeId(receipt, issue->node);
+        _json(_diagramId(receipt, issue->node).data);
         std::fputs(",\"relatedNodeId\":", stdout);
-        _diagramNodeId(receipt, issue->relatedNode);
+        _json(_diagramId(receipt, issue->relatedNode).data);
         std::fputs(",\"edgeId\":", stdout);
-        _diagramEdgeId(receipt, issue->edge);
+        _json(_diagramId(receipt, issue->edge).data);
         std::fputs(",\"zoneId\":", stdout);
-        _diagramZoneId(receipt, issue->zone);
+        _json(_diagramId(receipt, issue->zone).data);
         std::fputs(",\"endpoint\":", stdout);
         _json(_diagramEndpoint(issue->endpoint));
         std::fputs(",\"port\":", stdout);
@@ -2336,13 +1763,11 @@ static void _diagramReceipt(const DiagramRecord& record)
                 config.arrowLength, config.arrowWidth, config.corner, config.timeUnit,
                 config.layers.zones, config.layers.routes, config.layers.nodes,
                 config.layers.annotations);
-    for (auto i = 0u; i < receipt.nodeCount(); i++)
-    {
+    for (auto i = 0u; i < receipt.nodeCount(); i++) {
         auto node = diagram::Node{i};
         auto spec = receipt.nodeAt(i);
         auto placement = receipt.nodePlacementAt(i);
-        if (i)
-            std::putchar(',');
+        if (i) std::putchar(',');
         std::fputs("{\"id\":", stdout);
         _json(spec->id);
         std::fputs(",\"label\":", stdout);
@@ -2373,13 +1798,11 @@ static void _diagramReceipt(const DiagramRecord& record)
         std::fputs("}}", stdout);
     }
     std::fputs("],\"edges\":[", stdout);
-    for (auto i = 0u; i < receipt.edgeCount(); i++)
-    {
+    for (auto i = 0u; i < receipt.edgeCount(); i++) {
         auto edge = diagram::Edge{i};
         auto spec = receipt.edgeAt(i);
         auto placement = receipt.edgePlacementAt(i);
-        if (i)
-            std::putchar(',');
+        if (i) std::putchar(',');
         std::fputs("{\"id\":", stdout);
         _json(spec->id);
         std::fputs(",\"label\":", stdout);
@@ -2387,9 +1810,9 @@ static void _diagramReceipt(const DiagramRecord& record)
         std::fputs(",\"kind\":", stdout);
         _json(_diagramEdgeKind(spec->kind));
         std::fputs(",\"fromNodeId\":", stdout);
-        _diagramNodeId(receipt, spec->from);
+        _json(_diagramId(receipt, spec->from).data);
         std::fputs(",\"toNodeId\":", stdout);
-        _diagramNodeId(receipt, spec->to);
+        _json(_diagramId(receipt, spec->to).data);
         std::fputs(",\"fromPort\":", stdout);
         _json(_diagramPort(spec->fromPort));
         std::fputs(",\"toPort\":", stdout);
@@ -2397,25 +1820,19 @@ static void _diagramReceipt(const DiagramRecord& record)
         std::fputs(",\"route\":", stdout);
         _json(_diagramRoute(spec->route));
         std::fputs(",\"waypoints\":[", stdout);
-        for (auto j = 0u; j < spec->waypointCount; j++)
-        {
-            if (j)
-                std::putchar(',');
+        for (auto j = 0u; j < spec->waypointCount; j++) {
+            if (j) std::putchar(',');
             _diagramVec(spec->waypoints[j]);
         }
         std::printf("],\"flowOffset\":%.6g,\"flow\":%s,\"placement\":{\"centerline\":[",
                     spec->flowOffset, spec->flow ? "true" : "false");
-        for (auto j = 0u; j < placement->centerlineCount; j++)
-        {
-            if (j)
-                std::putchar(',');
+        for (auto j = 0u; j < placement->centerlineCount; j++) {
+            if (j) std::putchar(',');
             _diagramVec(placement->centerline[j]);
         }
         std::fputs("],\"labelPoint\":", stdout);
-        if (placement->hasLabelPoint)
-            _diagramVec(placement->labelPoint);
-        else
-            std::fputs("null", stdout);
+        if (placement->hasLabelPoint) _diagramVec(placement->labelPoint);
+        else std::fputs("null", stdout);
         std::fputs(",\"fromPort\":", stdout);
         _json(_diagramPort(placement->fromPort));
         std::fputs(",\"toPort\":", stdout);
@@ -2429,23 +1846,19 @@ static void _diagramReceipt(const DiagramRecord& record)
         std::fputs("}}", stdout);
     }
     std::fputs("],\"zones\":[", stdout);
-    for (auto i = 0u; i < receipt.zoneCount(); i++)
-    {
+    for (auto i = 0u; i < receipt.zoneCount(); i++) {
         auto zone = diagram::Zone{i};
         auto spec = receipt.zoneAt(i);
         auto placement = receipt.zonePlacementAt(i);
-        if (i)
-            std::putchar(',');
+        if (i) std::putchar(',');
         std::fputs("{\"id\":", stdout);
         _json(spec->id);
         std::fputs(",\"label\":", stdout);
         _json(spec->label);
         std::fputs(",\"memberNodeIds\":[", stdout);
-        for (auto j = 0u; j < spec->memberCount; j++)
-        {
-            if (j)
-                std::putchar(',');
-            _diagramNodeId(receipt, spec->members[j]);
+        for (auto j = 0u; j < spec->memberCount; j++) {
+            if (j) std::putchar(',');
+            _json(_diagramId(receipt, spec->members[j]).data);
         }
         std::printf("],\"fullWidth\":%s,\"placement\":{\"center\":",
                     spec->fullWidth ? "true" : "false");
@@ -2468,10 +1881,8 @@ static void _diagramReceipt(const DiagramRecord& record)
 static void _diagramReceipts(const DiagramList& diagrams)
 {
     std::putchar('[');
-    for (auto i = 0u; i < diagrams.count; i++)
-    {
-        if (i)
-            std::putchar(',');
+    for (auto i = 0u; i < diagrams.count; i++) {
+        if (i) std::putchar(',');
         _diagramReceipt(diagrams.values[i]);
     }
     std::putchar(']');
@@ -2493,10 +1904,7 @@ static void _jsonReport(const Options& options, const Scene* scene, const IssueL
     std::printf(",\"sampling\":{\"encodedFrames\":%u,\"samples\":%u,"
                 "\"finalSampleIncluded\":true}",
                 encodedFrames, samples);
-    std::printf(",\"thresholds\":{\"textGap\":%.6g,\"canvasInset\":%.6g,"
-                "\"panelInset\":%.6g,\"diagramRouteGap\":%.6g}",
-                options.textGap, options.canvasInset, options.panelInset,
-                options.diagramRouteGap);
+    _thresholds(options);
     std::fputs(",\"policy\":", stdout);
     _policy(options);
 #ifdef VIS_DIAGRAM
@@ -2504,11 +1912,9 @@ static void _jsonReport(const Options& options, const Scene* scene, const IssueL
     _diagramReceipts(diagrams);
 #endif
     std::fputs(",\"issues\":[", stdout);
-    for (auto i = 0u; i < issues.count; i++)
-    {
+    for (auto i = 0u; i < issues.count; i++) {
         auto& issue = issues.values[i];
-        if (i)
-            std::putchar(',');
+        if (i) std::putchar(',');
         std::fputs("{\"code\":", stdout);
         _json(_code(issue.code));
         std::fputs(",\"severity\":\"error\",\"scenePath\":", stdout);
@@ -2518,17 +1924,14 @@ static void _jsonReport(const Options& options, const Scene* scene, const IssueL
         std::fputs(",\"subject\":", stdout);
         _subject(issue.subject);
         std::fputs(",\"related\":", stdout);
-        if (issue.related.object || issue.related.authoredId.data)
-            _subject(issue.related);
-        else
-            std::fputs("null", stdout);
+        if (issue.related.object || issue.related.authoredId.data) _subject(issue.related);
+        else std::fputs("null", stdout);
         std::fputs(",\"visual\":", stdout);
         _evidence(issue.visual);
         std::fputs(",\"relatedVisual\":", stdout);
         _evidence(issue.relatedVisual);
         std::fputs(",\"provenance\":", stdout);
-        if (issue.provenance)
-        {
+        if (issue.provenance) {
             std::fputs("{\"kind\":", stdout);
             _json(issue.provenance);
             std::fputs(",\"diagramId\":", stdout);
@@ -2538,22 +1941,17 @@ static void _jsonReport(const Options& options, const Scene* scene, const IssueL
             std::fputs(",\"id\":", stdout);
             _json(issue.entityId);
             std::fputs("},\"related\":", stdout);
-            if (issue.relatedEntityKind.data)
-            {
+            if (issue.relatedEntityKind.data) {
                 std::fputs("{\"kind\":", stdout);
                 _json(issue.relatedEntityKind);
                 std::fputs(",\"id\":", stdout);
                 _json(issue.relatedEntityId);
                 std::putchar('}');
-            }
-            else
-            {
+            } else {
                 std::fputs("null", stdout);
             }
             std::putchar('}');
-        }
-        else
-        {
+        } else {
             std::fputs("null", stdout);
         }
         std::fputs(",\"firstSample\":", stdout);
@@ -2562,8 +1960,7 @@ static void _jsonReport(const Options& options, const Scene* scene, const IssueL
         _sample(issue.last);
         std::fputs(",\"worstSample\":", stdout);
         _sample(issue.worst);
-        if (issue.measured)
-        {
+        if (issue.measured) {
             std::printf(",\"measurement\":{\"actual\":%.6g,\"required\":%.6g,"
                         "\"deficit\":%.6g}",
                         issue.actual, issue.required, issue.score);
@@ -2573,31 +1970,24 @@ static void _jsonReport(const Options& options, const Scene* scene, const IssueL
             _bbox(issue.relatedBounds);
             std::putchar('}');
         }
-        if (issue.hasOverflow)
-        {
+        if (issue.hasOverflow) {
             std::printf(",\"overflow\":{\"left\":%.6g,\"top\":%.6g,\"right\":%.6g,"
                         "\"bottom\":%.6g}",
                         issue.overflowLeft, issue.overflowTop, issue.overflowRight, issue.overflowBottom);
         }
-        if (issue.hasSeparation)
-        {
+        if (issue.hasSeparation) {
             std::printf(",\"separation\":{\"x\":%.6g,\"y\":%.6g}", issue.separation.x, issue.separation.y);
         }
-        if (issue.hasScale)
-        {
-            std::printf(",\"scale\":{\"x\":%.6g,\"y\":%.6g}", issue.scaleX, issue.scaleY);
-        }
-        if (issue.missing)
-        {
+        if (issue.hasScale) std::printf(",\"scale\":{\"x\":%.6g,\"y\":%.6g}", issue.scaleX, issue.scaleY);
+        if (issue.missing) {
             std::printf(",\"glyphs\":{\"missing\":%u,\"first\":", issue.missing);
-            if (issue.firstMissing[0])
-                _json(issue.firstMissing);
-            else
-                std::fputs("null", stdout);
+            if (issue.firstMissing[0]) _json(issue.firstMissing);
+            else std::fputs("null", stdout);
             std::putchar('}');
         }
-        if (issue.code == IssueCode::PlaneTextSize)
+        if (issue.code == IssueCode::PlaneTextSize) {
             std::printf(",\"size\":{\"em\":%.6g,\"viewHeight\":%.6g}", issue.planeEm, issue.viewHeight);
+        }
         std::fputs(",\"repair\":", stdout);
         _json(_repair(issue.code));
         std::putchar('}');
@@ -2608,18 +1998,12 @@ static void _jsonReport(const Options& options, const Scene* scene, const IssueL
 
 static void _textSubject(const Subject& subject)
 {
-    if (subject.object)
-    {
+    if (subject.object) {
         std::printf("%s#%u", type(subject.object->type()), subject.object->id());
-        if (subject.object->tag())
-            std::printf(" id=%s", subject.object->tag());
-    }
-    else if (subject.authoredId.data)
-    {
+        if (subject.object->tag()) std::printf(" id=%s", subject.object->tag());
+    } else if (subject.authoredId.data) {
         std::fwrite(subject.authoredId.data, 1, subject.authoredId.size, stdout);
-    }
-    else
-    {
+    } else {
         std::fputs("scene", stdout);
     }
 }
@@ -2629,28 +2013,23 @@ static void _textBounds(const BBox& bounds)
     std::printf("[x=%.3f y=%.3f width=%.3f height=%.3f]", bounds.x, bounds.y, bounds.width, bounds.height);
 }
 
-static void _textReport(const Options& options, const IssueList& issues, uint32_t samples)
+static void _textReport(const IssueList& issues, uint32_t samples)
 {
     std::printf("viscript audit: %s (%u issue%s, %u samples)\n", issues.count ? "FAIL" : "PASS", issues.count,
                 issues.count == 1u ? "" : "s", samples);
-    for (auto i = 0u; i < issues.count; i++)
-    {
+    for (auto i = 0u; i < issues.count; i++) {
         auto& issue = issues.values[i];
         std::printf("- [%s] ", _code(issue.code));
-        if (issue.scope.path)
-            std::printf("%s ", issue.scope.path);
+        if (issue.scope.path) std::printf("%s ", issue.scope.path);
         _textSubject(issue.subject);
-        if (issue.related.object || issue.related.authoredId.data)
-        {
+        if (issue.related.object || issue.related.authoredId.data) {
             std::fputs(" with ", stdout);
             _textSubject(issue.related);
-        }
-        else if (issue.relatedScope.path)
+        } else if (issue.relatedScope.path) {
             std::fputs(" with scene", stdout);
-        if (issue.relatedScope.path)
-            std::printf(" [relatedScenePath=%s]", issue.relatedScope.path);
-        if (issue.measured)
-        {
+        }
+        if (issue.relatedScope.path) std::printf(" [relatedScenePath=%s]", issue.relatedScope.path);
+        if (issue.measured) {
             std::printf(" measurement[actual=%.3fpx required=%.3fpx deficit=%.3fpx] bounds[subject=",
                         issue.actual, issue.required, issue.score);
             _textBounds(issue.subjectBounds);
@@ -2658,22 +2037,21 @@ static void _textReport(const Options& options, const IssueList& issues, uint32_
             _textBounds(issue.relatedBounds);
             std::putchar(']');
         }
-        if (issue.hasOverflow)
+        if (issue.hasOverflow) {
             std::printf(" overflow[left=%.3f top=%.3f right=%.3f bottom=%.3f]", issue.overflowLeft,
                         issue.overflowTop, issue.overflowRight, issue.overflowBottom);
-        if (issue.hasSeparation)
-            std::printf(" separation[x=%.3f y=%.3f]", issue.separation.x, issue.separation.y);
-        if (issue.hasScale)
-            std::printf(" scale[x=%.6g y=%.6g]", issue.scaleX, issue.scaleY);
-        if (issue.missing)
+        }
+        if (issue.hasSeparation) std::printf(" separation[x=%.3f y=%.3f]", issue.separation.x, issue.separation.y);
+        if (issue.hasScale) std::printf(" scale[x=%.6g y=%.6g]", issue.scaleX, issue.scaleY);
+        if (issue.missing) {
             std::printf(" glyphs[missing=%u first=%s]", issue.missing, issue.firstMissing[0] ? issue.firstMissing : "?");
-        if (issue.code == IssueCode::PlaneTextSize)
+        }
+        if (issue.code == IssueCode::PlaneTextSize) {
             std::printf(" size[em=%.3f viewHeight=%.3f]", issue.planeEm, issue.viewHeight);
-        if (issue.worst.valid)
-            std::printf(" at %.6gs", issue.worst.time);
+        }
+        if (issue.worst.valid) std::printf(" at %.6gs", issue.worst.time);
         std::printf("; %s\n", _repair(issue.code));
     }
-    static_cast<void>(options);
 }
 
 enum struct ParseResult : uint8_t
@@ -2685,8 +2063,7 @@ enum struct ParseResult : uint8_t
 
 static ParseResult _parse(int argc, char** argv, Options& options)
 {
-    if (argc < 3)
-        return ParseResult::Invalid;
+    if (argc < 3) return ParseResult::Invalid;
     options.source = argv[2];
     options.fonts = new (std::nothrow) const char*[argc]{};
     options.containments = new (std::nothrow) Containment[argc]{};
@@ -2695,149 +2072,84 @@ static ParseResult _parse(int argc, char** argv, Options& options)
     options.allowedOverlaps = new (std::nothrow) AllowedOverlap[argc]{};
     options.allowedOccludedScenes = new (std::nothrow) AllowedOccludedScene[argc]{};
     if (!options.fonts || !options.containments || !options.allowedTexts || !options.allowedOverlaps ||
-        !options.allowedOccludedScenes)
+        !options.allowedOccludedScenes) {
         return ParseResult::OutOfMemory;
+    }
 
-    for (auto i = 3; i < argc; i++)
-    {
-        if (std::strcmp(argv[i], "--font") == 0 && i + 1 < argc && _operand(argv[i + 1]))
-        {
+    for (auto i = 3; i < argc; i++) {
+        if (std::strcmp(argv[i], "--font") == 0 && i + 1 < argc && _operand(argv[i + 1])) {
             options.fonts[options.fontCount++] = argv[++i];
-        }
-        else if (std::strcmp(argv[i], "--format") == 0 && i + 1 < argc &&
-                 (std::strcmp(argv[i + 1], "json") == 0 || std::strcmp(argv[i + 1], "text") == 0))
-        {
+        } else if (std::strcmp(argv[i], "--format") == 0 && i + 1 < argc &&
+                   (std::strcmp(argv[i + 1], "json") == 0 || std::strcmp(argv[i + 1], "text") == 0)) {
             options.format = argv[++i];
-        }
-        else if (std::strcmp(argv[i], "--width") == 0 && i + 1 < argc && _uint(argv[i + 1], options.width))
-        {
-            i++;
-        }
-        else if (std::strcmp(argv[i], "--height") == 0 && i + 1 < argc && _uint(argv[i + 1], options.height))
-        {
-            i++;
-        }
-        else if (std::strcmp(argv[i], "--fps") == 0 && i + 1 < argc && _uint(argv[i + 1], options.fps))
-        {
-            i++;
-        }
-        else if (std::strcmp(argv[i], "--max-samples") == 0 && i + 1 < argc &&
-                 _uint(argv[i + 1], options.maxSamples))
-        {
-            i++;
-        }
-        else if (std::strcmp(argv[i], "--text-gap") == 0 && i + 1 < argc && _float(argv[i + 1], options.textGap))
-        {
-            i++;
-        }
-        else if (std::strcmp(argv[i], "--canvas-inset") == 0 && i + 1 < argc &&
-                 _float(argv[i + 1], options.canvasInset))
-        {
-            i++;
-        }
-        else if (std::strcmp(argv[i], "--panel-inset") == 0 && i + 1 < argc && _float(argv[i + 1], options.panelInset))
-        {
-            i++;
-        }
-        else if (std::strcmp(argv[i], "--diagram-route-gap") == 0 && i + 1 < argc &&
-                 _float(argv[i + 1], options.diagramRouteGap))
-        {
-            i++;
-        }
-        else if (std::strcmp(argv[i], "--contain") == 0 && i + 2 < argc && _operand(argv[i + 1]) &&
-                 _operand(argv[i + 2]))
-        {
+        } else if (std::strcmp(argv[i], "--contain") == 0 && i + 2 < argc && _operand(argv[i + 1]) &&
+                   _operand(argv[i + 2])) {
             auto& containment = options.containments[options.containmentCount++];
             containment.text = _slice(argv[++i]);
             containment.panel = _slice(argv[++i]);
             float inset = 0.0f;
-            if (i + 1 < argc && _float(argv[i + 1], inset))
-            {
+            if (i + 1 < argc && _float(argv[i + 1], inset)) {
                 containment.inset = inset;
                 i++;
             }
-        }
-        else if (std::strcmp(argv[i], "--require-containment-ledger") == 0)
-        {
+        } else if (std::strcmp(argv[i], "--require-containment-ledger") == 0) {
             options.requireLedger = true;
-        }
-        else if (std::strcmp(argv[i], "--allow-uncontained") == 0 && i + 1 < argc && _operand(argv[i + 1]))
-        {
+        } else if (std::strcmp(argv[i], "--allow-uncontained") == 0 && i + 1 < argc && _operand(argv[i + 1])) {
             options.allowedTexts[options.allowedTextCount++].id = _slice(argv[++i]);
-        }
-        else if (std::strcmp(argv[i], "--allow-text-overlap") == 0 && i + 4 < argc && _operand(argv[i + 1]) &&
-                 _operand(argv[i + 2]) && _operand(argv[i + 3]) && _operand(argv[i + 4]))
-        {
+        } else if (std::strcmp(argv[i], "--allow-text-overlap") == 0 && i + 4 < argc && _operand(argv[i + 1]) &&
+                   _operand(argv[i + 2]) && _operand(argv[i + 3]) && _operand(argv[i + 4])) {
             auto& overlap = options.allowedOverlaps[options.allowedOverlapCount++];
             overlap.firstPath = _slice(argv[++i]);
             overlap.firstId = _slice(argv[++i]);
             overlap.secondPath = _slice(argv[++i]);
             overlap.secondId = _slice(argv[++i]);
-        }
-        else if (std::strcmp(argv[i], "--allow-occluded-scene") == 0 && i + 1 < argc && _operand(argv[i + 1]))
-        {
+        } else if (std::strcmp(argv[i], "--allow-occluded-scene") == 0 && i + 1 < argc && _operand(argv[i + 1])) {
             options.allowedOccludedScenes[options.allowedOccludedSceneCount++].path = _slice(argv[++i]);
-        }
-        else if (std::strcmp(argv[i], "--allow-viewport-stretch") == 0)
-        {
+        } else if (std::strcmp(argv[i], "--allow-viewport-stretch") == 0) {
             options.allowViewportStretch = true;
-        }
-        else
-        {
+        } else if (!_option(argc, argv, i, "--width", options.width) &&
+                   !_option(argc, argv, i, "--height", options.height) &&
+                   !_option(argc, argv, i, "--fps", options.fps) &&
+                   !_option(argc, argv, i, "--max-samples", options.maxSamples) &&
+                   !_option(argc, argv, i, "--text-gap", options.textGap) &&
+                   !_option(argc, argv, i, "--canvas-inset", options.canvasInset) &&
+                   !_option(argc, argv, i, "--panel-inset", options.panelInset) &&
+                   !_option(argc, argv, i, "--diagram-route-gap", options.diagramRouteGap)) {
             return ParseResult::Invalid;
         }
     }
-    if (!options.fontCount)
-        return ParseResult::Invalid;
-    for (auto i = 0u; i < options.fontCount; i++)
-    {
-        if (!options.fonts[i][0])
-            return ParseResult::Invalid;
+    if (!options.fontCount) return ParseResult::Invalid;
+    for (auto i = 0u; i < options.fontCount; i++) {
+        if (!options.fonts[i][0]) return ParseResult::Invalid;
     }
-    if (options.allowedTextCount && !options.requireLedger)
-        return ParseResult::Invalid;
-    for (auto i = 0u; i < options.containmentCount; i++)
-    {
-        if (options.containments[i].inset < 0.0f)
-            options.containments[i].inset = options.panelInset;
-        for (auto j = i + 1u; j < options.containmentCount; j++)
-        {
-            if (_equal(options.containments[i].text, options.containments[j].text))
-                return ParseResult::Invalid;
+    if (options.allowedTextCount && !options.requireLedger) return ParseResult::Invalid;
+    for (auto i = 0u; i < options.containmentCount; i++) {
+        if (options.containments[i].inset < 0.0f) options.containments[i].inset = options.panelInset;
+        for (auto j = i + 1u; j < options.containmentCount; j++) {
+            if (_equal(options.containments[i].text, options.containments[j].text)) return ParseResult::Invalid;
         }
-        for (auto j = 0u; j < options.allowedTextCount; j++)
-        {
-            if (_equal(options.containments[i].text, options.allowedTexts[j].id))
-                return ParseResult::Invalid;
+        for (auto j = 0u; j < options.allowedTextCount; j++) {
+            if (_equal(options.containments[i].text, options.allowedTexts[j].id)) return ParseResult::Invalid;
         }
     }
-    for (auto i = 0u; i < options.allowedTextCount; i++)
-    {
-        for (auto j = i + 1u; j < options.allowedTextCount; j++)
-        {
-            if (_equal(options.allowedTexts[i].id, options.allowedTexts[j].id))
-                return ParseResult::Invalid;
+    for (auto i = 0u; i < options.allowedTextCount; i++) {
+        for (auto j = i + 1u; j < options.allowedTextCount; j++) {
+            if (_equal(options.allowedTexts[i].id, options.allowedTexts[j].id)) return ParseResult::Invalid;
         }
     }
-    for (auto i = 0u; i < options.allowedOverlapCount; i++)
-    {
+    for (auto i = 0u; i < options.allowedOverlapCount; i++) {
         auto& first = options.allowedOverlaps[i];
-        for (auto j = i + 1u; j < options.allowedOverlapCount; j++)
-        {
+        for (auto j = i + 1u; j < options.allowedOverlapCount; j++) {
             auto& second = options.allowedOverlaps[j];
-            if (_sameOverlap(first, second))
-            {
+            if (_sameOverlap(first, second)) {
                 first.duplicate = true;
                 second.duplicate = true;
             }
         }
     }
-    for (auto i = 0u; i < options.allowedOccludedSceneCount; i++)
-    {
-        for (auto j = i + 1u; j < options.allowedOccludedSceneCount; j++)
-        {
-            if (_equal(options.allowedOccludedScenes[i].path, options.allowedOccludedScenes[j].path))
-            {
+    for (auto i = 0u; i < options.allowedOccludedSceneCount; i++) {
+        for (auto j = i + 1u; j < options.allowedOccludedSceneCount; j++) {
+            if (_equal(options.allowedOccludedScenes[i].path, options.allowedOccludedScenes[j].path)) {
                 options.allowedOccludedScenes[i].duplicate = true;
                 options.allowedOccludedScenes[j].duplicate = true;
             }
@@ -2852,10 +2164,8 @@ int visAudit(int argc, char** argv) noexcept
 {
     Options options;
     auto parse = _parse(argc, argv, options);
-    if (parse != ParseResult::Success)
-    {
-        if (parse == ParseResult::OutOfMemory)
-        {
+    if (parse != ParseResult::Success) {
+        if (parse == ParseResult::OutOfMemory) {
             std::fprintf(stderr, "viscript: audit failed: out of memory\n");
             return 4;
         }
@@ -2864,65 +2174,32 @@ int visAudit(int argc, char** argv) noexcept
     }
 
     // Fonts load before the script runs, which may measure text in them.
-    auto renderer = Renderer::gen();
-    if (!renderer)
-    {
-        std::fprintf(stderr, "viscript: the renderer is unavailable\n");
-        return 3;
-    }
-    for (auto i = 0u; i < options.fontCount; i++)
-    {
-        if (renderer->font(options.fonts[i]) == Result::Success)
-            continue;
-        auto reason = renderer->diagnostic();
-        if (reason)
-            std::fprintf(stderr, "viscript: %s\n", reason);
-        else
-            std::fprintf(stderr, "viscript: could not load the font file '%s'\n", options.fonts[i]);
-        delete renderer;
-        return 3;
-    }
-
-    auto scene = _load(options.source);
-    if (!scene)
-    {
-        delete renderer;
-        return 2;
-    }
+    Session session;
+    if (auto code = session.open(options.source, options.fonts, options.fontCount)) return code;
+    auto renderer = session.renderer;
+    auto scene = session.scene;
     auto& config = scene->config();
-    if (options.width)
-        config.width = options.width;
-    if (options.height)
-        config.height = options.height;
-    if (options.fps)
-        config.fps = options.fps;
+    if (options.width) config.width = options.width;
+    if (options.height) config.height = options.height;
+    if (options.fps) config.fps = options.fps;
 
     auto fps = config.fps;
     uint32_t encodedFrames = 0u;
     auto timeline = saver::timeline(scene, fps, encodedFrames);
-    if (timeline != Result::Success)
-    {
+    if (timeline != Result::Success) {
         std::fprintf(stderr, "viscript: audit timeline failed: the scene needs a positive fps, width and "
                              "height, and a duration whose frame count fits in 32 bits\n");
-        delete renderer;
-        delete scene;
         return 4;
     }
     auto duration = scene->duration();
-    if (duration > 0.0f && encodedFrames == UINT32_MAX)
-    {
+    if (duration > 0.0f && encodedFrames == UINT32_MAX) {
         std::fprintf(stderr, "viscript: audit sample count exceeds the supported range\n");
-        delete renderer;
-        delete scene;
         return 4;
     }
     auto totalSamples = encodedFrames + (duration > 0.0f ? 1u : 0u);
-    if (options.maxSamples && totalSamples > options.maxSamples)
-    {
+    if (options.maxSamples && totalSamples > options.maxSamples) {
         std::fprintf(stderr, "viscript: audit sample count %u exceeds the configured limit %u\n",
                      totalSamples, options.maxSamples);
-        delete renderer;
-        delete scene;
         return 4;
     }
 
@@ -2931,90 +2208,69 @@ int visAudit(int argc, char** argv) noexcept
     ScenePathList paths;
 #ifdef VIS_DIAGRAM
     DiagramList diagrams;
-    auto diagramStatus = _discoverDiagrams(scene, "root", options, issues, paths, diagrams);
-    if (diagramStatus != Result::Success)
-    {
+    auto diagramStatus = _walk(scene, "root", paths, [&](const Scene* current, const char* path) {
+        return _discoverDiagrams(current, path, options, issues, diagrams);
+    });
+    if (diagramStatus != Result::Success) {
         std::fprintf(stderr, "viscript: audit Diagram IR failed: %s\n",
                      diagramStatus == Result::OutOfMemory ? "out of memory" : "the scene could not be read");
-        delete renderer;
-        delete scene;
         return 4;
     }
 #endif
-    if (!_inventory(scene, "root", options, issues, texts, paths))
-    {
+    auto inventory = _walk(scene, "root", paths, [&](const Scene* current, const char* path) {
+        return _inventory(current, path, options, issues, texts, paths) ? Result::Success : Result::OutOfMemory;
+    });
+    if (inventory != Result::Success) {
         std::fprintf(stderr, "viscript: audit failed: out of memory\n");
-        delete renderer;
-        delete scene;
         return 4;
     }
     uint32_t sampleCount = 0u;
     uint32_t failingGeometrySamples = 0u;
     LayoutReport report;
     auto failed = false;
-    for (auto index = 0u; index < totalSamples; index++)
-    {
+    for (auto index = 0u; index < totalSamples; index++) {
         Sample sample;
         sample.index = index;
         sample.final = index == encodedFrames;
         sample.time = sample.final ? duration : static_cast<float>(index) / fps;
         sample.valid = true;
         auto status = renderer->layout(scene, sample.time, report, options.textGap);
-        if (status != Result::Success)
-        {
+        if (status != Result::Success) {
             auto reason = renderer->diagnostic();
             std::fprintf(stderr, "viscript: audit layout failed at %.6gs: %s\n", sample.time,
                          reason ? reason : status == Result::OutOfMemory ? "out of memory" : "the scene could not be painted");
-            delete renderer;
-            delete scene;
             return 4;
         }
-        if (!_auditSample(report, options, sample, issues, texts, paths, failed))
-        {
+        if (!_auditSample(report, options, sample, issues, texts, paths, failed)) {
             std::fprintf(stderr, "viscript: audit failed: inconsistent scene inventory or out of memory\n");
-            delete renderer;
-            delete scene;
             return 4;
         }
 #ifdef VIS_DIAGRAM
         auto diagramSample = _auditDiagramSample(report, options, sample, issues,
                                                  diagrams, failed);
-        if (diagramSample != Result::Success)
-        {
+        if (diagramSample != Result::Success) {
             std::fprintf(stderr, "viscript: audit sampled Diagram geometry failed at %.6gs: %s\n",
                          sample.time, diagramSample == Result::OutOfMemory ? "out of memory"
                                                                           : "the sampled geometry does not match the diagram");
-            delete renderer;
-            delete scene;
             return 4;
         }
 #endif
-        if (failed)
-            failingGeometrySamples++;
+        if (failed) failingGeometrySamples++;
         sampleCount++;
     }
 
-    if (!_finish(options, issues, texts))
-    {
+    if (!_finish(options, issues, texts)) {
         std::fprintf(stderr, "viscript: audit failed: out of memory\n");
-        delete renderer;
-        delete scene;
         return 4;
     }
-    if (std::strcmp(options.format, "json") == 0)
-    {
+    if (std::strcmp(options.format, "json") == 0) {
         _jsonReport(options, scene, issues, fps, encodedFrames, sampleCount, failingGeometrySamples
 #ifdef VIS_DIAGRAM
                     , diagrams
 #endif
         );
+    } else {
+        _textReport(issues, sampleCount);
     }
-    else
-    {
-        _textReport(options, issues, sampleCount);
-    }
-    auto exitCode = issues.count ? 1 : 0;
-    delete renderer;
-    delete scene;
-    return exitCode;
+    return issues.count ? 1 : 0;
 }

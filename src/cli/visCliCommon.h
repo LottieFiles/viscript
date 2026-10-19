@@ -1,5 +1,6 @@
-// What the viscript command and its audit share: parsing of numeric arguments, JSON strings on
-// stdout, plain words for a Result, and loading a scene with the context of the optional modules.
+// What the viscript command and its audit share: parsing of numeric options, JSON strings and
+// boxes on stdout, plain words for a Result, loading fonts and a scene with the context of the
+// optional modules, and the session that deletes the renderer and the scene of a command.
 #ifndef _VIS_CLI_COMMON_H_
 #define _VIS_CLI_COMMON_H_
 
@@ -36,6 +37,22 @@ static inline bool _float(const char* value, float& output)
     auto number = std::strtof(value, &end);
     if (!end || *end || !std::isfinite(number) || number < 0.0f) return false;
     output = number;
+    return true;
+}
+
+// Whether argv[i] names the option and the argument after it is a value for it; i then moves to
+// the value.
+static inline bool _option(int argc, char** argv, int& i, const char* name, uint32_t& output, bool allowZero = false)
+{
+    if (std::strcmp(argv[i], name) != 0 || i + 1 >= argc || !_uint(argv[i + 1], output, allowZero)) return false;
+    i++;
+    return true;
+}
+
+static inline bool _option(int argc, char** argv, int& i, const char* name, float& output)
+{
+    if (std::strcmp(argv[i], name) != 0 || i + 1 >= argc || !_float(argv[i + 1], output)) return false;
+    i++;
     return true;
 }
 
@@ -115,6 +132,29 @@ static inline void _jsonString(const char* value, size_t size)
     std::putchar('"');
 }
 
+// A JSON string, or null for nullptr.
+static inline void _json(const char* value)
+{
+    if (value) _jsonString(value, std::strlen(value));
+    else std::fputs("null", stdout);
+}
+
+static inline void _bbox(const vis::BBox& bounds)
+{
+    std::printf("{\"x\":%.6g,\"y\":%.6g,\"width\":%.6g,\"height\":%.6g}", bounds.x, bounds.y, bounds.width,
+                bounds.height);
+}
+
+static inline const char* _visualKind(vis::LayoutVisualKind kind)
+{
+    switch (kind) {
+        case vis::LayoutVisualKind::Stable: return "stable";
+        case vis::LayoutVisualKind::Morph: return "morph";
+        case vis::LayoutVisualKind::FadeOut: return "fade-out";
+        case vis::LayoutVisualKind::FadeIn: return "fade-in";
+    }
+    return "unknown";
+}
 
 // Plain words for a failure that nothing explained more precisely.
 static inline const char* _describe(vis::Result status)
@@ -162,5 +202,47 @@ static inline vis::Scene* _load(const char* path)
     vis::detail::LuaHostContext context;
     return _load(path, context);
 }
+
+// Loads font files in order; they load before a script runs, which may measure text in them.
+static inline bool _loadFonts(vis::Renderer* renderer, const char* const* paths, uint32_t count)
+{
+    for (auto i = 0u; i < count; i++) {
+        if (renderer->font(paths[i]) == vis::Result::Success) continue;
+        auto reason = renderer->diagnostic();
+        if (reason) std::fprintf(stderr, "viscript: %s\n", reason);
+        else std::fprintf(stderr, "viscript: could not load the font file '%s'\n", paths[i]);
+        return false;
+    }
+    return true;
+}
+
+// The renderer and the scene a command works on, deleted in that order when it returns.
+struct Session
+{
+    vis::Renderer* renderer = nullptr;
+    vis::Scene* scene = nullptr;
+
+    ~Session()
+    {
+        delete renderer;
+        delete scene;
+    }
+
+    // Makes the renderer, loads the fonts into it and then the scene, into context when one is
+    // given. Returns 0, or after reporting the failure the exit code: 3 when the renderer or a
+    // font fails, 2 when the scene does.
+    int open(const char* source, const char* const* fonts, uint32_t fontCount,
+             vis::detail::LuaHostContext* context = nullptr)
+    {
+        renderer = vis::Renderer::gen();
+        if (!renderer) {
+            std::fprintf(stderr, "viscript: the renderer is unavailable\n");
+            return 3;
+        }
+        if (!_loadFonts(renderer, fonts, fontCount)) return 3;
+        scene = context ? _load(source, *context) : _load(source);
+        return scene ? 0 : 2;
+    }
+};
 
 #endif

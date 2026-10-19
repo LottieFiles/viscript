@@ -1,5 +1,5 @@
-// The viscript command line: render, benchmark, layout, inspect and capabilities, with the
-// fonts, assets and audio the arguments name. The audit command is in visAudit.cpp.
+// The viscript command line: render, benchmark, layout and inspect, with the fonts, assets and
+// audio the arguments name. The audit command is in visAudit.cpp.
 #include <cerrno>
 #include <chrono>
 #include <cmath>
@@ -35,7 +35,6 @@ static void _usage()
                  "  viscript audit <scene.lua> --font FILE [--font FILE]... [--format json|text] [audit options]\n"
 #endif
                  "  viscript inspect <scene.lua> [--font FILE]...\n"
-                 "  viscript capabilities\n"
                  "Repeat --font for each font file; text names a font by its file name without the\n"
                  "extension, so font = \"Pretendard\" needs a file such as Pretendard.ttf. Fonts\n"
                  "load before the script runs, so a script can measure text in them.\n"
@@ -46,32 +45,12 @@ static void _usage()
     );
 }
 
-static int _capabilities()
-{
-    constexpr auto preview = "true";
-#if defined(VIS_AUDIT)
-    constexpr auto audit = "true";
-#else
-    constexpr auto audit = "false";
-#endif
-    std::printf("{\"format\":\"viscript.cli-capabilities\",\"version\":1,"
-                "\"nativeInspection\":{\"preview\":%s,\"audit\":%s}}\n",
-                preview, audit);
-    return 0;
-}
-
 static bool _ends(const char* value, const char* suffix)
 {
     auto valueSize = std::strlen(value);
     auto suffixSize = std::strlen(suffix);
     if (valueSize < suffixSize) return false;
     return std::strcmp(value + valueSize - suffixSize, suffix) == 0;
-}
-
-// A JSON string; nullptr is the empty string.
-static void _json(const char* value)
-{
-    _jsonString(value ? value : "", value ? std::strlen(value) : 0u);
 }
 
 // Reports a failed renderer call, preferring the renderer's own reason.
@@ -98,18 +77,6 @@ struct Fonts
         return true;
     }
 };
-
-static bool _loadFonts(Renderer* renderer, const Fonts& fonts)
-{
-    for (auto i = 0u; i < fonts.count; i++) {
-        if (renderer->font(fonts.paths[i]) == Result::Success) continue;
-        auto reason = renderer->diagnostic();
-        if (reason) std::fprintf(stderr, "viscript: %s\n", reason);
-        else std::fprintf(stderr, "viscript: could not load the font file '%s'\n", fonts.paths[i]);
-        return false;
-    }
-    return true;
-}
 
 #ifdef VIS_CLI_SOUNDTRACK
 static constexpr uint32_t SOUNDTRACK_RATE = 48000u;
@@ -336,8 +303,7 @@ static void _inspectScene(const Scene* scene, const char* source)
         auto object = scene->objectAt(i);
         if (i) std::putchar(',');
         std::printf("{\"handle\":%u,\"id\":", object->id());
-        if (object->tag()) _json(object->tag());
-        else std::fputs("null", stdout);
+        _json(object->tag());
         std::printf(",\"type\":");
         _json(type(object->type()));
         std::printf(",\"parent\":");
@@ -390,7 +356,7 @@ static int _inspect(int argc, char** argv)
             std::fprintf(stderr, "viscript: no renderer is available to load fonts\n");
             return 3;
         }
-        if (!_loadFonts(renderer, fonts)) {
+        if (!_loadFonts(renderer, fonts.paths, fonts.count)) {
             delete renderer;
             return 3;
         }
@@ -432,8 +398,7 @@ static bool _layoutScene(const Scene* scene, Renderer* renderer, float time, flo
         auto object = scene->objectAt(i);
         if (i) std::putchar(',');
         std::printf("{\"handle\":%u,\"id\":", object->id());
-        if (object->tag()) _json(object->tag());
-        else std::fputs("null", stdout);
+        _json(object->tag());
         std::fputs(",\"type\":", stdout);
         _json(type(object->type()));
         if (object->type() == Type::Text) {
@@ -502,12 +467,6 @@ static bool _layoutScene(const Scene* scene, Renderer* renderer, float time, flo
     return true;
 }
 
-static void _bbox(const BBox& bounds)
-{
-    std::printf("{\"x\":%.6g,\"y\":%.6g,\"width\":%.6g,\"height\":%.6g}",
-                bounds.x, bounds.y, bounds.width, bounds.height);
-}
-
 static const char* _layoutKind(LayoutSceneKind kind)
 {
     switch (kind) {
@@ -515,17 +474,6 @@ static const char* _layoutKind(LayoutSceneKind kind)
         case LayoutSceneKind::Viewport: return "viewport";
         case LayoutSceneKind::Transition: return "transition";
         case LayoutSceneKind::View: return "view";
-    }
-    return "unknown";
-}
-
-static const char* _layoutVisualKind(LayoutVisualKind kind)
-{
-    switch (kind) {
-        case LayoutVisualKind::Stable: return "stable";
-        case LayoutVisualKind::Morph: return "morph";
-        case LayoutVisualKind::FadeOut: return "fade-out";
-        case LayoutVisualKind::FadeIn: return "fade-in";
     }
     return "unknown";
 }
@@ -561,8 +509,7 @@ static void _layoutReport(const LayoutReport& report, const Scene* root)
         std::printf("{\"index\":%u,\"scene\":%u,\"scenePath\":", i, item->scene);
         _json(scene->path);
         std::printf(",\"handle\":%u,\"id\":", object->id());
-        if (object->tag()) _json(object->tag());
-        else std::fputs("null", stdout);
+        _json(object->tag());
         std::fputs(",\"parent\":", stdout);
         if (item->parent == UINT32_MAX) std::fputs("null", stdout);
         else std::printf("%u", item->parent);
@@ -608,7 +555,7 @@ static void _layoutReport(const LayoutReport& report, const Scene* root)
         if (visual->occluder == UINT32_MAX) std::fputs("null", stdout);
         else std::printf("%u", visual->occluder);
         std::fputs(",\"kind\":", stdout);
-        _json(_layoutVisualKind(visual->kind));
+        _json(_visualKind(visual->kind));
         std::printf(",\"layer\":%d,\"paintBounds\":", visual->layer);
         auto painted = visual->paintBounds.width > 0.0f && visual->paintBounds.height > 0.0f;
         if (painted) _bbox(visual->paintBounds);
@@ -680,36 +627,20 @@ static int _layout(int argc, char** argv)
     for (auto i = 3; i < argc; i++) {
         if (std::strcmp(argv[i], "--font") == 0 && i + 1 < argc) {
             if (!fonts.add(argv[++i])) return 2;
-        } else if (std::strcmp(argv[i], "--time") == 0 && i + 1 < argc && _float(argv[i + 1], time)) {
-            i++;
-        } else if (std::strcmp(argv[i], "--padding") == 0 && i + 1 < argc && _float(argv[i + 1], padding)) {
-            i++;
-        } else {
+        } else if (!_option(argc, argv, i, "--time", time) && !_option(argc, argv, i, "--padding", padding)) {
             std::fprintf(stderr, "viscript: invalid option: %s\n", argv[i]);
             return 2;
         }
     }
-    auto renderer = Renderer::gen();
-    if (!renderer) {
-        std::fprintf(stderr, "viscript: the renderer is unavailable\n");
-        return 3;
-    }
-    if (!_loadFonts(renderer, fonts)) {
-        delete renderer;
-        return 3;
-    }
-    auto scene = _load(source);
-    if (!scene) {
-        delete renderer;
-        return 2;
-    }
+    Session session;
+    if (auto code = session.open(source, fonts.paths, fonts.count)) return code;
+    auto renderer = session.renderer;
+    auto scene = session.scene;
     if (time < 0.0f) time = scene->duration();
     LayoutReport report;
     auto reportResult = renderer->layout(scene, time, report, padding);
     if (reportResult != Result::Success) {
         _failed("layout report", reportResult, renderer);
-        delete renderer;
-        delete scene;
         return 4;
     }
     std::fputs("{\"source\":", stdout);
@@ -722,8 +653,6 @@ static int _layout(int argc, char** argv)
         std::fputs("}\n", stdout);
     }
     else std::fprintf(stderr, "viscript: layout inspection failed: out of memory\n");
-    delete renderer;
-    delete scene;
     return success ? 0 : 4;
 }
 
@@ -772,15 +701,8 @@ static int _render(int argc, char** argv)
                 return 2;
             }
             narration = argv[++i];
-        } else if (std::strcmp(argv[i], "--width") == 0 && i + 1 < argc && _uint(argv[i + 1], width)) {
-            i++;
-        } else if (std::strcmp(argv[i], "--height") == 0 && i + 1 < argc && _uint(argv[i + 1], height)) {
-            i++;
-        } else if (std::strcmp(argv[i], "--fps") == 0 && i + 1 < argc && _uint(argv[i + 1], fps)) {
-            i++;
-        } else if (std::strcmp(argv[i], "--time") == 0 && i + 1 < argc && _float(argv[i + 1], time)) {
-            i++;
-        } else {
+        } else if (!_option(argc, argv, i, "--width", width) && !_option(argc, argv, i, "--height", height)
+                   && !_option(argc, argv, i, "--fps", fps) && !_option(argc, argv, i, "--time", time)) {
             std::fprintf(stderr, "viscript: invalid option: %s\n", argv[i]);
             return 2;
         }
@@ -799,21 +721,11 @@ static int _render(int argc, char** argv)
     }
 
     // Fonts load before the script runs, which may measure text in them.
-    auto renderer = Renderer::gen();
-    if (!renderer) {
-        std::fprintf(stderr, "viscript: the renderer is unavailable\n");
-        return 3;
-    }
-    if (!_loadFonts(renderer, fonts)) {
-        delete renderer;
-        return 3;
-    }
     detail::LuaHostContext context;
-    auto scene = _load(source, context);
-    if (!scene) {
-        delete renderer;
-        return 2;
-    }
+    Session session;
+    if (auto code = session.open(source, fonts.paths, fonts.count, &context)) return code;
+    auto renderer = session.renderer;
+    auto scene = session.scene;
     auto& config = scene->config();
     if (width) config.width = width;
     if (height) config.height = height;
@@ -828,11 +740,7 @@ static int _render(int argc, char** argv)
         Soundtrack soundtrack;
         auto soundscape = context.audio.soundscape;
         if (_ends(output, ".mp4") && soundscape && soundscape->count()) {
-            if (!_soundtrack(scene, soundscape, source, output, fps, narration, soundtrack)) {
-                delete renderer;
-                delete scene;
-                return 3;
-            }
+            if (!_soundtrack(scene, soundscape, source, output, fps, narration, soundtrack)) return 3;
             soundtrackPath = soundtrack.path;
         }
 #endif
@@ -854,8 +762,6 @@ static int _render(int argc, char** argv)
         status = Result::NonSupport;
     }
     if (status == Result::Success) std::printf("%s\n", output);
-    delete renderer;
-    delete scene;
     return status == Result::Success ? 0 : 4;
 }
 
@@ -881,32 +787,18 @@ static int _benchmark(int argc, char** argv)
     auto frames = 120u;
     auto warmup = 5u;
     for (auto i = 3; i < argc; i++) {
-        if (std::strcmp(argv[i], "--frames") == 0 && i + 1 < argc && _uint(argv[i + 1], frames)) {
-            i++;
-        } else if (std::strcmp(argv[i], "--warmup") == 0 && i + 1 < argc && _uint(argv[i + 1], warmup, true)) {
-            i++;
-        } else if (std::strcmp(argv[i], "--font") == 0 && i + 1 < argc) {
+        if (std::strcmp(argv[i], "--font") == 0 && i + 1 < argc) {
             if (!fonts.add(argv[++i])) return 2;
-        } else {
+        } else if (!_option(argc, argv, i, "--frames", frames) && !_option(argc, argv, i, "--warmup", warmup, true)) {
             std::fprintf(stderr, "viscript: invalid option: %s\n", argv[i]);
             return 2;
         }
     }
 
-    auto renderer = Renderer::gen();
-    if (!renderer) {
-        std::fprintf(stderr, "viscript: the renderer is unavailable\n");
-        return 3;
-    }
-    if (!_loadFonts(renderer, fonts)) {
-        delete renderer;
-        return 3;
-    }
-    auto scene = _load(source);
-    if (!scene) {
-        delete renderer;
-        return 2;
-    }
+    Session session;
+    if (auto code = session.open(source, fonts.paths, fonts.count)) return code;
+    auto renderer = session.renderer;
+    auto scene = session.scene;
 
     Surface surface;
     auto duration = scene->duration();
@@ -920,8 +812,6 @@ static int _benchmark(int argc, char** argv)
         auto status = render(i % frames, frames);
         if (status != Result::Success) {
             _failed("benchmark warmup", status, renderer);
-            delete renderer;
-            delete scene;
             return 4;
         }
     }
@@ -931,8 +821,6 @@ static int _benchmark(int argc, char** argv)
         auto status = render(i, frames);
         if (status != Result::Success) {
             _failed("benchmark render", status, renderer);
-            delete renderer;
-            delete scene;
             return 4;
         }
     }
@@ -944,8 +832,6 @@ static int _benchmark(int argc, char** argv)
     std::printf(",\"objects\":%llu,\"frames\":%u,\"warmup\":%u,\"elapsed_ms\":%.6f,\"ms_per_frame\":%.6f,\"fps\":%.6f}\n",
                 static_cast<unsigned long long>(_objectCount(scene)), frames, warmup, elapsed,
                 frameTime, 1000.0 / frameTime);
-    delete renderer;
-    delete scene;
     return 0;
 }
 
@@ -962,7 +848,6 @@ int main(int argc, char** argv)
     if (std::strcmp(argv[1], "audit") == 0) return visAudit(argc, argv);
 #endif
     if (std::strcmp(argv[1], "inspect") == 0 && argc >= 3) return _inspect(argc, argv);
-    if (std::strcmp(argv[1], "capabilities") == 0 && argc == 2) return _capabilities();
     _usage();
     return 2;
 }
