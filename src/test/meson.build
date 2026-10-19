@@ -212,12 +212,19 @@ if cli_enabled
                 ],
             }
         endif
+        # Room for a busy machine: js-binding alone takes about 15 s, half of meson's default.
         foreach name, args : node_tests
-            test(name, node, args: args)
+            test(name, node, args: args, timeout: 120)
         endforeach
     endif
 
-    typescript = find_program('tsc', required: false)
+    # tsc from PATH, or else the one npm installs for the VS Code extension or the player.
+    typescript = find_program(
+        'tsc',
+        meson.project_source_root() / 'tools/vscode/node_modules/.bin/tsc',
+        meson.project_source_root() / 'tools/player/node_modules/.bin/tsc',
+        required: false,
+    )
     if typescript.found()
         test(
             'ts-binding',
@@ -226,6 +233,9 @@ if cli_enabled
                 '--noEmit', '--strict', '--target', 'ES2022', '--module', 'ES2022',
                 '--moduleResolution', 'bundler', '--lib', 'ES2022,DOM', files('testTypes.ts'),
             ],
+            timeout: 120,
         )
+    else
+        message('Skipping ts-binding: no tsc on PATH or in tools/vscode or tools/player (npm ci there)')
     endif
 endif
