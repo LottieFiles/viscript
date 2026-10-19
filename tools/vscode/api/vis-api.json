@@ -443,7 +443,7 @@
       "route_width": {"type": "number", "description": "Base route stroke width."},
       "arrow_length": {"type": "number", "description": "Arrowhead length."},
       "arrow_width": {"type": "number", "description": "Arrowhead width."},
-      "corner": {"type": "number", "description": "Node corner radius in world units; zones round 1.5 times as much. Omitted or negative follows the Theme roundness of the shorter node_size side."},
+      "corner": {"type": "number", "description": "Node corner radius in world units; zones round 1.5 times as much. Omitted or negative follows the Theme roundness of the shorter node_size side. A corner is capped at half the shorter side, making a pill."},
       "layers": {"type": "DiagramLayersConfig", "description": "Generated sibling layer assignments."}
     },
     "DiagramNodeConfig": {

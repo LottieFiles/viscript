@@ -103,6 +103,27 @@ vis.diagram(scene, {id = "limits"}):zone {id = "z", members = {}}
 return scene
 )lua";
     _scriptError(members, "authoring-modules.lua", "between 1 and 256 members");
+
+    // A field of the wrong type is named, not numbered by its place on the stack; integers take
+    // integral floats and numeric strings, as before.
+    static constexpr const char* fields[][2] = {
+        {"vis.diagram(scene, {layers = 1})", "diagram layers must be a table, got number"},
+        {"d:node {id = 'c', label = {}}", "label must be a string, got table"},
+        {"d:node {id = 'c', rank = 'x'}", "rank must be a number, got string"},
+        {"d:node {id = 'c', rank = 1.5}", "rank must be an integer"},
+        {"d:node {id = 'c', rank = 2.0, row = '3', position = 1}", "position must be a table, got number"},
+        {"d:connect {id = 'e', from = a}", "to must be a vis.diagram.Node, got nil"},
+        {"d:connect {id = 'e', from = a, to = b, waypoints = 1}", "diagram waypoints must be a table"},
+        {"d:zone {id = 'z', members = 1}", "diagram zone members must be a table, got number"},
+    };
+    for (auto& field : fields) {
+        char source[256];
+        std::snprintf(source, sizeof(source),
+                      "local scene = vis.scene {}\nlocal d = vis.diagram(scene, {id = 'types'})\n"
+                      "local a, b = d:node {id = 'a'}, d:node {id = 'b'}\n%s\nreturn scene\n",
+                      field[0]);
+        _scriptError(source, "authoring-modules.lua", field[1]);
+    }
 }
 #endif
 

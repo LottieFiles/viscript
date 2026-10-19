@@ -46,9 +46,15 @@ struct LuaBuilt
     Group* root = nullptr;
 };
 
+// An int32_t, read as luaL_checkinteger reads one: integral floats and numeric strings pass.
 static int32_t _int32(lua_State* lua, int index, const char* name)
 {
-    auto value = luaL_checkinteger(lua, index);
+    int integral = 0;
+    auto value = lua_tointegerx(lua, index, &integral);
+    if (!integral) {
+        _checkNumber(lua, index, name);
+        luaL_error(lua, "%s must be an integer", name);
+    }
     if (value < INT32_MIN || value > INT32_MAX) luaL_error(lua, "%s is out of range", name);
     return static_cast<int32_t>(value);
 }
@@ -67,7 +73,7 @@ static const char* _fieldString(lua_State* lua, int index, const char* name,
         return nullptr;
     }
     size_t size = 0u;
-    auto value = luaL_checklstring(lua, -1, &size);
+    auto value = _checkString(lua, -1, name, &size);
     if (!size || std::memchr(value, '\0', size)) luaL_error(lua, "%s must be non-empty text", name);
     return value;
 }
@@ -76,7 +82,7 @@ static const char* _fieldString(lua_State* lua, int index, const char* name,
 // diagram's error wording.
 static Vec2 _vec2(lua_State* lua, int index, const char* name)
 {
-    luaL_checktype(lua, index, LUA_TTABLE);
+    _checkTable(lua, index, name);
     index = lua_absindex(lua, index);
     Vec2 value;
     auto keyed = _has(lua, index, "x") || _has(lua, index, "y");
@@ -135,11 +141,13 @@ static LuaDiagram* _diagram(lua_State* lua, int index = 1)
     return handle;
 }
 
+// The handle at index, named name when it is no argument of its own.
 template<typename T>
 static LuaHandle<T>* _handle(lua_State* lua, int index, const char* metatable,
-                             LuaDiagram* owner)
+                             LuaDiagram* owner, const char* name = nullptr)
 {
-    auto handle = static_cast<LuaHandle<T>*>(luaL_checkudata(lua, index, metatable));
+    auto handle = static_cast<LuaHandle<T>*>(luaL_testudata(lua, index, metatable));
+    if (!handle) _typeError(lua, index, metatable, name);
     if (!handle->owner || handle->owner != owner || !static_cast<bool>(handle->value)) {
         luaL_error(lua, "diagram handle belongs to another diagram");
     }
@@ -180,7 +188,7 @@ static Layers _fieldLayers(lua_State* lua, int index, const Layers& fallback)
         lua_pop(lua, 1);
         return fallback;
     }
-    luaL_checktype(lua, -1, LUA_TTABLE);
+    _checkTable(lua, -1, "diagram layers");
     auto layerIndex = lua_absindex(lua, -1);
     static const char* const options[] = {
         "zones", "routes", "nodes", "annotations", nullptr,
@@ -291,10 +299,10 @@ static int _addEdge(lua_State* lua)
     spec.id = _fieldString(lua, 2, "id", true);
     spec.label = _fieldString(lua, 2, "label");
     lua_getfield(lua, 2, "from");
-    spec.from = _handle<Node>(lua, -1, NODE_METATABLE, owner)->value;
+    spec.from = _handle<Node>(lua, -1, NODE_METATABLE, owner, "from")->value;
     lua_pop(lua, 1);
     lua_getfield(lua, 2, "to");
-    spec.to = _handle<Node>(lua, -1, NODE_METATABLE, owner)->value;
+    spec.to = _handle<Node>(lua, -1, NODE_METATABLE, owner, "to")->value;
     lua_pop(lua, 1);
     spec.fromPort = _fieldEnum(lua, 2, "from_port", spec.fromPort, PORTS, "diagram port");
     spec.toPort = _fieldEnum(lua, 2, "to_port", spec.toPort, PORTS, "diagram port");
@@ -304,7 +312,7 @@ static int _addEdge(lua_State* lua)
     spec.flowOffset = _fieldNumber(lua, 2, "flow_offset", spec.flowOffset);
     if (_has(lua, 2, "waypoints")) {
         lua_getfield(lua, 2, "waypoints");
-        luaL_checktype(lua, -1, LUA_TTABLE);
+        _checkTable(lua, -1, "diagram waypoints");
         auto waypointIndex = lua_absindex(lua, -1);
         auto count = lua_rawlen(lua, waypointIndex);
         if (!count || count > Diagram::WaypointLimit) {
@@ -339,7 +347,7 @@ static int _addZone(lua_State* lua)
     spec.id = _fieldString(lua, 2, "id", true);
     spec.label = _fieldString(lua, 2, "label");
     lua_getfield(lua, 2, "members");
-    luaL_checktype(lua, -1, LUA_TTABLE);
+    _checkTable(lua, -1, "diagram zone members");
     auto memberIndex = lua_absindex(lua, -1);
     auto count = lua_rawlen(lua, memberIndex);
     if (!count || count > Diagram::NodeLimit) {
@@ -349,7 +357,7 @@ static int _addZone(lua_State* lua)
     auto members = static_cast<Node*>(lua_newuserdatauv(lua, sizeof(Node) * count, 0));
     for (auto i = 0u; i < count; i++) {
         lua_rawgeti(lua, memberIndex, i + 1u);
-        members[i] = _handle<Node>(lua, -1, NODE_METATABLE, owner)->value;
+        members[i] = _handle<Node>(lua, -1, NODE_METATABLE, owner, "diagram zone member")->value;
         lua_pop(lua, 1);
     }
     spec.members = members;
