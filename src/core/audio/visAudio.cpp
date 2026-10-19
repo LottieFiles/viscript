@@ -6,6 +6,7 @@
 #include <new>
 
 #include "vis_audio.h"
+#include "../common/visString.h"
 
 namespace vis::audio
 {
@@ -22,15 +23,6 @@ struct GainClip
     float to = 1.0f;
     AnimCurve curve;
 };
-
-static char* _copy(const char* value) noexcept
-{
-    if (!value) return nullptr;
-    auto size = std::strlen(value) + 1u;
-    auto copy = new (std::nothrow) char[size];
-    if (copy) std::memcpy(copy, value, size);
-    return copy;
-}
 
 static bool _bus(Bus bus) noexcept
 {
@@ -146,7 +138,7 @@ Result Soundscape::cue(const CueConfig& config, Cue& output) noexcept
     if (!size || size > AssetNameLimit || pImpl->cueCount >= CueLimit) {
         return Result::InvalidArguments;
     }
-    auto asset = _copy(config.asset);
+    auto asset = _duplicate(config.asset);
     if (!asset || !pImpl->growCues()) {
         delete[] asset;
         return Result::OutOfMemory;

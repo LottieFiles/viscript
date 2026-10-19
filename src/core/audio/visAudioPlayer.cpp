@@ -9,6 +9,7 @@
 #include <miniaudio.h>
 
 #include "vis_audio.h"
+#include "../common/visString.h"
 
 namespace vis::audio
 {
@@ -29,15 +30,6 @@ static bool _gain(float value) noexcept
 static bool _rate(float value) noexcept
 {
     return std::isfinite(value) && value >= 0.125f && value <= 8.0f;
-}
-
-static char* _copy(const char* value) noexcept
-{
-    if (!value) return nullptr;
-    auto size = std::strlen(value) + 1u;
-    auto copy = new (std::nothrow) char[size];
-    if (copy) std::memcpy(copy, value, size);
-    return copy;
 }
 
 // The frame nearest to Scene time time, at rate frames per second.
@@ -214,37 +206,43 @@ struct Player::Impl
         auto status = ma_engine_init(&engineConfig, &engine);
         if (status != MA_SUCCESS) return _result(status);
 
+        // From here on uninit() undoes as much of the setup as has run.
+        initialized = true;
+        auto fail = [this](ma_result failure) {
+            uninit();
+            return _result(failure);
+        };
         for (auto i = 0u; i < 3u; i++) {
             status = ma_sound_group_init(&engine, MA_SOUND_FLAG_NO_SPATIALIZATION,
                                          nullptr, groups + i);
-            if (status != MA_SUCCESS) {
-                groupCount = i;
-                initialized = true;
-                uninit();
-                return _result(status);
-            }
+            if (status != MA_SUCCESS) return fail(status);
             groupCount++;
             ma_sound_group_set_volume(groups + i, busGain[i]);
         }
         status = ma_engine_set_volume(&engine, masterGain);
-        if (status != MA_SUCCESS) {
-            initialized = true;
-            uninit();
-            return _result(status);
-        }
+        if (status != MA_SUCCESS) return fail(status);
 
         auto manager = ma_engine_get_resource_manager(&engine);
         for (auto i = 0u; i < assetCount; i++) {
             status = ma_resource_manager_register_encoded_data(
                 manager, assets[i].name, assets[i].data, assets[i].size);
-            if (status != MA_SUCCESS) {
-                initialized = true;
-                uninit();
-                return _result(status);
-            }
+            if (status != MA_SUCCESS) return fail(status);
             assets[i].registered = true;
         }
-        initialized = true;
+        return Result::Success;
+    }
+
+    // Readies sound to play playback; the caller starts it.
+    Result init(ma_sound& sound, const Playback& playback) noexcept
+    {
+        auto flags = static_cast<ma_uint32>(MA_SOUND_FLAG_NO_SPATIALIZATION);
+        if (playback.bus != Bus::Music) flags |= MA_SOUND_FLAG_DECODE;
+        if (playback.loop) flags |= MA_SOUND_FLAG_LOOPING;
+        auto status = ma_sound_init_from_file(&engine, playback.asset, flags,
+                                              group(playback.bus), nullptr, &sound);
+        if (status != MA_SUCCESS) return _result(status);
+        ma_sound_set_volume(&sound, playback.gain);
+        ma_sound_set_pitch(&sound, playback.rate);
         return Result::Success;
     }
 
@@ -252,15 +250,9 @@ struct Player::Impl
     {
         if (slot.initialized) return Result::Success;
         if (!asset(cue.asset)) return Result::InsufficientCondition;
-        auto flags = static_cast<ma_uint32>(MA_SOUND_FLAG_NO_SPATIALIZATION);
-        if (cue.bus != Bus::Music) flags |= MA_SOUND_FLAG_DECODE;
-        if (cue.loop) flags |= MA_SOUND_FLAG_LOOPING;
-        auto status = ma_sound_init_from_file(&engine, cue.asset, flags,
-                                              group(cue.bus), nullptr, &slot.sound);
-        if (status != MA_SUCCESS) return _result(status);
+        auto result = init(slot.sound, {cue.asset, cue.bus, cue.gain, 1.0f, cue.loop});
+        if (result != Result::Success) return result;
         slot.initialized = true;
-        ma_sound_set_volume(&slot.sound, cue.gain);
-        ma_sound_set_looping(&slot.sound, cue.loop ? MA_TRUE : MA_FALSE);
         if (ma_sound_get_length_in_seconds(&slot.sound, &slot.length) != MA_SUCCESS) {
             slot.length = 0.0f;
         }
@@ -388,11 +380,10 @@ struct Player::Impl
     uint32_t groupCount = 0u;
     float masterGain = 1.0f;
     float busGain[3] = {1.0f, 1.0f, 1.0f};
-    float transportTime = 0.0f;
-    float transportRate = 1.0f;
+    // The transport sync() last applied, when transportValid.
+    Transport transport;
     bool initialized = false;
     bool started = false;
-    bool transportPlaying = false;
     bool transportValid = false;
 };
 
@@ -433,7 +424,7 @@ Result Player::load(const char* name, const uint8_t* data, uint32_t size) noexce
     }
     if (pImpl->asset(name)) return Result::InsufficientCondition;
 
-    auto copiedName = _copy(name);
+    auto copiedName = _duplicate(name);
     auto copiedData = new (std::nothrow) uint8_t[size];
     if (!copiedName || !copiedData) {
         delete[] copiedName;
@@ -497,25 +488,17 @@ Result Player::play(const Playback& playback, Voice* output) noexcept
     if (index == Voice::Invalid) return Result::InsufficientCondition;
 
     auto& slot = pImpl->voices[index];
-    auto flags = static_cast<ma_uint32>(MA_SOUND_FLAG_NO_SPATIALIZATION);
-    if (playback.bus != Bus::Music) flags |= MA_SOUND_FLAG_DECODE;
-    if (playback.loop) flags |= MA_SOUND_FLAG_LOOPING;
-    auto status = ma_sound_init_from_file(&pImpl->engine, playback.asset, flags,
-                                          pImpl->group(playback.bus), nullptr, &slot.sound);
-    if (status != MA_SUCCESS) return _result(status);
+    result = pImpl->init(slot.sound, playback);
+    if (result != Result::Success) return result;
+    auto status = ma_sound_start(&slot.sound);
+    if (status != MA_SUCCESS) {
+        ma_sound_uninit(&slot.sound);
+        return _result(status);
+    }
     slot.initialized = true;
     slot.loop = playback.loop;
     slot.generation++;
     if (!slot.generation) slot.generation = 1u;
-    ma_sound_set_volume(&slot.sound, playback.gain);
-    ma_sound_set_pitch(&slot.sound, playback.rate);
-    ma_sound_set_looping(&slot.sound, playback.loop ? MA_TRUE : MA_FALSE);
-    status = ma_sound_start(&slot.sound);
-    if (status != MA_SUCCESS) {
-        ma_sound_uninit(&slot.sound);
-        slot.initialized = false;
-        return _result(status);
-    }
     if (output) *output = {index, slot.generation};
     return Result::Success;
 }
@@ -579,23 +562,17 @@ Result Player::sync(const Transport& transport) noexcept
         || !_rate(transport.rate)) {
         return Result::InvalidArguments;
     }
-    if (!pImpl->soundscape) {
-        pImpl->transportTime = transport.time;
-        pImpl->transportRate = transport.rate;
-        pImpl->transportPlaying = transport.playing;
-        pImpl->transportValid = true;
-        return Result::Success;
-    }
+    // bind() forgets the transport, so an unbound player need not keep it.
+    if (!pImpl->soundscape) return Result::Success;
     auto result = pImpl->init();
     if (result != Result::Success) return result;
     if (pImpl->trackCount != pImpl->soundscape->count()) {
         return Result::InsufficientCondition;
     }
 
-    auto hard = transport.seek || !pImpl->transportValid
-             || (pImpl->transportValid && transport.time < pImpl->transportTime)
-             || (pImpl->transportValid && transport.rate != pImpl->transportRate)
-             || (pImpl->transportValid && transport.playing != pImpl->transportPlaying);
+    auto& last = pImpl->transport;
+    auto hard = transport.seek || !pImpl->transportValid || transport.time < last.time
+             || transport.rate != last.rate || transport.playing != last.playing;
     for (auto i = 0u; i < pImpl->trackCount; i++) {
         CueConfig cue;
         if (!pImpl->soundscape->cueAt(i, cue)) return Result::Unknown;
@@ -637,9 +614,7 @@ Result Player::sync(const Transport& transport) noexcept
             if (status != MA_SUCCESS) return _result(status);
         }
     }
-    pImpl->transportTime = transport.time;
-    pImpl->transportRate = transport.rate;
-    pImpl->transportPlaying = transport.playing;
+    last = transport;
     pImpl->transportValid = true;
     return Result::Success;
 }
