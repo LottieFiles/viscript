@@ -22,7 +22,7 @@ const read = (path) => readFileSync(new URL(path, page));
 // The font the page registers under a name, as player.js's provider gives it.
 const pageFont = (name, full) => read(name === "Pretendard" && full ? FULL_PRETENDARD : FONTS.get(name));
 const boot = async ({fonts = [], full = false, assets = []} = {}, module) => {
-    const runtime = await createVis("return vis.scene {width = 16, height = 16}", "bootstrap.lua", {wasmBinary, module, renderEngine: "cpu"});
+    const runtime = await createVis("return vis.scene {width = 16, height = 16}", "bootstrap.lua", {wasmBinary, module});
     for (const name of fonts) runtime.font(name, pageFont(name, full), "ttf");
     for (const name of assets) runtime.asset(name, read(ASSETS.get(name).path), ASSETS.get(name).mime);
     return runtime;

@@ -311,7 +311,7 @@ static detail::LuaHookSpan hooks(HookContext& context, detail::LuaHooks (&storag
     return {storage, 2u};
 }
 
-#ifdef VIS_EXPECT_CPU
+#ifdef VIS_TEST_FONT
 static Scene* loadSpans(const char* source, const char* name, char* error, uint32_t errorSize)
 {
     static const detail::LuaHooks boxHooks[] = {{openMethods, nullptr, nullptr}};
@@ -723,9 +723,9 @@ return vis.scene {theme = {text = {h1 = {font = "Serif Display", size = 40}}}}
                              sizeof(error), nullptr, nullptr, nullptr, 0u, nullptr, nullptr, {collecting, 1u});
     CHECK(status == Result::ScriptError && !scene);
     CHECK(std::strstr(error, "theme font must be a string") != nullptr);
-#ifdef VIS_EXPECT_CPU
+#ifdef VIS_TEST_FONT
     // Spans measure their texts in the fonts renderers load.
-    auto renderer = SwRenderer::gen();
+    auto renderer = Renderer::gen();
     CHECK(renderer && renderer->font(VIS_TEST_FONT) == Result::Success);
 #ifdef VIS_TEST_MONO_FONT
     CHECK(renderer && renderer->font(VIS_TEST_MONO_FONT) == Result::Success);

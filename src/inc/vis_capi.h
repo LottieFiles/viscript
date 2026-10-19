@@ -30,15 +30,6 @@ enum
     VIS_RESULT_UNKNOWN = 7
 };
 
-/* Integer ABI permits unknown engine values to reach boundary validation. */
-typedef int32_t VisRenderEngine;
-
-enum
-{
-    VIS_RENDER_ENGINE_CPU = 0,
-    VIS_RENDER_ENGINE_GL = 1
-};
-
 typedef enum VisCameraMode
 {
     VIS_CAMERA_FIXED = 0,
@@ -69,22 +60,7 @@ typedef struct VisBBox
     float height;
 } VisBBox;
 
-typedef struct VisGlTarget
-{
-    void* display;
-    void* surface;
-    void* context;
-    int32_t id;
-    uint32_t width;
-    uint32_t height;
-} VisGlTarget;
-
 VIS_API VisEngine vis_create(void);
-VIS_API VisEngine vis_create_with_engine(VisRenderEngine render_engine);
-VIS_API VisResult vis_default_render_engine_set(VisRenderEngine render_engine);
-VIS_API VisRenderEngine vis_default_render_engine(void);
-VIS_API uint8_t vis_render_engine_enabled(VisRenderEngine render_engine);
-VIS_API VisRenderEngine vis_render_engine(VisEngine engine);
 VIS_API void vis_destroy(VisEngine engine);
 VIS_API VisResult vis_load_lua(VisEngine engine, const char* source, uint32_t size, const char* name);
 VIS_API VisResult vis_load_font(VisEngine engine, const char* name, const uint8_t* data, uint32_t size,
@@ -96,8 +72,6 @@ VIS_API VisResult vis_load_asset(VisEngine engine, const char* name, const uint8
                                        const char* mime);
 VIS_API VisResult vis_render(VisEngine engine, float time);
 VIS_API VisResult vis_render_scaled(VisEngine engine, float time, uint32_t pixel_ratio);
-// Experimental: needs a build with the GL engine (-Dengines=cpu,gl).
-VIS_API VisResult vis_render_gl(VisEngine engine, float time, const VisGlTarget* target);
 VIS_API VisResult vis_bounds(VisEngine engine, const char* object, float time, VisBBox* output);
 VIS_API VisResult vis_intersects(VisEngine engine, const char* first, const char* second, float time,
                                        float padding, uint8_t* output);

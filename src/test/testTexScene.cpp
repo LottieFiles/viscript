@@ -91,7 +91,7 @@ static void _pieces(Scene* scene)
 // Every glyph's box is the box its ink covers as painted, leaning letters included, so bounds
 // frame what the reader sees; shapes keep their outlines. The glyphs paint where the layout
 // sets them, whatever their boxes.
-static void _inked(SwRenderer* renderer)
+static void _inked(Renderer* renderer)
 {
     Config config;
     config.width = 800;
@@ -191,7 +191,7 @@ static void _errors(Scene* scene)
 
 int main()
 {
-    auto renderer = SwRenderer::gen();
+    auto renderer = Renderer::gen();
     auto scene = Scene::gen();
     CHECK(renderer && scene);
     if (renderer && scene) {

@@ -312,7 +312,7 @@ static void actions()
     delete state;
 }
 
-static void pointerFollow(SwRenderer* renderer)
+static void pointerFollow(Renderer* renderer)
 {
     Config config;
     config.width = 200u;
@@ -396,7 +396,7 @@ static void pointerFollow(SwRenderer* renderer)
     delete scene;
 }
 
-static void keyboard(SwRenderer* renderer)
+static void keyboard(Renderer* renderer)
 {
     Config config;
     config.width = 200u;
@@ -602,7 +602,7 @@ int main()
 {
     rawState();
     actions();
-    auto renderer = SwRenderer::gen();
+    auto renderer = Renderer::gen();
     CHECK(renderer != nullptr);
     if (renderer) {
         pointerFollow(renderer);

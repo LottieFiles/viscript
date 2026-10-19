@@ -2,7 +2,7 @@
 
 // A function play blends vertically on matching grids without running callbacks during
 // rendering, and keeps the midpoint switch for points and incompatible grids.
-void _functionPlay(SwRenderer* renderer)
+void _functionPlay(Renderer* renderer)
 {
     static constexpr auto source = R"lua(
 local s = vis.scene {width = 320, height = 180, camera = {mode = "fixed", view = "2d", height = 6}}
@@ -56,7 +56,7 @@ return s
 }
 
 // Poles found between finite samples stay broken at baked frames and interior seek times.
-void _animatedPlotGaps(SwRenderer* renderer)
+void _animatedPlotGaps(Renderer* renderer)
 {
     static constexpr auto source = R"lua(
 local s = vis.scene {width = 960, height = 540, fps = 30, camera = {height = 540}}
@@ -132,7 +132,7 @@ return s
 
 // A plot takes fn or points of any count from play, set and bound states, and cuts them as it was
 // cut when it was made: its graph follows a tracker frame by frame even as poles move through it.
-void _replotting(SwRenderer* renderer)
+void _replotting(Renderer* renderer)
 {
     static constexpr auto source = R"lua(
 local s = vis.scene {width = 320, height = 180, fps = 10, camera = {mode = "fixed", view = "2d", height = 9}}
@@ -278,7 +278,7 @@ return s
     _scriptError(room, "scene point limit exceeded");
 }
 
-void _trimmedSegments(SwRenderer* renderer)
+void _trimmedSegments(Renderer* renderer)
 {
     static constexpr auto source = R"lua(
 local s = vis.scene {width = 200, height = 100, fps = 10,

@@ -17,7 +17,7 @@ sample -> compose -> project -> clip -> sort
 DisplayList -> retained ThorVG paints
         |
         +-> CPU RGBA
-        +-> OpenGL target
+        +-> OpenGL target (vis-gl module)
 ```
 
 ## Scene model
@@ -114,8 +114,8 @@ colors, gradients, strokes, and effects. Viewports, isolated Objects, masks, ble
 and transition stages keep their own composition groups.
 
 The display list remains the common source for drawing, hit queries, and layout
-reports. CPU and OpenGL renderers use the same lowering and paint-update logic.
-Renderer selection belongs to the host; CPU is the default.
+reports. The core's CPU renderer and the optional `vis-gl` module's OpenGL renderer use
+the same lowering and paint-update logic.
 
 Assets retain encoded image bytes for ThorVG Picture rendering. SVG remains vector;
 PNG, JPEG, and WebP remain raster. Cell texture sampling decodes straight-alpha RGBA

@@ -1,6 +1,6 @@
 #include "testLuaChecks.h"
 
-void _viewports(SwRenderer* renderer)
+void _viewports(Renderer* renderer)
 {
     static constexpr auto source = R"lua(
 local root = vis.scene {width = 200, height = 100, background = "#101820"}
@@ -46,7 +46,7 @@ return root
 
 }
 
-void _sceneTransitions(SwRenderer* renderer)
+void _sceneTransitions(Renderer* renderer)
 {
     static constexpr auto source = R"lua(
 local root = vis.scene {width = 200, height = 100, background = "#080d14", antialiasing = false}
@@ -92,7 +92,7 @@ return root
     delete scene;
 }
 
-void _transitionStyles(SwRenderer* renderer)
+void _transitionStyles(Renderer* renderer)
 {
     // A style for every transition, or one for each.
     static constexpr auto source = R"lua(
@@ -396,7 +396,7 @@ return root
     }
 }
 
-void _sceneTree(SwRenderer* renderer)
+void _sceneTree(Renderer* renderer)
 {
     static constexpr auto source = R"lua(
 local scene = vis.scene {

@@ -409,7 +409,7 @@ return s
                  "before then must end at that time or later");
 }
 
-void _themes(SwRenderer* renderer)
+void _themes(Renderer* renderer)
 {
     static constexpr auto source = R"lua(
 local scene = vis.scene {
@@ -672,7 +672,7 @@ return scene
     delete scene;
 }
 
-void _cellVoxelBindings(SwRenderer* renderer)
+void _cellVoxelBindings(Renderer* renderer)
 {
     static constexpr auto source = R"lua(
 local scene = vis.scene {

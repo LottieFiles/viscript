@@ -74,7 +74,7 @@ static uint32_t _changed(const Surface& surface, Color background)
 
 // One source: a typeset group of glyphs named after it, set in the role's color, its box
 // pinned to the point.
-static void _single(SwRenderer* renderer)
+static void _single(Renderer* renderer)
 {
     static constexpr char source[] = R"lua(
 local scene = vis.scene {}
@@ -229,7 +229,7 @@ return scene
 }
 
 // The bounds of a piece when the scene shows time, in pixels.
-static Vec2 _center(SwRenderer* renderer, const Scene* scene, const char* id, float time)
+static Vec2 _center(Renderer* renderer, const Scene* scene, const char* id, float time)
 {
     BBox box;
     auto object = scene->object(id);
@@ -245,7 +245,7 @@ static bool _at(Vec2 lhs, Vec2 rhs)
 // match_transform pairs the pieces of formulas by their TeX: a part that reads the same as a
 // whole, then glyphs in the order both keep, then wherever they stand; a pair of groups pairs
 // the pieces below them.
-static void _matching(SwRenderer* renderer)
+static void _matching(Renderer* renderer)
 {
     static constexpr char whole[] = R"lua(
 local scene = vis.scene {}
@@ -292,7 +292,7 @@ return scene
 // copy of b^2 - 4ac flies into the discriminant, while the rest of the target fades in where it
 // stands and the rest of the copy fades out where it stands. A pair of parts still pairs the
 // pieces below them.
-static void _choosing(SwRenderer* renderer)
+static void _choosing(Renderer* renderer)
 {
     static constexpr char given[] = R"lua(
 local s = vis.scene {width = 800, height = 400, camera = {mode = "fixed", view = "2d", target = {0, 0}, height = 400}}
@@ -343,7 +343,7 @@ return scene
 
 // A rectangle around glyphs sits its padding off their ink on every side, and bounds report
 // the ink, leaning letters included, as painted.
-static void _framing(SwRenderer* renderer)
+static void _framing(Renderer* renderer)
 {
     static constexpr char source[] = R"lua(
 local s = vis.scene {width = 800, height = 400, camera = {mode = "fixed", view = "2d", target = {0, 0}, height = 400}}
@@ -384,7 +384,7 @@ return s
 
 // A brace under a term of a formula reaches from the ink of its first glyph to the ink of its
 // last, offset below the lowest, and its label's ink stands gap below its tip.
-static void _bracing(SwRenderer* renderer)
+static void _bracing(Renderer* renderer)
 {
     static constexpr char source[] = R"lua(
 local s = vis.scene {width = 800, height = 400, camera = {mode = "fixed", view = "2d", target = {0, 0}, height = 400}}
@@ -450,7 +450,7 @@ static bool _near(float lhs, float rhs, float tolerance = 0.01f)
 
 // spans{..., {tex = "..."}, ...}: a formula set inline in text style, in the row's size and
 // color, as one box on the baseline that lines never break inside.
-static void _inline(SwRenderer* renderer)
+static void _inline(Renderer* renderer)
 {
     static constexpr char source[] = R"lua(
 local s = vis.scene {width = 1280, height = 720, camera = {mode = "fixed", view = "2d", height = 720}}
@@ -552,7 +552,7 @@ return s
 }
 
 // An inline formula applies its resolved row or part layer to every painted piece.
-static void _inlineLayers(SwRenderer* renderer)
+static void _inlineLayers(Renderer* renderer)
 {
     static constexpr char source[] = R"lua(
 local s = vis.scene {width = 640, height = 360, background = "#000000",
@@ -816,7 +816,7 @@ static void _host()
 
 int main()
 {
-    auto renderer = SwRenderer::gen();
+    auto renderer = Renderer::gen();
     CHECK(renderer != nullptr);
     if (renderer) {
 #ifdef VIS_TEST_FONT

@@ -213,10 +213,7 @@ export async function main(argv) {
 
     let problems = 0;
     for (const mode of options.themes) {
-        const runtime = await createVis("return vis.scene {width = 16, height = 16}", "bootstrap.lua", {
-            wasmBinary,
-            renderEngine: "cpu",
-        });
+        const runtime = await createVis("return vis.scene {width = 16, height = 16}", "bootstrap.lua", {wasmBinary});
         try {
             runtime.hostTheme({dark: mode === "dark", ...PALETTES[mode]});
             for (const [family, bytes] of fonts) runtime.font(family, bytes, "ttf");

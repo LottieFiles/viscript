@@ -1,6 +1,6 @@
 #include "testLuaChecks.h"
 
-void _emphasizing(SwRenderer* renderer)
+void _emphasizing(Renderer* renderer)
 {
     // A wiggle may begin while a shift carries the box: it grows and turns about the moving
     // center and leaves the box as the shift does. A frame 10 units high on 200 pixels makes
@@ -208,7 +208,7 @@ return s
     fails("s:ripple(s:group {})", "could not play ripple: the target has no geometry at the cursor");
 }
 
-void _animationMethods(SwRenderer* renderer)
+void _animationMethods(Renderer* renderer)
 {
     static constexpr auto source = R"lua(
 local scene = vis.scene {
@@ -358,7 +358,7 @@ static uint64_t _surfaceHash(const Surface& surface)
     return hash;
 }
 
-void _dashTimeline(SwRenderer* renderer)
+void _dashTimeline(Renderer* renderer)
 {
     static constexpr char source[] = R"lua(
 local scene = vis.scene {
@@ -394,7 +394,7 @@ return scene
     delete scene;
 }
 
-void _motion(SwRenderer* renderer)
+void _motion(Renderer* renderer)
 {
     static constexpr auto source = R"lua(
 local s = vis.scene {width = 160, height = 80, camera = {mode = "fixed", view = "2d", height = 4}}
@@ -643,7 +643,7 @@ return s
 }
 
 // The layer an object draws at at time, as a layout report gives it, or INT32_MIN without one.
-static int32_t _layerAt(SwRenderer* renderer, Scene* scene, const char* id, float time)
+static int32_t _layerAt(Renderer* renderer, Scene* scene, const char* id, float time)
 {
     LayoutReport report;
     auto object = scene->object(id);
@@ -655,7 +655,7 @@ static int32_t _layerAt(SwRenderer* renderer, Scene* scene, const char* id, floa
     return INT32_MIN;
 }
 
-void _layering(SwRenderer* renderer)
+void _layering(Renderer* renderer)
 {
     static constexpr auto source = R"lua(
 local s = vis.scene {width = 160, height = 80, camera = {height = 4}}
@@ -702,7 +702,7 @@ return s
 }
 
 // The center of the ink an object paints at time, in pixels, or (-1, -1) when it paints none.
-static Vec2 _centerAt(SwRenderer* renderer, Scene* scene, const char* id, float time)
+static Vec2 _centerAt(Renderer* renderer, Scene* scene, const char* id, float time)
 {
     auto object = scene->object(id);
     BBox ink;
@@ -711,7 +711,7 @@ static Vec2 _centerAt(SwRenderer* renderer, Scene* scene, const char* id, float 
 }
 
 // The pixel at (x, y) of the frame at time, packed as _pixel packs a color.
-static uint32_t _pixelAt(SwRenderer* renderer, Scene* scene, float time, uint32_t x, uint32_t y)
+static uint32_t _pixelAt(Renderer* renderer, Scene* scene, float time, uint32_t x, uint32_t y)
 {
     Surface surface;
     if (renderer->render(scene, time, surface) != Result::Success) return 0u;
@@ -721,7 +721,7 @@ static uint32_t _pixelAt(SwRenderer* renderer, Scene* scene, float time, uint32_
 // A morph of two surfaces calls their color function again at the points between the two: the
 // face over (0.1, 1.5) lies near height 0 halfway from the bowl to the saddle, gray, where the
 // bowl is orange and the saddle blue, so a blend of the two ends would be neither.
-void _pieceMorphs(SwRenderer* renderer)
+void _pieceMorphs(Renderer* renderer)
 {
     static constexpr auto source = R"lua(
 local s = vis.scene {width = 320, height = 180, camera = {height = 6}}
@@ -769,7 +769,7 @@ return s
     fails("{pairs={{1,1},{2,1}}}", "morph pairs need distinct piece indices within each outline");
 }
 
-void _surfaceMorph(SwRenderer* renderer)
+void _surfaceMorph(Renderer* renderer)
 {
     static constexpr auto source = R"lua(
 local s = vis.scene {width = 200, height = 200, background = "#101010",
@@ -841,7 +841,7 @@ return s
                  "morph needs a line, circle, rectangle, polygon, plot, path or curve on both sides, or two surfaces");
 }
 
-void _savingStates(SwRenderer* renderer)
+void _savingStates(Renderer* renderer)
 {
     // 20 pixels per unit with the origin at pixel (80, 40): the card at (40, 40).
     static constexpr auto source = R"lua(

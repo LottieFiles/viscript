@@ -505,7 +505,7 @@ Result saver::timeline(const Scene* scene, uint32_t& fps, uint32_t& frames) noex
     return Result::Success;
 }
 
-Result saver::frames(const Scene* scene, SwRenderer* renderer, const char* path, uint32_t fps,
+Result saver::frames(const Scene* scene, Renderer* renderer, const char* path, uint32_t fps,
                      const char* options, bool evenDimensions, const char* soundtrack) noexcept
 {
 #if defined(__EMSCRIPTEN__) || defined(_WIN32)
@@ -654,40 +654,35 @@ Result saver::frames(const Scene* scene, SwRenderer* renderer, const char* path,
 #endif
 }
 
-Result Saver::video(const Scene* scene, SwRenderer* renderer, const char* path, uint32_t fps) noexcept
+Result Saver::save(const Scene* scene, Renderer& renderer, const char* path, uint32_t fps) noexcept
 {
-    if (!scene || !renderer || !path || !path[0]) return Result::InvalidArguments;
+    if (!scene || !path || !path[0]) return Result::InvalidArguments;
     auto gif = saver::ends(path, ".gif");
     auto mp4 = saver::ends(path, ".mp4");
     if (!gif && !mp4) return Result::InvalidArguments;
 #if defined(__EMSCRIPTEN__) || defined(_WIN32)
+    static_cast<void>(renderer);
     static_cast<void>(fps);
     return Result::NonSupport;
 #else
-    if (gif) return saver::gif(scene, renderer, path, fps);
-    return saver::video(scene, renderer, path, fps);
+    if (gif) return saver::gif(scene, &renderer, path, fps);
+    return saver::video(scene, &renderer, path, fps);
 #endif
-}
-
-Result Saver::save(const Scene* scene, Renderer& renderer, const char* path, uint32_t fps) noexcept
-{
-    if (renderer.engine() != RenderEngine::Cpu) return Result::NonSupport;
-    return video(scene, renderer.cpuBackend(), path, fps);
 }
 
 Result Saver::save(const Scene* scene, Renderer& renderer, const char* path, uint32_t fps,
                    const char* soundtrack) noexcept
 {
     if (!soundtrack) return save(scene, renderer, path, fps);
-    if (renderer.engine() != RenderEngine::Cpu) return Result::NonSupport;
-    if (!scene || !renderer.cpuBackend() || !path || !soundtrack[0] || !saver::ends(path, ".mp4")) {
+    if (!scene || !path || !soundtrack[0] || !saver::ends(path, ".mp4")) {
         return Result::InvalidArguments;
     }
 #if defined(__EMSCRIPTEN__) || defined(_WIN32)
+    static_cast<void>(renderer);
     static_cast<void>(fps);
     return Result::NonSupport;
 #else
-    return saver::video(scene, renderer.cpuBackend(), path, fps, soundtrack);
+    return saver::video(scene, &renderer, path, fps, soundtrack);
 #endif
 }
 

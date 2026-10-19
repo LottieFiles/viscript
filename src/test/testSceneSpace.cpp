@@ -11,7 +11,7 @@ static bool _turned(const Vec3& point, Vec3& image, void*) noexcept
 // centered on the axis, square to it and tickLength pixels long, in the color of the axis. A warp
 // carries each tick to the image of its point and turns it square to the axis it bends, and
 // leaves it out of the bounds of the space, as it leaves out the numbers.
-void spaceTicks(SwRenderer* renderer)
+void spaceTicks(Renderer* renderer)
 {
     Config config;
     config.width = 240;
@@ -329,7 +329,7 @@ void spaceLabels()
 // A space passes its opacity and creation progress to the labels it placed below it, at any
 // depth, as a group passes them to its children, also when it draws into a layer of its own;
 // the other objects below it and the labels it placed elsewhere keep their own.
-void spaceScreenLabels(SwRenderer* renderer)
+void spaceScreenLabels(Renderer* renderer)
 {
 #ifdef VIS_TEST_FONT
     constexpr auto pi = 3.14159265359f;
@@ -462,7 +462,7 @@ void spaceScreenLabels(SwRenderer* renderer)
 #endif
 }
 
-void spaceScreenLabelWarps(SwRenderer* renderer)
+void spaceScreenLabelWarps(Renderer* renderer)
 {
 #ifdef VIS_TEST_FONT
     Config config;
@@ -542,7 +542,7 @@ void spaceScreenLabelWarps(SwRenderer* renderer)
 #endif
 }
 
-void spaceLabelOpacity(SwRenderer* renderer)
+void spaceLabelOpacity(Renderer* renderer)
 {
     Config config;
     config.width = 240;
@@ -622,7 +622,7 @@ void spaceLabelOpacity(SwRenderer* renderer)
 // twenty-nine of 0.3 end on the float nearest 9.2, which frame 276 samples at 30 frames a second,
 // and what starts there shows on that frame. Added up as floats they ended three ulps late, and it
 // showed a frame late. A play of items that begin a lag apart moves the cursor as far.
-void cursorDecimals(SwRenderer* renderer)
+void cursorDecimals(Renderer* renderer)
 {
     Config config;
     config.width = 40;

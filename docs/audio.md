@@ -7,7 +7,7 @@ cue names, timing, and gain animation. The same Player can mix cues offline for 
 ## Build
 
 ```sh
-meson setup build-audio -Dmodules=audio -Dengines=cpu
+meson setup build-audio -Dmodules=audio
 meson compile -C build-audio
 meson test -C build-audio --print-errorlogs
 ```

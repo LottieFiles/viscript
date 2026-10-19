@@ -74,7 +74,7 @@ return scene
     CHECK(runtime && runtime->advance(0.05f) == Result::Success);
     CHECK(runtime && runtime->steps() == 0u && runtime->tick() == 0u);
 
-    auto renderer = SwRenderer::gen();
+    auto renderer = Renderer::gen();
     CHECK(renderer != nullptr);
     auto box = scene ? scene->object("box") : nullptr;
     BBox before;
@@ -225,7 +225,7 @@ static void groupFill()
     state.fill = Color::hex("#ff6b6b");
     state.fillEnabled = true;
     CHECK(runtime->update(group, state) == Result::Success);
-    auto renderer = SwRenderer::gen();
+    auto renderer = Renderer::gen();
     const Object* candidates[] = {group};
     PixelSample sample;
     CHECK(renderer && renderer->sample(scene, 0.0f, {50.0f, 50.0f}, candidates, 1u, sample)
@@ -263,7 +263,7 @@ return scene
     auto result = load(source, scene, context, error, sizeof(error));
     CHECK(result == Result::Success && scene);
     auto runtime = context.runtime.runtime;
-    auto renderer = SwRenderer::gen();
+    auto renderer = Renderer::gen();
     auto box = scene ? scene->object("box") : nullptr;
     BBox bounds;
     CHECK(runtime && runtime->advance(0.2f) == Result::ScriptError);
@@ -342,7 +342,7 @@ return scene
     auto result = load(source, scene, context, error, sizeof(error));
     CHECK(result == Result::Success && scene);
     auto runtime = context.runtime.runtime;
-    auto renderer = SwRenderer::gen();
+    auto renderer = Renderer::gen();
     auto subject = scene ? scene->object("subject") : nullptr;
     BBox committed;
     BBox rolledBack;
@@ -417,7 +417,7 @@ return scene
     CHECK(runtime && runtime->advance(0.2f) == Result::Success);
     CHECK(runtime && runtime->steps() == 2u);
 
-    auto renderer = SwRenderer::gen();
+    auto renderer = Renderer::gen();
     auto box = scene ? scene->object("box") : nullptr;
     BBox bounds;
     CHECK(renderer && box

@@ -1,6 +1,6 @@
 #include "testSceneChecks.h"
 
-void highlightedParts(SwRenderer* renderer)
+void highlightedParts(Renderer* renderer)
 {
     Config config;
     config.width = 320;
@@ -75,7 +75,7 @@ void highlightedParts(SwRenderer* renderer)
     delete scene;
 }
 
-void sceneThemes(SwRenderer* renderer)
+void sceneThemes(Renderer* renderer)
 {
     auto proWhite = Theme::preset(ThemePreset::ProWhite);
     auto proBlack = Theme::preset(ThemePreset::ProBlack);
@@ -449,7 +449,7 @@ void sceneThemes(SwRenderer* renderer)
     delete scene;
 }
 
-void groupStyles(SwRenderer* renderer)
+void groupStyles(Renderer* renderer)
 {
     Config config;
     config.width = 160;

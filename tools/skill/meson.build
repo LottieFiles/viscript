@@ -61,13 +61,13 @@ foreach t : skill_templates
     if t.get('when', true)
         name = 'skill-template' + t['name']
         template = files(t['src'])
-        # Fonts load through a renderer, so a template that measures text needs the CPU engine.
-        if not t.get('font', false)
-            test(name, vis_cli, args: ['inspect', template])
-        elif cpu_enabled
+        # A template that measures text loads the fonts first.
+        if t.get('font', false)
             test(name, vis_cli, args: ['inspect', template] + example_fonts)
+        else
+            test(name, vis_cli, args: ['inspect', template])
         endif
-        if t.get('render', false) and cpu_enabled
+        if t.get('render', false)
             test(
                 'render-' + name,
                 vis_cli,

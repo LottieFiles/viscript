@@ -1,6 +1,6 @@
 #include "testSceneChecks.h"
 
-void matchedShapes(SwRenderer* renderer)
+void matchedShapes(Renderer* renderer)
 {
     Config config;
     config.width = 320;
@@ -143,7 +143,7 @@ void matchedShapes(SwRenderer* renderer)
     }
 }
 
-void morphedOutlines(SwRenderer* renderer)
+void morphedOutlines(Renderer* renderer)
 {
     Config config;
     config.width = 320;
@@ -275,7 +275,7 @@ static double _morphArea(const LayoutPath* path)
     return area * 0.5;
 }
 
-void pieceMorphs(SwRenderer* renderer)
+void pieceMorphs(Renderer* renderer)
 {
     Config config;
     config.width = 320;
@@ -488,7 +488,7 @@ void pieceMorphs(SwRenderer* renderer)
     delete scene;
 }
 
-void contouredPaths(SwRenderer* renderer)
+void contouredPaths(Renderer* renderer)
 {
     Config config;
     config.width = 320;

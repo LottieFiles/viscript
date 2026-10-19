@@ -1,6 +1,6 @@
 #include "testSceneChecks.h"
 
-void viewports(SwRenderer* renderer)
+void viewports(Renderer* renderer)
 {
     auto parent = Scene::gen();
     auto child = Scene::gen();
@@ -323,7 +323,7 @@ void viewports(SwRenderer* renderer)
     delete budgetRoot;
 }
 
-void liveSceneTransitions(SwRenderer* renderer)
+void liveSceneTransitions(Renderer* renderer)
 {
     Config config;
     config.width = 240;
@@ -412,7 +412,7 @@ void liveSceneTransitions(SwRenderer* renderer)
     delete root;
 }
 
-void sceneTransitions(SwRenderer* renderer)
+void sceneTransitions(Renderer* renderer)
 {
     Config config;
     config.width = 240;
@@ -540,7 +540,7 @@ void sceneTransitions(SwRenderer* renderer)
     delete root;
 }
 
-void transitionLayoutVisuals(SwRenderer* renderer)
+void transitionLayoutVisuals(Renderer* renderer)
 {
     Config config;
     config.width = 240;
@@ -964,7 +964,7 @@ static bool _shade(const Surface& surface, uint32_t x, uint32_t y, int red, int 
 
 // Styles of scene transitions: where each stage stands, at what scale and how opaque, while it
 // hands over to the next.
-void transitionStyles(SwRenderer* renderer)
+void transitionStyles(Renderer* renderer)
 {
     Config config;
     config.width = 200;

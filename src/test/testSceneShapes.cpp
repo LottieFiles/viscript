@@ -10,7 +10,7 @@ static const LayoutPath* anglePath(const LayoutReport& report, const Object* obj
     return nullptr;
 }
 
-void arcsAndAngles(SwRenderer* renderer)
+void arcsAndAngles(Renderer* renderer)
 {
     constexpr auto pi = 3.14159265359f;
     auto arc = Arc::gen({1.0f, 2.0f, 0.0f}, 2.0f, 0.0f, pi * 0.5f);
@@ -129,7 +129,7 @@ void arcsAndAngles(SwRenderer* renderer)
     delete scene;
 }
 
-void mathSymbolFallback(SwRenderer* renderer)
+void mathSymbolFallback(Renderer* renderer)
 {
     CHECK(renderer->font(VIS_TEST_FONT) == Result::Success);
     Config config; config.width = 400; config.height = 100; config.camera.orthoHeight = 100.0f;
@@ -152,7 +152,7 @@ void mathSymbolFallback(SwRenderer* renderer)
     delete scene;
 }
 
-void shapeProperties(SwRenderer* renderer)
+void shapeProperties(Renderer* renderer)
 {
     Config config;
     config.width = 160;
@@ -352,7 +352,7 @@ void shapeProperties(SwRenderer* renderer)
 
 // Geometry clips carry the points that define a shape point by point, and leave the shape with its
 // new points for whatever is authored next.
-void trimmedSegments(SwRenderer* renderer)
+void trimmedSegments(Renderer* renderer)
 {
     Config config;
     config.width = 200;
@@ -429,7 +429,7 @@ void trimmedSegments(SwRenderer* renderer)
     }
 }
 
-void zeroLengthArrows(SwRenderer* renderer)
+void zeroLengthArrows(Renderer* renderer)
 {
     Config config;
     config.width = 200;
@@ -557,7 +557,7 @@ void zeroLengthArrows(SwRenderer* renderer)
     delete scene;
 }
 
-void geometryClips(SwRenderer* renderer)
+void geometryClips(Renderer* renderer)
 {
     Config config;
     config.width = 160;
@@ -754,7 +754,7 @@ void geometryClips(SwRenderer* renderer)
 
 // Function columns keep x fixed and blend y before clipping, including as pieces leave or
 // enter the band. A copy retains the sampled column and discontinuity gaps.
-void plotFunctionPlay(SwRenderer* renderer)
+void plotFunctionPlay(Renderer* renderer)
 {
     Config config;
     config.width = 320;
@@ -828,7 +828,7 @@ void plotFunctionPlay(SwRenderer* renderer)
 
 // A plot that takes points in other pieces switches halfway; matching pieces travel.
 // Copies, saves and clips of one frame each go by the shape the plot shows.
-void plotReplot(SwRenderer* renderer)
+void plotReplot(Renderer* renderer)
 {
     Config config;
     config.width = 320;

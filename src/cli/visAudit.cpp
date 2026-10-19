@@ -2864,10 +2864,10 @@ int visAudit(int argc, char** argv) noexcept
     }
 
     // Fonts load before the script runs, which may measure text in them.
-    auto renderer = Renderer::gen(RenderEngine::Cpu);
+    auto renderer = Renderer::gen();
     if (!renderer)
     {
-        std::fprintf(stderr, "viscript: SW renderer is unavailable\n");
+        std::fprintf(stderr, "viscript: the renderer is unavailable\n");
         return 3;
     }
     for (auto i = 0u; i < options.fontCount; i++)

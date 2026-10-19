@@ -102,7 +102,7 @@ return s
     fails("s:plot {points = {{0, 0}, {1}}}", "point must contain 2 or 3 numbers");
 }
 
-void _plotEndpoints(SwRenderer* renderer)
+void _plotEndpoints(Renderer* renderer)
 {
     static constexpr auto source = R"lua(
 local s = vis.scene {width=320, height=180, camera={view="2d", height=6}}
@@ -153,7 +153,7 @@ return s
                  "points must contain at least 2 vectors");
 }
 
-void _plotEndpointProgress(SwRenderer* renderer)
+void _plotEndpointProgress(Renderer* renderer)
 {
     static constexpr auto source = R"lua(
 local s=vis.scene{width=320,height=180,camera={view="2d",height=6}}
@@ -425,7 +425,7 @@ return s
           "could not place label: layout and direct edits must come before the first play");
 }
 
-void _spaceScreenLabels(SwRenderer* renderer)
+void _spaceScreenLabels(Renderer* renderer)
 {
 #ifdef VIS_TEST_FONT
     static constexpr auto script = R"lua(
@@ -899,7 +899,7 @@ return s
                  "scene point limit exceeded");
 }
 
-void _contourLabels(SwRenderer* renderer)
+void _contourLabels(Renderer* renderer)
 {
     static constexpr auto source = R"lua(
 local s = vis.scene {width=320, height=180, fps=4, camera={mode="fixed", height=6}}
@@ -961,7 +961,7 @@ return s
     _scriptError("local s=vis.scene{}; s:contour{fn=function(x,y) return x+y end, levels={0}, x_range={-1,1,1}, y_range={-1,1,1}, labels={extra=true}}; return s", "unknown option 'extra'");
 }
 
-void _contourBindings(SwRenderer* renderer)
+void _contourBindings(Renderer* renderer)
 {
     static constexpr auto source = R"lua(
 local s = vis.scene {fps = 8}

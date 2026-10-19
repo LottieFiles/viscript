@@ -11,8 +11,7 @@
 
 static_assert(!std::is_copy_constructible<Object>::value, "Object owns its tag");
 static_assert(!std::is_copy_constructible<Scene>::value, "Scene owns its object graph");
-static_assert(!std::is_copy_constructible<SwRenderer>::value, "SwRenderer owns a canvas");
-static_assert(!std::is_copy_constructible<GlRenderer>::value, "GlRenderer owns a canvas");
+static_assert(!std::is_copy_constructible<Renderer>::value, "Renderer owns a canvas");
 static_assert(!std::is_constructible<Object, Type>::value, "Object hierarchy is closed");
 
 int failures = 0;
@@ -49,7 +48,7 @@ static Result runtimeInput(const CameraInput&, void* data) noexcept
     return Result::Success;
 }
 
-static void renderBounds(SwRenderer* renderer)
+static void renderBounds(Renderer* renderer)
 {
     BBox first = {10.0f, 10.0f, 20.0f, 20.0f};
     BBox second = {35.0f, 10.0f, 20.0f, 20.0f};
@@ -244,7 +243,7 @@ static void renderBounds(SwRenderer* renderer)
     delete root;
 }
 
-static void layoutOcclusion(SwRenderer* renderer)
+static void layoutOcclusion(Renderer* renderer)
 {
     Config config;
     config.width = 200;
@@ -510,7 +509,7 @@ static void layoutOcclusion(SwRenderer* renderer)
     delete painterRoot;
 }
 
-static uint32_t strokePixels(SwRenderer* renderer, const float* pattern, uint32_t count)
+static uint32_t strokePixels(Renderer* renderer, const float* pattern, uint32_t count)
 {
     Config config;
     config.width = 200;
@@ -534,7 +533,7 @@ static uint32_t strokePixels(SwRenderer* renderer, const float* pattern, uint32_
     return pixels;
 }
 
-static void dashedStrokes(SwRenderer* renderer)
+static void dashedStrokes(Renderer* renderer)
 {
     auto line = Line::gen({}, {1.0f, 0.0f});
     CHECK(line != nullptr);
@@ -769,7 +768,7 @@ static void pngCompression()
     std::remove("test-sw-png.png");
 }
 
-static void scene2D(SwRenderer* renderer)
+static void scene2D(Renderer* renderer)
 {
     Config config;
     config.width = 640;
@@ -824,7 +823,7 @@ static void scene2D(SwRenderer* renderer)
     delete scene;
 }
 
-static void coplanarDrawOrder(SwRenderer* renderer)
+static void coplanarDrawOrder(Renderer* renderer)
 {
     Config config;
     config.width = 100;
@@ -865,7 +864,7 @@ static void coplanarDrawOrder(SwRenderer* renderer)
 
 }
 
-static void rendererPixelSampling(SwRenderer* renderer)
+static void rendererPixelSampling(Renderer* renderer)
 {
     Config config;
     config.width = 100;
@@ -934,7 +933,7 @@ static Scene* _numberScene(NumberMode mode, bool numbers)
     return scene;
 }
 
-static void spaceNumbers(SwRenderer* renderer)
+static void spaceNumbers(Renderer* renderer)
 {
 #ifdef VIS_TEST_FONT
     CHECK(renderer->font(VIS_TEST_FONT) == Result::Success);
@@ -1023,7 +1022,7 @@ static void springResponses()
     CHECK(std::isnan(springResponse(1.0e10, 1.0, 1.0e-300, 0.0, 1.0e300, 1.0e300)));
 }
 
-static void boundaries(SwRenderer* renderer)
+static void boundaries(Renderer* renderer)
 {
     auto invalid = Point::gen({0.0f, 0.0f});
     CHECK(invalid != nullptr);
@@ -1202,17 +1201,13 @@ static void boundaries(SwRenderer* renderer)
     CHECK(odd != nullptr);
     if (odd) {
 #ifdef VIS_SAVER_VIDEO
-        CHECK(Saver::video(odd, renderer, "invalid.mp4") == Result::InvalidArguments);
+        CHECK(Saver::save(odd, *renderer, "invalid.mp4") == Result::InvalidArguments);
 #else
-        CHECK(Saver::video(odd, renderer, "invalid.mp4") == Result::NonSupport);
+        CHECK(Saver::save(odd, *renderer, "invalid.mp4") == Result::NonSupport);
 #endif
-        CHECK(Saver::video(odd, renderer, "invalid.webm") == Result::InvalidArguments);
+        CHECK(Saver::save(odd, *renderer, "invalid.webm") == Result::InvalidArguments);
         delete odd;
     }
-
-#ifndef VIS_EXPECT_GL
-    CHECK(GlRenderer::gen() == nullptr);
-#endif
 }
 
 #if !defined(_WIN32) && !defined(__EMSCRIPTEN__) && defined(VIS_SAVER_GIF) \
@@ -1237,7 +1232,7 @@ static bool _argument(const char* path, const char* argument)
     return false;
 }
 
-static void videoCadence(SwRenderer* renderer)
+static void videoCadence(Renderer* renderer)
 {
     char directory[64];
     std::snprintf(directory, sizeof(directory), "vis-video-%ld", static_cast<long>(getpid()));
@@ -1292,8 +1287,8 @@ static void videoCadence(SwRenderer* renderer)
     CHECK(scene != nullptr);
     if (scene) {
         CHECK(scene->wait(0.1f) == Result::Success);
-        CHECK(Saver::video(scene, renderer, "cadence.mp4", 30) == Result::Success);
-        CHECK(Saver::video(scene, renderer, "cadence.gif", 30) == Result::Success);
+        CHECK(Saver::save(scene, *renderer, "cadence.mp4", 30) == Result::Success);
+        CHECK(Saver::save(scene, *renderer, "cadence.gif", 30) == Result::Success);
         delete scene;
     }
 
@@ -1320,7 +1315,7 @@ static void videoCadence(SwRenderer* renderer)
         CHECK(invalidSpace->add(invalidPoint) == Result::Success);
         CHECK(invalidScene->add(invalidSpace) == Result::Success);
         invalidPoint->point.x = std::numeric_limits<float>::quiet_NaN();
-        CHECK(Saver::video(invalidScene, renderer, "preserved.mp4", 30) == Result::InvalidArguments);
+        CHECK(Saver::save(invalidScene, *renderer, "preserved.mp4", 30) == Result::InvalidArguments);
     }
     delete invalidScene;
     preserved = std::fopen("preserved.mp4", "rb");
@@ -1344,7 +1339,7 @@ static void videoCadence(SwRenderer* renderer)
         CHECK(std::fputs("RIFF", track) >= 0);
         CHECK(std::fclose(track) == 0);
     }
-    auto cpu = Renderer::gen(RenderEngine::Cpu);
+    auto cpu = Renderer::gen();
     auto voiced = Scene::gen(config);
     CHECK(cpu && voiced);
     if (cpu && voiced) {
@@ -1384,7 +1379,7 @@ static void videoCadence(SwRenderer* renderer)
 }
 #endif
 
-static void scene3D(SwRenderer* renderer)
+static void scene3D(Renderer* renderer)
 {
     Config config;
     config.width = 640;
@@ -1418,7 +1413,7 @@ static void scene3D(SwRenderer* renderer)
 }
 
 // Count pixels on the middle row of a red|blue picture that are neither pure red nor pure blue.
-static uint32_t pictureBlend(SwRenderer* renderer, const Asset* asset)
+static uint32_t pictureBlend(Renderer* renderer, const Asset* asset)
 {
     Config config;
     config.width = 320;
@@ -1453,7 +1448,7 @@ static uint32_t pictureBlend(SwRenderer* renderer, const Asset* asset)
     return blended;
 }
 
-static void pictureSharpness(SwRenderer* renderer, const Asset* svg)
+static void pictureSharpness(Renderer* renderer, const Asset* svg)
 {
     // A 4x2 SVG scaled 30x stays vector: the red/blue edge is crisp.
     auto vector = pictureBlend(renderer, svg);
@@ -1468,7 +1463,7 @@ static void pictureSharpness(SwRenderer* renderer, const Asset* svg)
     delete raster;
 }
 
-static void assetsAndCells(SwRenderer* renderer)
+static void assetsAndCells(Renderer* renderer)
 {
     static constexpr char svg[] = "<svg xmlns='http://www.w3.org/2000/svg' width='4' height='2'>"
                                   "<rect width='2' height='2' fill='#ff4050'/><rect x='2' width='2' height='2' fill='#40a0ff'/>"
@@ -1546,7 +1541,7 @@ static void assetsAndCells(SwRenderer* renderer)
     delete asset;
 }
 
-static void dimensionTransition(SwRenderer* renderer)
+static void dimensionTransition(Renderer* renderer)
 {
     Config config;
     config.width = 320;
@@ -1804,7 +1799,7 @@ static void dimensionTransition(SwRenderer* renderer)
     delete interactive;
 }
 
-static void pathAndCurveShapes(SwRenderer* renderer)
+static void pathAndCurveShapes(Renderer* renderer)
 {
     Config config;
     config.width = 240;
@@ -1892,7 +1887,7 @@ static void pathAndCurveShapes(SwRenderer* renderer)
     delete scene;
 }
 
-static void pathFillAnimations(SwRenderer* renderer)
+static void pathFillAnimations(Renderer* renderer)
 {
     Config config;
     config.width = 120;
@@ -1966,7 +1961,7 @@ static void pathFillAnimations(SwRenderer* renderer)
     delete scene;
 }
 
-static void runtimeModifiers(SwRenderer* renderer)
+static void runtimeModifiers(Renderer* renderer)
 {
     Config config;
     config.cameraMode = CameraMode::Interactive;
@@ -2088,7 +2083,7 @@ static void runtimeModifiers(SwRenderer* renderer)
 int main()
 {
     springResponses();
-    auto renderer = SwRenderer::gen();
+    auto renderer = Renderer::gen();
     CHECK(renderer != nullptr);
     if (renderer) {
         pngCompression();

@@ -48,7 +48,7 @@ static bool _tagged(const Object* object, const char* tag)
     return object && (tag ? object->tag() && std::strcmp(object->tag(), tag) == 0 : !object->tag());
 }
 
-void clonedObjects(SwRenderer* renderer)
+void clonedObjects(Renderer* renderer)
 {
     Config config;
     config.width = 200;
@@ -249,7 +249,7 @@ void clonedObjects(SwRenderer* renderer)
     delete scene;
 }
 
-void clonedLinks(SwRenderer* renderer)
+void clonedLinks(Renderer* renderer)
 {
     Config config;
     config.width = 200;
@@ -335,7 +335,7 @@ void clonedLinks(SwRenderer* renderer)
 
 // Matching carries the currently painted billboard size, including earlier model scaling.
 // Repeated samples on either side of the handoff remain stable in one retained scene.
-void matchedBillboard(SwRenderer* renderer)
+void matchedBillboard(Renderer* renderer)
 {
     for (auto copying : {false, true}) {
         for (auto guided : {false, true}) {
@@ -383,7 +383,7 @@ void matchedBillboard(SwRenderer* renderer)
 
 // A match guide contributes the same world-space detour to every piece, while each keeps
 // its own endpoints. Nonuniform parents do not reparameterize that shared path.
-void matchedPath(SwRenderer* renderer)
+void matchedPath(Renderer* renderer)
 {
     Config config;
     config.width = 200;
@@ -440,7 +440,7 @@ void matchedPath(SwRenderer* renderer)
 }
 
 // Copied transforms animate a cursor-time clone and leave the source in place.
-void copiedTransforms(SwRenderer* renderer)
+void copiedTransforms(Renderer* renderer)
 {
     Config config;
     config.width = 200;
@@ -585,7 +585,7 @@ void copiedTransforms(SwRenderer* renderer)
 }
 
 // A warped clone retains sampled geometry; later warps start from that snapshot.
-void clonedWarps(SwRenderer* renderer)
+void clonedWarps(Renderer* renderer)
 {
     Config config;
     config.width = 200;
@@ -702,7 +702,7 @@ static uint32_t _litRun(const Surface& frame, uint32_t y, uint32_t x0, uint32_t 
 // how much of its fill shows, the scale of its pixel sizes, and how its outline draws. A layout
 // that moves it before it animates, and a match into it, read its fields into its starting state
 // again and keep those parts.
-void rebasedCopies(SwRenderer* renderer)
+void rebasedCopies(Renderer* renderer)
 {
     Config config;
     config.width = 200;
@@ -776,7 +776,7 @@ void rebasedCopies(SwRenderer* renderer)
 // The points a geometry clip moves meet clones, warps and views: a copy keeps the points its
 // source shows as its own, a warp maps the points the clips end at and waits for a clip that
 // runs, a warped shape takes no new points, and a view draws them on their way.
-void geometryCopies(SwRenderer* renderer)
+void geometryCopies(Renderer* renderer)
 {
     Config config;
     config.width = 200;
@@ -925,7 +925,7 @@ void geometryCopies(SwRenderer* renderer)
 }
 
 // The layer an object of the scene has in a layout report at time, or INT32_MIN without one.
-static int32_t _reportedLayer(SwRenderer* renderer, Scene* scene, const Object* object, float time)
+static int32_t _reportedLayer(Renderer* renderer, Scene* scene, const Object* object, float time)
 {
     LayoutReport report;
     if (renderer->layout(scene, time, report) != Result::Success) return INT32_MIN;
@@ -936,7 +936,7 @@ static int32_t _reportedLayer(SwRenderer* renderer, Scene* scene, const Object* 
     return INT32_MIN;
 }
 
-void drawLayers(SwRenderer* renderer)
+void drawLayers(Renderer* renderer)
 {
     Config config;
     config.width = 160;
@@ -1052,14 +1052,14 @@ void drawLayers(SwRenderer* renderer)
 }
 
 // The center of an object's bounds in pixels at time, or (-1, -1) without them.
-static Vec2 _centerAt(SwRenderer* renderer, const Scene* scene, const Object* object, float time)
+static Vec2 _centerAt(Renderer* renderer, const Scene* scene, const Object* object, float time)
 {
     BBox bounds;
     if (renderer->bounds(scene, object, time, bounds) != Result::Success) return {-1.0f, -1.0f};
     return bounds.center();
 }
 
-void saveRestore(SwRenderer* renderer)
+void saveRestore(Renderer* renderer)
 {
     Config config;
     config.width = 160;

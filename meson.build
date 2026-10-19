@@ -34,16 +34,14 @@ states_enabled = interactive_enabled
 audio_enabled = all_modules or modules.contains('audio')
 diagram_enabled = all_modules or modules.contains('diagram')
 tex_enabled = all_modules or modules.contains('tex')
-engines = get_option('engines')
-cpu_enabled = engines.contains('cpu')
-gl_enabled = engines.contains('gl')
-
-# ThorVG loads GL at runtime; disable it when the platform lacks a GL library.
+# The experimental GL renderer module needs ThorVG's GL engine, which loads GL at runtime, so
+# it is left out when the platform has no GL library, and always in WebAssembly builds.
+gl_enabled = get_option('gl')
 if gl_enabled
     gl_platform = false
     gl_system = host_machine.system()
     if gl_system == 'emscripten'
-        warning('GL engine (experimental) disabled for Emscripten builds; the WebAssembly API renders through the CPU engine')
+        warning('GL renderer (experimental) left out of the Emscripten build; the WebAssembly API renders on the CPU')
     elif gl_system == 'darwin'
         gl_platform = dependency('appleframeworks', modules: 'OpenGL', required: false).found()
     elif gl_system == 'windows'
@@ -55,33 +53,18 @@ if gl_enabled
     endif
     if not gl_platform
         if gl_system != 'emscripten'
-            warning('GL engine disabled: no OpenGL library found for ' + gl_system + ' (use -Dengines=cpu to silence)')
+            warning('GL renderer left out: no OpenGL library found for ' + gl_system + ' (use -Dgl=false to silence)')
         endif
         gl_enabled = false
-        engines = cpu_enabled ? ['cpu'] : []
     endif
 endif
-
-if engines.length() == 0
-    error('Select at least one render engine: -Dengines=cpu, -Dengines=gl, or -Dengines=cpu,gl')
-endif
-if host_machine.system() == 'emscripten' and not cpu_enabled
-    error('Emscripten builds require the CPU engine for the RGBA WebAssembly API')
-endif
-
-tvg_engines = []
-foreach engine : ['cpu', 'gl']
-    if engines.contains(engine)
-        tvg_engines += engine
-    endif
-endforeach
 
 # External dependencies: ThorVG (system or bundled subproject), then Lua.
 # The browser runtime loads SVG and PNG pictures only; JPG and WebP stay native. Fonts are
 # TrueType or OpenType, with TrueType or CFF outlines.
 tvg_loaders = host_machine.system() == 'emscripten' ? 'svg,png,ttf,otf' : 'svg,png,jpg,webp,ttf,otf'
 tvg_options = [
-    'engines=' + ','.join(tvg_engines),
+    'engines=' + (gl_enabled ? 'cpu,gl' : 'cpu'),
     'default_library=static',
     'static=true',
     'loaders=' + tvg_loaders,
@@ -170,9 +153,6 @@ if not lua_option.disabled()
 endif
 lua_enabled = lua_dep.found()
 cli_enabled = lua_enabled and cli_requested and host_machine.system() != 'emscripten'
-if audit_requested and not cpu_enabled
-    error('The layout audit tool requires the CPU render engine')
-endif
 audit_enabled = cli_enabled and audit_requested
 if lua_runtime_enabled and not lua_enabled
     error('Experimental retained Lua runtime requires Lua support')
@@ -219,8 +199,6 @@ endif
 summary(
     {
         'ThorVG': tvg_dep.version(),
-        'CPU engine': cpu_enabled,
-        'GL engine': gl_enabled,
         'Module selector': modules,
         'Saver selector': savers,
         'Tool selector': tools,
@@ -231,6 +209,7 @@ summary(
         'Experimental Audio': audio_enabled,
         'Experimental Diagram': diagram_enabled,
         'Experimental TeX': tex_enabled,
+        'Experimental GL renderer': gl_enabled,
         'Tests': get_option('tests'),
     },
     section: 'viscript',

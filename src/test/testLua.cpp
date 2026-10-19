@@ -147,7 +147,7 @@ return s
 )lua";
 
 
-static void _dash(SwRenderer* renderer)
+static void _dash(Renderer* renderer)
 {
     static constexpr auto source = R"lua(
 local scene = vis.scene {
@@ -184,7 +184,7 @@ return scene
 
 }
 
-static void _render(SwRenderer* renderer, const char* source, const char* name, const char* tag,
+static void _render(Renderer* renderer, const char* source, const char* name, const char* tag,
                     Type type, float duration, bool loop, const char* output)
 {
     char error[1024] = {};
@@ -217,7 +217,7 @@ static void _render(SwRenderer* renderer, const char* source, const char* name, 
     delete scene;
 }
 
-static void _pngCompression(SwRenderer* renderer)
+static void _pngCompression(Renderer* renderer)
 {
     static constexpr auto source = "return vis.scene {width=960, height=540, background='#112233'}";
     Scene* scene = nullptr;
@@ -506,7 +506,7 @@ static const Asset* _asset(const char* name, void* data)
     return std::strcmp(name, "pixels") == 0 ? static_cast<const Asset*>(data) : nullptr;
 }
 
-static void _assets(SwRenderer* renderer)
+static void _assets(Renderer* renderer)
 {
     uint32_t pixels[] = {0xff5040ff, 0xffffa040, 0xff66bb66, 0xffffd166};
     Asset* asset = nullptr;
@@ -571,7 +571,7 @@ return scene
 
 int main()
 {
-    auto renderer = SwRenderer::gen();
+    auto renderer = Renderer::gen();
     CHECK(renderer != nullptr);
     if (renderer) {
 #ifdef VIS_TEST_FONT

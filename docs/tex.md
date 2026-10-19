@@ -7,7 +7,7 @@ animation, rendering, and audit.
 ## Build
 
 ```sh
-meson setup build-tex -Dmodules=tex -Dengines=cpu
+meson setup build-tex -Dmodules=tex
 meson compile -C build-tex
 ```
 

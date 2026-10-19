@@ -14,7 +14,7 @@ const FULL = new Uint8Array(readFileSync(new URL("Pretendard.ttf", bundle)));
 
 // Draws a line of text in the font registered as "Probe".
 async function render(font: Uint8Array, text = "Probe AaGg 0123"): Promise<Buffer> {
-    const engine = await createVis("return vis.scene {width = 16, height = 16}", "boot.lua", {wasmBinary, renderEngine: "cpu"});
+    const engine = await createVis("return vis.scene {width = 16, height = 16}", "boot.lua", {wasmBinary});
     try {
         engine.font("Probe", font, "ttf");
         engine.loadLua(`local s = vis.scene {width = 320, height = 60, theme = "pro_white"}

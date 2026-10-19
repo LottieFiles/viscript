@@ -2,7 +2,7 @@
 
 int failures = 0;
 
-static void _sameFrames(SwRenderer* renderer, Scene* first, Scene* second)
+static void _sameFrames(Renderer* renderer, Scene* first, Scene* second)
 {
     CHECK(near(first->duration(), second->duration()));
     CHECK(first->clipCount() == second->clipCount());
@@ -17,7 +17,7 @@ static void _sameFrames(SwRenderer* renderer, Scene* first, Scene* second)
     }
 }
 
-static void _native(SwRenderer* renderer)
+static void _native(Renderer* renderer)
 {
     Config config;
     config.width = 96;
@@ -57,7 +57,7 @@ static void _native(SwRenderer* renderer)
 }
 
 #ifdef VIS_EXPECT_LUA
-static void _lua(SwRenderer* renderer)
+static void _lua(Renderer* renderer)
 {
     static constexpr auto prefix =
         "local s=vis.scene{width=96,height=64}; "
@@ -134,7 +134,7 @@ static void _lua(SwRenderer* renderer)
 
 int main()
 {
-    auto renderer = SwRenderer::gen();
+    auto renderer = Renderer::gen();
     CHECK(renderer);
     if (renderer) {
         _native(renderer);

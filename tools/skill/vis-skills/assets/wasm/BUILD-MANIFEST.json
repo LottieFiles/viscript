@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "project": "viscript",
   "projectVersion": "0.1.0",
-  "sourceCommit": "da12150aba67",
-  "sourceDirty": false,
-  "buildDate": "2026-10-18",
+  "sourceCommit": "55bfe67b20c3",
+  "sourceDirty": true,
+  "buildDate": "2026-10-19",
   "toolchain": {
     "emscripten": "4.0.19",
     "buildType": "minsize",
@@ -21,8 +21,6 @@
     "luaRuntime": true,
     "retainedLuaRuntime": true,
     "canvasRgba": true,
-    "glRenderer": false,
-    "renderEngineSelection": true,
     "interactiveUi": true,
     "interactiveInput": true,
     "audio": true,
@@ -33,33 +31,33 @@
   "artifacts": [
     {
       "path": "vis-wasm.js",
-      "bytes": 24633,
-      "sha256": "25b7c2b70b3b659e3c99c7c7120bf863dbffbd862a160def54bca2a83366e843"
+      "bytes": 24036,
+      "sha256": "a9d7829f94aa295dd613b67ed9c9a7f1e7884a5a08adacab7eb557fa7d992689"
     },
     {
       "path": "vis-wasm.wasm",
-      "bytes": 1231596,
-      "sha256": "a0d6b2f525ad64fa237b8627d1f3b6cdec79ef292cd97bebc11b72e0a3778f35"
+      "bytes": 1229018,
+      "sha256": "8b2bca19b7656cbcc50e0f4e19d85b0c6d70c540e1e3de4065b7a7e8358a378a"
     },
     {
       "path": "client.js",
-      "bytes": 46636,
-      "sha256": "418afa5d00553e18c922504a905000b2496851a5ca2a56f9e13811433412b334"
+      "bytes": 45592,
+      "sha256": "d6aab74bf2d67d28275de3cf9930071b2960741d9038d812336d4662e05ca0b5"
     },
     {
       "path": "client.d.ts",
-      "bytes": 14350,
-      "sha256": "7357b10345fe4d490f85f9d3998a3ed7685e8f5e9848d42419b9e903f06600e3"
+      "bytes": 14023,
+      "sha256": "da7d3a7c53d8114501c2841561434f3b84e8c4d769dd8a59213f9f826d645ffa"
     },
     {
       "path": "bindings.js",
-      "bytes": 221220,
-      "sha256": "2101dab14fef3fb91a0b76d709e2e1fcfe3b26a16060ab05cc665b79b3a777f6"
+      "bytes": 221607,
+      "sha256": "759f7cc8bc237c5591b5cd5f25117fb6b223c24529127b81fb8c420d0fb87994"
     },
     {
       "path": "bindings.d.ts",
-      "bytes": 70172,
-      "sha256": "35c033883cf9a7afa89925b2edfde056a928e6290f88240929033ef8348ead10"
+      "bytes": 70259,
+      "sha256": "89b7052507b58427e9dbb489d9ecf4617594aaf80508dd796aba03b84de4a556"
     },
     {
       "path": "Pretendard.ttf",

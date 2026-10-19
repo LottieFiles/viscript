@@ -27,7 +27,7 @@ static bool _cameraAt(Scene* scene, float time, CameraSample& sample)
 
 // A camera move may begin while another runs: it adds its shift, turn, zoom and lens change to
 // that move, and switches the view and projection when a plain look would.
-void cameraLayers(SwRenderer* renderer)
+void cameraLayers(Renderer* renderer)
 {
     Config config;
     config.width = 200;
@@ -276,7 +276,7 @@ void cameraLayers(SwRenderer* renderer)
 
 // A shift, turn, scale, travel or effect may begin while another clip moves the object: it adds
 // its change on top, turning and scaling about a point of the object that travels with it.
-void layeredMotions(SwRenderer* renderer)
+void layeredMotions(Renderer* renderer)
 {
     Config config;
     config.width = 200;
@@ -393,7 +393,7 @@ void layeredMotions(SwRenderer* renderer)
 
 // Whether the points of a probe at its origin and one unit along x and y stand where model puts
 // them, in a 200 by 200 scene ten units high.
-static bool _probed(SwRenderer* renderer, Scene* scene, Group* probe, float time, const Mat4& model)
+static bool _probed(Renderer* renderer, Scene* scene, Group* probe, float time, const Mat4& model)
 {
     const Vec3 points[] = {{0.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}};
     auto placed = true;
@@ -424,7 +424,7 @@ static bool _matches(const Mat4& lhs, const Mat4& rhs)
 // A transform that turns, scales or skews may begin while another clip moves the object: it adds
 // its change from the authored model on top, about the object's moving center, and travels as it
 // would alone, so the object lands on its matrix once every motion ends.
-void layeredTransforms(SwRenderer* renderer)
+void layeredTransforms(Renderer* renderer)
 {
     constexpr auto PI = 3.14159265358979f;
     Config config;
@@ -525,7 +525,7 @@ void layeredTransforms(SwRenderer* renderer)
 
 // A morph may begin while its source moves: it adds the move to the place of the shape it becomes
 // on top of that motion, and ends no sooner, so the shape takes over where the source lands.
-void layeredMorphs(SwRenderer* renderer)
+void layeredMorphs(Renderer* renderer)
 {
     constexpr auto PI = 3.14159265358979f;
     Config config;
@@ -601,7 +601,7 @@ void layeredMorphs(SwRenderer* renderer)
     delete scene;
 }
 
-void instantUpdates(SwRenderer* renderer)
+void instantUpdates(Renderer* renderer)
 {
     Config config;
     config.width = 160;

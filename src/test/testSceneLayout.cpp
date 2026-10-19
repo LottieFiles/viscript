@@ -1,6 +1,6 @@
 #include "testSceneChecks.h"
 
-void objectTree(SwRenderer* renderer)
+void objectTree(Renderer* renderer)
 {
     auto labelScene = Scene::gen();
     auto labelParent = Rectangle::gen({}, {2.0f, 1.0f});
@@ -301,7 +301,7 @@ void objectIds()
 
 // A text's box moves off where align pins it by boxOffset, and bounds and the layout calls see
 // it there, while the glyphs stay where align pins them.
-void offsetBoxes(SwRenderer* renderer)
+void offsetBoxes(Renderer* renderer)
 {
     auto scene = Scene::gen();
     auto row = Group::gen();
@@ -499,7 +499,7 @@ void boundsAndLayout()
     delete empty;
 }
 
-void sceneUpdate(SwRenderer* renderer)
+void sceneUpdate(Renderer* renderer)
 {
     Config config;
     config.width = 100;
@@ -592,7 +592,7 @@ void sceneUpdate(SwRenderer* renderer)
     delete sealed;
 }
 
-void groupAndRectangleRendering(SwRenderer* renderer)
+void groupAndRectangleRendering(Renderer* renderer)
 {
     Config config;
     config.width = 120;
@@ -681,7 +681,7 @@ void groupAndRectangleRendering(SwRenderer* renderer)
     delete roundedScene;
 }
 
-void connectorOutlines(SwRenderer* renderer)
+void connectorOutlines(Renderer* renderer)
 {
     Config config;
     config.width = 960;
@@ -849,7 +849,7 @@ void connectorOutlines(SwRenderer* renderer)
 
 }
 
-void connectorAnimation(SwRenderer* renderer)
+void connectorAnimation(Renderer* renderer)
 {
     Config config;
     config.width = 100;
@@ -1084,7 +1084,7 @@ void connectorAnimation(SwRenderer* renderer)
     delete outgoingScene;
 }
 
-void animationTargets(SwRenderer* renderer)
+void animationTargets(Renderer* renderer)
 {
     Config config;
     config.width = 120;

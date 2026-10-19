@@ -3,7 +3,7 @@
 Build and test a change with the modules it affects:
 
 ```sh
-meson setup build -Dbundled_thorvg=true -Dmodules=all -Dengines=cpu
+meson setup build -Dbundled_thorvg=true -Dmodules=all
 meson compile -C build
 meson test -C build --print-errorlogs
 ```

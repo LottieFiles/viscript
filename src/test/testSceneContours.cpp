@@ -1,7 +1,7 @@
 #include "testSceneChecks.h"
 
 // Scalar contours join cell segments into loops and open pieces, refined against the field.
-void contourPlots(SwRenderer* renderer)
+void contourPlots(Renderer* renderer)
 {
     auto circle = [](double x, double y, double& value, void* data) noexcept {
         if (data) ++*static_cast<uint32_t*>(data);
@@ -104,7 +104,7 @@ void contourPlots(SwRenderer* renderer)
 }
 
 // Labels remain centered on sampled curves, with retained text and real stroke gaps.
-void contourLabels(SwRenderer* renderer)
+void contourLabels(Renderer* renderer)
 {
     CHECK(renderer->font(VIS_TEST_FONT) == Result::Success);
     Range range{-2.0f, 2.0f, 0.25f};
@@ -233,7 +233,7 @@ void contourLabels(SwRenderer* renderer)
     delete scene;
 }
 
-void contourStates(SwRenderer* renderer)
+void contourStates(Renderer* renderer)
 {
     struct Field { double a = 1.0; bool wells = false; uint32_t calls = 0; } field;
     auto fn = [](double x, double y, double& value, void* data) noexcept {
@@ -316,7 +316,7 @@ void contourStates(SwRenderer* renderer)
 
 // A plot in pieces draws nothing between them, ends them flat when it asks to, and draws on
 // through one piece after another.
-void plotEndpoints(SwRenderer* renderer)
+void plotEndpoints(Renderer* renderer)
 {
     Config config;
     config.width = 320;
@@ -414,7 +414,7 @@ void plotEndpoints(SwRenderer* renderer)
     delete scene;
 }
 
-void plotEndpointColor(SwRenderer* renderer)
+void plotEndpointColor(Renderer* renderer)
 {
     Config config;
     config.width = 160;
@@ -450,7 +450,7 @@ void plotEndpointColor(SwRenderer* renderer)
     delete scene;
 }
 
-void plotEndpointProgress(SwRenderer* renderer)
+void plotEndpointProgress(Renderer* renderer)
 {
     Config config;
     config.width = 320;
@@ -532,7 +532,7 @@ void plotEndpointProgress(SwRenderer* renderer)
     }
 }
 
-void plotPieces(SwRenderer* renderer)
+void plotPieces(Renderer* renderer)
 {
     Config config;
     config.width = 320;
@@ -689,7 +689,7 @@ static Result _combined(Object* a, Object* b, PathOperation operation, Path*& ou
     return Path::combine(shapes, 2u, operation, parent, output);
 }
 
-void combinedShapes(SwRenderer* renderer)
+void combinedShapes(Renderer* renderer)
 {
     // Two unit disks a unit apart: whatever the operation, the areas add up as sets do.
     auto left = Circle::gen({-0.5f, 0.0f, 0.0f}, 1.0f);

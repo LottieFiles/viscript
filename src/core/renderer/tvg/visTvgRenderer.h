@@ -1,4 +1,5 @@
-// What the two ThorVG renderers share: the retained paint tree, diagnostics and font loading.
+// What the CPU renderer and the GL module's renderer share: the retained paint tree,
+// diagnostics and font loading.
 #ifndef _VIS_TVG_RENDERER_H_
 #define _VIS_TVG_RENDERER_H_
 

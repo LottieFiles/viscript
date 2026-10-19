@@ -1,4 +1,4 @@
-// SwRenderer on ThorVG's software engine: renders into a Surface, and reads bounds,
+// Renderer on ThorVG's software engine: renders into a Surface, and reads bounds,
 // intersections, layout reports and pixel samples from what it drew.
 #include <cmath>
 #include <cstddef>
@@ -11,7 +11,6 @@
 
 #include "vis.h"
 #include "visDisplayList.h"
-#include "visRendererBackend.h"
 #include "visRendererData.h"
 #include "visScene.h"
 #include "visTvgRenderer.h"
@@ -19,7 +18,7 @@
 namespace vis
 {
 
-struct SwRenderer::Impl
+struct Renderer::Impl
 {
     tvg::SwCanvas* canvas = nullptr;
     RetainedTree* tree = nullptr;
@@ -32,7 +31,7 @@ struct SwRenderer::Impl
     renderer::TvgDiagnostic diagnostic;
 };
 
-SwRenderer::SwRenderer() noexcept
+Renderer::Renderer() noexcept
 {
     pImpl = new (std::nothrow) Impl;
     if (!pImpl) return;
@@ -46,7 +45,7 @@ SwRenderer::SwRenderer() noexcept
     }
 }
 
-SwRenderer::~SwRenderer()
+Renderer::~Renderer()
 {
     auto initialized = pImpl && pImpl->initialized;
     if (pImpl) {
@@ -57,27 +56,27 @@ SwRenderer::~SwRenderer()
     if (initialized) renderer::tvgTerm();
 }
 
-SwRenderer* SwRenderer::gen() noexcept
+Renderer* Renderer::gen() noexcept
 {
-    auto renderer = new (std::nothrow) SwRenderer;
+    auto renderer = new (std::nothrow) Renderer;
     if (!renderer || (renderer->pImpl && renderer->pImpl->canvas)) return renderer;
     delete renderer;
     return nullptr;
 }
 
-Result SwRenderer::font(const char* path) noexcept
+Result Renderer::font(const char* path) noexcept
 {
     if (!pImpl) return Result::InvalidArguments;
     return renderer::tvgFont(pImpl->diagnostic, path);
 }
 
-Result SwRenderer::font(const char* name, const void* data, uint32_t size, const char* mime) noexcept
+Result Renderer::font(const char* name, const void* data, uint32_t size, const char* mime) noexcept
 {
     if (!pImpl) return Result::InvalidArguments;
     return renderer::tvgFont(pImpl->diagnostic, name, data, size, mime);
 }
 
-const char* SwRenderer::diagnostic() const noexcept
+const char* Renderer::diagnostic() const noexcept
 {
     return pImpl ? pImpl->diagnostic.text() : nullptr;
 }
@@ -186,7 +185,7 @@ static Result _sampleFamily(tvg::SwCanvas* canvas, Surface& surface,
     return result;
 }
 
-Result SwRenderer::sample(const Scene* scene, float time, const Vec2& position,
+Result Renderer::sample(const Scene* scene, float time, const Vec2& position,
                           const Object* const* candidates, uint32_t count,
                           PixelSample& output, uint32_t pixelRatio) noexcept
 {
@@ -367,7 +366,7 @@ static Result _paintBounds(const DisplayList& list, const Object* object, bool f
     return Result::Success;
 }
 
-Result SwRenderer::bounds(const Scene* scene, const Object* object, float time, BBox& output) noexcept
+Result Renderer::bounds(const Scene* scene, const Object* object, float time, BBox& output) noexcept
 {
     if (!pImpl) return Result::InvalidArguments;
     renderer::TvgDiagnosis diagnosis(pImpl->diagnostic);
@@ -382,7 +381,7 @@ Result SwRenderer::bounds(const Scene* scene, const Object* object, float time, 
     return _paintBounds(list, object, true, presence, output);
 }
 
-Result SwRenderer::intersects(const Scene* scene, const Object* first, const Object* second,
+Result Renderer::intersects(const Scene* scene, const Object* first, const Object* second,
                               float time, bool& output, float padding) noexcept
 {
     output = false;
@@ -603,7 +602,7 @@ static char* _layoutPath(const char* parent, const char* kind, uint32_t index)
     return path;
 }
 
-Result SwRenderer::layout(const Scene* scene, float time, LayoutReport& output,
+Result Renderer::layout(const Scene* scene, float time, LayoutReport& output,
                           float padding) noexcept
 {
     if (!pImpl) return Result::InvalidArguments;
@@ -1288,12 +1287,12 @@ Result SwRenderer::layout(const Scene* scene, float time, LayoutReport& output,
     return Result::Success;
 }
 
-Result SwRenderer::render(const Scene* scene, float time, Surface& surface) noexcept
+Result Renderer::render(const Scene* scene, float time, Surface& surface) noexcept
 {
     return render(scene, time, surface, 1u);
 }
 
-Result SwRenderer::render(const Scene* scene, float time, Surface& surface,
+Result Renderer::render(const Scene* scene, float time, Surface& surface,
                           uint32_t pixelRatio) noexcept
 {
     if (!pImpl) return Result::InvalidArguments;
@@ -1340,20 +1339,5 @@ Result SwRenderer::render(const Scene* scene, float time, Surface& surface,
     if (!renderer::tvgSuccess(pImpl->canvas->sync())) return Result::Unknown;
     return Result::Success;
 }
-
-namespace renderer
-{
-
-bool cpuEnabled() noexcept
-{
-    return true;
-}
-
-SwRenderer* genCpu() noexcept
-{
-    return SwRenderer::gen();
-}
-
-}  // namespace renderer
 
 }  // namespace vis

@@ -1,6 +1,6 @@
 #include "testSceneChecks.h"
 
-void textAnimationRegression(SwRenderer* renderer)
+void textAnimationRegression(Renderer* renderer)
 {
     Config config;
     config.width = 160;
@@ -118,7 +118,7 @@ void textAnimationRegression(SwRenderer* renderer)
     delete motion;
 }
 
-void repeatedCreateRegression(SwRenderer* renderer)
+void repeatedCreateRegression(Renderer* renderer)
 {
     Config config;
     config.width = 96;
@@ -151,7 +151,7 @@ void repeatedCreateRegression(SwRenderer* renderer)
     delete scene;
 }
 
-void drawDirectionAnimations(SwRenderer* renderer)
+void drawDirectionAnimations(Renderer* renderer)
 {
     Config config;
     config.width = 160;
@@ -342,7 +342,7 @@ void drawDirectionAnimations(SwRenderer* renderer)
     delete revealScene;
 }
 
-void arrowCompositing(SwRenderer* renderer)
+void arrowCompositing(Renderer* renderer)
 {
     Config config;
     config.width = 200u;
@@ -395,7 +395,7 @@ void arrowCompositing(SwRenderer* renderer)
     delete scene;
 }
 
-void directedRouteRendering(SwRenderer* renderer)
+void directedRouteRendering(Renderer* renderer)
 {
     Config config;
     config.width = 200u;
@@ -472,7 +472,7 @@ void directedRouteRendering(SwRenderer* renderer)
     delete scene;
 }
 
-void fadeAnimations(SwRenderer* renderer)
+void fadeAnimations(Renderer* renderer)
 {
     Config config;
     config.width = 160;
@@ -640,7 +640,7 @@ void fadeAnimations(SwRenderer* renderer)
     delete invalid;
 }
 
-void scaleAndIndicateAnimations(SwRenderer* renderer)
+void scaleAndIndicateAnimations(Renderer* renderer)
 {
     Config config;
     config.width = 200;
@@ -802,7 +802,7 @@ void scaleAndIndicateAnimations(SwRenderer* renderer)
 }
 
 // Named emphasis effects in a 200 by 200 frame 10 units high, so a world unit is 20 pixels.
-void emphasisEffects(SwRenderer* renderer)
+void emphasisEffects(Renderer* renderer)
 {
     Config config;
     config.width = 200;
@@ -1259,7 +1259,7 @@ static bool _unbounded(const Vec3& point, Vec3& image, void*) noexcept
     return true;
 }
 
-void warpedGeometry(SwRenderer* renderer)
+void warpedGeometry(Renderer* renderer)
 {
     Config config;
     config.width = 480;
@@ -1518,7 +1518,7 @@ void warpedGeometry(SwRenderer* renderer)
     delete scene;
 }
 
-void morphAnimations(SwRenderer* renderer)
+void morphAnimations(Renderer* renderer)
 {
     Config config;
     config.width = 160;

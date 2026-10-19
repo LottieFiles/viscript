@@ -4,7 +4,7 @@
 namespace vis::saver
 {
 
-Result video(const Scene* scene, SwRenderer* renderer, const char* path, uint32_t fps,
+Result video(const Scene* scene, Renderer* renderer, const char* path, uint32_t fps,
              const char* soundtrack) noexcept
 {
     static constexpr auto SILENT = "-an -c:v libx264 -pix_fmt yuv420p -f mp4";

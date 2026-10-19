@@ -10,6 +10,7 @@
 
 #include "testGlContext.h"
 #include "vis.h"
+#include "vis_gl.h"
 
 using namespace vis;
 
@@ -272,17 +273,17 @@ int main()
     CHECK(AssetLoader::load(checker, 16, 16, pixelAsset) == Result::Success);
 
     CGLSetCurrentContext(context.context);
-    auto cpu = Renderer::gen(RenderEngine::Cpu);
-    auto gl = Renderer::gen(RenderEngine::Gl);
-    CHECK(cpu && gl);
-    if (!cpu || !gl) return 1;
+    auto cpu = Renderer::gen();
+    auto glRenderer = gl::Renderer::gen();
+    CHECK(cpu && glRenderer);
+    if (!cpu || !glRenderer) return 1;
     CHECK(cpu->font(VIS_TEST_FONT) == Result::Success);
 #ifdef VIS_TEST_MONO_FONT
     CHECK(cpu->font(VIS_TEST_MONO_FONT) == Result::Success);
 #endif
-    CHECK(gl->font(VIS_TEST_FONT) == Result::Success);
+    CHECK(glRenderer->font(VIS_TEST_FONT) == Result::Success);
 #ifdef VIS_TEST_MONO_FONT
-    CHECK(gl->font(VIS_TEST_MONO_FONT) == Result::Success);
+    CHECK(glRenderer->font(VIS_TEST_MONO_FONT) == Result::Success);
 #endif
 
     // Limits come from measured macOS GL output (mean / outlier%) with ~2x margin.
@@ -322,12 +323,12 @@ int main()
             std::memcpy(cpuPixels.data() + y * Width * 4, surface.data() + y * surface.stride(), Width * 4);
         }
 
-        GlTarget target;
+        gl::Target target;
         target.context = context.context;
         target.id = static_cast<int32_t>(context.fbo);
         target.width = Width;
         target.height = Height;
-        auto glResult = gl->render(scene, time, target);
+        auto glResult = glRenderer->render(scene, time, target);
         CHECK(glResult == Result::Success);
         context.bindFramebuffer(GL_FRAMEBUFFER, context.fbo);
         context.readPixels(0, 0, Width, Height, GL_RGBA, GL_UNSIGNED_BYTE, glPixels.data());
@@ -348,7 +349,7 @@ int main()
         delete scene;
     }
 
-    delete gl;
+    delete glRenderer;
     delete cpu;
     delete svgAsset;
     delete pixelAsset;

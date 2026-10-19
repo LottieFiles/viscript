@@ -1,6 +1,6 @@
 #include "testSceneChecks.h"
 
-void timelineTracks(SwRenderer* renderer)
+void timelineTracks(Renderer* renderer)
 {
     Config config;
     config.width = 160;
@@ -115,7 +115,7 @@ static float _redColumn(const Surface& surface)
 // Each object samples the clips of its own list, in the order they were stored, whatever the
 // clips of other objects stored between them: forty points switch on one by one, each group of
 // ten stored latest first, while a counting text counts up in clips stored among theirs.
-void clipLists(SwRenderer* renderer)
+void clipLists(Renderer* renderer)
 {
     Config config;
     config.width = 160;
@@ -267,7 +267,7 @@ void sampleWork()
 
 // An orbit keeps every angle: a full turn passes behind the scene and returns, where a look
 // to the same pose would not move at all.
-void cameraOrbit(SwRenderer* renderer)
+void cameraOrbit(Renderer* renderer)
 {
     constexpr auto PI = 3.14159265358979f;
     Config config;
@@ -343,7 +343,7 @@ void cameraOrbit(SwRenderer* renderer)
     delete planar;
 }
 
-void intentMotion(SwRenderer* renderer)
+void intentMotion(Renderer* renderer)
 {
     constexpr auto PI = 3.14159265358979f;
     Config config;
@@ -534,7 +534,7 @@ void timelineDiagnostics()
 // A view draws the scene again through its own camera into its rectangle: magnified where its
 // camera looks, with optical pixel sizes, clipped at its edges, between the layers it divides,
 // and as it moves, fades and follows.
-void viewRendering(SwRenderer* renderer)
+void viewRendering(Renderer* renderer)
 {
     auto linear = AnimCurve::preset(AnimCurvePreset::Linear);
     auto black = Color::hex("#000000");
@@ -695,7 +695,7 @@ void viewRendering(SwRenderer* renderer)
     float times[] = {2.0f, 0.0f, 0.5f, 1.5f, 1.0f, 0.0f};
     uint64_t expected[6] = {};
     for (auto i = 0u; i < 6u; i++) {
-        auto fresh = SwRenderer::gen();
+        auto fresh = Renderer::gen();
         CHECK(fresh != nullptr);
         if (fresh && fresh->render(scene, times[i], surface) == Result::Success) expected[i] = checksum(surface);
         delete fresh;

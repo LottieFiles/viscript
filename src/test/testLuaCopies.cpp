@@ -5,7 +5,7 @@ static bool _tagged(const Object* object, const char* tag)
     return object && object->tag() && std::strcmp(object->tag(), tag) == 0;
 }
 
-void _cloning(SwRenderer* renderer)
+void _cloning(Renderer* renderer)
 {
     static constexpr auto source = R"lua(
 local s = vis.scene {width = 320, height = 180}
@@ -82,7 +82,7 @@ return s
 
 // morph and match_transform with copy = true transform a copy of the
 // source and leave the source in place.
-void _copyTransforms(SwRenderer* renderer)
+void _copyTransforms(Renderer* renderer)
 {
     static constexpr auto source = R"lua(
 local s = vis.scene {width = 320, height = 180}
@@ -142,7 +142,7 @@ return s
 }
 
 // Measured billboard text preserves its ink bounds across scaling, cloning and matching.
-void _matchingBillboard(SwRenderer* renderer)
+void _matchingBillboard(Renderer* renderer)
 {
     const char* variants[] = {"", ", {copy=true}", ", {path=guide}", ", {copy=true,path=guide}"};
     for (auto variant : variants) {
@@ -180,7 +180,7 @@ return s
     }
 }
 
-void _matchingPath(SwRenderer* renderer)
+void _matchingPath(Renderer* renderer)
 {
     static constexpr auto source = R"lua(
 local s = vis.scene {width = 320, height = 180, camera = {height = 6}}
@@ -225,7 +225,7 @@ return s
                  "a match path must be a snapshot outline, not a live connector");
 }
 
-void _matching(SwRenderer* renderer)
+void _matching(Renderer* renderer)
 {
     static constexpr auto source = R"lua(
 local s = vis.scene {width = 640, height = 360}
@@ -351,7 +351,7 @@ return s
 }
 
 // Warp callbacks run during authoring; quadratic maps remain exact between grid samples.
-void _warping(SwRenderer* renderer)
+void _warping(Renderer* renderer)
 {
     static constexpr auto source = R"lua(
 local s = vis.scene {width = 480, height = 270, background = "#000000", antialiasing = false,
@@ -510,7 +510,7 @@ return s
 // the same curve from the moment it is attached and a later warp of the twin goes on from it,
 // a group's copy holds its bent line, and morph and match_transform with copy = true start
 // from the bent bar. Nothing is copied while a warp runs below the source.
-void _warpedClones(SwRenderer* renderer)
+void _warpedClones(Renderer* renderer)
 {
     static constexpr auto source = R"lua(
 local s = vis.scene {width = 320, height = 180, camera = {mode = "fixed", view = "2d", height = 9}}

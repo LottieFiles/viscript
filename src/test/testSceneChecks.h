@@ -189,7 +189,7 @@ static inline const char* _shown(const Scene* scene, const Text* text, float tim
 
 // The opacity a black shape shows over the white background of a 320x180 frame, six units
 // high, at a world point inside it.
-static inline float _shownOpacity(SwRenderer* renderer, Scene* scene, float time, const Vec3& point)
+static inline float _shownOpacity(Renderer* renderer, Scene* scene, float time, const Vec3& point)
 {
     Surface surface;
     if (renderer->render(scene, time, surface) != Result::Success || !surface.data()) return -1.0f;
@@ -200,7 +200,7 @@ static inline float _shownOpacity(SwRenderer* renderer, Scene* scene, float time
 }
 
 // Pixels at least half dark on a white background.
-static inline uint32_t _inked(SwRenderer* renderer, Scene* scene, float time)
+static inline uint32_t _inked(Renderer* renderer, Scene* scene, float time)
 {
     Surface surface;
     if (renderer->render(scene, time, surface) != Result::Success || !surface.data()) return 0u;
@@ -236,7 +236,7 @@ static inline uint32_t _pixelAt(const Surface& surface, uint32_t x, uint32_t y)
 
 // Whether the object's pixel bounds at time center on world point (x, y) and, when size is
 // positive, measure size world units on each side, in the 200 by 200 scene of layeredMotions.
-static inline bool _placed(SwRenderer* renderer, Scene* scene, Object* object, float time, float x, float y,
+static inline bool _placed(Renderer* renderer, Scene* scene, Object* object, float time, float x, float y,
                            float size = 0.0f)
 {
     BBox bounds;
@@ -279,103 +279,103 @@ static inline uint32_t _viewPixels(const Surface& surface, Color c, uint32_t x0,
     return count;
 }
 
-void textAnimationRegression(SwRenderer* renderer);
-void repeatedCreateRegression(SwRenderer* renderer);
-void drawDirectionAnimations(SwRenderer* renderer);
-void arrowCompositing(SwRenderer* renderer);
-void directedRouteRendering(SwRenderer* renderer);
-void fadeAnimations(SwRenderer* renderer);
-void scaleAndIndicateAnimations(SwRenderer* renderer);
-void emphasisEffects(SwRenderer* renderer);
-void warpedGeometry(SwRenderer* renderer);
-void spaceTicks(SwRenderer* renderer);
+void textAnimationRegression(Renderer* renderer);
+void repeatedCreateRegression(Renderer* renderer);
+void drawDirectionAnimations(Renderer* renderer);
+void arrowCompositing(Renderer* renderer);
+void directedRouteRendering(Renderer* renderer);
+void fadeAnimations(Renderer* renderer);
+void scaleAndIndicateAnimations(Renderer* renderer);
+void emphasisEffects(Renderer* renderer);
+void warpedGeometry(Renderer* renderer);
+void spaceTicks(Renderer* renderer);
 void spaceLabels();
-void spaceScreenLabels(SwRenderer* renderer);
-void spaceScreenLabelWarps(SwRenderer* renderer);
-void spaceLabelOpacity(SwRenderer* renderer);
-void cursorDecimals(SwRenderer* renderer);
-void morphAnimations(SwRenderer* renderer);
-void voxelSamples(SwRenderer* renderer);
+void spaceScreenLabels(Renderer* renderer);
+void spaceScreenLabelWarps(Renderer* renderer);
+void spaceLabelOpacity(Renderer* renderer);
+void cursorDecimals(Renderer* renderer);
+void morphAnimations(Renderer* renderer);
+void voxelSamples(Renderer* renderer);
 void cellSamples();
 void riemannSums();
 void vectorFields();
 void streamLines();
-void sampleTime(SwRenderer* renderer);
-void viewports(SwRenderer* renderer);
-void liveSceneTransitions(SwRenderer* renderer);
-void sceneTransitions(SwRenderer* renderer);
-void transitionLayoutVisuals(SwRenderer* renderer);
-void transitionStyles(SwRenderer* renderer);
-void objectTree(SwRenderer* renderer);
+void sampleTime(Renderer* renderer);
+void viewports(Renderer* renderer);
+void liveSceneTransitions(Renderer* renderer);
+void sceneTransitions(Renderer* renderer);
+void transitionLayoutVisuals(Renderer* renderer);
+void transitionStyles(Renderer* renderer);
+void objectTree(Renderer* renderer);
 void objectIds();
-void offsetBoxes(SwRenderer* renderer);
+void offsetBoxes(Renderer* renderer);
 void boundsAndLayout();
-void sceneUpdate(SwRenderer* renderer);
-void groupAndRectangleRendering(SwRenderer* renderer);
-void connectorOutlines(SwRenderer* renderer);
-void connectorAnimation(SwRenderer* renderer);
-void animationTargets(SwRenderer* renderer);
-void surfaceColors(SwRenderer* renderer);
-void surfaceMeshLines(SwRenderer* renderer);
-void surfaceMorph(SwRenderer* renderer);
-void surfaceLight(SwRenderer* renderer);
-void depthSplitStrokes(SwRenderer* renderer);
-void depthSplitSpace(SwRenderer* renderer);
-void depthSplitPlotPieces(SwRenderer* renderer);
-void depthSplitSpaceTicks(SwRenderer* renderer);
-void surfacePlaneTextAndWrite(SwRenderer* renderer);
-void countingText(SwRenderer* renderer);
-void textChanges(SwRenderer* renderer);
-void matchedPieces(SwRenderer* renderer);
-void diffedLines(SwRenderer* renderer);
-void arrangedRows(SwRenderer* renderer);
-void handedOver(SwRenderer* renderer);
+void sceneUpdate(Renderer* renderer);
+void groupAndRectangleRendering(Renderer* renderer);
+void connectorOutlines(Renderer* renderer);
+void connectorAnimation(Renderer* renderer);
+void animationTargets(Renderer* renderer);
+void surfaceColors(Renderer* renderer);
+void surfaceMeshLines(Renderer* renderer);
+void surfaceMorph(Renderer* renderer);
+void surfaceLight(Renderer* renderer);
+void depthSplitStrokes(Renderer* renderer);
+void depthSplitSpace(Renderer* renderer);
+void depthSplitPlotPieces(Renderer* renderer);
+void depthSplitSpaceTicks(Renderer* renderer);
+void surfacePlaneTextAndWrite(Renderer* renderer);
+void countingText(Renderer* renderer);
+void textChanges(Renderer* renderer);
+void matchedPieces(Renderer* renderer);
+void diffedLines(Renderer* renderer);
+void arrangedRows(Renderer* renderer);
+void handedOver(Renderer* renderer);
 void replacementContacts();
-void matchedShapes(SwRenderer* renderer);
-void morphedOutlines(SwRenderer* renderer);
-void pieceMorphs(SwRenderer* renderer);
-void contouredPaths(SwRenderer* renderer);
-void contourPlots(SwRenderer* renderer);
-void contourLabels(SwRenderer* renderer);
-void contourStates(SwRenderer* renderer);
-void plotEndpoints(SwRenderer* renderer);
-void plotEndpointColor(SwRenderer* renderer);
-void plotEndpointProgress(SwRenderer* renderer);
-void plotPieces(SwRenderer* renderer);
-void combinedShapes(SwRenderer* renderer);
-void highlightedParts(SwRenderer* renderer);
-void sceneThemes(SwRenderer* renderer);
-void groupStyles(SwRenderer* renderer);
-void timelineTracks(SwRenderer* renderer);
-void clipLists(SwRenderer* renderer);
+void matchedShapes(Renderer* renderer);
+void morphedOutlines(Renderer* renderer);
+void pieceMorphs(Renderer* renderer);
+void contouredPaths(Renderer* renderer);
+void contourPlots(Renderer* renderer);
+void contourLabels(Renderer* renderer);
+void contourStates(Renderer* renderer);
+void plotEndpoints(Renderer* renderer);
+void plotEndpointColor(Renderer* renderer);
+void plotEndpointProgress(Renderer* renderer);
+void plotPieces(Renderer* renderer);
+void combinedShapes(Renderer* renderer);
+void highlightedParts(Renderer* renderer);
+void sceneThemes(Renderer* renderer);
+void groupStyles(Renderer* renderer);
+void timelineTracks(Renderer* renderer);
+void clipLists(Renderer* renderer);
 void sampleWork();
-void cameraOrbit(SwRenderer* renderer);
-void intentMotion(SwRenderer* renderer);
+void cameraOrbit(Renderer* renderer);
+void intentMotion(Renderer* renderer);
 void timelineDiagnostics();
-void arcsAndAngles(SwRenderer* renderer);
-void mathSymbolFallback(SwRenderer* renderer);
-void shapeProperties(SwRenderer* renderer);
-void trimmedSegments(SwRenderer* renderer);
-void zeroLengthArrows(SwRenderer* renderer);
-void geometryClips(SwRenderer* renderer);
-void plotFunctionPlay(SwRenderer* renderer);
-void plotReplot(SwRenderer* renderer);
-void cameraLayers(SwRenderer* renderer);
-void layeredMotions(SwRenderer* renderer);
-void layeredTransforms(SwRenderer* renderer);
-void layeredMorphs(SwRenderer* renderer);
-void instantUpdates(SwRenderer* renderer);
-void clonedObjects(SwRenderer* renderer);
-void clonedLinks(SwRenderer* renderer);
-void matchedBillboard(SwRenderer* renderer);
-void matchedPath(SwRenderer* renderer);
-void copiedTransforms(SwRenderer* renderer);
-void clonedWarps(SwRenderer* renderer);
-void rebasedCopies(SwRenderer* renderer);
-void geometryCopies(SwRenderer* renderer);
-void drawLayers(SwRenderer* renderer);
-void saveRestore(SwRenderer* renderer);
-void viewRendering(SwRenderer* renderer);
+void arcsAndAngles(Renderer* renderer);
+void mathSymbolFallback(Renderer* renderer);
+void shapeProperties(Renderer* renderer);
+void trimmedSegments(Renderer* renderer);
+void zeroLengthArrows(Renderer* renderer);
+void geometryClips(Renderer* renderer);
+void plotFunctionPlay(Renderer* renderer);
+void plotReplot(Renderer* renderer);
+void cameraLayers(Renderer* renderer);
+void layeredMotions(Renderer* renderer);
+void layeredTransforms(Renderer* renderer);
+void layeredMorphs(Renderer* renderer);
+void instantUpdates(Renderer* renderer);
+void clonedObjects(Renderer* renderer);
+void clonedLinks(Renderer* renderer);
+void matchedBillboard(Renderer* renderer);
+void matchedPath(Renderer* renderer);
+void copiedTransforms(Renderer* renderer);
+void clonedWarps(Renderer* renderer);
+void rebasedCopies(Renderer* renderer);
+void geometryCopies(Renderer* renderer);
+void drawLayers(Renderer* renderer);
+void saveRestore(Renderer* renderer);
+void viewRendering(Renderer* renderer);
 void viewTimelines();
 
 #endif

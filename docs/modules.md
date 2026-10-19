@@ -10,6 +10,10 @@ libraries. Hosts link the modules they use and assemble their Lua hooks.
 | `interactive` | `vis-ui`, `vis-input`, `vis-states`, `vis-lua-runtime` | Controls and pointer capture, logical input and camera controls, named object states on an interaction clock, and retained Lua fixed-step callbacks |
 | `audio` | `vis-audio` | Play and mix audio through miniaudio |
 
+`-Dgl=true` adds `vis-gl`, an experimental OpenGL renderer (`vis_gl.h`, `vis::gl::Renderer`)
+for native hosts that own a GL context; it has no Lua hook and is never part of WebAssembly
+builds.
+
 `interactive` is one build option over four internal libraries. They keep separate
 headers (`vis_ui.h`, `vis_input.h`, `vis_states.h`, `vis_lua_runtime.h`), pkg-config
 entries, and Lua entries (`vis.ui`, `vis.input`, `vis.states`, `vis.runtime`), and are
@@ -24,16 +28,16 @@ platform input, asset delivery, and playback transport.
 
 ```sh
 # Core and CPU renderer.
-meson setup build-core -Dmodules='' -Dengines=cpu
+meson setup build-core -Dmodules=''
 
 # Diagram and formula authoring.
-meson setup build-author -Dmodules=diagram,tex -Dengines=cpu
+meson setup build-author -Dmodules=diagram,tex
 
 # Interactive host.
-meson setup build-interactive -Dmodules=interactive,audio -Dengines=cpu
+meson setup build-interactive -Dmodules=interactive,audio
 
-# All modules and render engines.
-meson setup build-full -Dmodules=all
+# All modules and the experimental GL renderer.
+meson setup build-full -Dmodules=all -Dgl=true
 ```
 
 `modules` defaults to none. Each selected module adds its library, installed header,

@@ -16,7 +16,7 @@ static void bowlPoints(Vec3* points, uint32_t n)
 // takes the first color of viridis and the face at a corner the color near its last; colors
 // given per point average over each face, and both follow the opacity. A map that cannot run
 // and a count that is not one color per point fail.
-void surfaceColors(SwRenderer* renderer)
+void surfaceColors(Renderer* renderer)
 {
     static constexpr auto N = 41u;
     static Vec3 points[N * N];
@@ -126,7 +126,7 @@ void surfaceColors(SwRenderer* renderer)
 // 40 pixels to a unit, draws lines only where the counts put them, between the samples where
 // they fall there; a Mesh surface draws nothing but them; a nearer surface hides the pieces
 // below it while the rest stay; and counts of 1 or past the points fail.
-void surfaceMeshLines(SwRenderer* renderer)
+void surfaceMeshLines(Renderer* renderer)
 {
     static constexpr auto N = 41u;
     static Vec3 plane[N * N];
@@ -237,7 +237,7 @@ void surfaceMeshLines(SwRenderer* renderer)
 // of the bowl's color there with the saddle's. Colors sampled between the two blend between
 // steps and mix into the target's by the progress. Surfaces on different grids, a surface and a
 // circle, and sampled colors that do not fit fail to play.
-void surfaceMorph(SwRenderer* renderer)
+void surfaceMorph(Renderer* renderer)
 {
     static constexpr auto N = 21u;
     static Vec3 bowl[N * N];
@@ -379,7 +379,7 @@ void surfaceMorph(SwRenderer* renderer)
 // a quarter turn around it, where the headlight shades it by the view; the side the camera
 // sees takes the light, a light behind it leaves the ambient share, no shading leaves the fill,
 // and a light that cannot shine fails to add.
-void surfaceLight(SwRenderer* renderer)
+void surfaceLight(Renderer* renderer)
 {
     constexpr auto PI = 3.14159265358979f;
     // z = x / 2 over [-1, 1]^2: its normal is (-1, 0, 2) / sqrt(5).
@@ -467,7 +467,7 @@ void surfaceLight(SwRenderer* renderer)
 
 // Adds count objects to a scene of config in order, orbits its camera by angle about +z over a
 // second, and renders time into frame; the scene owns what it takes and the rest is deleted.
-static bool depthRender(SwRenderer* renderer, const Config& config, Object* const* objects, uint32_t count,
+static bool depthRender(Renderer* renderer, const Config& config, Object* const* objects, uint32_t count,
                         float angle, float time, Surface& frame)
 {
     auto scene = Scene::gen(config);
@@ -493,7 +493,7 @@ static uint32_t depthPixel(const Surface& frame, uint32_t x, uint32_t y)
 }
 
 // Split strokes only at same-layer depth crossings, preserving dashes, caps and drawing progress.
-void depthSplitStrokes(SwRenderer* renderer)
+void depthSplitStrokes(Renderer* renderer)
 {
     auto config = topView();
     auto plate = Color::hex("#2050c0");
@@ -723,7 +723,7 @@ void depthSplitStrokes(SwRenderer* renderer)
 // they draw behind the surface there and over the space's own layer elsewhere; while the camera
 // orbits a dome, the axis hides inside and behind the dome in every frame and shows in front of
 // it; and a stroke that crosses more folds than it can be cut into still draws.
-void depthSplitSpace(SwRenderer* renderer)
+void depthSplitSpace(Renderer* renderer)
 {
     auto plate = Color::hex("#2050c0");
     // Colors apart from the theme's axis colors, which a theme would replace.
@@ -854,7 +854,7 @@ void depthSplitSpace(SwRenderer* renderer)
 // z = x along y = 0.5 hides under the plane z = 0 left of x = 0 and the piece z = -x along
 // y = -0.5 right of it, also while the plot draws; drawn to three quarters, the second piece
 // ends at x = 0.
-void depthSplitPlotPieces(SwRenderer* renderer)
+void depthSplitPlotPieces(Renderer* renderer)
 {
     auto config = topView();
     auto plate = Color::hex("#2050c0");
@@ -893,7 +893,7 @@ void depthSplitPlotPieces(SwRenderer* renderer)
 // grid's layer covers them, as the axes do. Seen from above, the plane z = 0.5 over
 // [-1, 1]^2 hides the ticks 20 pixels long at x = 0.5 and y = 0.5 below it, while those at
 // 1.5 beside it show.
-void depthSplitSpaceTicks(SwRenderer* renderer)
+void depthSplitSpaceTicks(Renderer* renderer)
 {
     auto config = topView();
     auto plate = Color::hex("#2050c0");
@@ -920,7 +920,7 @@ void depthSplitSpaceTicks(SwRenderer* renderer)
     }
 }
 
-void surfacePlaneTextAndWrite(SwRenderer* renderer)
+void surfacePlaneTextAndWrite(Renderer* renderer)
 {
     Vec3 points[] = {
         {-1.5f, 0.0f, -1.5f}, {0.0f, 0.4f, -1.5f}, {1.5f, 0.0f, -1.5f},

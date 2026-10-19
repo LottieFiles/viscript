@@ -13,7 +13,7 @@ if [ ! -f "$build/build.ninja" ]; then
     meson setup "$build" "$root" \
         --cross-file "$root/scripts/cross/wasm32.txt" \
         --buildtype=minsize -Ddebug=false -Db_lto=true -Db_ndebug=true \
-        -Dtests=false -Dexamples=false -Dengines=cpu \
+        -Dtests=false -Dexamples=false \
         -Dmodules=interactive,audio,diagram,tex
 fi
 ninja -C "$build" vis-wasm.js

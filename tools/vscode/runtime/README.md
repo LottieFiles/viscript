@@ -6,7 +6,7 @@ Portable viscript 0.1.0 runtime with the JavaScript builder, Lua authoring, and 
 import {createVis, vis} from "./client.js";
 const scene = vis.scene({width: 640, height: 360});
 scene.circle({radius: 1, fill: "accent"});
-const runtime = await createVis(scene, "scene.js", {renderEngine: "cpu"});
+const runtime = await createVis(scene, "scene.js");
 runtime.draw(document.querySelector("canvas"), runtime.duration);
 ```
 

@@ -7,7 +7,7 @@ from the Scene timeline. Its interaction clock is advanced by the host.
 ## Build
 
 ```sh
-meson setup build-interactive -Dmodules=interactive -Dengines=cpu
+meson setup build-interactive -Dmodules=interactive
 meson compile -C build-interactive
 ```
 

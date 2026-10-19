@@ -3,15 +3,10 @@ import type {AudioBus, SceneBuilder} from "./bindings.js";
 export {compileScene, evaluateScene, SceneBuilder, vis} from "./bindings.js";
 export type * from "./bindings.js";
 
-/** `"gl"` is experimental and absent from WebAssembly builds, which render through `"cpu"`. */
-export type RenderEngine = "cpu" | "gl";
-
 /** A loaded WebAssembly instance from `createVisModule`; it can host many scenes. */
 export type VisModule = Readonly<Record<string, unknown>>;
 
 export interface VisModuleOptions {
-    /** Fixed at creation; unavailable engines fail without fallback. The portable bundle is CPU-only. */
-    readonly renderEngine?: RenderEngine;
     /** Create the scene's engine in this instance instead of a new one. Fonts loaded through any engine in it are shared by all of them while one is alive. */
     readonly module?: VisModule;
     readonly [option: string]: unknown;
@@ -302,7 +297,6 @@ export interface VisAudio {
 }
 
 export interface VisScene {
-    readonly renderEngine: RenderEngine;
     readonly duration: number;
     readonly loop: boolean;
     readonly cameraMode: "fixed" | "interactive";

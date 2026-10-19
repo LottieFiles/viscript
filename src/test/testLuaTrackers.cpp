@@ -1,6 +1,6 @@
 #include "testLuaChecks.h"
 
-void _boundGeometry(SwRenderer* renderer)
+void _boundGeometry(Renderer* renderer)
 {
     static constexpr auto source = R"lua(
 local s = vis.scene {width = 160, height = 90, fps = 10}
@@ -129,7 +129,7 @@ return s
 
 // Tracks of different trackers may overlap on one binding: it shows the values of both at
 // every sample, whether the tracks come from the branches of a parallel or from an at.
-void _overlappingTracks(SwRenderer* renderer)
+void _overlappingTracks(Renderer* renderer)
 {
     static constexpr auto source = R"lua(
 local s = vis.scene {width = 160, height = 90, fps = 10}
@@ -270,7 +270,7 @@ return s
     delete scene;
 }
 
-void _longTracks(SwRenderer* renderer)
+void _longTracks(Renderer* renderer)
 {
     static constexpr auto source = R"lua(
 local s = vis.scene {width = 160, height = 90, fps = %u}
@@ -334,7 +334,7 @@ return s
                  "scene point limit exceeded: contour grids share the 1000000-point budget");
 }
 
-void _springResponses(SwRenderer* renderer)
+void _springResponses(Renderer* renderer)
 {
     static constexpr auto source = R"lua(
 local function close(actual, expected)

@@ -5,7 +5,7 @@ namespace vis
 {
 
 #ifndef VIS_SAVER_GIF
-Result saver::gif(const Scene* scene, SwRenderer* renderer, const char* path,
+Result saver::gif(const Scene* scene, Renderer* renderer, const char* path,
                   uint32_t) noexcept
 {
     if (!scene || !renderer || !path || !path[0]) return Result::InvalidArguments;
@@ -14,7 +14,7 @@ Result saver::gif(const Scene* scene, SwRenderer* renderer, const char* path,
 #endif
 
 #ifndef VIS_SAVER_VIDEO
-Result saver::video(const Scene* scene, SwRenderer* renderer, const char* path,
+Result saver::video(const Scene* scene, Renderer* renderer, const char* path,
                     uint32_t, const char*) noexcept
 {
     if (!scene || !renderer || !path || !path[0]) return Result::InvalidArguments;

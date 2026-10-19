@@ -36,7 +36,6 @@ const INPUT_KEYS = Object.freeze({
     Shift: 46,
     Tab: 47,
 });
-const RENDER_ENGINES = Object.freeze({cpu: 0, gl: 1});
 const ACTION_BINDING_LIMIT = 256;
 const ACTION_NAME_LIMIT = 63;
 
@@ -224,33 +223,14 @@ export async function createVis(source, name = "scene.lua", moduleOptions = {}) 
     if (!moduleOptions || typeof moduleOptions !== "object" || Array.isArray(moduleOptions)) {
         throw new TypeError("viscript module options must be an object");
     }
-    const requestedRenderEngine = moduleOptions.renderEngine ?? "cpu";
-    const renderEngineCode = RENDER_ENGINES[requestedRenderEngine];
-    if (renderEngineCode === undefined) {
-        throw new TypeError("renderEngine must be 'cpu' or 'gl'");
-    }
     const {module: shared, ...options} = moduleOptions;
     const module = shared ?? await createModule(options);
-    if (typeof module._vis_create_with_engine !== "function"
-        || typeof module._vis_render_engine_enabled !== "function"
-        || typeof module._vis_render_engine !== "function") {
-        throw new Error("The bundled viscript runtime does not support render-engine selection");
+    if (typeof module._vis_create !== "function") {
+        throw new Error("The module is not a viscript runtime");
     }
-    if (module._vis_render_engine_enabled(renderEngineCode) === 0) {
-        throw new Error(`The viscript ${requestedRenderEngine.toUpperCase()} renderer is not enabled in this build`);
-    }
-    let engine = module._vis_create_with_engine(renderEngineCode);
+    let engine = module._vis_create();
     if (!engine) {
-        throw new Error(`Unable to initialize the viscript ${requestedRenderEngine.toUpperCase()} renderer`);
-    }
-    const activeRenderEngineCode = module._vis_render_engine(engine);
-    const renderEngine = activeRenderEngineCode === RENDER_ENGINES.cpu ? "cpu"
-        : activeRenderEngineCode === RENDER_ENGINES.gl ? "gl"
-        : undefined;
-    if (!renderEngine) {
-        module._vis_destroy(engine);
-        engine = 0;
-        throw new Error(`The viscript runtime returned an unknown render engine (${activeRenderEngineCode})`);
+        throw new Error("Unable to initialize the viscript renderer");
     }
 
     const assertAlive = () => {
@@ -305,11 +285,6 @@ export async function createVis(source, name = "scene.lua", moduleOptions = {}) 
             ? module._vis_render(engine, time)
             : module._vis_render_scaled(engine, time, pixelRatio);
         if (result !== 0) {
-            if (renderEngine === "gl" && result === 3) {
-                throw new Error(
-                    "GL rendering requires an explicit native GL target; the pixel and Canvas 2D paths never fall back to CPU",
-                );
-            }
             throw new Error(module.UTF8ToString(module._vis_last_error(engine)) || `Render failed (${result})`);
         }
         const ptr = module._vis_pixels(engine);
@@ -972,10 +947,6 @@ export async function createVis(source, name = "scene.lua", moduleOptions = {}) 
         get duration() {
             assertAlive();
             return module._vis_duration(engine);
-        },
-        get renderEngine() {
-            assertAlive();
-            return renderEngine;
         },
         get loop() {
             assertAlive();

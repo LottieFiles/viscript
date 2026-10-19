@@ -3,7 +3,7 @@
 
 #include "testGlContext.h"
 #include "vis.h"
-#include "vis_capi.h"
+#include "vis_gl.h"
 
 using namespace vis;
 
@@ -78,11 +78,10 @@ int main()
     }
 
     CGLSetCurrentContext(context.context);
-    auto renderer = Renderer::gen(RenderEngine::Gl);
+    auto renderer = gl::Renderer::gen();
     CHECK(renderer != nullptr);
     if (renderer) {
-        CHECK(renderer->engine() == RenderEngine::Gl);
-        GlTarget target;
+        gl::Target target;
         target.context = context.context;
         target.id = static_cast<int32_t>(context.fbo);
         target.width = context.width;
@@ -111,32 +110,6 @@ int main()
         }
     }
     delete renderer;
-
-#if defined(VIS_EXPECT_LUA)
-    static constexpr char source[] = R"lua(
-local scene = vis.scene {width = 160, height = 90}
-scene:rectangle {center = {0, 0}, size = {2, 2}, fill = "#40d8a0"}
-return scene
-    )lua";
-    auto capi = vis_create_with_engine(VIS_RENDER_ENGINE_GL);
-    CHECK(capi != nullptr);
-    if (capi) {
-        CHECK(vis_load_lua(capi, source, sizeof(source) - 1u, "gl-capi.lua")
-              == VIS_RESULT_SUCCESS);
-        VisGlTarget target = {
-            nullptr,
-            nullptr,
-            context.context,
-            static_cast<int32_t>(context.fbo),
-            context.width,
-            context.height,
-        };
-        CHECK(vis_render_gl(capi, 0.0f, &target) == VIS_RESULT_SUCCESS);
-        CHECK(vis_render_engine(capi) == VIS_RENDER_ENGINE_GL);
-        CHECK(vis_pixels(capi) == nullptr && vis_pixels_size(capi) == 0u);
-        vis_destroy(capi);
-    }
-#endif
 
     delete scene;
     return failures ? 1 : 0;

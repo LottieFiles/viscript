@@ -48,12 +48,8 @@ static void _usage()
 
 static int _capabilities()
 {
-#ifdef VIS_ENGINE_CPU
     constexpr auto preview = "true";
-#else
-    constexpr auto preview = "false";
-#endif
-#if defined(VIS_AUDIT) && defined(VIS_ENGINE_CPU)
+#if defined(VIS_AUDIT)
     constexpr auto audit = "true";
 #else
     constexpr auto audit = "false";
@@ -693,9 +689,9 @@ static int _layout(int argc, char** argv)
             return 2;
         }
     }
-    auto renderer = Renderer::gen(RenderEngine::Cpu);
+    auto renderer = Renderer::gen();
     if (!renderer) {
-        std::fprintf(stderr, "viscript: SW renderer is unavailable\n");
+        std::fprintf(stderr, "viscript: the renderer is unavailable\n");
         return 3;
     }
     if (!_loadFonts(renderer, fonts)) {
@@ -803,9 +799,9 @@ static int _render(int argc, char** argv)
     }
 
     // Fonts load before the script runs, which may measure text in them.
-    auto renderer = Renderer::gen(RenderEngine::Cpu);
+    auto renderer = Renderer::gen();
     if (!renderer) {
-        std::fprintf(stderr, "viscript: SW renderer is unavailable\n");
+        std::fprintf(stderr, "viscript: the renderer is unavailable\n");
         return 3;
     }
     if (!_loadFonts(renderer, fonts)) {
@@ -897,9 +893,9 @@ static int _benchmark(int argc, char** argv)
         }
     }
 
-    auto renderer = Renderer::gen(RenderEngine::Cpu);
+    auto renderer = Renderer::gen();
     if (!renderer) {
-        std::fprintf(stderr, "viscript: SW renderer is unavailable\n");
+        std::fprintf(stderr, "viscript: the renderer is unavailable\n");
         return 3;
     }
     if (!_loadFonts(renderer, fonts)) {

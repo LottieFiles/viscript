@@ -1,6 +1,6 @@
 # Bundled WASM runtime
 
-Use skill-relative `assets/wasm/` only when the user lacks a viscript installation. Copy the entire directory together: `client.js`, `bindings.js`, `vis-wasm.js`, `vis-wasm.wasm`, declarations, fonts, manifest, and license notices have intentional relative relationships. Request `renderEngine: "cpu"` for the portable bundle.
+Use skill-relative `assets/wasm/` only when the user lacks a viscript installation. Copy the entire directory together: `client.js`, `bindings.js`, `vis-wasm.js`, `vis-wasm.wasm`, declarations, fonts, manifest, and license notices have intentional relative relationships.
 
 It provides JavaScript/TypeScript construction and embedded Lua rendering. UI/Input, action maps, retained Lua runtime, audio, and interaction loops route to `vis-interactive`; this reference covers only rendering or mounting a finished scene.
 

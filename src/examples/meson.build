@@ -1,11 +1,10 @@
 # Example stem -> validation mode.
-#   'render'      inspect, plus a CPU render to PNG
+#   'render'      inspect, plus a render to PNG
 #   'inspect'     inspect only
-#   'cpu-inspect' inspect only, and only with the CPU engine
 # Test names derive from the stem ('_' -> '-'); `example_names` overrides that.
 example_scenes = {
     'matrix_transform': 'inspect',
-    'image_cells': 'cpu-inspect',
+    'image_cells': 'inspect',
     'cell_field': 'render',
     'voxel_field': 'render',
     'surface_plot': 'render',
@@ -45,10 +44,8 @@ if get_option('tests') and cli_enabled
     foreach stem, mode : example_scenes
         name = example_names.get(stem, stem.replace('_', '-'))
         scene = files('lua' / stem + '.lua')
-        if mode != 'cpu-inspect' or cpu_enabled
-            test('example-' + name, vis_cli, args: ['inspect', scene])
-        endif
-        if mode == 'render' and cpu_enabled
+        test('example-' + name, vis_cli, args: ['inspect', scene])
+        if mode == 'render'
             test(
                 'render-' + name,
                 vis_cli,

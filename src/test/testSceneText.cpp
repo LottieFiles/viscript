@@ -1,6 +1,6 @@
 #include "testSceneChecks.h"
 
-void countingText(SwRenderer* renderer)
+void countingText(Renderer* renderer)
 {
     // A counting text writes its value with the format between its prefix and suffix.
     auto text = Text::gen("plain");
@@ -102,7 +102,7 @@ void countingText(SwRenderer* renderer)
         target.value(1000.0f);
         CHECK(owner->play(target, 1.0f, AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
         Surface kept, fresh;
-        auto other = SwRenderer::gen();
+        auto other = Renderer::gen();
         CHECK(renderer->render(owner, 1.0f, kept) == Result::Success);
         CHECK(renderer->render(owner, 0.25f, kept) == Result::Success);
         CHECK(other->render(owner, 0.25f, fresh) == Result::Success);
@@ -219,7 +219,7 @@ static void _textChange(const char* from, const char* to, TextChange change, con
     delete scene;
 }
 
-void textChanges(SwRenderer* renderer)
+void textChanges(Renderer* renderer)
 {
     // Sweep replaces characters from the left; shortening removes them from the right.
     _textChange("cat", "horse", TextChange::Sweep, "hat", "hots", "horse");
@@ -334,7 +334,7 @@ void textChanges(SwRenderer* renderer)
     delete scene;
 }
 
-void matchedPieces(SwRenderer* renderer)
+void matchedPieces(Renderer* renderer)
 {
     Config config;
     config.width = 320;
@@ -594,7 +594,7 @@ static Group* _lines(const char* const* lines, uint32_t count, Text** texts = nu
     return block;
 }
 
-void diffedLines(SwRenderer* renderer)
+void diffedLines(Renderer* renderer)
 {
     Config config;
     config.width = 320;
@@ -754,14 +754,14 @@ void diffedLines(SwRenderer* renderer)
 
 // A match and a cross-fade record that their objects hand over while they play.
 // The pixel center of object at time along x, or -1 when it is not drawn.
-static float _shownX(SwRenderer* renderer, Scene* scene, const Object* object, float time)
+static float _shownX(Renderer* renderer, Scene* scene, const Object* object, float time)
 {
     BBox box;
     if (renderer->bounds(scene, object, time, box) != Result::Success) return -1.0f;
     return box.center().x;
 }
 
-void arrangedRows(SwRenderer* renderer)
+void arrangedRows(Renderer* renderer)
 {
     Config config;
     config.width = 320;
@@ -831,7 +831,7 @@ void arrangedRows(SwRenderer* renderer)
     delete scene;
 }
 
-void handedOver(SwRenderer* renderer)
+void handedOver(Renderer* renderer)
 {
     Config config;
     config.width = 320;

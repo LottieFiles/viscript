@@ -2,7 +2,7 @@
 
 // A text measures in its loaded font, and the box it reports holds the glyphs the renderer
 // paints for it.
-void _measuring(SwRenderer* renderer)
+void _measuring(Renderer* renderer)
 {
     static constexpr auto source = R"lua(
 local s = vis.scene {width = 640, height = 360}
@@ -148,7 +148,7 @@ return s
 }
 
 // The width of the ink an object paints at time, or zero when it paints none.
-static float _inkWidth(SwRenderer* renderer, Scene* scene, const char* id, float time)
+static float _inkWidth(Renderer* renderer, Scene* scene, const char* id, float time)
 {
     auto object = scene->object(id);
     BBox ink;
@@ -156,7 +156,7 @@ static float _inkWidth(SwRenderer* renderer, Scene* scene, const char* id, float
     return ink.width;
 }
 
-void _scalingTexts(SwRenderer* renderer)
+void _scalingTexts(Renderer* renderer)
 {
     static constexpr auto source = R"lua(
 local s = vis.scene {width = 640, height = 360}
@@ -211,7 +211,7 @@ return s
 
 // A slanted text leans about its first baseline: what stands on the baseline stays where it
 // is and the top moves right by the slant times its height, billboard or plane, moving or not.
-void _slanting(SwRenderer* renderer)
+void _slanting(Renderer* renderer)
 {
     static constexpr auto source = R"lua(
 local s = vis.scene {width = 640, height = 360}
@@ -282,7 +282,7 @@ return s
     // A renderer that keeps its paints between frames draws a moving slanted text as a fresh one.
     Surface kept;
     Surface fresh;
-    auto other = SwRenderer::gen();
+    auto other = Renderer::gen();
     CHECK(other && renderer->render(scene, 0.0f, kept) == Result::Success);
     CHECK(renderer->render(scene, 0.5f, kept) == Result::Success);
     CHECK(other && other->render(scene, 0.5f, fresh) == Result::Success);
@@ -631,7 +631,7 @@ return s
     _scriptError("local s=vis.scene{}; s:spans{{'a', baseline=true}}; return s", "unknown option 'baseline'");
 }
 
-void _counting(SwRenderer* renderer)
+void _counting(Renderer* renderer)
 {
     {
         constexpr auto source = R"lua(
@@ -806,7 +806,7 @@ return s
 
 // A text without a box counts with its glyphs as the scene sets them, so the frame of a
 // circumscribe hugs the same box a measured twin of the text takes.
-void _framingTexts(SwRenderer* renderer)
+void _framingTexts(Renderer* renderer)
 {
     static constexpr auto source = R"lua(
 local s = vis.scene {width = 200, height = 200, camera = {height = 10}}
@@ -840,7 +840,7 @@ return s
 // where that side ends and its tip depth out; it is set with its text, so its sizes follow the
 // text's size, and a label stands gap off its tip, a string as the ink of a text, a handle by
 // its bounds.
-void _bracing(SwRenderer* renderer)
+void _bracing(Renderer* renderer)
 {
     static constexpr auto source = R"lua(
 local s = vis.scene {width = 400, height = 300, camera = {mode = "fixed", view = "2d", target = {0, 0}, height = 300}}

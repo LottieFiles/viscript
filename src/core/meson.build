@@ -38,7 +38,8 @@ vis_dep = declare_dependency(
 install_headers('../inc/vis.h', '../inc/vis_capi.h')
 
 # Optional modules. Each records its define/dependency for hosts (CLI, WASM)
-# and its pkg-config metadata.
+# and its pkg-config metadata; the GL renderer is a library for native hosts
+# only, with no define or Lua hook.
 vis_module_args = []
 vis_module_deps = []
 vis_module_pkgs = []
@@ -106,5 +107,12 @@ if tex_enabled
     vis_module_pkgs += {
         'lib': vis_tex_lib, 'name': 'vis-tex',
         'description': 'Experimental TeX math module for viscript',
+    }
+endif
+if gl_enabled
+    subdir('gl')
+    vis_module_pkgs += {
+        'lib': vis_gl_lib, 'name': 'vis-gl',
+        'description': 'Experimental OpenGL renderer module for viscript',
     }
 endif

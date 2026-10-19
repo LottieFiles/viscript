@@ -21,7 +21,7 @@ static bool _near(float lhs, float rhs, float epsilon = 1.0e-4f)
     return std::fabs(lhs - rhs) <= epsilon;
 }
 
-static void _clocks(SwRenderer* renderer)
+static void _clocks(Renderer* renderer)
 {
     Config config;
     config.width = 200u;
@@ -66,7 +66,7 @@ static void _clocks(SwRenderer* renderer)
     delete scene;
 }
 
-static void _visibility(SwRenderer* renderer)
+static void _visibility(Renderer* renderer)
 {
     auto scene = Scene::gen();
     auto object = Rectangle::gen({}, {1.0f, 1.0f});
@@ -104,7 +104,7 @@ static void _visibility(SwRenderer* renderer)
     delete scene;
 }
 
-static void _pivot(SwRenderer* renderer)
+static void _pivot(Renderer* renderer)
 {
     Config config;
     config.width = 200u;
@@ -159,7 +159,7 @@ static void _pivot(SwRenderer* renderer)
 
 int main()
 {
-    auto renderer = SwRenderer::gen();
+    auto renderer = Renderer::gen();
     CHECK(renderer != nullptr);
     if (renderer) {
         _clocks(renderer);

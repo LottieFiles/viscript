@@ -180,7 +180,7 @@ runtime.asset("diagram", imageBytes, "png");
 runtime.loadScene(definition, "scene.js");
 ```
 
-Serve browser runtime files over HTTP. In Node, pass `.wasm` bytes as `wasmBinary`. Use `renderEngine: "cpu"` with the portable bundle.
+Serve browser runtime files over HTTP. In Node, pass `.wasm` bytes as `wasmBinary`.
 
 ```js
 runtime.render(time);             // pixel view

@@ -277,7 +277,7 @@ return s
 }
 
 // The scale of the view at index in the layout report at time, or 0 when it is not shown.
-static float _viewScale(SwRenderer* renderer, Scene* scene, float time, uint32_t index)
+static float _viewScale(Renderer* renderer, Scene* scene, float time, uint32_t index)
 {
     LayoutReport report;
     if (renderer->layout(scene, time, report) != Result::Success) return -1.0f;
@@ -292,7 +292,7 @@ static float _viewScale(SwRenderer* renderer, Scene* scene, float time, uint32_t
 
 // scene:view shows the scene again through a camera of its own; the view it returns takes look,
 // focus, orbit and fade as the scene does.
-void _views(SwRenderer* renderer)
+void _views(Renderer* renderer)
 {
     static constexpr auto source = R"lua(
 local s = vis.scene {width = 200, height = 100, background = "#000000", antialiasing = false,

@@ -47,7 +47,7 @@ static InputEvent pointer(InputKind kind, float x, float y, uint32_t id = 1u,
 
 struct SampleResolver
 {
-    SwRenderer* renderer = nullptr;
+    Renderer* renderer = nullptr;
     uint32_t pixelRatio = 1u;
     Result failure = Result::Success;
 };
@@ -307,7 +307,7 @@ static void limits()
     delete scene;
 }
 
-static void objectBindings(SwRenderer* renderer)
+static void objectBindings(Renderer* renderer)
 {
     Config config;
     config.width = 200;
@@ -391,7 +391,7 @@ static void objectBindings(SwRenderer* renderer)
     delete scene;
 }
 
-static void toggleBindings(SwRenderer* renderer)
+static void toggleBindings(Renderer* renderer)
 {
     Config config;
     config.width = 200;
@@ -500,7 +500,7 @@ static void toggleBindings(SwRenderer* renderer)
     delete scene;
 }
 
-static void buttonStates(SwRenderer* renderer)
+static void buttonStates(Renderer* renderer)
 {
     Config config;
     config.width = 100;
@@ -616,7 +616,7 @@ static void buttonStates(SwRenderer* renderer)
     delete scene;
 }
 
-static void sampleAreas(SwRenderer* renderer)
+static void sampleAreas(Renderer* renderer)
 {
     Config config;
     config.width = 200;
@@ -799,7 +799,7 @@ static void sampleAreas(SwRenderer* renderer)
     delete scene;
 }
 
-static void cameraBindings(SwRenderer* renderer)
+static void cameraBindings(Renderer* renderer)
 {
     Config config;
     config.width = 200;
@@ -1120,7 +1120,7 @@ int main()
     controls();
     limits();
     luaBindings();
-    auto renderer = SwRenderer::gen();
+    auto renderer = Renderer::gen();
     CHECK(renderer != nullptr);
     if (renderer) {
         objectBindings(renderer);

@@ -333,7 +333,7 @@ int main(int argc, char** argv)
         return EXIT_FAILURE;
     }
     if (argc == 3) {
-        auto renderer = std::unique_ptr<vis::SwRenderer>(vis::SwRenderer::gen());
+        auto renderer = std::unique_ptr<vis::Renderer>(vis::Renderer::gen());
         vis::Surface surface;
         if (!renderer || renderer->font(argv[1]) != vis::Result::Success
             || renderer->render(monitor->scene(), 0.0f, surface) != vis::Result::Success

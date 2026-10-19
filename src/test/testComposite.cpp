@@ -86,7 +86,7 @@ static bool _equal(const Surface& first, const Surface& second)
 
 static bool _render(const Scene* scene, float time, Surface& surface)
 {
-    auto renderer = Renderer::gen(RenderEngine::Cpu);
+    auto renderer = Renderer::gen();
     CHECK(renderer);
     if (!renderer) return false;
     auto result = renderer->render(scene, time, surface);
@@ -219,7 +219,7 @@ static void retainedLayers()
     auto scene = _scene();
     auto group = Group::gen();
     auto later = Group::gen();
-    auto reused = Renderer::gen(RenderEngine::Cpu);
+    auto reused = Renderer::gen();
     CHECK(group && later && reused);
     if (!scene || !group || !later || !reused) {
         delete group;
@@ -281,7 +281,7 @@ static void transitionsAndMounts()
     CHECK(second->play(AnimationTarget::from(second->objectAt(0)).opacity(0.5f), 1.0f) == Result::Success);
     Scene* stages[] = {first, second};
     CHECK(root->transition(stages, 2u, {}, 1.0f) == Result::Success);
-    auto reused = Renderer::gen(RenderEngine::Cpu);
+    auto reused = Renderer::gen();
     CHECK(reused);
     if (reused) {
         Surface surface;
@@ -389,7 +389,7 @@ static void maskTimeline()
     spot.expect(1.5f, {191, 0, 0, 255}, Black, Black, "fading");
     spot.expect(2.5f, Black, Black, Black, "removed");
 
-    auto reused = Renderer::gen(RenderEngine::Cpu);
+    auto reused = Renderer::gen();
     CHECK(reused);
     if (!reused) return;
     for (auto time : {0.0f, 0.5f, 1.0f, 1.5f, 2.5f, 0.25f})
@@ -503,7 +503,7 @@ static void maskRules()
     CHECK(spot.square->mask(spot.hole) == Result::Success);
     CHECK(group->mask(spot.square) == Result::InvalidArguments);
 
-    auto reused = Renderer::gen(RenderEngine::Cpu);
+    auto reused = Renderer::gen();
     CHECK(reused);
     if (reused) {
         CHECK(spot.square->mask(nullptr) == Result::Success);
@@ -604,7 +604,7 @@ static void blendModes()
         CHECK(top->blend(BlendMode::Multiply) == Result::Success);
         CHECK(group->isolate() == Result::Success);
         CHECK(scene->add(group) == Result::Success);
-        auto reused = Renderer::gen(RenderEngine::Cpu);
+        auto reused = Renderer::gen();
         Surface surface;
         if (_render(scene, 0.0f, surface)) {
             CHECK(_near(_at(surface, 60u, 40u), Red));
@@ -705,7 +705,7 @@ static void effects()
         }
         if (_render(scene, 1.0f, surface)) CHECK(_at(surface, 38u, 40u).r > 0);
         if (_render(scene, 2.0f, surface)) CHECK(_at(surface, 85u, 40u).b > 64);
-        auto reused = Renderer::gen(RenderEngine::Cpu);
+        auto reused = Renderer::gen();
         CHECK(reused);
         if (reused) {
             for (auto time : {0.0f, 0.5f, 1.0f, 1.5f, 2.0f, 0.25f})

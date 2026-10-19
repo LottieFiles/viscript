@@ -15,40 +15,9 @@ static auto failures = 0;
 
 int main()
 {
-    CHECK(vis_render_engine_enabled(VIS_RENDER_ENGINE_CPU) == 1u);
-    CHECK(vis_render_engine_enabled(static_cast<VisRenderEngine>(42)) == 0u);
-    CHECK(vis_default_render_engine_set(static_cast<VisRenderEngine>(42))
-          == VIS_RESULT_INVALID_ARGUMENTS);
-    CHECK(vis_default_render_engine_set(VIS_RENDER_ENGINE_CPU) == VIS_RESULT_SUCCESS);
-    CHECK(vis_default_render_engine() == VIS_RENDER_ENGINE_CPU);
-    auto explicitCpu = vis_create_with_engine(VIS_RENDER_ENGINE_CPU);
-    CHECK(explicitCpu != nullptr);
-    CHECK(vis_render_engine(explicitCpu) == VIS_RENDER_ENGINE_CPU);
-    vis_destroy(explicitCpu);
-    CHECK(vis_create_with_engine(static_cast<VisRenderEngine>(42)) == nullptr);
-
-    auto glEnabled = vis_render_engine_enabled(VIS_RENDER_ENGINE_GL) != 0u;
-    auto explicitGl = vis_create_with_engine(VIS_RENDER_ENGINE_GL);
-    CHECK((explicitGl != nullptr) == glEnabled);
-    if (explicitGl) {
-        CHECK(vis_render_engine(explicitGl) == VIS_RENDER_ENGINE_GL);
-        vis_destroy(explicitGl);
-    }
-    CHECK(vis_default_render_engine_set(VIS_RENDER_ENGINE_GL)
-          == (glEnabled ? VIS_RESULT_SUCCESS : VIS_RESULT_NON_SUPPORT));
-    if (glEnabled) {
-        auto defaultGl = vis_create();
-        CHECK(defaultGl != nullptr);
-        CHECK(vis_render_engine(defaultGl) == VIS_RENDER_ENGINE_GL);
-        vis_destroy(defaultGl);
-    }
-    CHECK(vis_default_render_engine_set(VIS_RENDER_ENGINE_CPU) == VIS_RESULT_SUCCESS);
-
     auto engine = vis_create();
     CHECK(engine != nullptr);
     if (!engine) return 1;
-    CHECK(vis_render_engine(engine) == VIS_RENDER_ENGINE_CPU);
-
     CHECK(vis_render(engine, 0.0f) == VIS_RESULT_INSUFFICIENT_CONDITION);
     CHECK(vis_layout_report(engine, 0.0f, 0.0f) == VIS_RESULT_INSUFFICIENT_CONDITION);
     CHECK(vis_layout_report_data(engine) == nullptr && vis_layout_report_size(engine) == 0);
@@ -80,9 +49,6 @@ return scene
     CHECK(vis_load_lua(engine, source, sizeof(source) - 1u, "capi.lua") == 0);
     CHECK(vis_width(engine) == 160 && vis_height(engine) == 90);
     CHECK(vis_loop(engine) == 1);
-    VisGlTarget glTarget = {};
-    CHECK(vis_render_gl(engine, 0.0f, nullptr) == VIS_RESULT_INVALID_ARGUMENTS);
-    CHECK(vis_render_gl(engine, 0.0f, &glTarget) == VIS_RESULT_NON_SUPPORT);
     CHECK(vis_pixels(engine) == nullptr && vis_pixels_size(engine) == 0);
     VisBBox bounds = {};
     CHECK(vis_bounds(engine, "box-a", 0.0f, &bounds) == VIS_RESULT_SUCCESS);

@@ -197,15 +197,6 @@ static bool _audioBus(uint32_t value, vis::audio::Bus& output)
 }
 #endif
 
-static bool _renderEngine(VisRenderEngine value, vis::RenderEngine& output)
-{
-    switch (value) {
-        case VIS_RENDER_ENGINE_CPU: output = vis::RenderEngine::Cpu; return true;
-        case VIS_RENDER_ENGINE_GL: output = vis::RenderEngine::Gl; return true;
-    }
-    return false;
-}
-
 #if defined(VIS_UI)
 static vis::Result _sample(const vis::Scene* scene, float time,
                              const vis::Vec2& position,
@@ -604,8 +595,6 @@ static_assert(static_cast<VisResult>(vis::Result::OutOfMemory) == VIS_RESULT_OUT
 static_assert(static_cast<VisResult>(vis::Result::IoError) == VIS_RESULT_IO_ERROR);
 static_assert(static_cast<VisResult>(vis::Result::ScriptError) == VIS_RESULT_SCRIPT_ERROR);
 static_assert(static_cast<VisResult>(vis::Result::Unknown) == VIS_RESULT_UNKNOWN);
-static_assert(static_cast<uint8_t>(vis::RenderEngine::Cpu) == VIS_RENDER_ENGINE_CPU);
-static_assert(static_cast<uint8_t>(vis::RenderEngine::Gl) == VIS_RENDER_ENGINE_GL);
 static_assert(static_cast<uint8_t>(vis::CameraMode::Fixed) == VIS_CAMERA_FIXED);
 static_assert(static_cast<uint8_t>(vis::CameraMode::Interactive) == VIS_CAMERA_INTERACTIVE);
 static_assert(static_cast<uint8_t>(vis::CameraView::TwoD) == VIS_CAMERA_VIEW_2D);
@@ -628,38 +617,6 @@ static VisEngine _create(vis::Renderer* renderer)
 extern "C" VIS_KEEPALIVE VisEngine vis_create(void)
 {
     return _create(vis::Renderer::gen());
-}
-
-extern "C" VIS_KEEPALIVE VisEngine vis_create_with_engine(VisRenderEngine value)
-{
-    vis::RenderEngine engine;
-    if (!_renderEngine(value, engine)) return nullptr;
-    return _create(vis::Renderer::gen(engine));
-}
-
-extern "C" VIS_KEEPALIVE VisResult vis_default_render_engine_set(VisRenderEngine value)
-{
-    vis::RenderEngine engine;
-    if (!_renderEngine(value, engine)) return VIS_RESULT_INVALID_ARGUMENTS;
-    return static_cast<VisResult>(vis::Renderer::defaultEngine(engine));
-}
-
-extern "C" VIS_KEEPALIVE VisRenderEngine vis_default_render_engine(void)
-{
-    return static_cast<VisRenderEngine>(vis::Renderer::defaultEngine());
-}
-
-extern "C" VIS_KEEPALIVE uint8_t vis_render_engine_enabled(VisRenderEngine value)
-{
-    vis::RenderEngine engine;
-    return _renderEngine(value, engine) && vis::Renderer::enabled(engine) ? 1u : 0u;
-}
-
-extern "C" VIS_KEEPALIVE VisRenderEngine vis_render_engine(VisEngine handle)
-{
-    auto engine = _engine(handle);
-    if (!engine || !engine->renderer) return VIS_RENDER_ENGINE_CPU;
-    return static_cast<VisRenderEngine>(engine->renderer->engine());
 }
 
 extern "C" VIS_KEEPALIVE void vis_destroy(VisEngine handle)
@@ -941,32 +898,6 @@ extern "C" VIS_KEEPALIVE VisResult vis_render_scaled(VisEngine handle, float tim
 {
     auto engine = _engine(handle);
     return engine ? _render(engine, time, pixelRatio) : VIS_RESULT_INVALID_ARGUMENTS;
-}
-
-extern "C" VIS_KEEPALIVE VisResult vis_render_gl(VisEngine handle, float time,
-                                                         const VisGlTarget* target)
-{
-    auto engine = _engine(handle);
-    if (!engine) return VIS_RESULT_INVALID_ARGUMENTS;
-    if (!target) return _error(engine, vis::Result::InvalidArguments);
-    if (!engine->scene || !engine->renderer) {
-        return _error(engine, vis::Result::InsufficientCondition);
-    }
-    vis::GlTarget output = {
-        target->display,
-        target->surface,
-        target->context,
-        target->id,
-        target->width,
-        target->height,
-    };
-    engine->rendered = false;
-    auto result = engine->renderer->render(engine->scene, time, output);
-    if (result != vis::Result::Success) return _rendererError(engine, result);
-    engine->rendered = true;
-    engine->renderTime = time;
-    engine->error[0] = '\0';
-    return VIS_RESULT_SUCCESS;
 }
 
 extern "C" VIS_KEEPALIVE VisResult vis_bounds(VisEngine handle, const char* object, float time,

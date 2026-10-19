@@ -36,7 +36,6 @@ lua_test_sources = files(
 )
 
 # Optional extra dependencies/arguments that several tests share.
-renderer_args = (cpu_enabled ? ['-DVIS_EXPECT_CPU'] : []) + (gl_enabled ? ['-DVIS_EXPECT_GL'] : [])
 ui_deps = ui_enabled ? [vis_ui_dep] : []
 ui_args = ui_enabled ? ['-DVIS_UI'] : []
 input_deps = input_enabled ? [vis_input_dep] : []
@@ -52,12 +51,12 @@ endif
 # build condition, dependencies, cpp args, extra include directories.
 cpp_tests = [
     {'name': 'math', 'exe': 'testMath', 'when': true},
-    {'name': 'renderer', 'exe': 'testRenderer', 'when': true, 'args': renderer_args},
+    {'name': 'renderer', 'exe': 'testRenderer', 'when': true},
 ]
 if diagram_enabled
     cpp_tests += {
         'name': 'diagram', 'exe': 'testDiagram', 'when': true, 'deps': [vis_diagram_dep],
-        'args': cpu_enabled ? ['-DVIS_EXPECT_CPU', font_arg] : [],
+        'args': [font_arg],
     }
 endif
 if states_enabled
@@ -72,51 +71,52 @@ if tex_enabled
             'inc': [include_directories('../core/tex')],
         },
         {
-            'name': 'tex-scene', 'exe': 'testTexScene', 'when': cpu_enabled and native,
+            'name': 'tex-scene', 'exe': 'testTexScene', 'when': native,
             'deps': [vis_tex_dep], 'args': [font_arg],
         },
     ]
 endif
 
-# Software-renderer tests.
+# Renderer tests.
 cpp_tests += [
     {
         'name': 'sw-scene', 'exe': 'testScene', 'src': scene_test_sources,
-        'when': cpu_enabled and native,
-        'args': vis_args + (gl_enabled ? ['-DVIS_EXPECT_GL'] : []) + [font_arg],
+        'when': native, 'args': vis_args + [font_arg],
     },
-    {'name': 'composite', 'exe': 'testComposite', 'when': cpu_enabled and native},
-    {'name': 'timing-options', 'exe': 'testTimingOptions', 'when': cpu_enabled and native, 'args': expect_lua},
-    {'name': 'ui', 'exe': 'testUi', 'when': cpu_enabled and ui_enabled, 'deps': ui_deps},
+    {'name': 'composite', 'exe': 'testComposite', 'when': native},
+    {'name': 'timing-options', 'exe': 'testTimingOptions', 'when': native, 'args': expect_lua},
+    {'name': 'ui', 'exe': 'testUi', 'when': ui_enabled, 'deps': ui_deps},
     {
-        'name': 'input', 'exe': 'testInput', 'when': cpu_enabled and input_enabled,
+        'name': 'input', 'exe': 'testInput', 'when': input_enabled,
         'deps': input_deps + ui_deps, 'args': expect_lua + ui_args,
     },
 ]
 if states_enabled
-    cpp_tests += {'name': 'states-sw', 'exe': 'testStatesSw', 'when': cpu_enabled, 'deps': [vis_states_dep]}
+    cpp_tests += {'name': 'states-sw', 'exe': 'testStatesSw', 'when': true, 'deps': [vis_states_dep]}
 endif
 cpp_tests += {
-    'name': 'lua-runtime', 'exe': 'testLuaRuntime', 'when': cpu_enabled and lua_runtime_enabled,
+    'name': 'lua-runtime', 'exe': 'testLuaRuntime', 'when': lua_runtime_enabled,
     'deps': runtime_deps, 'args': runtime_args + input_args, 'inc': [lua_inc],
 }
 if audio_enabled
     cpp_tests += {
-        'name': 'audio', 'exe': 'testAudio', 'when': cpu_enabled,
+        'name': 'audio', 'exe': 'testAudio', 'when': true,
         'deps': [vis_audio_dep] + runtime_deps,
         'args': expect_lua + (lua_runtime_enabled ? ['-DVIS_AUDIO', '-DVIS_LUA_RUNTIME', '-DVIS_EXPECT_LUA_RUNTIME'] : []),
         'inc': lua_runtime_enabled ? [lua_inc] : [],
     }
 endif
-cpp_tests += {
-    'name': 'gl-offscreen', 'exe': 'testGl', 'when': gl_deps.length() > 0,
-    'deps': [vis_dep] + gl_deps, 'args': expect_lua,
-}
-svg_arg = '-DVIS_TEST_SVG="' + (meson.project_source_root() / 'src/examples/assets/pixels.svg') + '"'
-cpp_tests += {
-    'name': 'gl-parity', 'exe': 'testGlParity', 'when': gl_deps.length() > 0 and cpu_enabled,
-    'deps': [vis_dep] + gl_deps, 'args': [font_arg, svg_arg],
-}
+# The GL module's tests make an offscreen CGL context, so they run on macOS only.
+if gl_deps.length() > 0
+    svg_arg = '-DVIS_TEST_SVG="' + (meson.project_source_root() / 'src/examples/assets/pixels.svg') + '"'
+    cpp_tests += [
+        {'name': 'gl-offscreen', 'exe': 'testGl', 'when': true, 'deps': [vis_gl_dep] + gl_deps},
+        {
+            'name': 'gl-parity', 'exe': 'testGlParity', 'when': true,
+            'deps': [vis_gl_dep] + gl_deps, 'args': [font_arg, svg_arg],
+        },
+    ]
+endif
 
 # Lua binding tests.
 if lua_enabled
@@ -142,22 +142,22 @@ if lua_enabled
     endif
     if tex_enabled
         cpp_tests += {
-            'name': 'tex-lua', 'exe': 'testTexLua', 'when': cpu_enabled and native,
+            'name': 'tex-lua', 'exe': 'testTexLua', 'when': native,
             'deps': [vis_tex_dep], 'args': [font_arg, '-DVIS_TEX'], 'inc': [lua_inc],
         }
     endif
     cpp_tests += [
         {
             'name': 'lua-extension', 'exe': 'testLuaExtension', 'when': true, 'inc': [lua_inc],
-            'args': cpu_enabled and native ? ['-DVIS_EXPECT_CPU', font_arg] : [],
+            'args': native ? [font_arg] : [],
         },
         {
             'name': 'lua-scene', 'exe': 'testLua', 'src': lua_test_sources,
-            'when': cpu_enabled and native, 'args': [font_arg],
+            'when': native, 'args': [font_arg],
         },
-        {'name': 'c-api', 'exe': 'testCapi', 'when': cpu_enabled and native},
+        {'name': 'c-api', 'exe': 'testCapi', 'when': native},
         {
-            'name': 'retained', 'exe': 'testRetained', 'when': cpu_enabled and native,
+            'name': 'retained', 'exe': 'testRetained', 'when': native,
             'args': [font_arg, '-DVIS_TEST_EXAMPLES="' + (meson.project_source_root() / 'src/examples/lua') + '"'],
         },
     ]
@@ -183,7 +183,7 @@ if node.found()
     test('api-sync', node, args: [files('../../tools/vscode/test/api-sync.mjs')])
 endif
 if cli_enabled
-    if node.found() and cpu_enabled
+    if node.found()
         node_tests = {
             'js-binding': [files('testJsBinding.mjs', '../bindings/js/bindings.js'), vis_cli],
         }

@@ -119,7 +119,7 @@ also span explicit `from` and `to` points and place a label beside its tip.
 
 For a layout change during animation, `scene:arrange` calculates targets from the
 current cursor and schedules their movement. For final measurement,
-`SwRenderer::bounds` and `layout` report sampled paint in root pixels, including
+`Renderer::bounds` and `layout` report sampled paint in root pixels, including
 fonts, transforms, projection, and composition. See [Layout audit](layout-audit.md).
 
 ## Draw order and composition

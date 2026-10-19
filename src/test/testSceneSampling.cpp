@@ -67,7 +67,7 @@ static bool _reentrantVoxel(float, float, float, float, Color& color,
     return true;
 }
 
-void voxelSamples(SwRenderer* renderer)
+void voxelSamples(Renderer* renderer)
 {
     auto space = Space::gen({-1.0f, 1.0f, 1.0f}, {0.0f, 1.0f, 1.0f},
                             {-1.0f, 1.0f, 1.0f});
@@ -617,7 +617,7 @@ static bool _temporalVoxel(float, float, float, float time, Color& color,
     return true;
 }
 
-void sampleTime(SwRenderer* renderer)
+void sampleTime(Renderer* renderer)
 {
     Config config;
     config.width = 80u;

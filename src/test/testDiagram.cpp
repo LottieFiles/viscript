@@ -2005,7 +2005,6 @@ static void invalidGraphs()
     delete diagram;
 }
 
-#ifdef VIS_EXPECT_CPU
 static void sampledPhysicalConstraints()
 {
     vis::Config childConfig;
@@ -2073,7 +2072,7 @@ static void sampledPhysicalConstraints()
                       1.0f, Easing::Linear) == Result::Success);
     CHECK(root->viewport(child, {0.5f, 0.0f, 0.5f, 1.0f}) == Result::Success);
 
-    auto renderer = SwRenderer::gen();
+    auto renderer = Renderer::gen();
     CHECK(renderer && renderer->font(VIS_TEST_FONT) == Result::Success);
 #ifdef VIS_TEST_MONO_FONT
     CHECK(renderer && renderer->font(VIS_TEST_MONO_FONT) == Result::Success);
@@ -2192,7 +2191,7 @@ static void sampledPhysicalConstraints()
     CHECK(diagram->build(Theme::preset(ThemePreset::ProWhite), built) == Result::Success);
     CHECK(built && scene->add(built->release()) == Result::Success);
     if (built) {
-        renderer = SwRenderer::gen();
+        renderer = Renderer::gen();
         CHECK(renderer && renderer->font(VIS_TEST_FONT) == Result::Success);
 #ifdef VIS_TEST_MONO_FONT
         CHECK(renderer && renderer->font(VIS_TEST_MONO_FONT) == Result::Success);
@@ -2218,7 +2217,6 @@ static void sampledPhysicalConstraints()
     delete scene;
     delete diagram;
 }
-#endif
 
 int main()
 {
@@ -2264,8 +2262,6 @@ int main()
     endpointRouteDiagnostics();
     rankBoundariesAndFiniteGeometry();
     invalidGraphs();
-#ifdef VIS_EXPECT_CPU
     sampledPhysicalConstraints();
-#endif
     return failures ? 1 : 0;
 }

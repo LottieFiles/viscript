@@ -262,10 +262,7 @@ async function loadScene(scene, {themeRefresh = false} = {}) {
     let candidate;
     try {
         if (scene.assetErrors.length) throw new Error(scene.assetErrors.join("\n"));
-        candidate = await createVis(BOOTSTRAP, "bootstrap.lua", {
-            wasmBinary,
-            renderEngine: "cpu",
-        });
+        candidate = await createVis(BOOTSTRAP, "bootstrap.lua", {wasmBinary});
         const hostTheme = readAdaptiveVscodeTheme();
         const hostThemeKey = adaptiveVscodeThemeKey(hostTheme);
         candidate.hostTheme(hostTheme);

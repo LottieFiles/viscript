@@ -93,7 +93,7 @@ export class RenderServer {
         this.#env = env;
         this.#pool = new InstancePool({
             createModule: (onAbort) => this.#createModule(onAbort),
-            createEngine: (module) => env.runtime.createVis(BOOT, "boot.lua", {renderEngine: "cpu", module}),
+            createEngine: (module) => env.runtime.createVis(BOOT, "boot.lua", {module}),
             font: (name: string) => this.#font(name),
             assetBytes: (asset: AssetRef) => this.#fetch(asset.id),
         }, {idleMs: env.idleMs});

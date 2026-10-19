@@ -40,7 +40,7 @@ static Scene* _load(const char* name)
 
 static Renderer* _renderer()
 {
-    auto renderer = Renderer::gen(RenderEngine::Cpu);
+    auto renderer = Renderer::gen();
     CHECK(renderer);
     if (renderer) CHECK(renderer->font(VIS_TEST_FONT) == Result::Success);
 #ifdef VIS_TEST_MONO_FONT

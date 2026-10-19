@@ -14,7 +14,6 @@ import {
     type ObjectHandle,
     type RandomGenerator,
     type RectangleOptions,
-    type RenderEngine,
     type SceneTransitionOptions,
     type SpringResponseOptions,
     type TexHandle,
@@ -744,8 +743,7 @@ definition.sceneTransition([vis.scene(), vis.scene()], {hold: "short"});
 
 async function preview(canvas: HTMLCanvasElement)
 {
-    const scene = await createVis(definition, "typed-scene.ts", {renderEngine: "cpu"});
-    const renderEngine: RenderEngine = scene.renderEngine;
+    const scene = await createVis(definition, "typed-scene.ts");
     const cameraHandled: boolean = scene.cameraInput("pan", 0.1, 0);
     void cameraHandled;
     // @ts-expect-error Runtime camera input accepts defined actions.
@@ -773,14 +771,11 @@ async function preview(canvas: HTMLCanvasElement)
     void occluder;
     void sampledPath;
     void sampledPoint;
-    void renderEngine;
     scene.asset("pixels", new Uint8Array([1, 2, 3]), "png");
     scene.draw(canvas, scene.duration);
     scene.draw(canvas, scene.duration, 2);
     // @ts-expect-error Canvas pixel ratio is numeric.
     scene.draw(canvas, scene.duration, "2");
-    // @ts-expect-error Render engine must be CPU or GL.
-    void createVis(definition, "invalid-engine.ts", {renderEngine: "gpu"});
     scene.destroy();
 }
 

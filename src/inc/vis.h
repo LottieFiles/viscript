@@ -10,7 +10,7 @@
 //   objects                     Object, Group, Space, shapes, Plot, Text, Picture, Cell, Connector
 //   animations                  Animation, AnimationTarget, MatchOptions, Emphasis, CloneOptions
 //   scenes                      Config, Viewport, SceneView, transitions, RuntimeModifier, Scene
-//   rendering and saving        Surface, SwRenderer, GlRenderer, Renderer, Saver, Lua
+//   rendering and saving        Surface, Renderer, Saver, Lua
 //
 // Words the API uses:
 //   object    a node of the tree, with a style, a model matrix, a layer, an opacity and a progress.
@@ -60,13 +60,6 @@ enum struct Result : uint8_t
     IoError = 5,
     ScriptError = 6,
     Unknown = 7
-};
-
-enum struct RenderEngine : uint8_t
-{
-    Cpu = 0,
-    // Experimental: built only with -Dengines=cpu,gl, and never in WebAssembly builds.
-    Gl
 };
 
 enum struct Type : uint8_t
@@ -862,7 +855,7 @@ struct LayoutReport
 private:
     struct Impl;
     Impl* pImpl = nullptr;
-    friend struct SwRenderer;
+    friend struct Renderer;
 };
 
 // A soft shadow that a layer casts beneath itself.
@@ -2505,8 +2498,7 @@ private:
     static uint32_t depth(const Scene* scene) noexcept;
     Result attach(Object* object, Object* parent) noexcept;
     friend struct RendererBuilder;
-    friend struct SwRenderer;
-    friend struct GlRenderer;
+    friend struct Renderer;
     friend struct Object;
     friend struct Space;
 };
@@ -2531,13 +2523,15 @@ private:
     uint32_t bufferStride = 0;
 };
 
-struct SwRenderer
+// Draws a scene on the CPU, into a Surface, and measures what it drew. The experimental GL
+// module (vis_gl.h) draws through OpenGL instead.
+struct Renderer
 {
-    ~SwRenderer();
-    SwRenderer(const SwRenderer&) = delete;
-    SwRenderer& operator=(const SwRenderer&) = delete;
+    ~Renderer();
+    Renderer(const Renderer&) = delete;
+    Renderer& operator=(const Renderer&) = delete;
 
-    static SwRenderer* gen() noexcept;
+    static Renderer* gen() noexcept;
     Result font(const char* path) noexcept;
     Result font(const char* name, const void* data, uint32_t size, const char* mime = "ttf") noexcept;
     // Why the most recent font, bounds, intersects, layout, sample or render call failed, in
@@ -2558,78 +2552,7 @@ struct SwRenderer
 private:
     struct Impl;
     Impl* pImpl = nullptr;
-    SwRenderer() noexcept;
-};
-
-struct GlTarget
-{
-    void* display = nullptr;
-    void* surface = nullptr;
-    void* context = nullptr;
-    int32_t id = 0;
-    uint32_t width = 0;
-    uint32_t height = 0;
-};
-
-struct GlRenderer
-{
-    ~GlRenderer();
-    GlRenderer(const GlRenderer&) = delete;
-    GlRenderer& operator=(const GlRenderer&) = delete;
-
-    static GlRenderer* gen() noexcept;
-    Result font(const char* path) noexcept;
-    Result font(const char* name, const void* data, uint32_t size, const char* mime = "ttf") noexcept;
-    // Why the most recent font or render call failed, in plain words; nullptr when the
-    // renderer has no reason.
-    const char* diagnostic() const noexcept;
-    Result render(const Scene* scene, float time, const GlTarget& target) noexcept;
-
-private:
-    struct Impl;
-    Impl* pImpl = nullptr;
-    GlRenderer() noexcept;
-};
-
-struct Renderer
-{
-    ~Renderer();
-    Renderer(const Renderer&) = delete;
-    Renderer& operator=(const Renderer&) = delete;
-
-    static Renderer* gen() noexcept;
-    static Renderer* gen(RenderEngine engine) noexcept;
-    static Result defaultEngine(RenderEngine engine) noexcept;
-    static RenderEngine defaultEngine() noexcept;
-    static bool enabled(RenderEngine engine) noexcept;
-
-    RenderEngine engine() const noexcept;
-    Result font(const char* path) noexcept;
-    Result font(const char* name, const void* data, uint32_t size,
-                const char* mime = "ttf") noexcept;
-    // Why the most recent call failed, in plain words, such as the font a text needs or a
-    // query the engine cannot answer; nullptr when the renderer has no reason.
-    const char* diagnostic() const noexcept;
-    Result bounds(const Scene* scene, const Object* object, float time,
-                  BBox& output) noexcept;
-    Result intersects(const Scene* scene, const Object* first, const Object* second,
-                      float time, bool& output, float padding = 0.0f) noexcept;
-    Result layout(const Scene* scene, float time, LayoutReport& output,
-                  float padding = 0.0f) noexcept;
-    Result sample(const Scene* scene, float time, const Vec2& position,
-                  const Object* const* candidates, uint32_t count,
-                  PixelSample& output, uint32_t pixelRatio = 1u) noexcept;
-    Result render(const Scene* scene, float time, Surface& surface) noexcept;
-    Result render(const Scene* scene, float time, Surface& surface,
-                  uint32_t pixelRatio) noexcept;
-    Result render(const Scene* scene, float time, const GlTarget& target) noexcept;
-
-private:
-    struct Impl;
-    Impl* pImpl = nullptr;
-    explicit Renderer(RenderEngine engine) noexcept;
-    SwRenderer* cpuBackend() const noexcept;
-    friend struct Saver;
+    Renderer() noexcept;
 };
 
 struct Saver
@@ -2637,6 +2560,9 @@ struct Saver
     // Compiled-out savers retain their declarations and return NonSupport.
     // Built-in savers sample scene time; interaction clocks must be advanced by the host.
     static Result png(const Surface& surface, const char* path) noexcept;
+    // Saves every frame of the timeline as a GIF or an MP4, by the path's extension, at fps
+    // frames per second (0: the scene's). Both run ffmpeg from the PATH, so neither is
+    // supported in WebAssembly or Windows builds.
     static Result save(const Scene* scene, Renderer& renderer, const char* path,
                        uint32_t fps = 0) noexcept;
     // Saves an MP4 like save() with soundtrack as its audio: any file ffmpeg reads, such as
@@ -2644,7 +2570,6 @@ struct Saver
     // a shorter one leaves the rest silent. Only .mp4 carries audio; nullptr saves no audio.
     static Result save(const Scene* scene, Renderer& renderer, const char* path, uint32_t fps,
                        const char* soundtrack) noexcept;
-    static Result video(const Scene* scene, SwRenderer* renderer, const char* path, uint32_t fps = 0) noexcept;
 };
 
 struct Lua

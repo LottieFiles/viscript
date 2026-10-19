@@ -1,29 +1,28 @@
-// GlRenderer on ThorVG's GL engine: draws a display list into a GL target (experimental).
+// gl::Renderer on ThorVG's GL engine: keeps a scene's retained paint tree on a GL canvas and
+// draws it into the host's framebuffer (experimental).
 #include <cmath>
 #include <new>
 
 #include <thorvg.h>
 
-#include "vis.h"
-#include "visRendererBackend.h"
-#include "visScene.h"
+#include "vis_gl.h"
 #include "visTvgRenderer.h"
 
-namespace vis
+namespace vis::gl
 {
 
-struct GlRenderer::Impl
+struct Renderer::Impl
 {
     tvg::GlCanvas* canvas = nullptr;
     RetainedTree* tree = nullptr;
-    GlTarget target = {};
+    Target target = {};
     bool targeted = false;
     bool initialized = false;
     bool antialiasing = true;
     renderer::TvgDiagnostic diagnostic;
 };
 
-GlRenderer::GlRenderer() noexcept
+Renderer::Renderer() noexcept
 {
     pImpl = new (std::nothrow) Impl;
     if (!pImpl) return;
@@ -35,7 +34,7 @@ GlRenderer::GlRenderer() noexcept
     }
 }
 
-GlRenderer::~GlRenderer()
+Renderer::~Renderer()
 {
     if (pImpl) {
         renderer::tvgRetainedFree(pImpl->tree);
@@ -45,49 +44,49 @@ GlRenderer::~GlRenderer()
     delete pImpl;
 }
 
-GlRenderer* GlRenderer::gen() noexcept
+Renderer* Renderer::gen() noexcept
 {
-    auto renderer = new (std::nothrow) GlRenderer;
+    auto renderer = new (std::nothrow) Renderer;
     if (!renderer || (renderer->pImpl && renderer->pImpl->initialized)) return renderer;
     delete renderer;
     return nullptr;
 }
 
-Result GlRenderer::font(const char* path) noexcept
+Result Renderer::font(const char* path) noexcept
 {
     if (!pImpl) return Result::InvalidArguments;
     return renderer::tvgFont(pImpl->diagnostic, path);
 }
 
-Result GlRenderer::font(const char* name, const void* data, uint32_t size, const char* mime) noexcept
+Result Renderer::font(const char* name, const void* data, uint32_t size, const char* mime) noexcept
 {
     if (!pImpl) return Result::InvalidArguments;
     return renderer::tvgFont(pImpl->diagnostic, name, data, size, mime);
 }
 
-const char* GlRenderer::diagnostic() const noexcept
+const char* Renderer::diagnostic() const noexcept
 {
     return pImpl ? pImpl->diagnostic.text() : nullptr;
 }
 
-Result GlRenderer::render(const Scene* scene, float time, const GlTarget& target) noexcept
+Result Renderer::render(const Scene* scene, float time, const Target& target) noexcept
 {
     if (!pImpl) return Result::InvalidArguments;
     renderer::TvgDiagnosis diagnosis(pImpl->diagnostic);
-    if (!pImpl->initialized || !scene || !scene->pImpl
-        || !std::isfinite(time) || time < 0.0f) {
+    if (!pImpl->initialized || !scene || !std::isfinite(time) || time < 0.0f) {
         return Result::InvalidArguments;
     }
     if (!target.context || target.id < 0 || !target.width || !target.height) {
         return Result::InvalidArguments;
     }
-    if (target.width != scene->pImpl->cfg.width || target.height != scene->pImpl->cfg.height) return Result::InvalidArguments;
-    if (!pImpl->canvas || pImpl->antialiasing != scene->pImpl->cfg.antialiasing) {
+    auto& config = scene->config();
+    if (target.width != config.width || target.height != config.height) return Result::InvalidArguments;
+    if (!pImpl->canvas || pImpl->antialiasing != config.antialiasing) {
         renderer::tvgRetainedReset(pImpl->tree);
         delete pImpl->canvas;
-        pImpl->canvas = tvg::GlCanvas::gen(scene->pImpl->cfg.antialiasing ? tvg::EngineOption::Default
-                                                                          : tvg::EngineOption::Aliased);
-        pImpl->antialiasing = scene->pImpl->cfg.antialiasing;
+        pImpl->canvas = tvg::GlCanvas::gen(config.antialiasing ? tvg::EngineOption::Default
+                                                               : tvg::EngineOption::Aliased);
+        pImpl->antialiasing = config.antialiasing;
         pImpl->targeted = false;
         if (!pImpl->canvas) return Result::NonSupport;
     }
@@ -111,19 +110,4 @@ Result GlRenderer::render(const Scene* scene, float time, const GlTarget& target
     return Result::Success;
 }
 
-namespace renderer
-{
-
-bool glEnabled() noexcept
-{
-    return true;
-}
-
-GlRenderer* genGl() noexcept
-{
-    return GlRenderer::gen();
-}
-
-}  // namespace renderer
-
-}  // namespace vis
+}  // namespace vis::gl
