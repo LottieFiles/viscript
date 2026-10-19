@@ -8,57 +8,9 @@
 #include <initializer_list>
 
 #include "vis.h"
+#include "testCheck.h"
 
 using namespace vis;
-
-extern int failures;
-
-#define CHECK(condition)                                                                       \
-    do {                                                                                       \
-        if (!(condition)) {                                                                    \
-            std::fprintf(stderr, "%s:%d: check failed: %s\n", __FILE__, __LINE__, #condition); \
-            failures++;                                                                        \
-        }                                                                                      \
-    } while (false)
-
-static inline uint32_t changed(const Surface& surface, Color background)
-{
-    auto pixel = static_cast<uint32_t>(background.a) << 24 | static_cast<uint32_t>(background.b) << 16 | static_cast<uint32_t>(background.g) << 8 | background.r;
-    auto count = 0u;
-    for (auto y = 0u; y < surface.height(); y++) {
-        for (auto x = 0u; x < surface.width(); x++) {
-            if (surface.data()[static_cast<size_t>(y) * surface.stride() + x] != pixel) count++;
-        }
-    }
-    return count;
-}
-
-static inline uint64_t checksum(const Surface& surface)
-{
-    auto hash = 14695981039346656037ull;
-    for (auto i = 0u; i < surface.width() * surface.height(); i++) {
-        hash ^= surface.data()[i];
-        hash *= 1099511628211ull;
-    }
-    return hash;
-}
-
-static inline uint32_t pixel(Color color)
-{
-    return static_cast<uint32_t>(color.a) << 24 | static_cast<uint32_t>(color.b) << 16
-        | static_cast<uint32_t>(color.g) << 8 | color.r;
-}
-
-static inline bool same(Color first, Color second)
-{
-    return first.r == second.r && first.g == second.g && first.b == second.b
-           && first.a == second.a;
-}
-
-static inline bool near(float lhs, float rhs, float epsilon = 1.0e-4f)
-{
-    return std::fabs(lhs - rhs) <= epsilon;
-}
 
 static inline const LayoutVisual* _layoutVisual(const LayoutReport& report,
                                                 const Object* object)

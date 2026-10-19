@@ -11,10 +11,7 @@
 
 static_assert(!std::is_copy_constructible<Object>::value, "Object owns its tag");
 static_assert(!std::is_copy_constructible<Scene>::value, "Scene owns its object graph");
-static_assert(!std::is_copy_constructible<Renderer>::value, "Renderer owns a canvas");
 static_assert(!std::is_constructible<Object, Type>::value, "Object hierarchy is closed");
-
-int failures = 0;
 
 struct RuntimeProbe
 {
@@ -935,12 +932,6 @@ static Scene* _numberScene(NumberMode mode, bool numbers)
 
 static void spaceNumbers(Renderer* renderer)
 {
-#ifdef VIS_TEST_FONT
-    CHECK(renderer->font(VIS_TEST_FONT) == Result::Success);
-#ifdef VIS_TEST_MONO_FONT
-    CHECK(renderer->font(VIS_TEST_MONO_FONT) == Result::Success);
-#endif
-#endif
     auto hidden = _numberScene(NumberMode::Fixed, false);
     auto fixed = _numberScene(NumberMode::Fixed, true);
     auto relative = _numberScene(NumberMode::Relative, true);
@@ -2089,6 +2080,10 @@ int main()
         scene2D(renderer);
         coplanarDrawOrder(renderer);
         rendererPixelSampling(renderer);
+        // Fonts load for the whole process and stay while this renderer lives, so these serve
+        // every test from here on; the tests above draw no text.
+        CHECK(renderer->font(VIS_TEST_FONT) == Result::Success);
+        CHECK(renderer->font(VIS_TEST_MONO_FONT) == Result::Success);
         spaceNumbers(renderer);
         renderBounds(renderer);
         layoutOcclusion(renderer);
@@ -2203,6 +2198,5 @@ int main()
 #endif
     }
     delete renderer;
-    if (failures) std::fprintf(stderr, "%d checks failed\n", failures);
-    return failures ? 1 : 0;
+    return report();
 }

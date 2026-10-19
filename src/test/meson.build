@@ -1,7 +1,9 @@
 native = host_machine.system() != 'emscripten'
 lua_inc = include_directories('../core/lua')
-font_arg = '-DVIS_TEST_FONT="' + (meson.project_source_root() / 'src/examples/assets/Pretendard.ttf') + '"'
-mono_font_arg = '-DVIS_TEST_MONO_FONT="' + (meson.project_source_root() / 'src/examples/assets/JetBrainsMono.ttf') + '"'
+font_args = [
+    '-DVIS_TEST_FONT="' + (meson.project_source_root() / 'src/examples/assets/Pretendard.ttf') + '"',
+    '-DVIS_TEST_MONO_FONT="' + (meson.project_source_root() / 'src/examples/assets/JetBrainsMono.ttf') + '"',
+]
 scene_test_sources = files(
     'testScene.cpp',
     'testSceneAnimations.cpp',
@@ -55,7 +57,7 @@ cpp_tests = [
 if diagram_enabled
     cpp_tests += {
         'name': 'diagram', 'exe': 'testDiagram', 'when': true, 'deps': [vis_diagram_dep],
-        'args': [font_arg],
+        'args': font_args,
     }
 endif
 if states_enabled
@@ -71,7 +73,7 @@ if tex_enabled
         },
         {
             'name': 'tex-scene', 'exe': 'testTexScene', 'when': native,
-            'deps': [vis_tex_dep], 'args': [font_arg],
+            'deps': [vis_tex_dep], 'args': font_args,
         },
     ]
 endif
@@ -80,7 +82,7 @@ endif
 cpp_tests += [
     {
         'name': 'sw-scene', 'exe': 'testScene', 'src': scene_test_sources,
-        'when': native, 'args': [font_arg],
+        'when': native, 'args': font_args,
     },
     {'name': 'composite', 'exe': 'testComposite', 'when': native},
     {'name': 'timing-options', 'exe': 'testTimingOptions', 'when': native},
@@ -112,7 +114,7 @@ if gl_deps.length() > 0
         {'name': 'gl-offscreen', 'exe': 'testGl', 'when': true, 'deps': [vis_gl_dep] + gl_deps},
         {
             'name': 'gl-parity', 'exe': 'testGlParity', 'when': true,
-            'deps': [vis_gl_dep] + gl_deps, 'args': [font_arg, svg_arg],
+            'deps': [vis_gl_dep] + gl_deps, 'args': font_args + [svg_arg],
         },
     ]
 endif
@@ -126,37 +128,31 @@ if states_enabled
     }
 endif
 if diagram_enabled
-    cpp_tests += [
-        {
-            'name': 'diagram-lua', 'exe': 'testDiagramLua', 'src': 'testAuthoringModules.cpp',
-            'when': true, 'deps': [vis_diagram_dep], 'args': ['-DVIS_DIAGRAM'], 'inc': [lua_inc],
-        },
-        {
-            'name': 'authoring-modules', 'exe': 'testAuthoringModules', 'when': true,
-            'deps': [vis_diagram_dep] + ui_deps + input_deps,
-            'args': ['-DVIS_DIAGRAM'] + ui_args + input_args, 'inc': [lua_inc],
-        },
-    ]
+    cpp_tests += {
+        'name': 'authoring-modules', 'exe': 'testAuthoringModules', 'when': true,
+        'deps': [vis_diagram_dep] + ui_deps + input_deps,
+        'args': ['-DVIS_DIAGRAM'] + ui_args + input_args, 'inc': [lua_inc],
+    }
 endif
 if tex_enabled
     cpp_tests += {
         'name': 'tex-lua', 'exe': 'testTexLua', 'when': native,
-        'deps': [vis_tex_dep], 'args': [font_arg, '-DVIS_TEX'], 'inc': [lua_inc],
+        'deps': [vis_tex_dep], 'args': font_args + ['-DVIS_TEX'], 'inc': [lua_inc],
     }
 endif
 cpp_tests += [
     {
         'name': 'lua-extension', 'exe': 'testLuaExtension', 'when': true, 'inc': [lua_inc],
-        'args': native ? [font_arg] : [],
+        'args': native ? font_args : [],
     },
     {
         'name': 'lua-scene', 'exe': 'testLua', 'src': lua_test_sources,
-        'when': native, 'args': [font_arg],
+        'when': native, 'args': font_args,
     },
     {'name': 'c-api', 'exe': 'testCapi', 'when': native},
     {
         'name': 'retained', 'exe': 'testRetained', 'when': native,
-        'args': [font_arg, '-DVIS_TEST_EXAMPLES="' + (meson.project_source_root() / 'src/examples/lua') + '"'],
+        'args': font_args + ['-DVIS_TEST_EXAMPLES="' + (meson.project_source_root() / 'src/examples/lua') + '"'],
     },
 ]
 
@@ -167,7 +163,7 @@ foreach t : cpp_tests
             t.get('src', t['exe'] + '.cpp'),
             dependencies: t.get('deps', [vis_dep]),
             include_directories: t.get('inc', []),
-            cpp_args: t.get('args', []) + (t.get('args', []).contains(font_arg) ? [mono_font_arg] : []),
+            cpp_args: t.get('args', []),
         )
         test(t['name'], exe)
     endif
@@ -187,7 +183,7 @@ if cli_enabled
         if audit_enabled
             node_tests += {
                 'audit-cli': [
-                    files('testAuditCli.mjs'), vis_cli, example_font,
+                    files('testAuditCli.mjs'), vis_cli,
                     files(
                         'fixtures/audit/layout-good.lua',
                         'fixtures/audit/layout-transient-failure.lua',
@@ -199,7 +195,7 @@ if cli_enabled
         if audit_enabled and diagram_enabled
             node_tests += {
                 'diagram-audit': [
-                    files('testDiagramAudit.mjs'), vis_cli, example_font,
+                    files('testDiagramAudit.mjs'), vis_cli,
                     files(
                         '../examples/lua/diagram_native_flow.lua',
                         'fixtures/audit/diagram-static-failure.lua',

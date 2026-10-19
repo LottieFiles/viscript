@@ -4,19 +4,9 @@
 
 #include "vis.h"
 #include "vis_tex.h"
+#include "testCheck.h"
 
 using namespace vis;
-
-static int failures = 0;
-
-static void check(bool condition, const char* expression, int line)
-{
-    if (condition) return;
-    std::fprintf(stderr, "%s:%d: CHECK(%s) failed\n", __FILE__, line, expression);
-    failures++;
-}
-
-#define CHECK(condition) check((condition), #condition, __LINE__)
 
 // A formula set from parts: a group per part below its typeset group, its pieces keyed by
 // their TeX, and the pairs it gives a match transform.
@@ -195,12 +185,8 @@ int main()
     auto scene = Scene::gen();
     CHECK(renderer && scene);
     if (renderer && scene) {
-#ifdef VIS_TEST_FONT
         CHECK(renderer->font(VIS_TEST_FONT) == Result::Success);
-#ifdef VIS_TEST_MONO_FONT
         CHECK(renderer->font(VIS_TEST_MONO_FONT) == Result::Success);
-#endif
-#endif
         _parts(scene);
         _pieces(scene);
         _baseline(scene);
@@ -209,6 +195,5 @@ int main()
     }
     delete scene;
     delete renderer;
-    if (failures) std::fprintf(stderr, "%d check(s) failed\n", failures);
-    return failures ? 1 : 0;
+    return report();
 }

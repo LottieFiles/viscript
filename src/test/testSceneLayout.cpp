@@ -332,11 +332,6 @@ void offsetBoxes(Renderer* renderer)
     Bounds placed;
     CHECK(mark->bounds(placed) && near(placed.min.x, 2.75f) && near(placed.center().y, 1.5f));
     // The glyphs draw where the text without an offset draws them.
-#ifdef VIS_TEST_FONT
-    CHECK(renderer->font(VIS_TEST_FONT) == Result::Success);
-#ifdef VIS_TEST_MONO_FONT
-    CHECK(renderer->font(VIS_TEST_MONO_FONT) == Result::Success);
-#endif
     BBox drawn;
     BBox kept;
     CHECK(renderer->bounds(scene, word, 0.0f, drawn) == Result::Success);
@@ -346,9 +341,6 @@ void offsetBoxes(Renderer* renderer)
     CHECK(renderer->bounds(scene, plain, 0.0f, kept) == Result::Success);
     CHECK(near(drawn.x, kept.x) && near(drawn.y, kept.y) && near(drawn.width, kept.width)
           && near(drawn.height, kept.height));
-#else
-    (void)renderer;
-#endif
     delete scene;
     // An offset must be finite.
     auto broken = Text::gen("x");

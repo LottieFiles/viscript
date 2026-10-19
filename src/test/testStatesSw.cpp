@@ -2,24 +2,10 @@
 #include <cstdio>
 
 #include "vis_states.h"
+#include "testCheck.h"
 
 using namespace vis;
 using namespace vis::states;
-
-static int failures = 0;
-
-#define CHECK(condition)                                                                       \
-    do {                                                                                       \
-        if (!(condition)) {                                                                    \
-            std::fprintf(stderr, "%s:%d: check failed: %s\n", __FILE__, __LINE__, #condition); \
-            failures++;                                                                        \
-        }                                                                                      \
-    } while (false)
-
-static bool _near(float lhs, float rhs, float epsilon = 1.0e-4f)
-{
-    return std::fabs(lhs - rhs) <= epsilon;
-}
 
 static void _clocks(Renderer* renderer)
 {
@@ -57,12 +43,12 @@ static void _clocks(Renderer* renderer)
     CHECK(renderer->bounds(scene, object, 0.0f, begin) == Result::Success);
     CHECK(renderer->bounds(scene, object, 1.0f, end) == Result::Success);
     CHECK(renderer->bounds(scene, object, 0.0f, resampled) == Result::Success);
-    CHECK(_near(begin.center().x, 125.0f, 0.1f));
-    CHECK(_near(end.center().x, begin.center().x, 0.1f));
+    CHECK(near(begin.center().x, 125.0f, 0.1f));
+    CHECK(near(end.center().x, begin.center().x, 0.1f));
     CHECK(end.center().y < begin.center().y);
-    CHECK(_near(resampled.center().x, begin.center().x, 0.1f));
-    CHECK(_near(resampled.center().y, begin.center().y, 0.1f));
-    CHECK(_near(static_cast<float>(controller->time()), 0.5f));
+    CHECK(near(resampled.center().x, begin.center().x, 0.1f));
+    CHECK(near(resampled.center().y, begin.center().y, 0.1f));
+    CHECK(near(static_cast<float>(controller->time()), 0.5f));
     delete scene;
 }
 
@@ -143,17 +129,17 @@ static void _pivot(Renderer* renderer)
     CHECK(controller->transition(object, "focused", 0.0f) == Result::Success);
     CHECK(renderer->bounds(scene, object, 0.0f, after) == Result::Success);
     CHECK(renderer->bounds(scene, object, 1.0f, afterEnd) == Result::Success);
-    CHECK(_near(after.center().x, before.center().x, 0.1f));
-    CHECK(_near(after.center().y, before.center().y, 0.1f));
-    CHECK(_near(afterEnd.center().x, beforeEnd.center().x, 0.1f));
-    CHECK(_near(afterEnd.center().y, beforeEnd.center().y, 0.1f));
+    CHECK(near(after.center().x, before.center().x, 0.1f));
+    CHECK(near(after.center().y, before.center().y, 0.1f));
+    CHECK(near(afterEnd.center().x, beforeEnd.center().x, 0.1f));
+    CHECK(near(afterEnd.center().y, beforeEnd.center().y, 0.1f));
     CHECK(after.width > before.width * 1.5f);
     CHECK(after.height > before.height * 1.5f);
     State sampled;
     CHECK(controller->sample(object, sampled) == Result::Success);
     CHECK(sampled.originEnabled);
-    CHECK(_near(sampled.origin.x, 2.0f));
-    CHECK(_near(sampled.origin.y, 0.0f));
+    CHECK(near(sampled.origin.x, 2.0f));
+    CHECK(near(sampled.origin.y, 0.0f));
     delete scene;
 }
 
@@ -167,6 +153,5 @@ int main()
         _visibility(renderer);
     }
     delete renderer;
-    if (failures) std::fprintf(stderr, "%d states render test(s) failed\n", failures);
-    return failures ? 1 : 0;
+    return report();
 }

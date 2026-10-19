@@ -17,12 +17,7 @@ if table.concat(names, ",") ~= "-1,1,2.5,3,Beta,alpha,zeta" then error("keys: " 
 if #vis.keys({}) ~= 0 or #vis.keys(vis.merge()) ~= 0 then error("empty keys") end
 return s
 )lua";
-    char error[256] = {};
-    Scene* scene = nullptr;
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "tables.lua", &scene, error, sizeof(error))
-          == Result::Success);
-    if (!scene) std::fprintf(stderr, "tables.lua: %s\n", error);
-    delete scene;
+    delete _loaded(source, "tables.lua");
     _scriptError("local s=vis.scene{}; vis.keys({[true]=1}); return s",
                  "keys orders only number and string keys, got a boolean key");
     _scriptError("local s=vis.scene{}; vis.keys(1); return s", "(table expected, got number)");
@@ -48,11 +43,7 @@ s:find("card"):arrange({1, 0}, 0.2)
 s:play({{target = s:find("body"), fill = "#ff0000"}, {target = kids[2], opacity = 0.5}}, 1)
 return s
 )lua";
-    char error[256] = {};
-    Scene* scene = nullptr;
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "queries.lua", &scene, error, sizeof(error))
-          == Result::Success);
-    if (!scene) std::fprintf(stderr, "queries.lua: %s\n", error);
+    auto scene = _loaded(source, "queries.lua");
     if (scene) CHECK(scene->clipCount() == 2u);
     delete scene;
     _scriptError("local s=vis.scene{}; s:find(); return s", "bad argument #1 to 'find'");
@@ -81,11 +72,7 @@ if grid:children()[2] ~= between then error("the rectangle stays a child") end
 s:play({{target = grid:entry(1, 2), fill = "#ff0000"}, {target = grid:row(2), opacity = 0.5}}, 1)
 return s
 )lua";
-    char error[256] = {};
-    Scene* scene = nullptr;
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "rows.lua", &scene, error, sizeof(error))
-          == Result::Success);
-    if (!scene) std::fprintf(stderr, "rows.lua: %s\n", error);
+    auto scene = _loaded(source, "rows.lua");
     if (scene) CHECK(scene->clipCount() == 2u);
     delete scene;
     static constexpr auto grid = "local s=vis.scene{}; local g=s:group{}; local a=g:group{}; a:point{point={0,0}}; "
@@ -122,11 +109,7 @@ s:arrange({a, c, b}, 1, "linear", {gap = 0.5})
 s:arrange(row, 0.5, "smooth", {direction = {0, -1}, gap = 0, center = {2, 0}})
 return s
 )lua";
-    char error[256] = {};
-    Scene* scene = nullptr;
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "arrange.lua", &scene, error, sizeof(error))
-          == Result::Success);
-    if (!scene) std::fprintf(stderr, "arrange.lua: %s\n", error);
+    auto scene = _loaded(source, "arrange.lua");
     if (scene) {
         CHECK(_near(scene->duration(), 2.0f));
         struct Expected { const char* id; float x; float y; };
@@ -170,11 +153,7 @@ local f = s:point {point = {0, -1}, id = "f"}
 s:advect(f, U, {duration = 10})
 return s
 )lua";
-    char error[256] = {};
-    Scene* scene = nullptr;
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "advect.lua", &scene, error, sizeof(error))
-          == Result::Success);
-    if (!scene) std::fprintf(stderr, "advect.lua: %s\n", error);
+    auto scene = _loaded(source, "advect.lua");
     if (scene) {
         auto moved = [&](const char* id, float x, float y) {
             auto object = scene->object(id);
@@ -222,11 +201,7 @@ s:wait(1)
 s:rectangle {id = "late", around = dot, padding = 0, corner = 0.1}
 return s
 )lua";
-    char error[256] = {};
-    Scene* scene = nullptr;
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "around.lua", &scene, error, sizeof(error))
-          == Result::Success);
-    if (!scene) std::fprintf(stderr, "around.lua: %s\n", error);
+    auto scene = _loaded(source, "around.lua");
     if (scene) {
         auto rectangle = [&](const char* id) { return static_cast<Rectangle*>(scene->object(id)); };
         auto word = static_cast<Text*>(scene->object("word"));
@@ -310,12 +285,7 @@ local moved = s:bounds(dot)
 if not (near(moved.left, -1.5) and near(moved.right, -0.5)) then error("moved") end
 return s
 )lua";
-    char error[512] = {};
-    Scene* scene = nullptr;
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "bounds.lua", &scene, error, sizeof(error))
-          == Result::Success);
-    if (!scene) std::fprintf(stderr, "bounds.lua: %s\n", error);
-    delete scene;
+    delete _loaded(source, "bounds.lua");
 
     static constexpr auto prefix = "local s=vis.scene{}; ";
     char script[256];

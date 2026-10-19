@@ -6,31 +6,12 @@
 #include <type_traits>
 
 #include "vis_diagram.h"
+#include "testCheck.h"
 
 using namespace vis;
 using namespace vis::diagram;
 
 static_assert(!std::is_destructible_v<IR>);
-
-static int failures = 0;
-
-#define CHECK(condition)                                                                       \
-    do {                                                                                       \
-        if (!(condition)) {                                                                    \
-            std::fprintf(stderr, "%s:%d: check failed: %s\n", __FILE__, __LINE__, #condition); \
-            failures++;                                                                        \
-        }                                                                                      \
-    } while (false)
-
-static bool near(float lhs, float rhs, float epsilon = 1.0e-4f)
-{
-    return std::fabs(lhs - rhs) <= epsilon;
-}
-
-static bool same(Color lhs, Color rhs)
-{
-    return lhs.r == rhs.r && lhs.g == rhs.g && lhs.b == rhs.b && lhs.a == rhs.a;
-}
 
 static const ConstraintIssue* issue(const ConstraintReport& report, ConstraintCode code)
 {
@@ -2074,9 +2055,7 @@ static void sampledPhysicalConstraints()
 
     auto renderer = Renderer::gen();
     CHECK(renderer && renderer->font(VIS_TEST_FONT) == Result::Success);
-#ifdef VIS_TEST_MONO_FONT
     CHECK(renderer && renderer->font(VIS_TEST_MONO_FONT) == Result::Success);
-#endif
     if (renderer) {
         LayoutReport layout;
         PhysicalConstraintReport physical;
@@ -2193,9 +2172,7 @@ static void sampledPhysicalConstraints()
     if (built) {
         renderer = Renderer::gen();
         CHECK(renderer && renderer->font(VIS_TEST_FONT) == Result::Success);
-#ifdef VIS_TEST_MONO_FONT
         CHECK(renderer && renderer->font(VIS_TEST_MONO_FONT) == Result::Success);
-#endif
         if (renderer) {
             LayoutReport layout;
             PhysicalConstraintReport physical;
@@ -2263,5 +2240,5 @@ int main()
     rankBoundariesAndFiniteGeometry();
     invalidGraphs();
     sampledPhysicalConstraints();
-    return failures ? 1 : 0;
+    return report();
 }

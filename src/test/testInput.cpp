@@ -7,6 +7,7 @@
 #if defined(VIS_UI)
 #include "vis_ui.h"
 #endif
+#include "testCheck.h"
 
 using namespace vis;
 using namespace vis::input;
@@ -18,24 +19,14 @@ static_assert(!std::is_copy_constructible<State>::value,
 static_assert(!std::is_copy_constructible<ActionMap>::value,
               "Input ActionMap has unique ownership");
 
-static int failures = 0;
-
-#define CHECK(condition)                                                                       \
-    do {                                                                                       \
-        if (!(condition)) {                                                                    \
-            std::fprintf(stderr, "%s:%d: check failed: %s\n", __FILE__, __LINE__, #condition); \
-            failures++;                                                                        \
-        }                                                                                      \
-    } while (false)
-
-static bool near(float lhs, float rhs, float epsilon = 0.2f)
+static bool _near(float lhs, float rhs, float epsilon = 0.2f)
 {
     return std::fabs(lhs - rhs) <= epsilon;
 }
 
 static bool precise(float lhs, float rhs)
 {
-    return near(lhs, rhs, 1.0e-5f);
+    return _near(lhs, rhs, 1.0e-5f);
 }
 
 static InputEvent pointer(float x, float y, float time)
@@ -357,13 +348,13 @@ static void pointerFollow(Renderer* renderer)
     CHECK(result.handled && result.redraw && result.status == Result::Success);
     CHECK(renderer->bounds(scene, target, 0.2f, middle) == Result::Success);
     CHECK(renderer->bounds(scene, target, 0.4f, end) == Result::Success);
-    CHECK(near(middle.center().x, 125.0f) && near(middle.center().y, 37.5f));
-    CHECK(near(end.center().x, 150.0f) && near(end.center().y, 25.0f));
+    CHECK(_near(middle.center().x, 125.0f) && _near(middle.center().y, 37.5f));
+    CHECK(_near(end.center().x, 150.0f) && _near(end.center().y, 25.0f));
     CHECK(end.height > initial.height);
     BBox resampledMiddle;
     CHECK(renderer->bounds(scene, target, 0.2f, resampledMiddle) == Result::Success);
-    CHECK(near(resampledMiddle.center().x, middle.center().x));
-    CHECK(near(resampledMiddle.center().y, middle.center().y));
+    CHECK(_near(resampledMiddle.center().x, middle.center().x));
+    CHECK(_near(resampledMiddle.center().y, middle.center().y));
 
     CHECK(controller->input(pointer(50.0f, 75.0f, 0.4f)).handled);
     BBox beforeRetarget;
@@ -371,22 +362,22 @@ static void pointerFollow(Renderer* renderer)
     CHECK(renderer->bounds(scene, target, 0.5f, beforeRetarget) == Result::Success);
     CHECK(controller->input(pointer(100.0f, 50.0f, 0.5f)).handled);
     CHECK(renderer->bounds(scene, target, 0.5f, afterRetarget) == Result::Success);
-    CHECK(near(beforeRetarget.center().x, afterRetarget.center().x));
-    CHECK(near(beforeRetarget.center().y, afterRetarget.center().y));
+    CHECK(_near(beforeRetarget.center().x, afterRetarget.center().x));
+    CHECK(_near(beforeRetarget.center().y, afterRetarget.center().y));
     CHECK(renderer->bounds(scene, target, 0.9f, end) == Result::Success);
-    CHECK(near(end.center().x, 100.0f) && near(end.center().y, 50.0f));
+    CHECK(_near(end.center().x, 100.0f) && _near(end.center().y, 50.0f));
     BBox wrapped;
     CHECK(renderer->bounds(scene, target, 0.1f, wrapped) == Result::Success);
-    CHECK(near(wrapped.center().x, end.center().x));
-    CHECK(near(wrapped.center().y, end.center().y));
+    CHECK(_near(wrapped.center().x, end.center().x));
+    CHECK(_near(wrapped.center().y, end.center().y));
 
     auto cancel = pointer(100.0f, 50.0f, 1.0f);
     cancel.kind = InputKind::PointerCancel;
     result = controller->input(cancel);
     CHECK(result.handled && result.redraw);
     CHECK(renderer->bounds(scene, target, 1.4f, end) == Result::Success);
-    CHECK(near(end.center().x, initial.center().x) && near(end.center().y, initial.center().y));
-    for (auto i = 0u; i < 16u; i++) CHECK(near(target->model.e[i], authored.e[i], 1.0e-4f));
+    CHECK(_near(end.center().x, initial.center().x) && _near(end.center().y, initial.center().y));
+    for (auto i = 0u; i < 16u; i++) CHECK(_near(target->model.e[i], authored.e[i], 1.0e-4f));
 
     auto invalid = binding;
     invalid.period = -1.0f;
@@ -440,7 +431,7 @@ static void keyboard(Renderer* renderer)
     CHECK(renderer->bounds(scene, target, 1.1f, middle) == Result::Success);
     CHECK(renderer->bounds(scene, target, 1.2f, end) == Result::Success);
     CHECK(middle.center().x > initial.center().x && middle.center().x < end.center().x);
-    CHECK(near(end.center().x - initial.center().x, 25.0f));
+    CHECK(_near(end.center().x - initial.center().x, 25.0f));
 
     auto repeat = key(InputKind::KeyDown, Key::ArrowRight, 1.25f);
     repeat.repeat = true;
@@ -448,16 +439,16 @@ static void keyboard(Renderer* renderer)
     CHECK(result.handled && !result.redraw);
     BBox held;
     CHECK(renderer->bounds(scene, target, 1.4f, held) == Result::Success);
-    CHECK(near(held.center().x - initial.center().x, 50.0f));
+    CHECK(_near(held.center().x - initial.center().x, 50.0f));
     result = controller->input(key(InputKind::KeyUp, Key::ArrowRight, 1.4f));
     CHECK(result.handled && result.redraw);
     CHECK(renderer->bounds(scene, target, 1.6f, end) == Result::Success);
-    CHECK(near(end.center().x, held.center().x));
+    CHECK(_near(end.center().x, held.center().x));
 
     result = controller->input(key(InputKind::KeyDown, Key::A, 1.6f));
     CHECK(result.handled && result.redraw);
     CHECK(renderer->bounds(scene, target, 1.8f, end) == Result::Success);
-    CHECK(near(end.center().x - initial.center().x, 25.0f));
+    CHECK(_near(end.center().x - initial.center().x, 25.0f));
     result = controller->input(key(InputKind::KeyUp, Key::A, 1.8f));
     CHECK(result.handled && result.redraw);
 
@@ -466,7 +457,7 @@ static void keyboard(Renderer* renderer)
     result = controller->input(shortcut);
     CHECK(!result.handled && !result.redraw && result.status == Result::Success);
     CHECK(renderer->bounds(scene, target, 2.2f, end) == Result::Success);
-    CHECK(near(end.center().x - initial.center().x, 25.0f));
+    CHECK(_near(end.center().x - initial.center().x, 25.0f));
 
     KeyLog log;
     KeyTriggerBinding trigger;
@@ -487,19 +478,19 @@ static void keyboard(Renderer* renderer)
     CHECK(result.handled && !result.redraw);
     KeyState state;
     CHECK(controller->keyState(Key::B, state) == Result::Success);
-    CHECK(state.down && near(state.begin, 2.2f) && near(state.end, 2.2f));
+    CHECK(state.down && _near(state.begin, 2.2f) && _near(state.end, 2.2f));
     repeat = key(InputKind::KeyDown, Key::B, 2.3f);
     repeat.repeat = true;
     CHECK(controller->input(repeat).handled);
     CHECK(log.count == 1u);
     CHECK(controller->input(key(InputKind::KeyUp, Key::B, 2.6f)).handled);
     CHECK(controller->keyState(Key::B, state) == Result::Success);
-    CHECK(!state.down && near(state.begin, 2.2f) && near(state.end, 2.6f));
+    CHECK(!state.down && _near(state.begin, 2.2f) && _near(state.end, 2.6f));
     CHECK(log.count == 3u);
     CHECK(log.signals[0].trigger == KeyTrigger::Down);
     CHECK(log.signals[1].trigger == KeyTrigger::Up);
     CHECK(log.signals[2].trigger == KeyTrigger::Tap);
-    CHECK(near(log.signals[2].begin, 2.2f) && near(log.signals[2].end, 2.6f));
+    CHECK(_near(log.signals[2].begin, 2.2f) && _near(log.signals[2].end, 2.6f));
     CHECK(controller->keyState(Key::Unknown, state) == Result::InvalidArguments);
 
     CHECK(controller->input(key(InputKind::KeyDown, Key::ArrowRight, 2.8f)).handled);
@@ -603,6 +594,5 @@ int main()
     uiComposition();
 #endif
     delete renderer;
-    if (failures) std::fprintf(stderr, "%d input test(s) failed\n", failures);
-    return failures ? 1 : 0;
+    return report();
 }

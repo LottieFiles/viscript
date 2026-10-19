@@ -29,10 +29,7 @@ s:at(2.25, function() s:clone(r, {id = "grid_before"}) end)
 s:at(2.75, function() s:clone(r, {id = "grid_after"}) end)
 return s
 )lua";
-    char error[512] = {};
-    Scene* scene = nullptr;
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "function-play.lua", &scene, error, sizeof(error)) == Result::Success);
-    if (!scene) std::fprintf(stderr, "function-play.lua: %s\n", error);
+    auto scene = _loaded(source, "function-play.lua");
     if (scene) {
         auto plot = [&](const char* id) { return static_cast<Plot*>(scene->object(id)); };
         auto at = [](const Plot* plot, float x, float y) {
@@ -84,11 +81,7 @@ s:clone(graph, {id = "baked", opacity = 0})
 finished = true
 return s
 )lua";
-    char error[512] = {};
-    Scene* scene = nullptr;
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "animated-poles.lua", &scene,
-                    error, sizeof(error)) == Result::Success);
-    if (!scene) std::fprintf(stderr, "animated-poles.lua: %s\n", error);
+    auto scene = _loaded(source, "animated-poles.lua");
     if (!scene) return;
     auto graph = static_cast<Plot*>(scene->object("graph"));
     auto samples = graph->samples();
@@ -162,11 +155,7 @@ s:play({target = twin, fn = shifted(-1)}, 1)
 s:plot {id = "before", fn = shifted(-1), x_range = {-3, 3, 0.05}, y_range = {-4, 4}}
 return s
 )lua";
-    char error[512] = {};
-    Scene* scene = nullptr;
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "replot.lua", &scene, error, sizeof(error))
-          == Result::Success);
-    if (!scene) std::fprintf(stderr, "replot.lua: %s\n", error);
+    auto scene = _loaded(source, "replot.lua");
     if (scene) {
         auto plot = [&](const char* id) {
             auto object = scene->object(id);
@@ -268,10 +257,7 @@ return s
                                     "s:play({target = p, fn = zero, x_range = {0, 1, 1 / 40000}}, 0.1) ";
     char room[1024];
     std::snprintf(room, sizeof(room), "%sreturn s", growing);
-    scene = nullptr;
-    CHECK(Lua::load(room, static_cast<uint32_t>(std::strlen(room)), "room.lua", &scene, error, sizeof(error))
-          == Result::Success);
-    if (!scene) std::fprintf(stderr, "room.lua: %s\n", error);
+    scene = _loaded(room, "room.lua");
     delete scene;
     std::snprintf(room, sizeof(room), "%ss:play({target = p, fn = zero, x_range = {0, 1, 1 / 60000}}, 0.1) return s",
                   growing);
@@ -292,11 +278,7 @@ s:bind(l, x, function(t) return {to = {4, 6 * t}, trim_distance = {1 + t, 2 - t}
 s:track(x, 1, 1, "linear")
 return s
 )lua";
-    Scene* scene = nullptr;
-    char error[512] = {};
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "trim-distance.lua", &scene, error, sizeof(error))
-          == Result::Success);
-    if (!scene) std::fprintf(stderr, "trim-distance.lua: %s\n", error);
+    auto scene = _loaded(source, "trim-distance.lua");
     if (scene) {
         auto line = static_cast<Line*>(scene->object("line"));
         auto arrow = static_cast<Arrow*>(scene->object("arrow"));

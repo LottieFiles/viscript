@@ -18,11 +18,7 @@ s:rectangle {size = {w, h}, id = "box"}
 s:rectangle {size = {pw, ph}, id = "plane-box"}
 return s
 )lua";
-    char error[256] = {};
-    Scene* scene = nullptr;
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "measure.lua", &scene, error, sizeof(error))
-          == Result::Success);
-    if (!scene) std::fprintf(stderr, "measure.lua: %s\n", error);
+    auto scene = _loaded(source, "measure.lua");
     if (scene) {
         auto label = static_cast<Text*>(scene->object("label"));
         auto box = static_cast<Rectangle*>(scene->object("box"));
@@ -69,10 +65,7 @@ local late = s:text {text = "late", point = {0, -2}, measure = true, id = "late"
 s:play({target = late, opacity = 0.5}, 0.5)
 return s
 )lua";
-    scene = nullptr;
-    CHECK(Lua::load(boxed, static_cast<uint32_t>(std::strlen(boxed)), "boxed.lua", &scene, error, sizeof(error))
-          == Result::Success);
-    if (!scene) std::fprintf(stderr, "boxed.lua: %s\n", error);
+    scene = _loaded(boxed, "boxed.lua");
     if (scene) {
         auto pixelWorld = scene->config().camera.orthoHeight / static_cast<float>(scene->config().height);
         auto wide = static_cast<Text*>(scene->object("wide"));
@@ -180,11 +173,7 @@ s:parallel(
     function() s:scale(stretched, {3, 1.5}, {duration = 1}) end)
 return s
 )lua";
-    char error[256] = {};
-    Scene* scene = nullptr;
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "scaled-texts.lua", &scene, error,
-                    sizeof(error)) == Result::Success);
-    if (!scene) std::fprintf(stderr, "scaled-texts.lua: %s\n", error);
+    auto scene = _loaded(source, "scaled-texts.lua");
     if (!scene) return;
     auto near = [](float value, float expected) { return std::fabs(value - expected) <= 2.0f; };
     // A billboard grows with a scale of its own or of a group above it, and a turn keeps its size.
@@ -225,11 +214,7 @@ s:text {text = "b", point = {0, 2}, size = 48, slant = 0.25, id = "bowl"}
 s:shift(leaning, {0, 1}, 1)
 return s
 )lua";
-    char error[256] = {};
-    Scene* scene = nullptr;
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "slanted.lua", &scene, error,
-                    sizeof(error)) == Result::Success);
-    if (!scene) std::fprintf(stderr, "slanted.lua: %s\n", error);
+    auto scene = _loaded(source, "slanted.lua");
     if (!scene) return;
     auto pixels = 1.0f / (scene->config().camera.orthoHeight / static_cast<float>(scene->config().height));
     BBox upright;
@@ -326,11 +311,7 @@ local late = s:spans {"late words", split = "words", size = 28, point = {0, -3},
 s:write(late:children(), 1, "smooth", 0.2)
 return s
 )lua";
-    char error[256] = {};
-    Scene* scene = nullptr;
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "spans.lua", &scene, error, sizeof(error))
-          == Result::Success);
-    if (!scene) std::fprintf(stderr, "spans.lua: %s\n", error);
+    auto scene = _loaded(source, "spans.lua");
     if (scene) {
         // The blank a space leaves and the line a row takes, in the row's size.
         auto blank = Text::gen(" ");
@@ -510,11 +491,7 @@ s:spans {"g\n", {"H", size = 84}, "\nx", leading = 1, size = 28, point = {-300, 
 s:spans {"a", {"b", rise = -1}, "\nc", leading = 1, size = 28, point = {300, 0}, id = "risen"}
 return s
 )lua";
-    char error[256] = {};
-    Scene* scene = nullptr;
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "spans-leading.lua", &scene, error,
-                    sizeof(error)) == Result::Success);
-    if (!scene) std::fprintf(stderr, "spans-leading.lua: %s\n", error);
+    auto scene = _loaded(source, "spans-leading.lua");
     if (scene) {
         auto blank = _inkOf(scene, " ", 28.0f);
         auto lineHeight = blank.ascent + blank.descent;
@@ -594,11 +571,7 @@ s:spans {"one two", {"three", size = 40}, "\nfour", split = "words", point = {30
 s:spans {"x\ny", point = {300, -100}, size = 28, baseline = true, leading = 2, align = {1, 0}, id = "led"}
 return s
 )lua";
-    char error[256] = {};
-    Scene* scene = nullptr;
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "baselines.lua", &scene, error, sizeof(error))
-          == Result::Success);
-    if (!scene) std::fprintf(stderr, "baselines.lua: %s\n", error);
+    auto scene = _loaded(source, "baselines.lua");
     if (scene) {
         CHECK(std::fabs(_firstBaseline(scene, "plain") - 100.0f) < 1.0e-3f);
         CHECK(std::fabs(_firstBaseline(scene, "big") - 100.0f) < 1.0e-3f);
@@ -643,9 +616,7 @@ s:matrix{rows={{1,"9"}},tabular=true,reserve="0000",id="m"}
 s:play({target=n,value=1000},1,"linear")
 return s
 )lua";
-        Scene* scene = nullptr;
-        char error[256] = {};
-        CHECK(Lua::load(source, std::strlen(source), "tabular.lua", &scene, error, sizeof(error)) == Result::Success);
+        auto scene = _loaded(source, "tabular.lua");
         if (scene) {
             auto n = static_cast<Text*>(scene->object("n"));
             TextExtent one, nine;
@@ -681,11 +652,7 @@ s:play({target = counter, value = 1000}, 2, "linear")
 s:track(x, 1.5, 1, "linear")
 return s
 )lua";
-    char error[256] = {};
-    Scene* scene = nullptr;
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "number.lua", &scene, error, sizeof(error))
-          == Result::Success);
-    if (!scene) std::fprintf(stderr, "number.lua: %s\n", error);
+    auto scene = _loaded(source, "number.lua");
     if (scene) {
         auto counter = static_cast<Text*>(scene->object("counter"));
         auto label = static_cast<Text*>(scene->object("label"));
@@ -743,11 +710,7 @@ s:set {target = start, text = "done"}
 s:play({target = word, text = ""}, 1, "linear")
 return s
 )lua";
-    char error[512] = {};
-    Scene* scene = nullptr;
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "text.lua", &scene, error, sizeof(error))
-          == Result::Success);
-    if (!scene) std::fprintf(stderr, "text.lua: %s\n", error);
+    auto scene = _loaded(source, "text.lua");
     if (scene) {
         // Characters turn from the left while the length grows, and the fade overlaps them.
         CHECK(std::strcmp(_shows(scene, "word", 0.0f), "cat") == 0);
@@ -797,11 +760,9 @@ return s
     _scriptError("local s=vis.scene{}; local x=s:tracker(0); local t=s:text{text='7'}; "
                  "s:bind(t, x, function(v) return {text='a'} end); return s",
                  "a bound state cannot set 'text'");
-#ifdef VIS_TEST_FONT
     _scriptError("local s=vis.scene{}; local r=s:spans{'a ', 'b', size=28}; s:play({target=r, text='c'}, 1); "
                  "return s",
                  "text changes one text, and a spans row or other block of texts holds several");
-#endif
 }
 
 // A text without a box counts with its glyphs as the scene sets them, so the frame of a
@@ -815,12 +776,7 @@ s:text {id = "twin", text = "word", point = {1, -2}, size = 28, measure = true}
 s:circumscribe(word, {padding = 0, width = 1})
 return s
 )lua";
-    char error[256] = {};
-    Scene* scene = nullptr;
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "frame-text.lua", &scene, error,
-                    sizeof(error))
-          == Result::Success);
-    if (!scene) std::fprintf(stderr, "frame-text.lua: %s\n", error);
+    auto scene = _loaded(source, "frame-text.lua");
     if (scene) {
         auto frame = scene->object("word.circumscribe.1.frame");
         auto twin = scene->object("twin");
@@ -890,11 +846,7 @@ local inner = holder:rectangle {center = {0, -100}, size = {10, 4}}
 if not sides(s:bounds(holder:brace {around = inner, offset = 1, depth = 2}), -10, 10, -210, -206) then error("group") end
 return s
 )lua";
-    char error[512] = {};
-    Scene* scene = nullptr;
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "brace.lua", &scene, error, sizeof(error))
-          == Result::Success);
-    if (!scene) std::fprintf(stderr, "brace.lua: %s\n", error);
+    auto scene = _loaded(source, "brace.lua");
     if (scene) {
         auto under = scene->object("under");
         CHECK(under && under->type() == Type::Path && static_cast<Path*>(under)->closed());
@@ -962,9 +914,7 @@ s:matrix{rows={{1},{2}},reserve="-000.00",id="u"}
 s:play({target=n,value=12345678},1,"linear")
 return s
 )lua";
-        Scene* reserved = nullptr;
-        char error[256] = {};
-        CHECK(Lua::load(source, std::strlen(source), "reserved.lua", &reserved, error, sizeof(error)) == Result::Success);
+        auto reserved = _loaded(source, "reserved.lua");
         if (reserved) {
             auto n = static_cast<Text*>(reserved->object("n"));
             TextExtent sample;
@@ -998,11 +948,7 @@ if #m:column(2) ~= 3 or m:column(2)[3] ~= s:find("m/3/2") then error("a column")
 s:play({target = m:entry(2, 3), value = 7}, 1)
 return s
 )lua";
-    char error[256] = {};
-    Scene* scene = nullptr;
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "matrix.lua", &scene, error, sizeof(error))
-          == Result::Success);
-    if (!scene) std::fprintf(stderr, "matrix.lua: %s\n", error);
+    auto scene = _loaded(source, "matrix.lua");
     if (scene) {
         auto text = [&](const char* id) { return static_cast<Text*>(scene->object(id)); };
         auto path = [&](const char* id) { return static_cast<Path*>(scene->object(id)); };
@@ -1047,7 +993,7 @@ return s
             CHECK(_near(points[0].x - points[1].x, 0.3f * line) && _near(points[1].x, box.min.x));
             CHECK(_near(left(a) - points[0].x, 0.3f * line) && _near(points[0].y, top(a) + 0.15f * line));
             CHECK(_near(bracket->style.width, 2.0f));
-            CHECK(_sameColor(bracket->style.stroke, scene->theme().text.color));
+            CHECK(same(bracket->style.stroke, scene->theme().text.color));
         }
         auto right = path("m/right");
         CHECK(right && right->count() == 4u && right->points()[1].x > right->points()[0].x);
@@ -1059,20 +1005,20 @@ return s
             auto points = paren->points();
             auto middle = points[paren->count() / 2u];
             CHECK(middle.x < points[0].x - 0.2f * line);
-            CHECK(_sameColor(paren->style.stroke, Color{0, 0, 255, 255}));
+            CHECK(same(paren->style.stroke, Color{0, 0, 255, 255}));
         }
         auto first = text("r/1/1");
         auto last = text("r/2/2");
         auto widest = text("r/2/1");
         CHECK(first && _near(first->align.x, 0.0f) && widest && _near(left(first), left(widest)));
         CHECK(last && _near(last->align.x, 1.0f));
-        CHECK(first && _sameColor(first->style.fill, Color{0, 0, 255, 255}));
+        CHECK(first && same(first->style.fill, Color{0, 0, 255, 255}));
         if (first && widest) CHECK(_near(top(first) - widest->box.y - 0.2f, top(widest)));
 
         // A bar is one stroke; decimals set every number, and none leaves the rows alone.
         auto bar = path("b/right");
         CHECK(bar && bar->count() == 2u && _near(bar->style.width, 3.0f));
-        CHECK(bar && _sameColor(bar->style.stroke, Color{255, 0, 0, 255}));
+        CHECK(bar && same(bar->style.stroke, Color{255, 0, 0, 255}));
         CHECK(text("b/1/1") && std::strcmp(text("b/1/1")->text(), "0.5") == 0);
         CHECK(text("b/1/2") && std::strcmp(text("b/1/2")->text(), "2.25") == 0);
         auto lone = scene->object("n");
@@ -1122,11 +1068,7 @@ if #t:column(1) ~= 4 or #t:children() ~= 7 then error("the header is the first r
 s:play({target = s:find("bare/1/1"), value = 16}, 1)
 return s
 )lua";
-    char error[256] = {};
-    Scene* scene = nullptr;
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "table.lua", &scene, error, sizeof(error))
-          == Result::Success);
-    if (!scene) std::fprintf(stderr, "table.lua: %s\n", error);
+    auto scene = _loaded(source, "table.lua");
     if (scene) {
         auto& theme = scene->theme();
         auto text = [&](const char* id) { return static_cast<Text*>(scene->object(id)); };
@@ -1145,7 +1087,7 @@ return s
         // The header takes the accent color, and numbers count.
         auto head = text("t/1/1");
         CHECK(head && std::strcmp(head->text(), "n") == 0);
-        CHECK(head && _sameColor(head->style.fill, theme.color(ThemeColorRole::Accent)));
+        CHECK(head && same(head->style.fill, theme.color(ThemeColorRole::Accent)));
         auto one = text("t/2/1");
         CHECK(one && one->counting() && _near(one->value(), 1.0f));
         // Cells tile: each is its column's widest entry and the padding wide, and a line
@@ -1174,7 +1116,7 @@ return s
         CHECK(stripe && stripe->type() == Type::Rectangle && stripe->layer == -1);
         if (stripe && below) {
             auto band = static_cast<Rectangle*>(stripe);
-            CHECK(_sameColor(band->style.fill, theme.color(ThemeColorRole::Surface)) && band->style.stroke.a == 0);
+            CHECK(same(band->style.fill, theme.color(ThemeColorRole::Surface)) && band->style.stroke.a == 0);
             CHECK(_near(band->center.y, top(below) - 0.5f * below->box.y) && _near(band->size.x, box.max.x - box.min.x));
         }
         auto rule = table ? table->childAt(5u) : nullptr;
@@ -1182,7 +1124,7 @@ return s
         if (rule && one) {
             auto ruled = static_cast<Line*>(rule);
             CHECK(_near(ruled->from.y, top(one)) && _near(ruled->to.y, top(one)) && _near(ruled->from.x, box.min.x));
-            CHECK(_sameColor(ruled->style.stroke, theme.color(ThemeColorRole::Foreground)));
+            CHECK(same(ruled->style.stroke, theme.color(ThemeColorRole::Foreground)));
             CHECK(_near(ruled->style.width, 1.5f));
         }
         auto column = table ? table->childAt(6u) : nullptr;
@@ -1191,7 +1133,7 @@ return s
             auto ruled = static_cast<Line*>(column);
             CHECK(_near(ruled->from.x, left(beside)));
             CHECK(_near(ruled->from.y, box.max.y) && _near(ruled->to.y, box.min.y));
-            CHECK(_sameColor(ruled->style.stroke, theme.color(ThemeColorRole::Border)));
+            CHECK(same(ruled->style.stroke, theme.color(ThemeColorRole::Border)));
             CHECK(_near(ruled->style.width, 1.0f));
         }
 
@@ -1201,16 +1143,16 @@ return s
         CHECK(grid && grid->childCount() == 9u);
         if (grid && grid->childCount() == 9u) {
             CHECK(grid->childAt(2u)->type() == Type::Rectangle && grid->childAt(2u)->layer == 1);
-            CHECK(_sameColor(grid->childAt(2u)->style.fill, Color{0, 255, 0, 255}));
+            CHECK(same(grid->childAt(2u)->style.fill, Color{0, 255, 0, 255}));
             for (auto i = 3u; i < 9u; i++) {
                 CHECK(grid->childAt(i)->type() == Type::Line && grid->childAt(i)->layer == 2);
-                CHECK(_sameColor(grid->childAt(i)->style.stroke, Color{255, 0, 0, 255}));
+                CHECK(same(grid->childAt(i)->style.stroke, Color{255, 0, 0, 255}));
                 CHECK(_near(grid->childAt(i)->style.width, 3.0f));
             }
         }
         auto a = text("g/1/1");
         auto d = text("g/2/2");
-        CHECK(a && a->layer == 2 && _sameColor(a->style.fill, Color{0, 0, 255, 255}));
+        CHECK(a && a->layer == 2 && same(a->style.fill, Color{0, 0, 255, 255}));
         if (a && d) {
             TextExtent glyphs;
             CHECK(scene->measure(a, glyphs) == Result::Success);

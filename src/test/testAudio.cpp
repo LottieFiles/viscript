@@ -9,28 +9,14 @@
 #include "vis_lua_runtime.h"
 #include "visLuaHost.h"
 #endif
+#include "testCheck.h"
 
 using namespace vis;
 using namespace vis::audio;
 
-static int failures = 0;
-
-#define CHECK(condition)                                                                       \
-    do {                                                                                       \
-        if (!(condition)) {                                                                    \
-            std::fprintf(stderr, "%s:%d: check failed: %s\n", __FILE__, __LINE__, #condition); \
-            failures++;                                                                        \
-        }                                                                                      \
-    } while (false)
-
 static constexpr uint32_t SampleRate = 8000u;
 static constexpr uint32_t SampleCount = 800u;
 static constexpr uint32_t WavSize = 44u + SampleCount;
-
-static bool _near(float lhs, float rhs, float epsilon = 1.0e-4f)
-{
-    return std::fabs(lhs - rhs) <= epsilon;
-}
 
 static void _word(uint8_t* output, uint16_t value)
 {
@@ -76,7 +62,7 @@ static void soundscape()
     CHECK(soundscape->type() == Type::Group);
     CHECK(soundscape->scene() == scene);
     CHECK(scene->object(soundscape->id()) == soundscape);
-    CHECK(soundscape->count() == 0u && _near(soundscape->duration(), 0.0f));
+    CHECK(soundscape->count() == 0u && near(soundscape->duration(), 0.0f));
 
     Cue cue;
     CueConfig invalid;
@@ -120,19 +106,19 @@ static void soundscape()
     effect.gain = 0.5f;
     Cue effectCue;
     CHECK(soundscape->cue(effect, effectCue) == Result::Success && effectCue);
-    CHECK(soundscape->count() == 2u && _near(soundscape->duration(), 4.0f));
+    CHECK(soundscape->count() == 2u && near(soundscape->duration(), 4.0f));
 
     float value = 0.0f;
     CHECK(soundscape->sample(musicCue, 0.0f, value) == Result::Success);
-    CHECK(_near(value, 0.8f));
+    CHECK(near(value, 0.8f));
     CHECK(soundscape->gain(musicCue, 0.4f, 1.0f, 2.0f, Easing::Linear)
           == Result::Success);
     CHECK(soundscape->sample(musicCue, 1.0f, value) == Result::Success);
-    CHECK(_near(value, 0.8f));
+    CHECK(near(value, 0.8f));
     CHECK(soundscape->sample(musicCue, 2.0f, value) == Result::Success);
-    CHECK(_near(value, 0.6f));
+    CHECK(near(value, 0.6f));
     CHECK(soundscape->sample(musicCue, 3.0f, value) == Result::Success);
-    CHECK(_near(value, 0.4f));
+    CHECK(near(value, 0.4f));
 
     CHECK(soundscape->gain(musicCue, 0.7f, 2.0f, 1.0f, Easing::Linear)
           == Result::InvalidArguments);
@@ -149,9 +135,9 @@ static void soundscape()
 
     auto curve = AnimCurve::preset(AnimCurvePreset::Smooth);
     CHECK(soundscape->gain(musicCue, 1.0f, 5.0f, 1.0f, curve) == Result::Success);
-    CHECK(_near(soundscape->duration(), 6.0f));
+    CHECK(near(soundscape->duration(), 6.0f));
     CHECK(soundscape->sample(musicCue, 6.0f, value) == Result::Success);
-    CHECK(_near(value, 1.0f));
+    CHECK(near(value, 1.0f));
     CHECK(scene->duration() == 0.0f);
     delete scene;
 }
@@ -312,8 +298,8 @@ static float _level(uint32_t index)
 
 static bool _stereo(const float* output, uint32_t frame, float expected, float epsilon = 1.0e-5f)
 {
-    return _near(output[frame * 2u], expected, epsilon)
-        && _near(output[frame * 2u + 1u], expected, epsilon);
+    return near(output[frame * 2u], expected, epsilon)
+        && near(output[frame * 2u + 1u], expected, epsilon);
 }
 
 static void mixing()
@@ -463,10 +449,10 @@ return scene
         CHECK(soundscape->count() == 1u);
         CueConfig cue;
         CHECK(soundscape->cueAt(0u, cue));
-        CHECK(cue.bus == Bus::Music && cue.loop && _near(cue.end, 4.0f));
+        CHECK(cue.bus == Bus::Music && cue.loop && near(cue.end, 4.0f));
         auto value = 0.0f;
         CHECK(soundscape->sample({0u}, 1.5f, value) == Result::Success);
-        CHECK(_near(value, 0.5f));
+        CHECK(near(value, 0.5f));
     }
     delete scene;
 
@@ -526,6 +512,5 @@ int main()
 #if defined(VIS_LUA_RUNTIME)
     retainedLua();
 #endif
-    if (failures) std::fprintf(stderr, "%d audio test(s) failed\n", failures);
-    return failures ? 1 : 0;
+    return report();
 }

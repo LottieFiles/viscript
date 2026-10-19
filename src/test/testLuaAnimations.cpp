@@ -17,11 +17,7 @@ s:parallel(
 s:wiggle(box)
 return s
 )lua";
-    char error[256] = {};
-    Scene* scene = nullptr;
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "wiggle.lua", &scene, error, sizeof(error))
-          == Result::Success);
-    if (!scene) std::fprintf(stderr, "wiggle.lua: %s\n", error);
+    auto scene = _loaded(source, "wiggle.lua");
     if (scene) {
         auto box = scene->object("box");
         CHECK(_near(scene->duration(), 4.0f));
@@ -57,11 +53,7 @@ s:parallel(
     function() s:circumscribe(box, {shape = "ellipse", color = "#ff0000", duration = 1.5}) end)
 return s
 )lua";
-    scene = nullptr;
-    CHECK(Lua::load(framing, static_cast<uint32_t>(std::strlen(framing)), "circumscribe.lua", &scene, error,
-                    sizeof(error))
-          == Result::Success);
-    if (!scene) std::fprintf(stderr, "circumscribe.lua: %s\n", error);
+    scene = _loaded(framing, "circumscribe.lua");
     if (scene) {
         auto first = scene->object("box.circumscribe.1.frame");
         auto ellipse = scene->object("box.circumscribe.2.frame");
@@ -100,11 +92,7 @@ s:parallel(
     function() s:passing_flash(edge, {color = "#ff0000", width = 2, window = 0.2, curve = "linear"}) end)
 return s
 )lua";
-    scene = nullptr;
-    CHECK(Lua::load(passing, static_cast<uint32_t>(std::strlen(passing)), "passing.lua", &scene, error,
-                    sizeof(error))
-          == Result::Success);
-    if (!scene) std::fprintf(stderr, "passing.lua: %s\n", error);
+    scene = _loaded(passing, "passing.lua");
     if (scene) {
         auto flash = scene->object("edge.passing_flash.1.flash");
         CHECK(_near(scene->duration(), 2.0f) && scene->count() == 5u);
@@ -137,11 +125,7 @@ s:parallel(
     function() s:flash({-3, -3}, {lines = 6, color = "#ff0000"}) end)
 return s
 )lua";
-    scene = nullptr;
-    CHECK(Lua::load(bursting, static_cast<uint32_t>(std::strlen(bursting)), "flash.lua", &scene, error,
-                    sizeof(error))
-          == Result::Success);
-    if (!scene) std::fprintf(stderr, "flash.lua: %s\n", error);
+    scene = _loaded(bursting, "flash.lua");
     if (scene) {
         auto line = scene->object("box.flash.1.1");
         auto spark = scene->object("flash.1.6");
@@ -176,11 +160,7 @@ s:parallel(
     function() s:wait(1); s:ripple(box, {padding = 0.5, color = "#ff0000", curve = "linear"}) end)
 return s
 )lua";
-    scene = nullptr;
-    CHECK(Lua::load(rippling, static_cast<uint32_t>(std::strlen(rippling)), "ripple.lua", &scene, error,
-                    sizeof(error))
-          == Result::Success);
-    if (!scene) std::fprintf(stderr, "ripple.lua: %s\n", error);
+    scene = _loaded(rippling, "ripple.lua");
     if (scene) {
         auto first = scene->object("box.ripple.1.ring");
         auto second = scene->object("box.ripple.2.ring");
@@ -324,13 +304,7 @@ if math.abs(scene:duration() - 4.75) > 0.0001 then error("animation duration mis
 return scene
 )lua";
 
-    char error[1024] = {};
-    Scene* scene = nullptr;
-    auto status = Lua::load(source, static_cast<uint32_t>(std::strlen(source)),
-                            "animation-methods.lua", &scene, error, sizeof(error));
-    CHECK(status == Result::Success);
-    CHECK(scene != nullptr);
-    if (status != Result::Success) std::fprintf(stderr, "animation-methods.lua: %s\n", error);
+    auto scene = _loaded(source, "animation-methods.lua");
     if (scene) {
         CHECK(scene->count() == 19u);
         CHECK(_near(scene->duration(), 4.75f));
@@ -341,21 +315,9 @@ return scene
         CHECK(scene->object("batch-target-b") != nullptr);
         Surface surface;
         CHECK(renderer->render(scene, scene->duration(), surface) == Result::Success);
-        CHECK(_changed(surface, scene->config().background) > 100u);
+        CHECK(changed(surface, scene->config().background) > 100u);
     }
     delete scene;
-}
-
-static uint64_t _surfaceHash(const Surface& surface)
-{
-    auto hash = uint64_t{1469598103934665603ull};
-    for (auto y = 0u; y < surface.height(); y++) {
-        for (auto x = 0u; x < surface.width(); x++) {
-            hash ^= surface.data()[static_cast<size_t>(y) * surface.stride() + x];
-            hash *= 1099511628211ull;
-        }
-    }
-    return hash;
 }
 
 void _dashTimeline(Renderer* renderer)
@@ -372,13 +334,7 @@ local flow = scene:line {
 scene:play({target = flow, dash_offset = -32}, 1, "linear")
 return scene
 )lua";
-    char error[1024] = {};
-    Scene* scene = nullptr;
-    auto status = Lua::load(source, sizeof(source) - 1u, "dash-timeline.lua", &scene,
-                            error, sizeof(error));
-    CHECK(status == Result::Success);
-    CHECK(scene != nullptr);
-    if (status != Result::Success) std::fprintf(stderr, "dash-timeline.lua: %s\n", error);
+    auto scene = _loaded(source, "dash-timeline.lua");
     if (scene) {
         auto flow = scene->object("flow");
         CHECK(flow != nullptr);
@@ -386,9 +342,9 @@ return scene
         Surface middle;
         Surface end;
         CHECK(renderer->render(scene, 0.5f, middle) == Result::Success);
-        auto middleChecksum = _surfaceHash(middle);
+        auto middleChecksum = checksum(middle);
         CHECK(renderer->render(scene, 1.0f, end) == Result::Success);
-        auto endChecksum = _surfaceHash(end);
+        auto endChecksum = checksum(end);
         CHECK(middleChecksum != endChecksum);
     }
     delete scene;
@@ -418,13 +374,8 @@ s:scale(box, 2, {about = {-3.5, -0.5}})
 s:move_along({dot, car}, ring, {from = 1, to = 0.5, lag = 0.5})
 return s
 )lua";
-    char error[512] = {};
-    Scene* scene = nullptr;
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "motion.lua", &scene, error, sizeof(error)) == Result::Success);
-    if (!scene) {
-        std::fprintf(stderr, "motion.lua: %s\n", error);
-        return;
-    }
+    auto scene = _loaded(source, "motion.lua");
+    if (!scene) return;
     CHECK(std::fabs(scene->duration() - 3.5f) < 1.0e-4f);
     auto near = [](float value, float expected) { return std::fabs(value - expected) < 0.6f; };
     BBox bounds;
@@ -458,10 +409,7 @@ s:rotate(dot, math.pi, {duration = 1})
 s:at(2.5, function() s:set {target = dot, shift = {0, 1}} end)
 return s
 )lua";
-    scene = nullptr;
-    CHECK(Lua::load(layered, static_cast<uint32_t>(std::strlen(layered)), "layered.lua", &scene, error, sizeof(error))
-          == Result::Success);
-    if (!scene) std::fprintf(stderr, "layered.lua: %s\n", error);
+    scene = _loaded(layered, "layered.lua");
     if (scene) {
         CHECK(std::fabs(scene->duration() - 3.0f) < 1.0e-4f);
         CHECK(renderer->bounds(scene, scene->object("dot"), 1.0f, bounds) == Result::Success);
@@ -491,10 +439,7 @@ s:shift(bar, {0, -1}, 1, "linear")
 s:at(2.5, function() s:set {target = bar, transform = {1, 0, 0, 4, 0, 1, 0, -1, 0, 0, 1, 0, 0, 0, 0, 1}} end)
 return s
 )lua";
-    scene = nullptr;
-    CHECK(Lua::load(turned, static_cast<uint32_t>(std::strlen(turned)), "turned.lua", &scene, error, sizeof(error))
-          == Result::Success);
-    if (!scene) std::fprintf(stderr, "turned.lua: %s\n", error);
+    scene = _loaded(turned, "turned.lua");
     if (scene) {
         CHECK(renderer->bounds(scene, scene->object("bar"), 1.0f, bounds) == Result::Success);
         CHECK(near(bounds.center().x, 80.0f) && near(bounds.center().y, 40.0f));
@@ -524,10 +469,7 @@ s:parallel(
     end)
 return s
 )lua";
-    scene = nullptr;
-    CHECK(Lua::load(morphed, static_cast<uint32_t>(std::strlen(morphed)), "morphed.lua", &scene, error, sizeof(error))
-          == Result::Success);
-    if (!scene) std::fprintf(stderr, "morphed.lua: %s\n", error);
+    scene = _loaded(morphed, "morphed.lua");
     if (scene) {
         CHECK(renderer->bounds(scene, scene->object("dot"), 1.0f, bounds) == Result::Success);
         CHECK(near(bounds.center().x, 80.0f) && near(bounds.center().y, 40.0f));
@@ -552,10 +494,7 @@ s:parallel(
     end)
 return s
 )lua";
-    scene = nullptr;
-    CHECK(Lua::load(tracked, static_cast<uint32_t>(std::strlen(tracked)), "tracked.lua", &scene, error, sizeof(error))
-          == Result::Success);
-    if (!scene) std::fprintf(stderr, "tracked.lua: %s\n", error);
+    scene = _loaded(tracked, "tracked.lua");
     if (scene) {
         CHECK(renderer->bounds(scene, scene->object("dot"), 1.0f, bounds) == Result::Success);
         CHECK(near(bounds.center().x, 80.0f) && near(bounds.center().y, 40.0f) && near(bounds.width, 30.0f));
@@ -581,9 +520,7 @@ s:parallel(
     function() s:move_along(token, edge, {from = 1, to = 0, duration = 1, curve = "linear"}) end)
 return s
 )lua";
-    scene = nullptr;
-    CHECK(Lua::load(connected, static_cast<uint32_t>(std::strlen(connected)), "connected.lua", &scene,
-                    error, sizeof(error)) == Result::Success);
+    scene = _loaded(connected, "connected.lua");
     if (scene) {
         LayoutReport report;
         CHECK(renderer->layout(scene, 0.25f, report) == Result::Success);
@@ -610,16 +547,11 @@ return s
             CHECK(std::fabs(bounds.center().x - (100 + 20 * dx * distance / length)) < 0.01f);
             CHECK(std::fabs(bounds.center().y - (100 - 60 * distance / length)) < 0.01f);
         }
-    } else std::fprintf(stderr, "connected.lua: %s\n", error);
+    }
     delete scene;
-    static constexpr auto cyclic = "local s=vis.scene{} local a=s:circle{} "
-                                  "local b=s:circle{center={3,3}} local k=s:connector{from=a,to=b} "
-                                  "s:move_along(a,k) return s";
-    scene = nullptr;
-    CHECK(Lua::load(cyclic, static_cast<uint32_t>(std::strlen(cyclic)), "cyclic.lua", &scene,
-                    error, sizeof(error)) == Result::ScriptError);
-    CHECK(std::strstr(error, "an endpoint cannot move along its connector"));
-    delete scene;
+    _scriptError("local s=vis.scene{} local a=s:circle{} local b=s:circle{center={3,3}} "
+                 "local k=s:connector{from=a,to=b} s:move_along(a,k) return s",
+                 "an endpoint cannot move along its connector");
 
     _error("local s = vis.scene {} local a = s:rectangle {} local t = s:text {text = 'x'} "
            "s:move_along(a, t) return s", "move-along-text.lua");
@@ -668,11 +600,7 @@ s:set {target = card, layer = 0}
 s:play({target = low, layer = -1, shift = {0, 0.5}}, 1)
 return s
 )lua";
-    char error[512] = {};
-    Scene* scene = nullptr;
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "layers.lua", &scene, error, sizeof(error))
-          == Result::Success);
-    if (!scene) std::fprintf(stderr, "layers.lua: %s\n", error);
+    auto scene = _loaded(source, "layers.lua");
     if (scene) {
         // A higher layer applies as the play begins and a lower one as it ends.
         CHECK(_layerAt(renderer, scene, "low", 0.0f) == 4);
@@ -731,11 +659,7 @@ local c = s:plot {points = {{-2,-2},{-1,-2},{0/0,0},{1,-2},{2,-2}}, id = "second
 s:morph({a,a}, {b,c}, 1, "linear", {copy=true, lag=0.25, pairs={{1,2}}})
 return s
 )lua";
-    Scene* scene = nullptr;
-    char error[512] = {};
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "piece-morph.lua", &scene, error, sizeof(error))
-          == Result::Success);
-    if (!scene) std::fprintf(stderr, "piece-morph.lua: %s\n", error);
+    auto scene = _loaded(source, "piece-morph.lua");
     if (scene) {
         CHECK(_near(scene->duration(), 1.25f));
         BBox bounds;
@@ -747,9 +671,9 @@ return s
         CHECK(report.pathCount() == 6u);
         Surface surface;
         CHECK(renderer->render(scene, 0.5f, surface) == Result::Success);
-        auto hash = _surfaceHash(surface);
+        auto hash = checksum(surface);
         CHECK(renderer->render(scene, 1.25f, surface) == Result::Success);
-        CHECK(renderer->render(scene, 0.5f, surface) == Result::Success && _surfaceHash(surface) == hash);
+        CHECK(renderer->render(scene, 0.5f, surface) == Result::Success && checksum(surface) == hash);
     }
     delete scene;
     auto fails = [](const char* options, const char* expected) {
@@ -796,15 +720,11 @@ local saddle = s:surface {points = grid(21, function(x, y) return (x * x - y * y
 s:morph(bowl, saddle, 1, "linear")
 return s
 )lua";
-    char error[512] = {};
-    Scene* scene = nullptr;
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "morph.lua", &scene, error, sizeof(error))
-          == Result::Success);
-    if (!scene) std::fprintf(stderr, "morph.lua: %s\n", error);
+    auto scene = _loaded(source, "morph.lua");
     if (scene) {
-        CHECK(_pixelAt(renderer, scene, 0.0f, 104u, 40u) == _pixel(Color::hex("#f59e0b")));
-        CHECK(_pixelAt(renderer, scene, 0.5f, 104u, 40u) == _pixel(Color::hex("#e5e7eb")));
-        CHECK(_pixelAt(renderer, scene, 1.0f, 104u, 40u) == _pixel(Color::hex("#3b82f6")));
+        CHECK(_pixelAt(renderer, scene, 0.0f, 104u, 40u) == pixel(Color::hex("#f59e0b")));
+        CHECK(_pixelAt(renderer, scene, 0.5f, 104u, 40u) == pixel(Color::hex("#e5e7eb")));
+        CHECK(_pixelAt(renderer, scene, 1.0f, 104u, 40u) == pixel(Color::hex("#3b82f6")));
     }
     delete scene;
     // The function fails at a point between the two, after the eight calls that made them.
@@ -872,11 +792,7 @@ s:play({target = card, shift = {2, 0}}, 2, "linear")
 s:at(8.5, function() s:restore(card, 1, "linear") end)
 return s
 )lua";
-    char error[512] = {};
-    Scene* scene = nullptr;
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "save.lua", &scene, error, sizeof(error))
-          == Result::Success);
-    if (!scene) std::fprintf(stderr, "save.lua: %s\n", error);
+    auto scene = _loaded(source, "save.lua");
     if (scene) {
         auto near = [](float lhs, float rhs) { return std::fabs(lhs - rhs) < 1.0f; };
         // A restore brings back a move, a recolor, a shape tween and text and number changes;
@@ -885,7 +801,7 @@ return s
         CHECK(near(center.x, 50.0f) && near(center.y, 30.0f));
         center = _centerAt(renderer, scene, "card", 2.0f);
         CHECK(near(center.x, 40.0f) && near(center.y, 40.0f));
-        CHECK(_pixelAt(renderer, scene, 2.0f, 40u, 40u) == _pixel(Color::hex("#ff0000")));
+        CHECK(_pixelAt(renderer, scene, 2.0f, 40u, 40u) == pixel(Color::hex("#ff0000")));
         CHECK(std::strcmp(_shows(scene, "word", 0.0f), "dog") == 0);
         CHECK(std::strcmp(_shows(scene, "word", 1.0f), "horse") == 0);
         CHECK(std::strcmp(_shows(scene, "word", 2.0f), "cat") == 0);
@@ -897,8 +813,8 @@ return s
         // Saves nest, and each restore takes the newest state of its target.
         CHECK(near(_centerAt(renderer, scene, "card", 3.99f).y, 20.0f));
         CHECK(near(_centerAt(renderer, scene, "card", 4.0f).y, 40.0f));
-        CHECK(_pixelAt(renderer, scene, 4.0f, 40u, 40u) == _pixel(Color::hex("#0000ff")));
-        CHECK(_pixelAt(renderer, scene, 5.0f, 40u, 40u) == _pixel(Color::hex("#ff0000")));
+        CHECK(_pixelAt(renderer, scene, 4.0f, 40u, 40u) == pixel(Color::hex("#0000ff")));
+        CHECK(_pixelAt(renderer, scene, 5.0f, 40u, 40u) == pixel(Color::hex("#ff0000")));
         // A later target begins later by the lag.
         CHECK(near(_centerAt(renderer, scene, "card", 6.5f).y, 30.0f));
         CHECK(near(_centerAt(renderer, scene, "dot", 6.5f).y, 20.0f));
@@ -914,7 +830,7 @@ return s
         auto total = static_cast<Text*>(scene->object("total"));
         auto dot = scene->object("dot");
         CHECK(card && _near(card->size.x, 1.0f) && _near(card->size.y, 1.0f) && _near(card->corner, 0.0f));
-        CHECK(card && _same(card->style.fill, Color::hex("#ff0000")) && _near(card->opacity, 1.0f));
+        CHECK(card && same(card->style.fill, Color::hex("#ff0000")) && _near(card->opacity, 1.0f));
         CHECK(card && std::fabs(card->model.e[3]) < 1.0e-4f && std::fabs(card->model.e[7]) < 1.0e-4f);
         CHECK(word && std::strcmp(word->text(), "cat") == 0);
         CHECK(total && _near(total->value(), 5.0f));

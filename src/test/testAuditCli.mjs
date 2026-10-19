@@ -1,16 +1,15 @@
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
 import { copyFileSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
+import { auditor, font, fontOptions, monoFont } from "./testNode.mjs";
 
-const [cliArg, fontArg, goodArg, transientArg, finalArg] = process.argv.slice(2);
-if (!cliArg || !fontArg || !goodArg || !transientArg || !finalArg) {
-    throw new Error("Usage: testAuditCli.mjs <viscript> <font> <good> <transient> <final>");
+const [cliArg, goodArg, transientArg, finalArg] = process.argv.slice(2);
+if (!cliArg || !goodArg || !transientArg || !finalArg) {
+    throw new Error("Usage: testAuditCli.mjs <viscript> <good> <transient> <final>");
 }
 
-const cli = resolve(cliArg);
-const font = resolve(fontArg);
+const run = auditor(resolve(cliArg), fontOptions);
 const good = resolve(goodArg);
 const transient = resolve(transientArg);
 const finalOnly = resolve(finalArg);
@@ -26,17 +25,6 @@ const ownership = [
     "--require-containment-ledger",
     "--contain", "audit:label", "audit:body", "12",
 ];
-
-const monoFont = join(dirname(font), "JetBrainsMono.ttf");
-
-function run(scene, extra = [], expected = 0) {
-    const result = spawnSync(cli, ["audit", scene, "--font", font, "--font", monoFont, ...extra], {
-        encoding: "utf8",
-        maxBuffer: 32 * 1024 * 1024,
-    });
-    assert.equal(result.status, expected, result.stderr || result.stdout);
-    return result;
-}
 
 const passed = JSON.parse(run(good, [...ownership, "--width", "900", "--fps", "24"]).stdout);
 assert.equal(passed.schema, "viscript.layout-audit/v1");

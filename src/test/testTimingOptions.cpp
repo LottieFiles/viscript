@@ -1,7 +1,5 @@
 #include "testSceneChecks.h"
 
-int failures = 0;
-
 static void _sameFrames(Renderer* renderer, Scene* first, Scene* second)
 {
     CHECK(near(first->duration(), second->duration()));
@@ -139,5 +137,5 @@ int main()
         _lua(renderer);
     }
     delete renderer;
-    return failures ? 1 : 0;
+    return report();
 }

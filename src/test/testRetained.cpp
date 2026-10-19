@@ -6,19 +6,11 @@
 #include <cstring>
 
 #include "vis.h"
+#include "testCheck.h"
 
 using namespace vis;
 
-static auto failures = 0;
 static auto frames = 0;
-
-#define CHECK(condition)                                                                       \
-    do {                                                                                       \
-        if (!(condition)) {                                                                    \
-            std::fprintf(stderr, "%s:%d: check failed: %s\n", __FILE__, __LINE__, #condition); \
-            failures++;                                                                        \
-        }                                                                                      \
-    } while (false)
 
 static const char* Scenes[] = {
     "animation_gallery", "scene_transition", "gradient_kinds",
@@ -43,21 +35,8 @@ static Renderer* _renderer()
     auto renderer = Renderer::gen();
     CHECK(renderer);
     if (renderer) CHECK(renderer->font(VIS_TEST_FONT) == Result::Success);
-#ifdef VIS_TEST_MONO_FONT
     CHECK(renderer && renderer->font(VIS_TEST_MONO_FONT) == Result::Success);
-#endif
     return renderer;
-}
-
-static bool _equal(const Surface& first, const Surface& second)
-{
-    if (first.width() != second.width() || first.height() != second.height()) return false;
-    for (auto y = 0u; y < first.height(); y++) {
-        auto a = first.data() + static_cast<size_t>(y) * first.stride();
-        auto b = second.data() + static_cast<size_t>(y) * second.stride();
-        if (std::memcmp(a, b, first.width() * sizeof(uint32_t)) != 0) return false;
-    }
-    return true;
 }
 
 // Renders one frame with the reused renderer and with a fresh one, and compares them.
@@ -74,7 +53,7 @@ static void _frame(Renderer* reused, Surface& surface, const Scene* scene, float
     auto second = fresh->render(scene, time, expected, pixelRatio);
     CHECK(first == Result::Success);
     CHECK(second == Result::Success);
-    auto same = first == Result::Success && second == Result::Success && _equal(surface, expected);
+    auto same = first == Result::Success && second == Result::Success && equal(surface, expected);
     if (!same) std::fprintf(stderr, "retained frame differs: %s t=%g ratio=%u\n", label, time, pixelRatio);
     CHECK(same);
     frames++;
@@ -163,10 +142,6 @@ static void _sequence()
 int main()
 {
     _sequence();
-    if (failures) {
-        std::fprintf(stderr, "%d retained renderer check(s) failed\n", failures);
-        return 1;
-    }
-    std::printf("retained renderer: %d frames match a fresh renderer\n", frames);
-    return 0;
+    if (!failures) std::printf("retained renderer: %d frames match a fresh renderer\n", frames);
+    return report();
 }

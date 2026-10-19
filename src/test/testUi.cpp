@@ -1,36 +1,20 @@
 #include <cmath>
-#include <cstdlib>
 #include <cstdio>
 #include <cstring>
 #include <limits>
 #include <type_traits>
 
 #include "vis_ui.h"
+#include "testCheck.h"
 
 using namespace vis;
 using namespace vis::ui;
 
 static_assert(std::is_base_of<Group, UIObject>::value, "UI controls remain renderer groups");
 
-static int failures = 0;
-
-#define CHECK(condition)                                                                       \
-    do {                                                                                       \
-        if (!(condition)) {                                                                    \
-            std::fprintf(stderr, "%s:%d: check failed: %s\n", __FILE__, __LINE__, #condition); \
-            failures++;                                                                        \
-        }                                                                                      \
-    } while (false)
-
-static bool near(float lhs, float rhs, float epsilon = 1.0e-3f)
+static bool _near(float lhs, float rhs, float epsilon = 1.0e-3f)
 {
     return std::fabs(lhs - rhs) <= epsilon;
-}
-
-static uint32_t pixel(Color color)
-{
-    return static_cast<uint32_t>(color.a) << 24 | static_cast<uint32_t>(color.b) << 16
-        | static_cast<uint32_t>(color.g) << 8 | color.r;
 }
 
 static InputEvent pointer(InputKind kind, float x, float y, uint32_t id = 1u,
@@ -131,8 +115,8 @@ static void pointerPosition()
     event.delta = {4.0f, -3.0f};
     auto result = panel->input(event);
     CHECK(result.handled && result.redraw && probe->moves == 1u);
-    CHECK(near(probe->position.x, 20.0f) && near(probe->position.y, 30.0f));
-    CHECK(near(probe->delta.x, 4.0f) && near(probe->delta.y, -3.0f));
+    CHECK(_near(probe->position.x, 20.0f) && _near(probe->position.y, 30.0f));
+    CHECK(_near(probe->delta.x, 4.0f) && _near(probe->delta.y, -3.0f));
     result = panel->input(pointer(InputKind::PointerMove, 120.0f, 30.0f));
     CHECK(!result.handled && result.redraw && probe->cancels == 1u);
     result = panel->input(pointer(InputKind::PointerDown, 20.0f, 30.0f));
@@ -256,18 +240,18 @@ static void controls()
     panel->enabled(true);
 
     result = panel->input(pointer(InputKind::PointerDown, 25.0f, 70.0f, 6u));
-    CHECK(result.capture && horizontal->dragging() && near(horizontal->value(), 0.25f));
+    CHECK(result.capture && horizontal->dragging() && _near(horizontal->value(), 0.25f));
     result = panel->input(pointer(InputKind::PointerMove, 160.0f, 70.0f, 6u));
-    CHECK(result.handled && near(horizontal->value(), 1.0f));
+    CHECK(result.handled && _near(horizontal->value(), 1.0f));
     result = panel->input(pointer(InputKind::PointerUp, -20.0f, 70.0f, 6u));
-    CHECK(result.release && !horizontal->dragging() && near(horizontal->value(), 0.0f));
+    CHECK(result.release && !horizontal->dragging() && _near(horizontal->value(), 0.0f));
 
     result = panel->input(pointer(InputKind::PointerDown, 130.0f, 75.0f, 7u));
-    CHECK(result.capture && vertical->dragging() && near(vertical->value(), 0.25f));
+    CHECK(result.capture && vertical->dragging() && _near(vertical->value(), 0.25f));
     panel->input(pointer(InputKind::PointerMove, 130.0f, -20.0f, 7u));
     result = panel->input(pointer(InputKind::PointerUp, 130.0f, -20.0f, 7u));
-    CHECK(result.release && near(vertical->value(), 1.0f));
-    CHECK(state.sliders >= 5u && near(state.sliderValue, 1.0f));
+    CHECK(result.release && _near(vertical->value(), 1.0f));
+    CHECK(state.sliders >= 5u && _near(state.sliderValue, 1.0f));
 
     // Disabling a captured control releases it through the next event.
     horizontal->enabled(true);
@@ -354,12 +338,12 @@ static void objectBindings(Renderer* renderer)
     CHECK(renderer->bounds(scene, box, 0.0f, base) == Result::Success);
     slider->value(1.0f);
     CHECK(renderer->bounds(scene, box, 0.0f, runtime) == Result::Success);
-    CHECK(near(runtime.center().x - base.center().x, 50.0f, 0.1f));
+    CHECK(_near(runtime.center().x - base.center().x, 50.0f, 0.1f));
     CHECK(renderer->bounds(scene, box, 1.0f, timeline) == Result::Success);
-    CHECK(near(timeline.center().x - runtime.center().x, 25.0f, 0.1f));
-    for (auto i = 0u; i < 16u; i++) CHECK(near(box->model.e[i], authoredModel.e[i]));
+    CHECK(_near(timeline.center().x - runtime.center().x, 25.0f, 0.1f));
+    for (auto i = 0u; i < 16u; i++) CHECK(_near(box->model.e[i], authoredModel.e[i]));
 
-    CHECK(near(box->opacity, 1.0f) && near(box->progress, 1.0f));
+    CHECK(_near(box->opacity, 1.0f) && _near(box->progress, 1.0f));
 
     slider->value(0.0f);
     BBox actionBefore;
@@ -368,7 +352,7 @@ static void objectBindings(Renderer* renderer)
     panel->input(pointer(InputKind::PointerDown, 10.0f, 70.0f, 9u));
     panel->input(pointer(InputKind::PointerUp, 10.0f, 70.0f, 9u));
     CHECK(renderer->bounds(scene, box, 0.0f, actionAfter) == Result::Success);
-    CHECK(near(actionAfter.center().x - actionBefore.center().x, -25.0f, 0.1f));
+    CHECK(_near(actionAfter.center().x - actionBefore.center().x, -25.0f, 0.1f));
 
     auto animated = Button::gen(nullptr, {30.0f, 60.0f, 20.0f, 20.0f});
     CHECK(animated && panel->add(animated) == Result::Success);
@@ -383,7 +367,7 @@ static void objectBindings(Renderer* renderer)
     CHECK(renderer->bounds(scene, box, 0.0f, transitionStart) == Result::Success);
     CHECK(renderer->bounds(scene, box, 0.5f, transitionMid) == Result::Success);
     CHECK(renderer->bounds(scene, box, 1.0f, transitionEnd) == Result::Success);
-    CHECK(near(transitionStart.center().x, actionAfter.center().x, 0.1f));
+    CHECK(_near(transitionStart.center().x, actionAfter.center().x, 0.1f));
     CHECK(transitionMid.center().x > transitionStart.center().x
           && transitionMid.center().x < transitionEnd.center().x);
     CHECK(panel->bind(animated, box, animatedTarget, -0.1f) == Result::InvalidArguments);
@@ -446,7 +430,7 @@ static void toggleBindings(Renderer* renderer)
 
     BBox initial;
     CHECK(renderer->bounds(scene, target, 0.0f, initial) == Result::Success);
-    CHECK(near(initial.center().x, 75.0f, 0.1f));
+    CHECK(_near(initial.center().x, 75.0f, 0.1f));
 
     panel->input(pointer(InputKind::PointerDown, 20.0f, 15.0f, 2u, 0.2f));
     panel->input(pointer(InputKind::PointerUp, 80.0f, 15.0f, 2u, 0.2f));
@@ -464,18 +448,18 @@ static void toggleBindings(Renderer* renderer)
     CHECK(renderer->bounds(scene, target, 0.5f, start) == Result::Success);
     CHECK(renderer->bounds(scene, target, 0.7f, middle) == Result::Success);
     CHECK(renderer->bounds(scene, target, 0.9f, end) == Result::Success);
-    CHECK(near(start.center().x, 75.0f, 0.1f));
-    CHECK(near(middle.center().x, 100.0f, 0.1f));
-    CHECK(near(end.center().x, 125.0f, 0.1f));
+    CHECK(_near(start.center().x, 75.0f, 0.1f));
+    CHECK(_near(middle.center().x, 100.0f, 0.1f));
+    CHECK(_near(end.center().x, 125.0f, 0.1f));
     BBox resampledMiddle;
     CHECK(renderer->bounds(scene, target, 0.7f, resampledMiddle) == Result::Success);
-    CHECK(near(resampledMiddle.center().x, middle.center().x, 0.1f));
+    CHECK(_near(resampledMiddle.center().x, middle.center().x, 0.1f));
 
     panel->input(pointer(InputKind::PointerDown, 20.0f, 15.0f, 5u, 1.0f));
     panel->input(pointer(InputKind::PointerUp, 20.0f, 15.0f, 5u, 1.0f));
     CHECK(!toggle->toggled() && state.buttons == 2u && !state.toggleValue);
     CHECK(renderer->bounds(scene, target, 1.4f, end) == Result::Success);
-    CHECK(near(end.center().x, 75.0f, 0.1f));
+    CHECK(_near(end.center().x, 75.0f, 0.1f));
 
     panel->input(pointer(InputKind::PointerDown, 20.0f, 15.0f, 6u, 1.5f));
     panel->input(pointer(InputKind::PointerUp, 20.0f, 15.0f, 6u, 1.5f));
@@ -490,13 +474,13 @@ static void toggleBindings(Renderer* renderer)
     CHECK(renderer->bounds(scene, target, 1.7f, reversalStart) == Result::Success);
     CHECK(renderer->bounds(scene, target, 1.9f, reversalMiddle) == Result::Success);
     CHECK(renderer->bounds(scene, target, 2.1f, reversalEnd) == Result::Success);
-    CHECK(near(reversalStart.center().x, reversalBefore.center().x, 0.1f));
+    CHECK(_near(reversalStart.center().x, reversalBefore.center().x, 0.1f));
     CHECK(reversalMiddle.center().x < reversalStart.center().x
           && reversalMiddle.center().x > reversalEnd.center().x);
-    CHECK(near(reversalEnd.center().x, 75.0f, 0.1f));
+    CHECK(_near(reversalEnd.center().x, 75.0f, 0.1f));
     BBox wrapped;
     CHECK(renderer->bounds(scene, target, 0.1f, wrapped) == Result::Success);
-    CHECK(near(wrapped.center().x, reversalEnd.center().x, 0.1f));
+    CHECK(_near(wrapped.center().x, reversalEnd.center().x, 0.1f));
     delete scene;
 }
 
@@ -684,7 +668,7 @@ static void sampleAreas(Renderer* renderer)
     CHECK(area->selected() && area->selection().object == overlay);
     CHECK(area->selection().color.r == 0x30 && area->selection().color.g == 0xa4
           && area->selection().color.b == 0x6c && area->selection().color.a == 0xff);
-    CHECK(near(area->value().x, 0.5f) && near(area->value().y, 0.5f));
+    CHECK(_near(area->value().x, 0.5f) && _near(area->value().y, 0.5f));
     CHECK(renderer->render(scene, 0.0f, surface) == Result::Success);
     BBox swatchBounds;
     CHECK(renderer->bounds(scene, swatch, 0.0f, swatchBounds) == Result::Success);
@@ -699,10 +683,10 @@ static void sampleAreas(Renderer* renderer)
     CHECK(result.sample == area && area->selection().object == gradient);
     auto gradientColor = area->selection().color;
     CHECK(gradientColor.a == 0xff && gradientColor.r > gradientColor.b);
-    CHECK(near(area->value().x, 0.3f) && near(area->value().y, 0.5f));
+    CHECK(_near(area->value().x, 0.3f) && _near(area->value().y, 0.5f));
     CHECK(renderer->bounds(scene, marker, 0.0f, markerBounds) == Result::Success);
-    CHECK(near(markerBounds.center().x, 60.0f, 0.2f)
-          && near(markerBounds.center().y, 50.0f, 0.2f));
+    CHECK(_near(markerBounds.center().x, 60.0f, 0.2f)
+          && _near(markerBounds.center().y, 50.0f, 0.2f));
 
     // The selected marker now overlaps the source, but target-isolated sampling
     // must return the same source pixel on a repeated click.
@@ -720,7 +704,7 @@ static void sampleAreas(Renderer* renderer)
     result = panel->input(pointer(InputKind::PointerUp, 10.0f, 90.0f, 23u));
     CHECK(result.handled && result.release && !result.sample);
     CHECK(area->selection().object == gradient
-          && near(area->position().x, 60.0f) && near(area->position().y, 50.0f));
+          && _near(area->position().x, 60.0f) && _near(area->position().y, 50.0f));
 
     resolver.failure = Result::Unknown;
     panel->input(pointer(InputKind::PointerDown, 60.0f, 50.0f, 24u));
@@ -729,7 +713,7 @@ static void sampleAreas(Renderer* renderer)
           && result.status == Result::Unknown);
     resolver.failure = Result::Success;
 
-    for (auto i = 0u; i < 16u; i++) CHECK(near(marker->model.e[i], authoredMarker.e[i]));
+    for (auto i = 0u; i < 16u; i++) CHECK(_near(marker->model.e[i], authoredMarker.e[i]));
     CHECK(swatch->style.fill.r == authoredSwatch.r && swatch->style.fill.g == authoredSwatch.g
           && swatch->style.fill.b == authoredSwatch.b && swatch->style.fill.a == authoredSwatch.a);
 
@@ -843,7 +827,7 @@ static void cameraBindings(Renderer* renderer)
     CHECK(std::fabs(moved.center().x - timeline.center().x) > 1.0f);
     CHECK(panel->cameraReset() == Result::Success);
     CHECK(renderer->bounds(scene, box, 0.5f, restored) == Result::Success);
-    CHECK(near(restored.center().x, timeline.center().x, 0.1f));
+    CHECK(_near(restored.center().x, timeline.center().x, 0.1f));
 
     panel->input(pointer(InputKind::PointerDown, 10.0f, 10.0f, 1u, 0.5f));
     panel->input(pointer(InputKind::PointerUp, 10.0f, 10.0f, 1u, 0.5f));
@@ -981,7 +965,7 @@ return scene
         CHECK(toggle && toggle->toggled());
         panel->input(pointer(InputKind::PointerDown, 75.0f, 35.0f, 2u));
         panel->input(pointer(InputKind::PointerUp, 75.0f, 35.0f, 2u));
-        CHECK(slider && near(slider->value(), 0.75f));
+        CHECK(slider && _near(slider->value(), 0.75f));
     } else if (error[0]) {
         std::fprintf(stderr, "Lua UI load error: %s\n", error);
     }
@@ -1129,6 +1113,5 @@ int main()
         cameraBindings(renderer);
     }
     delete renderer;
-    if (failures) std::fprintf(stderr, "%d UI test(s) failed\n", failures);
-    return failures ? EXIT_FAILURE : EXIT_SUCCESS;
+    return report();
 }

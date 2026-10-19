@@ -11,18 +11,9 @@
 #include "testGlContext.h"
 #include "vis.h"
 #include "vis_gl.h"
+#include "testCheck.h"
 
 using namespace vis;
-
-static auto failures = 0;
-
-#define CHECK(condition)                                                                       \
-    do {                                                                                       \
-        if (!(condition)) {                                                                    \
-            std::fprintf(stderr, "%s:%d: check failed: %s\n", __FILE__, __LINE__, #condition); \
-            failures++;                                                                        \
-        }                                                                                      \
-    } while (false)
 
 static constexpr uint32_t Width = 320;
 static constexpr uint32_t Height = 180;
@@ -278,13 +269,9 @@ int main()
     CHECK(cpu && glRenderer);
     if (!cpu || !glRenderer) return 1;
     CHECK(cpu->font(VIS_TEST_FONT) == Result::Success);
-#ifdef VIS_TEST_MONO_FONT
     CHECK(cpu->font(VIS_TEST_MONO_FONT) == Result::Success);
-#endif
     CHECK(glRenderer->font(VIS_TEST_FONT) == Result::Success);
-#ifdef VIS_TEST_MONO_FONT
     CHECK(glRenderer->font(VIS_TEST_MONO_FONT) == Result::Success);
-#endif
 
     // Limits come from measured macOS GL output (mean / outlier%) with ~2x margin.
     // Remaining differences are edge antialiasing (GL MSAA vs CPU analytic coverage).
@@ -353,5 +340,5 @@ int main()
     delete cpu;
     delete svgAsset;
     delete pixelAsset;
-    return failures ? 1 : 0;
+    return report();
 }

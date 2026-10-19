@@ -331,7 +331,6 @@ void spaceLabels()
 // the other objects below it and the labels it placed elsewhere keep their own.
 void spaceScreenLabels(Renderer* renderer)
 {
-#ifdef VIS_TEST_FONT
     constexpr auto pi = 3.14159265359f;
     Config config;
     config.width = 960;
@@ -457,14 +456,10 @@ void spaceScreenLabels(Renderer* renderer)
     CHECK(centerVisual && centerVisual->visible
           && near(centerVisual->paintBounds.y + centerVisual->paintBounds.height, 256.0f, 0.02f));
     delete scene;
-#else
-    (void) renderer;
-#endif
 }
 
 void spaceScreenLabelWarps(Renderer* renderer)
 {
-#ifdef VIS_TEST_FONT
     Config config;
     config.width = 320;
     config.height = 180;
@@ -537,9 +532,6 @@ void spaceScreenLabelWarps(Renderer* renderer)
     CHECK(space->placeScreen(late, 0u, -2.0f, 10.0f) == Result::InsufficientCondition);
     CHECK(space->place(late, 0u, -2.0f) == Result::Success && space->add(late) == Result::Success);
     delete scene;
-#else
-    (void) renderer;
-#endif
 }
 
 void spaceLabelOpacity(Renderer* renderer)

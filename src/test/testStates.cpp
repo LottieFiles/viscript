@@ -5,27 +5,13 @@
 #include <type_traits>
 
 #include "vis_states.h"
+#include "testCheck.h"
 
 using namespace vis;
 using namespace vis::states;
 
 static_assert(std::is_base_of<Group, Controller>::value,
               "States controller remains a renderer group");
-
-static int failures = 0;
-
-#define CHECK(condition)                                                                       \
-    do {                                                                                       \
-        if (!(condition)) {                                                                    \
-            std::fprintf(stderr, "%s:%d: check failed: %s\n", __FILE__, __LINE__, #condition); \
-            failures++;                                                                        \
-        }                                                                                      \
-    } while (false)
-
-static bool _near(float lhs, float rhs, float epsilon = 1.0e-4f)
-{
-    return std::fabs(lhs - rhs) <= epsilon;
-}
 
 static void _definitions()
 {
@@ -109,26 +95,26 @@ static void _retarget()
     CHECK(controller->active());
     State state;
     CHECK(controller->sample(object, state) == Result::Success);
-    CHECK(_near(state.shift.x, 0.0f));
+    CHECK(near(state.shift.x, 0.0f));
     CHECK(controller->advance(0.4f) == Result::Success);
     CHECK(controller->sample(object, state) == Result::Success);
-    CHECK(_near(state.shift.x, 0.8f));
+    CHECK(near(state.shift.x, 0.8f));
     auto before = state;
     CHECK(controller->transition(object, "correct", 1.0f, linear) == Result::Success);
     CHECK(controller->sample(object, state) == Result::Success);
-    CHECK(_near(state.shift.x, before.shift.x));
-    CHECK(_near(state.shift.y, before.shift.y));
-    CHECK(_near(state.scale.x, before.scale.x));
+    CHECK(near(state.shift.x, before.shift.x));
+    CHECK(near(state.shift.y, before.shift.y));
+    CHECK(near(state.scale.x, before.scale.x));
     CHECK(controller->advance(0.5f) == Result::Success);
     CHECK(controller->sample(object, state) == Result::Success);
-    CHECK(_near(state.shift.x, 1.4f));
-    CHECK(_near(state.shift.y, 0.5f));
-    CHECK(_near(state.scale.x, 1.1f));
-    CHECK(_near(state.opacity, 0.75f));
+    CHECK(near(state.shift.x, 1.4f));
+    CHECK(near(state.shift.y, 0.5f));
+    CHECK(near(state.scale.x, 1.1f));
+    CHECK(near(state.opacity, 0.75f));
     CHECK(controller->advance(0.5f) == Result::Success);
     CHECK(controller->sample(object, state) == Result::Success);
-    CHECK(_near(state.shift.x, correct.shift.x));
-    CHECK(_near(state.shift.y, correct.shift.y));
+    CHECK(near(state.shift.x, correct.shift.x));
+    CHECK(near(state.shift.y, correct.shift.y));
     CHECK(!controller->active());
     CHECK(controller->eventCount() == 2u);
     Event event;
@@ -136,11 +122,11 @@ static void _retarget()
     CHECK(event.object == object->id() && std::strcmp(event.state, "right") == 0);
     auto firstTransaction = event.transaction;
     CHECK(firstTransaction != 0u);
-    CHECK(_near(static_cast<float>(event.time), 0.0f));
+    CHECK(near(static_cast<float>(event.time), 0.0f));
     CHECK(controller->eventAt(1u, event));
     CHECK(std::strcmp(event.state, "correct") == 0);
     CHECK(event.transaction == firstTransaction + 1u);
-    CHECK(_near(static_cast<float>(event.time), 0.4f));
+    CHECK(near(static_cast<float>(event.time), 0.4f));
     CHECK(!controller->eventAt(2u, event));
     controller->clearEvents();
     CHECK(controller->eventCount() == 0u);
@@ -189,9 +175,9 @@ static void _atomicBatch()
     CHECK(firstEvent.transaction != 0u);
     CHECK(firstEvent.transaction == secondEvent.transaction);
     CHECK(controller->sample(first, sample) == Result::Success);
-    CHECK(_near(sample.scale.x, 1.5f));
+    CHECK(near(sample.scale.x, 1.5f));
     CHECK(controller->sample(second, sample) == Result::Success);
-    CHECK(_near(sample.scale.y, 1.5f));
+    CHECK(near(sample.scale.y, 1.5f));
     delete scene;
 }
 
@@ -284,7 +270,7 @@ static void _journalBackpressure()
           == Result::InsufficientCondition);
     CHECK(controller->eventCount() == Controller::EventLimit);
     CHECK(controller->sample(object, after) == Result::Success);
-    CHECK(_near(after.shift.x, before.shift.x));
+    CHECK(near(after.shift.x, before.shift.x));
     controller->clearEvents();
     CHECK(controller->transition(object, "left", 0.0f) == Result::Success);
     Event resumed;
@@ -300,6 +286,5 @@ int main()
     _atomicBatch();
     _boundaries();
     _journalBackpressure();
-    if (failures) std::fprintf(stderr, "%d states test(s) failed\n", failures);
-    return failures ? 1 : 0;
+    return report();
 }

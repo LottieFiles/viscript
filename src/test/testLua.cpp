@@ -2,8 +2,6 @@
 
 #include "testLuaChecks.h"
 
-int _failures = 0;
-
 static constexpr auto _scene2d = R"lua(
 if type(table) ~= "table" or type(string) ~= "table" or type(math) ~= "table" or type(utf8) ~= "table" then
     error("safe libraries are unavailable")
@@ -160,13 +158,7 @@ scene:line {
 }
 return scene
 )lua";
-    char error[256] = {};
-    Scene* scene = nullptr;
-    auto status = Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "dash.lua",
-                            &scene, error, sizeof(error));
-    CHECK(status == Result::Success);
-    CHECK(scene != nullptr);
-    if (status != Result::Success) std::fprintf(stderr, "dash.lua: %s\n", error);
+    auto scene = _loaded(source, "dash.lua");
     if (scene) {
         auto line = scene->object("dashed-line");
         CHECK(line != nullptr);
@@ -178,7 +170,7 @@ return scene
         }
         Surface surface;
         CHECK(renderer->render(scene, 0.0f, surface) == Result::Success);
-        CHECK(_changed(surface, scene->config().background) > 100u);
+        CHECK(changed(surface, scene->config().background) > 100u);
     }
     delete scene;
 
@@ -187,16 +179,8 @@ return scene
 static void _render(Renderer* renderer, const char* source, const char* name, const char* tag,
                     Type type, float duration, bool loop, const char* output)
 {
-    char error[1024] = {};
-    Scene* scene = nullptr;
-    auto status = Lua::load(source, static_cast<uint32_t>(std::strlen(source)), name, &scene, error, sizeof(error));
-    CHECK(status == Result::Success);
-    CHECK(scene != nullptr);
-    if (status != Result::Success || !scene) {
-        std::fprintf(stderr, "%s: %s\n", name, error);
-        delete scene;
-        return;
-    }
+    auto scene = _loaded(source, name);
+    if (!scene) return;
 
     CHECK(std::fabs(scene->duration() - duration) < 1.0e-4f);
     CHECK(scene->config().loop == loop);
@@ -206,37 +190,14 @@ static void _render(Renderer* renderer, const char* source, const char* name, co
     if (object) CHECK(object->type() == type);
 
     Surface surface;
-    status = renderer->render(scene, scene->duration(), surface);
+    auto status = renderer->render(scene, scene->duration(), surface);
     CHECK(status == Result::Success);
     if (status == Result::Success) {
         CHECK(surface.width() == scene->config().width);
         CHECK(surface.height() == scene->config().height);
-        CHECK(_changed(surface, scene->config().background) > 100);
+        CHECK(changed(surface, scene->config().background) > 100);
         CHECK(Saver::png(surface, output) == Result::Success);
     }
-    delete scene;
-}
-
-static void _pngCompression(Renderer* renderer)
-{
-    static constexpr auto source = "return vis.scene {width=960, height=540, background='#112233'}";
-    Scene* scene = nullptr;
-    char error[512] = {};
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "png.lua", &scene, error, sizeof(error))
-          == Result::Success);
-    if (!scene) return;
-    Surface surface;
-    CHECK(renderer->render(scene, 0.0f, surface) == Result::Success);
-    CHECK(Saver::png(surface, "test-lua-png.png") == Result::Success);
-    auto file = std::fopen("test-lua-png.png", "rb");
-    CHECK(file != nullptr);
-    if (file) {
-        CHECK(std::fseek(file, 0, SEEK_END) == 0);
-        auto size = std::ftell(file);
-        CHECK(size > 0 && size < 10000);
-        std::fclose(file);
-    }
-    std::remove("test-lua-png.png");
     delete scene;
 }
 
@@ -299,13 +260,7 @@ local scene = vis.scene {}
 scene:point {point = {1, 2}, id = "root-point"}
 return scene
 )lua";
-    char error[256] = {};
-    Scene* scene = nullptr;
-    auto status = Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "scene-object.lua",
-                            &scene, error, sizeof(error));
-    CHECK(status == Result::Success);
-    CHECK(scene != nullptr);
-    if (status != Result::Success) std::fprintf(stderr, "scene-object.lua: %s\n", error);
+    auto scene = _loaded(source, "scene-object.lua");
     if (scene) {
         CHECK(scene->count() == 1);
         auto point = scene->object("root-point");
@@ -323,12 +278,8 @@ local world = s:space {}
 world:point {point = {math.random(), math.random()}, id = "random"}
 return s
 )lua";
-    char error[256] = {};
-    Scene* first = nullptr;
-    Scene* second = nullptr;
-    auto size = static_cast<uint32_t>(std::strlen(source));
-    CHECK(Lua::load(source, size, "random.lua", &first, error, sizeof(error)) == Result::Success);
-    CHECK(Lua::load(source, size, "random.lua", &second, error, sizeof(error)) == Result::Success);
+    auto first = _loaded(source, "random.lua");
+    auto second = _loaded(source, "random.lua");
     if (first && second) {
         auto a = static_cast<Point*>(first->object("random"));
         auto b = static_cast<Point*>(second->object("random"));
@@ -374,12 +325,7 @@ if unseeded ~= "0.2469118419609948 0.23482927841848023 0.069275939529084729 22 1
 end
 return vis.scene {}
 )lua";
-    Scene* seeded = nullptr;
-    size = static_cast<uint32_t>(std::strlen(seededSource));
-    auto status = Lua::load(seededSource, size, "seeded.lua", &seeded, error, sizeof(error));
-    CHECK(status == Result::Success);
-    if (status != Result::Success) std::fprintf(stderr, "seeded.lua: %s\n", error);
-    delete seeded;
+    delete _loaded(seededSource, "seeded.lua");
 
     static constexpr auto scaledCameraSource = R"lua(
 return vis.scene {
@@ -389,11 +335,7 @@ return vis.scene {
     }
 }
 )lua";
-    Scene* scaledCamera = nullptr;
-    size = static_cast<uint32_t>(std::strlen(scaledCameraSource));
-    CHECK(Lua::load(scaledCameraSource, size, "scaled-camera.lua", &scaledCamera, error, sizeof(error)) == Result::Success);
-    CHECK(scaledCamera != nullptr);
-    delete scaledCamera;
+    delete _loaded(scaledCameraSource, "scaled-camera.lua");
 
     static constexpr auto inclusivePlotSource = R"lua(
 local s = vis.scene {}
@@ -401,10 +343,7 @@ local world = s:space {}
 world:plot {fn = function(x) return x end, x_range = {0, 1, 0.1}, id = "inclusive"}
 return s
 )lua";
-    Scene* inclusivePlot = nullptr;
-    size = static_cast<uint32_t>(std::strlen(inclusivePlotSource));
-    CHECK(Lua::load(inclusivePlotSource, size, "inclusive-plot.lua", &inclusivePlot, error, sizeof(error)) == Result::Success);
-    CHECK(inclusivePlot != nullptr);
+    auto inclusivePlot = _loaded(inclusivePlotSource, "inclusive-plot.lua");
     if (inclusivePlot) {
         auto plot = static_cast<Plot*>(inclusivePlot->object("inclusive"));
         CHECK(plot != nullptr);
@@ -422,10 +361,7 @@ local frame = world:space {id = "frame", opacity = 0}
 frame:point {point = {1, 2, 3}, id = "joint"}
 return s
 )lua";
-    Scene* nested = nullptr;
-    size = static_cast<uint32_t>(std::strlen(nestedSource));
-    CHECK(Lua::load(nestedSource, size, "nested.lua", &nested, error, sizeof(error)) == Result::Success);
-    CHECK(nested != nullptr);
+    auto nested = _loaded(nestedSource, "nested.lua");
     if (nested) {
         auto world = nested->object("world");
         auto frame = nested->object("frame");
@@ -443,10 +379,7 @@ local world = s:space {
 }
 return s
 )lua";
-    Scene* numbered = nullptr;
-    size = static_cast<uint32_t>(std::strlen(numberedSource));
-    CHECK(Lua::load(numberedSource, size, "numbered.lua", &numbered, error, sizeof(error)) == Result::Success);
-    CHECK(numbered != nullptr);
+    auto numbered = _loaded(numberedSource, "numbered.lua");
     if (numbered) {
         auto space = static_cast<Space*>(numbered->object("numbered"));
         CHECK(space != nullptr);
@@ -489,14 +422,7 @@ if "" .. 1.5 ~= "1.5" then error("localized concatenation") end
 if string.format("%.1f", 1.5) ~= "1.5" then error("localized format") end
 return vis.scene {}
 )lua";
-    char error[256] = {};
-    Scene* scene = nullptr;
-    auto status = Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "locale.lua",
-                            &scene, error, sizeof(error));
-    CHECK(status == Result::Success);
-    CHECK(scene != nullptr);
-    if (status != Result::Success) std::fprintf(stderr, "locale.lua: %s\n", error);
-    delete scene;
+    delete _loaded(source, "locale.lua");
     CHECK(std::localeconv() && std::strcmp(std::localeconv()->decimal_point, "."));
     std::setlocale(LC_NUMERIC, previous);
 }
@@ -532,25 +458,19 @@ local cells = world:cell {
 scene:create({image, cells}, 0.4, "linear")
 return scene
 )lua";
-    char error[512] = {};
-    Scene* scene = nullptr;
-    auto status = Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "assets.lua",
-                            &scene, error, sizeof(error), _asset, asset);
-    CHECK(status == Result::Success);
-    CHECK(scene != nullptr);
-    if (status != Result::Success) std::fprintf(stderr, "assets.lua: %s\n", error);
+    auto scene = _loaded(source, "assets.lua", _asset, asset);
     if (scene) {
         CHECK(!scene->config().antialiasing);
         CHECK(scene->object("image") && scene->object("image")->type() == Type::Picture);
         CHECK(scene->object("buffer") && scene->object("buffer")->type() == Type::Picture);
         auto buffer = static_cast<Picture*>(scene->object("buffer"));
         CHECK(buffer && buffer->pixelWidth() == 2u && buffer->pixelHeight() == 2u);
-        CHECK(buffer && buffer->pixels()[0] == _pixel(Color::hex("#ff4050")));
-        CHECK(buffer && buffer->pixels()[3] == _pixel(Color::hex("#ffd166")));
+        CHECK(buffer && buffer->pixels()[0] == pixel(Color::hex("#ff4050")));
+        CHECK(buffer && buffer->pixels()[3] == pixel(Color::hex("#ffd166")));
         CHECK(scene->object("cells") && scene->object("cells")->type() == Type::Cell);
         Surface surface;
         CHECK(renderer->render(scene, scene->duration(), surface) == Result::Success);
-        CHECK(_changed(surface, scene->config().background) > 2000);
+        CHECK(changed(surface, scene->config().background) > 2000);
     }
     delete scene;
 
@@ -574,13 +494,8 @@ int main()
     auto renderer = Renderer::gen();
     CHECK(renderer != nullptr);
     if (renderer) {
-#ifdef VIS_TEST_FONT
         CHECK(renderer->font(VIS_TEST_FONT) == Result::Success);
-#ifdef VIS_TEST_MONO_FONT
         CHECK(renderer->font(VIS_TEST_MONO_FONT) == Result::Success);
-#endif
-#endif
-        _pngCompression(renderer);
         _render(renderer, _scene2d, "source-2d.lua", "vector", Type::Arrow, 1.9f, true, "test-lua-2d.png");
         _render(renderer, _scene3d, "source-3d.lua", "space-vector", Type::Vector, 1.24f, false, "test-lua-3d.png");
         _render(renderer, _plot, "source-plot.lua", "sine", Type::Plot, 0.6f, false, "test-lua-plot.png");
@@ -648,7 +563,6 @@ int main()
         _animatedPlotGaps(renderer);
         _overlappingTracks(renderer);
         _pendingReads();
-#ifdef VIS_TEST_FONT
         _measuring(renderer);
         _scalingTexts(renderer);
         _slanting(renderer);
@@ -670,7 +584,6 @@ int main()
         _framingTexts(renderer);
         _matrices();
         _tables();
-#endif
     }
     delete renderer;
 
@@ -1034,7 +947,5 @@ return s
            "theme-semantic-literal.lua");
     _deterministic();
     _localeIndependent();
-
-    if (_failures) std::fprintf(stderr, "%d Lua checks failed\n", _failures);
-    return _failures ? 1 : 0;
+    return report();
 }

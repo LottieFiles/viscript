@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
+import { font, fontOptions, run } from "./testNode.mjs";
 
 const bindingPath = process.argv[2];
 const cliPath = process.argv[3];
@@ -2215,7 +2216,7 @@ shapes.play(
     ],
     1,
 );
-let shapesLua = compileScene(shapes);
+const shapesLua = compileScene(shapes);
 assert.match(shapesLua, /\{target=objects\[1\],width=4,radius=1\.5\}/);
 assert.match(shapesLua, /\{target=objects\[2\],progress=0\.5,size=\{3,2\},corner=0\.5\}/);
 assert.match(shapesLua, /\{target=objects\[3\],size=40\}/);
@@ -3543,11 +3544,33 @@ assert.match(inlinedLua, /scene:tex \{\["align"\]=\{0,0\.5\},\["baseline"\]=true
 
 const directory = mkdtempSync(join(tmpdir(), "vis-js-binding-"));
 try {
-    const motionPath = join(directory, "motion.lua");
-    writeFileSync(motionPath, motionLua);
-    const motionResult = spawnSync(cliPath, ["inspect", motionPath], { encoding: "utf8" });
-    assert.equal(motionResult.status, 0, motionResult.stderr);
-    assert.equal(JSON.parse(motionResult.stdout).duration, 5.5);
+    // The CLI on scripts written to the directory: a run must exit with the expected status, an
+    // inspect or a layout must succeed, and a refused script must fail.
+    const cli = (args, expected = 0, options = {}) => run(cliPath, args, expected, options);
+    const writeScript = (name, source) => {
+        const path = join(directory, name);
+        writeFileSync(path, source);
+        return path;
+    };
+    const inspectScript = (name, source, fonts = []) => {
+        const path = writeScript(name, source);
+        return { path, scene: JSON.parse(cli(["inspect", path, ...fonts]).stdout) };
+    };
+    const layoutAt = (path, time, fonts = []) =>
+        JSON.parse(cli(["layout", path, "--time", String(time), ...fonts]).stdout);
+    const refusal = (name, source) => {
+        const result = spawnSync(cliPath, ["inspect", writeScript(name, source)], { encoding: "utf8" });
+        assert.notEqual(result.status, 0);
+        return result.stderr;
+    };
+    // A twin that writes texts renders with the fonts it names as further arguments.
+    const renderFrame = (path, time, fonts = []) => {
+        const png = join(directory, "frame.png");
+        cli(["render", path, "--time", String(time), ...fonts, "-o", png]);
+        return readFileSync(png);
+    };
+
+    assert.equal(inspectScript("motion.lua", motionLua).scene.duration, 5.5);
 
     // A Lua function holds at most 200 locals, so a scene with more handles and marks than that
     // still loads, and a viewport child keeps its handles apart from its parent's.
@@ -3563,81 +3586,42 @@ try {
     assert.match(crowdedLua, /^local scene = vis\.scene \{\}\nlocal objects = \{\}\nlocal times = \{\}\n/);
     assert.match(crowdedLua, /\ndo\n    local viewportScene1 = vis\.scene \{\}\n    local objects = \{\}\n/);
     assert.match(crowdedLua, /\nend\nscene:play\(\{\{target=objects\[1\],opacity=0\.5\}\},1,"smooth",0\)\n/);
-    const crowdedPath = join(directory, "crowded.lua");
-    writeFileSync(crowdedPath, crowdedLua);
-    const crowdedResult = spawnSync(cliPath, ["inspect", crowdedPath], { encoding: "utf8" });
-    assert.equal(crowdedResult.status, 0, crowdedResult.stderr);
-    const crowdedScene = JSON.parse(crowdedResult.stdout);
+    const crowdedScene = inspectScript("crowded.lua", crowdedLua).scene;
     assert.equal(crowdedScene.objects.length, 301);
     assert.equal(crowdedScene.viewports[0].scene.objects.length, 250);
 
-    const turntablePath = join(directory, "turntable.lua");
-    writeFileSync(turntablePath, turntableLua);
-    const turntableResult = spawnSync(cliPath, ["inspect", turntablePath], { encoding: "utf8" });
-    assert.equal(turntableResult.status, 0, turntableResult.stderr);
-    assert.equal(JSON.parse(turntableResult.stdout).duration, 5);
-    const framingPath = join(directory, "framing.lua");
-    writeFileSync(framingPath, framingLua);
-    const framingResult = spawnSync(cliPath, ["inspect", framingPath], { encoding: "utf8" });
-    assert.equal(framingResult.status, 0, framingResult.stderr);
-    assert.equal(JSON.parse(framingResult.stdout).duration, 2.75);
-    const lookingAroundPath = join(directory, "looking-around.lua");
-    writeFileSync(lookingAroundPath, lookingAroundLua);
-    const lookingAroundResult = spawnSync(cliPath, ["inspect", lookingAroundPath], { encoding: "utf8" });
-    assert.notEqual(lookingAroundResult.status, 0);
-    assert.match(lookingAroundResult.stderr, /focus requires a 2D camera; use look in 3D/);
-    const aimingPath = join(directory, "aiming.lua");
-    writeFileSync(aimingPath, aimingLua);
-    const aimingResult = spawnSync(cliPath, ["inspect", aimingPath], { encoding: "utf8" });
-    assert.equal(aimingResult.status, 0, aimingResult.stderr);
-    assert.equal(JSON.parse(aimingResult.stdout).duration, 4);
+    assert.equal(inspectScript("turntable.lua", turntableLua).scene.duration, 5);
+    assert.equal(inspectScript("framing.lua", framingLua).scene.duration, 2.75);
+    assert.match(refusal("looking-around.lua", lookingAroundLua), /focus requires a 2D camera; use look in 3D/);
+    assert.equal(inspectScript("aiming.lua", aimingLua).scene.duration, 4);
 
-    const surfacePath = join(directory, "surface.lua");
-    writeFileSync(surfacePath, surfaceLua);
-    const surfaceResult = spawnSync(cliPath, ["inspect", surfacePath], { encoding: "utf8" });
-    assert.equal(surfaceResult.status, 0, surfaceResult.stderr);
-    assert.equal(JSON.parse(surfaceResult.stdout).duration, 1);
+    assert.equal(inspectScript("surface.lua", surfaceLua).scene.duration, 1);
 
-    shapesLua = compileScene(shapes);
-    const shapesPath = join(directory, "shapes.lua");
-    writeFileSync(shapesPath, shapesLua);
-    const shapesResult = spawnSync(cliPath, ["inspect", shapesPath], { encoding: "utf8" });
-    assert.equal(shapesResult.status, 0, shapesResult.stderr);
-    assert.equal(JSON.parse(shapesResult.stdout).duration, 1);
+    assert.equal(inspectScript("shapes.lua", compileScene(shapes)).scene.duration, 1);
 
     // A measured text measures in its font while the script runs, or in the default font without it.
-    const measuredPath = join(directory, "measured.lua");
-    writeFileSync(measuredPath, measuredLua);
-    const font = join(repoRoot, "src/examples/assets/Pretendard.ttf");
-    const monoFont = join(repoRoot, "src/examples/assets/JetBrainsMono.ttf");
-    const screenLabelPath = join(directory, "screen-labels.lua");
-    writeFileSync(screenLabelPath, screenLabelLua);
+    const measuredPath = writeScript("measured.lua", measuredLua);
+    const screenLabelPath = writeScript("screen-labels.lua", screenLabelLua);
     for (const time of [0, 1, 0.5, 1]) {
-        const result = spawnSync(cliPath, ["layout", screenLabelPath, "--time", String(time), "--font", font], {encoding: "utf8"});
-        assert.equal(result.status, 0, result.stderr);
-        const report = JSON.parse(result.stdout);
+        const report = layoutAt(screenLabelPath, time, ["--font", font]);
         const box = report.scene.objects.find((object) => object.id === "screen-axes/label/x/1")?.bounds;
         assert.ok(box);
         const anchor = 160 - 360 / (6 - 2 * time);
         assert.ok(Math.abs(box.x + box.width - (anchor - 14)) < 0.02, "Screen label lost its pixel gap during zoom");
     }
     for (const time of [2, 1.75, 1, 2]) {
-        const result = spawnSync(cliPath, ["layout", screenLabelPath, "--time", String(time), "--font", font], {encoding: "utf8"});
-        assert.equal(result.status, 0, result.stderr);
-        const box = JSON.parse(result.stdout).scene.objects.find((object) => object.id === "screen-axes/label/x/1")?.bounds;
+        const box = layoutAt(screenLabelPath, time, ["--font", font]).scene.objects
+            .find((object) => object.id === "screen-axes/label/x/1")?.bounds;
         assert.ok(box);
         const anchor = 160 + 45 * (-2 + 3 * (time - 1));
         assert.ok(Math.abs(box.x + box.width - (anchor - 14)) < 0.02, "Screen label used the unwarped Space origin");
     }
-    const measuredResult = spawnSync(cliPath, ["inspect", measuredPath, "--font", font, "--font", monoFont], { encoding: "utf8" });
-    assert.equal(measuredResult.status, 0, measuredResult.stderr);
-    const fontless = spawnSync(cliPath, ["inspect", measuredPath], { encoding: "utf8" });
-    assert.equal(fontless.status, 0, fontless.stderr);
+    cli(["inspect", measuredPath, ...fontOptions]);
+    cli(["inspect", measuredPath]);
 
     // Lua seeded alike draws the same numbers, the draws a range throws away included; the script
     // hands them back in its error, which the CLI reports whole up to 2 KiB.
-    const randomPath = join(directory, "random.lua");
-    writeFileSync(randomPath, [
+    const randomPath = writeScript("random.lua", [
         "math.randomseed(2024, 5)",
         "local values = {}",
         "for i = 1, 40 do",
@@ -3657,109 +3641,68 @@ try {
     }
     assert.deepEqual(luaDraws, jsDraws, randomResult.stderr);
 
-    const countingPath = join(directory, "counting.lua");
-    writeFileSync(countingPath, countingLua);
-    const countingResult = spawnSync(cliPath, ["inspect", countingPath], { encoding: "utf8" });
-    assert.equal(countingResult.status, 0, countingResult.stderr);
-    assert.equal(JSON.parse(countingResult.stdout).duration, 2);
+    assert.equal(inspectScript("counting.lua", countingLua).scene.duration, 2);
 
-    const retitledPath = join(directory, "retitled.lua");
-    writeFileSync(retitledPath, retitledLua);
-    const retitledResult = spawnSync(cliPath, ["inspect", retitledPath], { encoding: "utf8" });
-    assert.equal(retitledResult.status, 0, retitledResult.stderr);
-    assert.equal(JSON.parse(retitledResult.stdout).duration, 1);
+    assert.equal(inspectScript("retitled.lua", retitledLua).scene.duration, 1);
 
     // The back rectangle keeps its higher layer until the play ends, and the front circle
     // switches at the cursor.
-    const layeredPath = join(directory, "layered.lua");
-    writeFileSync(layeredPath, layeredLua);
-    const layersAt = (time) => {
-        const result = spawnSync(cliPath, ["layout", layeredPath, "--time", String(time)], { encoding: "utf8" });
-        assert.equal(result.status, 0, result.stderr);
-        return Object.fromEntries(JSON.parse(result.stdout).report.objects.map((object) => [object.id, object.layer]));
-    };
+    const layeredPath = writeScript("layered.lua", layeredLua);
+    const layersAt = (time) =>
+        Object.fromEntries(layoutAt(layeredPath, time).report.objects.map((object) => [object.id, object.layer]));
     assert.deepEqual(layersAt(0.5), { back: 2, front: 1 });
     assert.deepEqual(layersAt(1), { back: 0, front: -1 });
 
     // The card comes back over a second, the dot's layer switches back at once, and the last
     // restore waits half a second; 20 pixels per unit with the origin at pixel (80, 40).
-    const savingPath = join(directory, "saving.lua");
-    writeFileSync(savingPath, savingLua);
-    const savedAt = (time) => {
-        const result = spawnSync(cliPath, ["layout", savingPath, "--time", String(time)], { encoding: "utf8" });
-        assert.equal(result.status, 0, result.stderr);
-        return Object.fromEntries(JSON.parse(result.stdout).report.objects.map((object) => {
-            const bounds = object.paintBounds;
-            return [object.id, [Math.round(bounds.x + bounds.width / 2), Math.round(bounds.y + bounds.height / 2),
-                object.layer]];
-        }));
-    };
+    const saving = inspectScript("saving.lua", savingLua);
+    const savedAt = (time) => Object.fromEntries(layoutAt(saving.path, time).report.objects.map((object) => {
+        const bounds = object.paintBounds;
+        return [object.id, [Math.round(bounds.x + bounds.width / 2), Math.round(bounds.y + bounds.height / 2),
+            object.layer]];
+    }));
     assert.deepEqual(savedAt(1), { card: [60, 20, 0], dot: [120, 40, 3] });
     assert.deepEqual(savedAt(1.5), { card: [50, 30, 0], dot: [120, 40, 3] });
     assert.deepEqual(savedAt(2), { card: [40, 40, 0], dot: [120, 40, 0] });
-    const savingResult = spawnSync(cliPath, ["inspect", savingPath], { encoding: "utf8" });
-    assert.equal(savingResult.status, 0, savingResult.stderr);
-    assert.equal(JSON.parse(savingResult.stdout).duration, 2.5);
-    const unsavedPath = join(directory, "unsaved.lua");
-    writeFileSync(unsavedPath, unsavedLua);
-    const unsavedResult = spawnSync(cliPath, ["inspect", unsavedPath], { encoding: "utf8" });
-    assert.notEqual(unsavedResult.status, 0);
-    assert.match(unsavedResult.stderr, /could not restore: 'lonely' has no saved state; save it before restoring/);
+    assert.equal(saving.scene.duration, 2.5);
+    assert.match(refusal("unsaved.lua", unsavedLua), /could not restore: 'lonely' has no saved state; save it before restoring/);
 
-    const spannedPath = join(directory, "spanned.lua");
-    writeFileSync(spannedPath, spannedLua);
-    const spannedResult = spawnSync(cliPath, ["inspect", spannedPath, "--font", font, "--font", monoFont], { encoding: "utf8" });
-    assert.equal(spannedResult.status, 0, spannedResult.stderr);
-    const spannedObjects = JSON.parse(spannedResult.stdout).objects;
+    const spannedObjects = inspectScript("spanned.lua", spannedLua, fontOptions).scene.objects;
     const sentenceHandle = spannedObjects.find((object) => object.id === "sentence").handle;
     assert.equal(spannedObjects.filter((object) => object.parent === sentenceHandle).length, 4);
     assert.equal(spannedObjects.find((object) => object.id === "brown").parent, sentenceHandle);
     assert.equal(spannedObjects.find((object) => object.id === "sentence/4").parent, sentenceHandle);
     assert.equal(spannedObjects.filter((object) => object.type === "text").length, 12);
 
-    const matchingPath = join(directory, "matching.lua");
-    writeFileSync(matchingPath, matchingLua);
-    const matchingResult = spawnSync(cliPath, ["inspect", matchingPath, "--font", font, "--font", monoFont], { encoding: "utf8" });
-    assert.equal(matchingResult.status, 0, matchingResult.stderr);
-    assert.equal(JSON.parse(matchingResult.stdout).duration, 3.6);
+    assert.equal(inspectScript("matching.lua", matchingLua, fontOptions).scene.duration, 3.6);
 
     // Every handle the builder names for a brace is the object the script returns.
-    const bracingPath = join(directory, "bracing.lua");
-    writeFileSync(bracingPath, bracingLua);
-    const bracingResult = spawnSync(cliPath, ["inspect", bracingPath, "--font", font, "--font", monoFont], { encoding: "utf8" });
-    assert.equal(bracingResult.status, 0, bracingResult.stderr);
-    const bracingObjects = JSON.parse(bracingResult.stdout).objects;
+    const bracing = inspectScript("bracing.lua", bracingLua, fontOptions).scene;
+    const bracingObjects = bracing.objects;
     const bracingId = (id) => bracingObjects.find((object) => object.id === id);
     assert.equal(bracingId("under")?.type, "path");
     assert.equal(bracingId("under/label")?.type, "text");
     assert.equal(bracingId("span")?.parent, bracingId("holder").handle);
     assert.equal(bracingObjects.filter((object) => object.type === "path").length, 3);
-    assert.equal(JSON.parse(bracingResult.stdout).duration, 2);
+    assert.equal(bracing.duration, 2);
 
     // Every token handle the builder names exists once the scene runs.
-    const codedPath = join(directory, "coded.lua");
-    writeFileSync(codedPath, codedLua);
-    const codedResult = spawnSync(cliPath, ["inspect", codedPath, "--font", font, "--font", monoFont], { encoding: "utf8" });
-    assert.equal(codedResult.status, 0, codedResult.stderr);
+    const coded = inspectScript("coded.lua", codedLua, fontOptions);
     // Without its font, code is set in the default font, and the CLI says so.
-    const missingCodeFont = spawnSync(cliPath, ["inspect", codedPath, "--font", font], { encoding: "utf8" });
-    assert.equal(missingCodeFont.status, 0, missingCodeFont.stderr);
+    const missingCodeFont = cli(["inspect", coded.path, "--font", font]);
     assert.match(missingCodeFont.stderr, /the font 'JetBrainsMono' is not loaded, so its text is drawn in the default font/);
     assert.doesNotMatch(missingCodeFont.stderr, /'Pretendard'/);
-    const codedObjects = JSON.parse(codedResult.stdout).objects;
+    const codedObjects = coded.scene.objects;
     assert.equal(codedObjects.filter((object) => object.type === "text").length, 16);
     const lastLine = codedObjects.find((object) => object.id === "listing/4").handle;
     assert.equal(codedObjects.find((object) => object.id === "listing/4/7").parent, lastLine);
     assert.ok(codedObjects.find((object) => object.id === "band" && object.type === "rectangle"));
-    assert.equal(JSON.parse(codedResult.stdout).duration, 4.6);
+    assert.equal(coded.scene.duration, 4.6);
 
     // The script makes every token the builder named for a search, and every edited block, with
     // each token in its line; a block below a group edits into that group.
-    const sumsPath = join(directory, "sums.lua");
-    writeFileSync(sumsPath, sumsLua);
-    const sumsResult = spawnSync(cliPath, ["inspect", sumsPath, "--font", font, "--font", monoFont], { encoding: "utf8" });
-    assert.equal(sumsResult.status, 0, sumsResult.stderr);
-    const sumsObjects = JSON.parse(sumsResult.stdout).objects;
+    const sums = inspectScript("sums.lua", sumsLua, fontOptions).scene;
+    const sumsObjects = sums.objects;
     const sumsId = (id) => sumsObjects.find((object) => object.id === id);
     assert.equal(sumsId("sum/5/3").parent, sumsId("sum/5").handle);
     assert.equal(sumsId("word/2/3").parent, sumsId("word/2").handle);
@@ -3771,13 +3714,9 @@ try {
     assert.equal(sumsId("word.3/3").parent, sumsId("word.3").handle);
     assert.equal(sumsId("word.3/4"), undefined);
     assert.equal(sumsId("box")?.type, "rectangle");
-    assert.equal(JSON.parse(sumsResult.stdout).duration, 6.5);
+    assert.equal(sums.duration, 6.5);
 
-    const shadedPath = join(directory, "shaded.lua");
-    writeFileSync(shadedPath, compileScene(shaded));
-    const shadedResult = spawnSync(cliPath, ["inspect", shadedPath], { encoding: "utf8" });
-    assert.equal(shadedResult.status, 0, shadedResult.stderr);
-    const shadedObjects = JSON.parse(shadedResult.stdout).objects;
+    const shadedObjects = inspectScript("shaded.lua", compileScene(shaded)).scene.objects;
     assert.ok(shadedObjects.find((object) => object.id === "between" && object.type === "polygon"));
     const sumHandle = shadedObjects.find((object) => object.id === "sum").handle;
     assert.equal(shadedObjects.filter((object) => object.parent === sumHandle && object.type === "rectangle").length, 4);
@@ -3786,41 +3725,30 @@ try {
     assert.equal(shadedObjects.filter((object) => object.parent === fieldHandle && object.type === "vector").length, 8);
     assert.ok(shadedObjects.find((object) => object.id === "field/3/2"));
 
-    const shelfPath = join(directory, "shelf.lua");
-    writeFileSync(shelfPath, shelfLua);
-    const shelfResult = spawnSync(cliPath, ["inspect", shelfPath], { encoding: "utf8" });
-    assert.equal(shelfResult.status, 0, shelfResult.stderr);
-    assert.equal(JSON.parse(shelfResult.stdout).duration, 2);
+    assert.equal(inspectScript("shelf.lua", shelfLua).scene.duration, 2);
 
-    const gridPath = join(directory, "grid.lua");
-    writeFileSync(gridPath, gridLua);
-    const gridResult = spawnSync(cliPath, ["inspect", gridPath, "--font", font, "--font", monoFont], { encoding: "utf8" });
-    assert.equal(gridResult.status, 0, gridResult.stderr);
-    const gridObjects = JSON.parse(gridResult.stdout).objects;
+    const grid = inspectScript("grid.lua", gridLua, fontOptions).scene;
+    const gridObjects = grid.objects;
     const secondRow = gridObjects.find((object) => object.id === "m/2").handle;
     assert.equal(gridObjects.find((object) => object.id === "m/2/3").parent, secondRow);
     assert.ok(gridObjects.find((object) => object.id === "m/left" && object.type === "path"));
     assert.ok(gridObjects.find((object) => object.id === "band" && object.type === "rectangle"));
     assert.equal(gridObjects.filter((object) => object.type === "text").length, 8);
-    assert.equal(JSON.parse(gridResult.stdout).duration, 1);
+    assert.equal(grid.duration, 1);
 
-    const ledgerPath = join(directory, "ledger.lua");
-    writeFileSync(ledgerPath, ledgerLua);
-    const ledgerResult = spawnSync(cliPath, ["inspect", ledgerPath, "--font", font, "--font", monoFont], { encoding: "utf8" });
-    assert.equal(ledgerResult.status, 0, ledgerResult.stderr);
-    const ledgerObjects = JSON.parse(ledgerResult.stdout).objects;
+    const ledger = inspectScript("ledger.lua", ledgerLua, fontOptions).scene;
+    const ledgerObjects = ledger.objects;
     const sheetHandle = ledgerObjects.find((object) => object.id === "t").handle;
     const sheetChildren = ledgerObjects.filter((object) => object.parent === sheetHandle).map((object) => object.type);
     assert.deepEqual(sheetChildren, [...Array(4).fill("group"), "rectangle", ...Array(8).fill("line")]);
     assert.equal(ledgerObjects.find((object) => object.id === "t/4/2").parent, ledgerObjects.find((object) => object.id === "t/4").handle);
     assert.equal(ledgerObjects.filter((object) => object.type === "text").length, 8 + 4 + 2);
-    assert.equal(JSON.parse(ledgerResult.stdout).duration, 1);
+    assert.equal(ledger.duration, 1);
 
     // Every part handle the builder names exists once the tex module sets the formulas; a build
     // without the module names the build option instead.
-    const typesetPath = join(directory, "typeset.lua");
-    writeFileSync(typesetPath, typesetLua);
-    const typesetResult = spawnSync(cliPath, ["inspect", typesetPath, "--font", font, "--font", monoFont], { encoding: "utf8" });
+    const typesetResult = spawnSync(cliPath, ["inspect", writeScript("typeset.lua", typesetLua), ...fontOptions],
+        { encoding: "utf8" });
     if (typesetResult.status === 0) {
         const typesetObjects = JSON.parse(typesetResult.stdout).objects;
         const handleOf = (id) => typesetObjects.find((object) => object.id === id)?.handle;
@@ -3837,9 +3765,8 @@ try {
     }
 
     // Every child the builder names in a row with formulas exists below it once the scene runs.
-    const inlinedPath = join(directory, "inlined.lua");
-    writeFileSync(inlinedPath, inlinedLua);
-    const inlinedResult = spawnSync(cliPath, ["inspect", inlinedPath, "--font", font, "--font", monoFont], { encoding: "utf8" });
+    const inlinedResult = spawnSync(cliPath, ["inspect", writeScript("inlined.lua", inlinedLua), ...fontOptions],
+        { encoding: "utf8" });
     if (inlinedResult.status === 0) {
         const inlinedObjects = JSON.parse(inlinedResult.stdout).objects;
         const handleOf = (id) => inlinedObjects.find((object) => object.id === id)?.handle;
@@ -3854,35 +3781,19 @@ try {
         assert.match(inlinedResult.stderr, /a tex part needs the tex module: build viscript with -Dmodules=tex/);
     }
 
-    const vennPath = join(directory, "venn.lua");
-    writeFileSync(vennPath, vennLua);
-    const vennResult = spawnSync(cliPath, ["inspect", vennPath], { encoding: "utf8" });
-    assert.equal(vennResult.status, 0, vennResult.stderr);
-    const vennObjects = JSON.parse(vennResult.stdout).objects;
+    const vennObjects = inspectScript("venn.lua", vennLua).scene.objects;
     for (const id of ["lens", "both", "crescent", "apart", "ring"]) {
         assert.ok(vennObjects.find((object) => object.id === id && object.type === "path"), id);
     }
 
-    const tracksPath = join(directory, "tracks.lua");
-    writeFileSync(tracksPath, tracksLua);
-    const tracksResult = spawnSync(cliPath, ["inspect", tracksPath], { encoding: "utf8" });
-    assert.equal(tracksResult.status, 0, tracksResult.stderr);
-    const inspectedTracks = JSON.parse(tracksResult.stdout);
+    const inspectedTracks = inspectScript("tracks.lua", tracksLua).scene;
     assert.equal(inspectedTracks.duration, 5);
     assert.deepEqual(inspectedTracks.markers, [{ name: "badge", time: 1 }]);
 
-    const lensedPath = join(directory, "lensed.lua");
-    writeFileSync(lensedPath, lensedLua);
-    const lensedResult = spawnSync(cliPath, ["inspect", lensedPath], { encoding: "utf8" });
-    assert.equal(lensedResult.status, 0, lensedResult.stderr);
-    assert.equal(JSON.parse(lensedResult.stdout).duration, 2);
+    assert.equal(inspectScript("lensed.lua", lensedLua).scene.duration, 2);
 
     // The copies take the ids the builder gave them, and the runtime derives the others.
-    const cloningPath = join(directory, "cloning.lua");
-    writeFileSync(cloningPath, cloningLua);
-    const cloningResult = spawnSync(cliPath, ["inspect", cloningPath, "--font", font, "--font", monoFont], { encoding: "utf8" });
-    assert.equal(cloningResult.status, 0, cloningResult.stderr);
-    const cloningObjects = JSON.parse(cloningResult.stdout).objects;
+    const cloningObjects = inspectScript("cloning.lua", cloningLua, fontOptions).scene.objects;
     const twinHandle = cloningObjects.find((object) => object.id === "twin").handle;
     for (const id of ["twin/a", "twin/b", "pair/a:copy"]) {
         assert.equal(cloningObjects.find((object) => object.id === id).parent, twinHandle, id);
@@ -3892,41 +3803,17 @@ try {
     }
 
     // Each transform from a copy adds the copy beside its source, which stays.
-    const copyingPath = join(directory, "copying.lua");
-    writeFileSync(copyingPath, copyingLua);
-    const copyingResult = spawnSync(cliPath, ["inspect", copyingPath], { encoding: "utf8" });
-    assert.equal(copyingResult.status, 0, copyingResult.stderr);
-    const inspectedCopying = JSON.parse(copyingResult.stdout);
+    const inspectedCopying = inspectScript("copying.lua", copyingLua).scene;
     assert.equal(inspectedCopying.duration, 4.5);
     assert.equal(inspectedCopying.objects.filter((object) => object.type === "rectangle").length, 4);
     assert.equal(inspectedCopying.objects.filter((object) => object.type === "group").length, 3);
 
     // A JS scene with trackers renders as its Lua twin does, and its functions see the values
     // the twin's functions see, to the last bit.
-    const inspectScript = (name, source, fonts = []) => {
-        const path = join(directory, name);
-        writeFileSync(path, source);
-        const result = spawnSync(cliPath, ["inspect", path, ...fonts], { encoding: "utf8" });
-        assert.equal(result.status, 0, `${name}: ${result.stderr}`);
-        return { path, scene: JSON.parse(result.stdout) };
-    };
-    // A twin that writes texts renders with the fonts it names as further arguments.
-    const renderFrame = (path, time, fonts = []) => {
-        const png = join(directory, "frame.png");
-        const result = spawnSync(cliPath, ["render", path, "--time", String(time), ...fonts, "-o", png], {
-            encoding: "utf8",
-        });
-        assert.equal(result.status, 0, result.stderr);
-        return readFileSync(png);
-    };
     for (const [index, script] of scaledMatchScripts.entries()) {
         const built = inspectScript(`scaled-match-${index}.lua`, script, ["--font", font]);
-        const boundsAt = (time, id) => {
-            const result = spawnSync(cliPath, ["layout", built.path, "--time", String(time), "--font", font],
-                { encoding: "utf8" });
-            assert.equal(result.status, 0, result.stderr);
-            return JSON.parse(result.stdout).scene.objects.find((object) => object.id === id).bounds;
-        };
+        const boundsAt = (time, id) =>
+            layoutAt(built.path, time, ["--font", font]).scene.objects.find((object) => object.id === id).bounds;
         const before = boundsAt(0.499, "source");
         for (const time of [1.5, 0.5, 0.499, 0.5]) {
             const actual = boundsAt(time, time === 0.5 ? "target" : "source");
@@ -3942,9 +3829,7 @@ try {
     for (const time of [2, 1.5, 1, 1.25]) {
         assert.deepEqual(renderFrame(guidedBuilt.path, time), renderFrame(guidedAuthored.path, time));
     }
-    const guidedLayout = spawnSync(cliPath, ["layout", guidedBuilt.path, "--time", "1.5"], { encoding: "utf8" });
-    assert.equal(guidedLayout.status, 0, guidedLayout.stderr);
-    const guidedObjects = JSON.parse(guidedLayout.stdout).scene.objects;
+    const guidedObjects = layoutAt(guidedBuilt.path, 1.5).scene.objects;
     const guidedC = guidedObjects.find((object) => object.id === "c").bounds;
     assert.ok(Math.abs(guidedC.x + guidedC.width / 2 - 100) < 0.01);
     assert.ok(Math.abs(guidedC.y + guidedC.height / 2 - 60) < 0.01);
@@ -3996,9 +3881,9 @@ try {
         ["long-track", longTrack, longTrackScript, [597 / 30, 598 / 30, 599 / 30, 597 / 30], ["--font", font]],
         ["minute-track", minuteTrack, minuteTrackScript, [3598 / 60], ["--font", font]],
         ["piece-morph", pieceMorph, pieceMorphScript, [0, 0.25, 0.5, 0.75, 1, 1.25, 0.5]],
-        ["pinned-code", pinnedCode, pinnedCodeScript, [0, 0.5, 1, 0.5], ["--font", font, "--font", monoFont]],
-        ["angles", angleTwin, angleTwinScript, [0, 0.25, 0.5, 1, 1.25, 1.5, 0.5], ["--font", font, "--font", monoFont]],
-        ["connected", connected, connectedScript, [0.25, 0.5, 1, 1.25, 1.5, 1.75, 2, 1.25], ["--font", font, "--font", monoFont]],
+        ["pinned-code", pinnedCode, pinnedCodeScript, [0, 0.5, 1, 0.5], fontOptions],
+        ["angles", angleTwin, angleTwinScript, [0, 0.25, 0.5, 1, 1.25, 1.5, 0.5], fontOptions],
+        ["connected", connected, connectedScript, [0.25, 0.5, 1, 1.25, 1.5, 1.75, 2, 1.25], fontOptions],
         ["trimmed", trimmed, trimmedScript, [0, 0.25, 0.5, 0.75, 1, 1.5, 2]],
         ["twin", twin, twinScript, [0, 0.3, 1, 1.4, 1.9, 2.4, 2.8, 3.1, 3.5, 3.9, 4.4, 4.5, 4.65, 5.1, 5.65, 5.9, 6.15]],
         ["shaped", shaped, shapedScript, [0, 0.25, 0.5, 0.75, 1, 1.25, 1.5]],
@@ -4017,7 +3902,7 @@ try {
         ["replot", replot, replotScript, [0, 0.25, 0.45, 0.55, 0.75, 1, 1.25, 1.75, 2.25, 2.75, 3.25, 3.75, 4.25, 4.75, 5]],
         ["function-play", functionPlay, functionPlayScript, [0, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.25, 2.5, 2.75, 3]],
         ["animated-poles", animatedPoles, animatedPolesScript, Array.from({ length: 21 }, (_, i) => i / 20)],
-        ["labeled", labeled, labeledScript, [0, 0.5, 1, 1.5, 2, 3, 4], ["--font", font, "--font", monoFont]],
+        ["labeled", labeled, labeledScript, [0, 0.5, 1, 1.5, 2, 3, 4], fontOptions],
     ]) {
         const fromJs = inspectScript(`${name}-js.lua`, compileScene(built), fonts);
         const fromLua = inspectScript(`${name}-lua.lua`, script, fonts);
@@ -4026,9 +3911,7 @@ try {
             assert.equal(fromJs.scene.duration, 8);
             for (const time of times) {
                 for (const path of [fromJs.path, fromLua.path]) {
-                    const result = spawnSync(cliPath, ["layout", path, "--time", String(time)], {encoding: "utf8"});
-                    assert.equal(result.status, 0, result.stderr);
-                    const mass = JSON.parse(result.stdout).scene.objects.find((object) => object.id === "mass");
+                    const mass = layoutAt(path, time).scene.objects.find((object) => object.id === "mass");
                     const displacement = mass.bounds.x + mass.bounds.width / 2 - 480;
                     assert.ok(Math.abs(displacement - springReference(Math.max(0, time - 0.5))) < 0.002);
                 }
@@ -4037,9 +3920,7 @@ try {
         if (name === "labelled-contours") {
             const label = fromJs.scene.objects.find((object) => object.id === "labels/1/label/1");
             assert.ok(label && label.type === "text", "contour labels must be real native Text children");
-            const measured = spawnSync(cliPath, ["layout", fromJs.path, "--time", "0.5", ...fonts], { encoding: "utf8" });
-            assert.equal(measured.status, 0, measured.stderr);
-            const layout = JSON.parse(measured.stdout);
+            const layout = layoutAt(fromJs.path, 0.5, fonts);
             const text = layout.scene.objects.find((object) => object.id === "labels/1/label/1");
             assert.equal(text.text, "0.50");
             const centerX = text.bounds.x + text.bounds.width / 2;
@@ -4051,9 +3932,7 @@ try {
         }
         for (const time of times) {
             if (name === "animated-poles") {
-                const result = spawnSync(cliPath, ["layout", fromJs.path, "--time", String(time)], { encoding: "utf8" });
-                assert.equal(result.status, 0, result.stderr);
-                const report = JSON.parse(result.stdout).report;
+                const report = layoutAt(fromJs.path, time).report;
                 const object = report.objects.findIndex((entry) => entry.id === "graph");
                 const paths = report.paths.filter((path) => report.visuals[path.visual].object === object);
                 assert.equal(paths.length, 3, `pole branch count at ${time}`);
@@ -4071,9 +3950,7 @@ try {
     // The scene takes the points of the plots in the counts the builder left to it.
     const endpointPath = inspectScript("endpoint.lua", compileScene(endpointPlot)).path;
     for (const [time, x, y] of [[0, 145, 120], [1.5, 137.5, 120], [2, 130, 120], [3, 130, 90], [4, null, null], [0, 145, 120]]) {
-        const measured = spawnSync(cliPath, ["layout", endpointPath, "--time", String(time)], {encoding: "utf8"});
-        assert.equal(measured.status, 0, measured.stderr);
-        const graph = JSON.parse(measured.stdout).report.objects.find((object) => object.id === "graph");
+        const graph = layoutAt(endpointPath, time).report.objects.find((object) => object.id === "graph");
         assert.equal(graph.visible, x !== null);
         if (x !== null) {
             assert.ok(Math.abs(graph.paintBounds.x + graph.paintBounds.width / 2 - x) < 0.1);
@@ -4082,9 +3959,7 @@ try {
     }
     const progressPath = inspectScript("endpoint-progress.lua", compileScene(endpointProgress)).path;
     for (const time of [0, 1, 1.25, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 0]) {
-        const measured = spawnSync(cliPath, ["layout", progressPath, "--time", String(time)], {encoding: "utf8"});
-        assert.equal(measured.status, 0, measured.stderr);
-        const objects = JSON.parse(measured.stdout).report.objects;
+        const objects = layoutAt(progressPath, time).report.objects;
         for (const id of ["down", "up", "stay", "grouped", "spaced", "reset", "future"]) {
             let visible = true;
             if (id === "grouped") visible = (time > 1 && time < 3) || time > 4;
@@ -4101,11 +3976,8 @@ try {
     assert.equal(inspectScript("recut.lua", recutLua).scene.duration, 2);
     // The warp of the pending twin lifts the beam the last tracks lay back flat at y = 0.5 to
     // y = 1.5, 15 pixels to a unit above the center of the frame.
-    const pendingPath = join(directory, "pending.lua");
-    writeFileSync(pendingPath, pendingLua);
-    const pendingLayout = spawnSync(cliPath, ["layout", pendingPath, "--time", "13.5"], { encoding: "utf8" });
-    assert.equal(pendingLayout.status, 0, pendingLayout.stderr);
-    const liftedBeam = JSON.parse(pendingLayout.stdout).scene.objects.find((object) => object.id === "beam").bounds;
+    const liftedBeam = layoutAt(writeScript("pending.lua", pendingLua), 13.5).scene.objects
+        .find((object) => object.id === "beam").bounds;
     assert.ok(Math.abs(liftedBeam.y + liftedBeam.height / 2 - 22.5) < 0.5, JSON.stringify(liftedBeam));
     // The texts made from strings lie below the space and the rectangle keeps its parent; placed
     // twice, it ends right of the y axis at -1, its left side 5 + 4 pixels from the axis.
@@ -4116,20 +3988,16 @@ try {
     assert.deepEqual(namedLabels.scene.objects.filter((object) => object.type === "text").map((object) => object.id),
         ["axes/label/x/1", "axes/label/x/2", "axes/label/y/1", "axes/label/z/1",
             "axes/label/x/3", "axes/label/y/2", "axes/label/x/4", null, null]);
-    const graphLayout = spawnSync(cliPath, ["layout", graphed.path, "--font", font, "--font", monoFont], { encoding: "utf8" });
-    assert.equal(graphLayout.status, 0, graphLayout.stderr);
-    const tagged = JSON.parse(graphLayout.stdout).scene.objects.find((object) => object.id === "tag");
+    const tagged = JSON.parse(cli(["layout", graphed.path, ...fontOptions]).stdout).scene.objects
+        .find((object) => object.id === "tag");
     assert.deepEqual(tagged.bounds, { x: 168.375, y: 115.625, width: 16.25, height: 8.75 });
     // A code block lays its tokens out as one block, and the report says so; a plain Group does not.
-    const blockPath = join(directory, "block.lua");
-    writeFileSync(blockPath, `local scene = vis.scene {width = 320, height = 120}
+    const blockPath = writeScript("block.lua", `local scene = vis.scene {width = 320, height = 120}
 scene:group {id = "plain"}
 scene:code {text = "a = b", language = "plain", id = "snippet"}
 return scene
 `);
-    const blockLayout = spawnSync(cliPath, ["layout", blockPath, "--font", font, "--font", monoFont], { encoding: "utf8" });
-    assert.equal(blockLayout.status, 0, blockLayout.stderr);
-    const blockObjects = JSON.parse(blockLayout.stdout).report.objects;
+    const blockObjects = JSON.parse(cli(["layout", blockPath, ...fontOptions]).stdout).report.objects;
     const typesetOf = (id) => blockObjects.find((object) => object.id === id)?.typeset;
     assert.equal(typesetOf("snippet"), true);
     assert.equal(typesetOf("plain"), false);
@@ -4139,13 +4007,9 @@ return scene
     // or fully faded is left out of the report and draws nothing.
     const inspectedLens = inspectScript("lens.lua", magnifiedLua);
     assert.equal(inspectedLens.scene.duration, 3.75);
-    const viewScenes = (time) => {
-        const result = spawnSync(cliPath, ["layout", inspectedLens.path, "--time", String(time)], { encoding: "utf8" });
-        assert.equal(result.status, 0, result.stderr);
-        return JSON.parse(result.stdout).report.scenes
-            .filter((entry) => entry.kind === "view")
-            .map((entry) => [entry.path, entry.bounds, entry.scale]);
-    };
+    const viewScenes = (time) => layoutAt(inspectedLens.path, time).report.scenes
+        .filter((entry) => entry.kind === "view")
+        .map((entry) => [entry.path, entry.bounds, entry.scale]);
     const lensBounds = { x: 80, y: 0, width: 80, height: 45 };
     const overviewBounds = { x: 0, y: 45, width: 40, height: 45 };
     assert.deepEqual(viewScenes(0), []);
@@ -4159,11 +4023,7 @@ return scene
         ["root/view:1", overviewBounds, { x: 1, y: 1 }],
     ]);
     assert.ok(!renderFrame(inspectedLens.path, 0).equals(renderFrame(inspectedLens.path, 1)));
-    const hurriedPath = join(directory, "hurried.lua");
-    writeFileSync(hurriedPath, hurriedLua);
-    const hurriedResult = spawnSync(cliPath, ["inspect", hurriedPath], { encoding: "utf8" });
-    assert.notEqual(hurriedResult.status, 0);
-    assert.match(hurriedResult.stderr, /could not fade view: the view already fades until 1\.00 s/);
+    assert.match(refusal("hurried.lua", hurriedLua), /could not fade view: the view already fades until 1\.00 s/);
     assert.equal(inspectScript("turning.lua", turningLua).scene.duration, 2);
 
     const flattened = inspectScript("flattening.lua", flatteningLua).scene;
@@ -4189,48 +4049,28 @@ return scene
     const laterFromLua = inspectScript("later-lua.lua", laterScript);
     assert.equal(laterFromJs.scene.duration, laterFromLua.scene.duration);
     for (const time of [1.2, 1.6, 1.62, 2, 2.5, 3]) {
-        const boundsAt = (path) => {
-            const result = spawnSync(cliPath, ["layout", path, "--time", String(time)], { encoding: "utf8" });
-            assert.equal(result.status, 0, result.stderr);
-            return JSON.parse(result.stdout).scene.objects.find((object) => object.id === "dot").bounds;
-        };
+        const boundsAt = (path) => layoutAt(path, time).scene.objects.find((object) => object.id === "dot").bounds;
         const [fromJs, fromLua] = [boundsAt(laterFromJs.path), boundsAt(laterFromLua.path)];
         for (const key of ["x", "y", "width", "height"]) {
             assert.ok(Math.abs(fromJs[key] - fromLua[key]) < 0.01, `later at ${time}: ${key}`);
         }
     }
-    const apartPath = join(directory, "apart.lua");
-    writeFileSync(apartPath, apartLua);
-    const apartResult = spawnSync(cliPath, ["inspect", apartPath], { encoding: "utf8" });
-    assert.notEqual(apartResult.status, 0);
-    assert.match(apartResult.stderr, /'dot' already animates its size until 3\.00 s/);
+    assert.match(refusal("apart.lua", apartLua), /'dot' already animates its size until 3\.00 s/);
 
     // Halfway through, the shift has carried the bar to the middle and the quarter turn, which
     // travels straight without an arc, has shrunk it to a square 1.25 units wide. Halfway through
     // the morph, the shift still to come holds the blob one unit short of the morph at rest.
-    const layersPath = join(directory, "layers.lua");
-    writeFileSync(layersPath, layersLua);
-    const layersResult = spawnSync(cliPath, ["layout", layersPath, "--time", "1"], { encoding: "utf8" });
-    assert.equal(layersResult.status, 0, layersResult.stderr);
-    const layered = JSON.parse(layersResult.stdout).scene.objects.find((object) => object.id === "bar").bounds;
+    const layersPath = writeScript("layers.lua", layersLua);
+    const layered = layoutAt(layersPath, 1).scene.objects.find((object) => object.id === "bar").bounds;
     for (const [value, expected] of [[layered.x, 67.5], [layered.y, 27.5], [layered.width, 25], [layered.height, 25]]) {
         assert.ok(Math.abs(value - expected) < 0.5, `bar bounds ${JSON.stringify(layered)}`);
     }
-    const morphResult = spawnSync(cliPath, ["layout", layersPath, "--time", "1.5"], { encoding: "utf8" });
-    assert.equal(morphResult.status, 0, morphResult.stderr);
-    const morphing = JSON.parse(morphResult.stdout).scene.objects.find((object) => object.id === "blob").bounds;
+    const morphing = layoutAt(layersPath, 1.5).scene.objects.find((object) => object.id === "blob").bounds;
     const morphCenter = [morphing.x + morphing.width / 2, morphing.y + morphing.height / 2];
     assert.ok(Math.abs(morphCenter[0] - 100) < 0.5 && Math.abs(morphCenter[1] - 50) < 0.5, JSON.stringify(morphing));
-    const hastyPath = join(directory, "hasty.lua");
-    writeFileSync(hastyPath, hastyLua);
-    const hastyResult = spawnSync(cliPath, ["inspect", hastyPath], { encoding: "utf8" });
-    assert.notEqual(hastyResult.status, 0);
-    assert.match(hastyResult.stderr, /'dot' already animates its transform until 2\.00 s; a morph that begins before then must end/);
-    const emphasisPath = join(directory, "emphasis.lua");
-    writeFileSync(emphasisPath, emphasisLua);
-    const emphasisResult = spawnSync(cliPath, ["inspect", emphasisPath], { encoding: "utf8" });
-    assert.equal(emphasisResult.status, 0, emphasisResult.stderr);
-    const inspectedEmphasis = JSON.parse(emphasisResult.stdout);
+    assert.match(refusal("hasty.lua", hastyLua),
+        /'dot' already animates its transform until 2\.00 s; a morph that begins before then must end/);
+    const inspectedEmphasis = inspectScript("emphasis.lua", emphasisLua).scene;
     assert.equal(inspectedEmphasis.duration, 10);
     // The shapes of the emphases are named after their target, and the lines of a flash at a
     // point after the effect alone.
@@ -4249,39 +4089,20 @@ return scene
 
     // The dot rides the samples from (1, 1) to its image (0, 2) under z -> z^2, then to
     // (0.1, 1); 30 pixels to a unit from the center of the frame.
-    const warpingPath = join(directory, "warping.lua");
-    writeFileSync(warpingPath, warpingLua);
-    const warpedAt = (time) => {
-        const result = spawnSync(cliPath, ["layout", warpingPath, "--time", String(time)], { encoding: "utf8" });
-        assert.equal(result.status, 0, result.stderr);
-        const bounds = JSON.parse(result.stdout).scene.objects.find((object) => object.id === "dot").bounds;
-        return [bounds.x + bounds.width / 2, bounds.y + bounds.height / 2];
-    };
+    const warping = inspectScript("warping.lua", warpingLua);
     for (const [time, expected] of [[0, [270, 105]], [0.5, [255, 90]], [1, [240, 75]], [1.5, [243, 105]]]) {
-        const center = warpedAt(time);
+        const bounds = layoutAt(warping.path, time).scene.objects.find((object) => object.id === "dot").bounds;
+        const center = [bounds.x + bounds.width / 2, bounds.y + bounds.height / 2];
         assert.ok(Math.hypot(center[0] - expected[0], center[1] - expected[1]) < 0.5, `dot at ${time} s: ${center}`);
     }
-    const warpingResult = spawnSync(cliPath, ["inspect", warpingPath], { encoding: "utf8" });
-    assert.equal(warpingResult.status, 0, warpingResult.stderr);
-    assert.equal(JSON.parse(warpingResult.stdout).duration, 2);
-    const uncoveredPath = join(directory, "uncovered.lua");
-    writeFileSync(uncoveredPath, uncoveredLua);
-    const uncoveredResult = spawnSync(cliPath, ["inspect", uncoveredPath], { encoding: "utf8" });
-    assert.notEqual(uncoveredResult.status, 0);
-    assert.match(uncoveredResult.stderr,
+    assert.equal(warping.scene.duration, 2);
+    assert.match(refusal("uncovered.lua", uncoveredLua),
         /the warp point \(3\.0, 0\.0, 0\.0\) lies outside its samples, x from -1\.0 to 1\.0 and y from -1\.0 to 1\.0/);
 
     // The copy keeps the line its source showed halfway through the track, from (-2, -2) to
     // (2, -1), and the warp lifts the line the track leaves, from (-2, -2) to (2, 0), by 1; 15
     // pixels to a unit from the center of the frame. New points for the warped beam fail.
-    const copiedPath = join(directory, "copied.lua");
-    writeFileSync(copiedPath, copiedLua);
-    const copiedAt = (time, id) => {
-        const result = spawnSync(cliPath, ["layout", copiedPath, "--time", String(time)], { encoding: "utf8" });
-        assert.equal(result.status, 0, result.stderr);
-        const bounds = JSON.parse(result.stdout).scene.objects.find((object) => object.id === id).bounds;
-        return [bounds.x + bounds.width / 2, bounds.y + bounds.height / 2];
-    };
+    const copiedPath = writeScript("copied.lua", copiedLua);
     for (const [time, id, expected] of [
         [0.75, "rib2", [80, 67.5]],
         [2, "rib2", [80, 67.5]],
@@ -4289,20 +4110,14 @@ return scene
         [1, "rib", [80, 60]],
         [2, "rib", [80, 45]],
     ]) {
-        const center = copiedAt(time, id);
+        const bounds = layoutAt(copiedPath, time).scene.objects.find((object) => object.id === id).bounds;
+        const center = [bounds.x + bounds.width / 2, bounds.y + bounds.height / 2];
         assert.ok(Math.hypot(center[0] - expected[0], center[1] - expected[1]) < 0.5, `${id} at ${time} s: ${center}`);
     }
-    const rewarpedPath = join(directory, "rewarped.lua");
-    writeFileSync(rewarpedPath, rewarpedLua);
-    const rewarpedResult = spawnSync(cliPath, ["inspect", rewarpedPath], { encoding: "utf8" });
-    assert.notEqual(rewarpedResult.status, 0);
-    assert.match(rewarpedResult.stderr, /could not play animation: a warped shape keeps the outline its warp gave/);
+    assert.match(refusal("rewarped.lua", rewarpedLua),
+        /could not play animation: a warped shape keeps the outline its warp gave/);
 
-    const luaPath = join(directory, "scene.lua");
-    writeFileSync(luaPath, lua);
-    const result = spawnSync(cliPath, ["inspect", luaPath], { encoding: "utf8" });
-    assert.equal(result.status, 0, result.stderr);
-    const inspected = JSON.parse(result.stdout);
+    const inspected = inspectScript("scene.lua", lua).scene;
     assert.equal(inspected.width, 320);
     assert.equal(inspected.height, 180);
     assert.equal(inspected.loop, true);
@@ -4315,11 +4130,7 @@ return scene
     assert.equal(inspected.objects[1].space, inspected.objects[0].handle);
     assert.equal(inspected.objects[2].space, inspected.objects[0].handle);
 
-    const samplePath = join(directory, "cell-voxel.lua");
-    writeFileSync(samplePath, sampleLua);
-    const sampleResult = spawnSync(cliPath, ["inspect", samplePath], { encoding: "utf8" });
-    assert.equal(sampleResult.status, 0, sampleResult.stderr);
-    const inspectedSample = JSON.parse(sampleResult.stdout);
+    const inspectedSample = inspectScript("cell-voxel.lua", sampleLua).scene;
     assert.deepEqual(inspectedSample.objects.map((object) => object.type), [
         "space", "group", "cell", "cell", "cell", "group", "cell",
     ]);
@@ -4334,11 +4145,7 @@ return scene
     assert.equal(inspectedSample.objects[6].parent, cellGroup.handle);
     assert.equal(inspectedSample.duration, 1);
 
-    const freeformPath = join(directory, "freeform.lua");
-    writeFileSync(freeformPath, freeformLua);
-    const freeformResult = spawnSync(cliPath, ["inspect", freeformPath], { encoding: "utf8" });
-    assert.equal(freeformResult.status, 0, freeformResult.stderr);
-    const inspectedFreeform = JSON.parse(freeformResult.stdout);
+    const inspectedFreeform = inspectScript("freeform.lua", freeformLua).scene;
     assert.equal(inspectedFreeform.width, 480);
     assert.equal(inspectedFreeform.height, 270);
     assert.ok(objectCount(inspectedFreeform) >= 5);
@@ -4349,10 +4156,8 @@ return scene
         );
     }
 
-    const reservePath = join(directory, "reserved.lua");
-    const reserveTwin = join(directory, "reserved-twin.lua");
-    writeFileSync(reservePath, reservedLua);
-    writeFileSync(reserveTwin, `
+    const reservePath = writeScript("reserved.lua", reservedLua);
+    const reserveTwin = writeScript("reserved-twin.lua", `
 local s=vis.scene{width=320,height=180,camera={height=180}}
 s:space{x={-100,100,50},y={-70,70,50},width=1,axis_width=2,ticks=true}
 local n=s:number{tabular=true,value=1.5,decimals=2,reserve="-000.00",align={1,0.5},id="n"}
@@ -4362,20 +4167,15 @@ s:play({target=n,value=-3},1,"linear")
 return s
 `);
     for (const time of [0, 0.25, 0.5, 1]) {
-        assert.deepEqual(renderFrame(reservePath, time, ["--font", font, "--font", monoFont]), renderFrame(reserveTwin, time, ["--font", font, "--font", monoFont]));
+        assert.deepEqual(renderFrame(reservePath, time, fontOptions), renderFrame(reserveTwin, time, fontOptions));
     }
-    const proportionalPath = join(directory, "proportional.lua");
-    writeFileSync(proportionalPath, reservedLua.replaceAll('["tabular"]=true', '["tabular"]=false'));
-    assert.notDeepEqual(renderFrame(reservePath, 0.5, ["--font", font, "--font", monoFont]),
-        renderFrame(proportionalPath, 0.5, ["--font", font, "--font", monoFont]));
-    const reserveLayout = spawnSync(cliPath, ["layout", reservePath, "--time", "0.5", "--font", font, "--font", monoFont], { encoding: "utf8" });
-    assert.equal(reserveLayout.status, 0, reserveLayout.stderr);
-    assert.equal(JSON.parse(reserveLayout.stdout).scene.objects.find((object) => object.id === "n").text, "-0.75");
+    const proportionalPath = writeScript("proportional.lua",
+        reservedLua.replaceAll('["tabular"]=true', '["tabular"]=false'));
+    assert.notDeepEqual(renderFrame(reservePath, 0.5, fontOptions), renderFrame(proportionalPath, 0.5, fontOptions));
+    assert.equal(layoutAt(reservePath, 0.5, fontOptions).scene.objects.find((object) => object.id === "n").text, "-0.75");
 
-    const livePath = join(directory, "live-transition.lua");
-    const liveTwinPath = join(directory, "live-transition-twin.lua");
-    writeFileSync(livePath, liveLua);
-    writeFileSync(liveTwinPath, `
+    const live = inspectScript("live-transition.lua", liveLua);
+    const liveTwinPath = writeScript("live-transition-twin.lua", `
 local cfg = {width=120,height=60,background="#000000",camera={height=4},antialiasing=false}
 local root = vis.scene(cfg)
 local a, b = vis.scene(cfg), vis.scene(cfg)
@@ -4387,31 +4187,15 @@ root:scene_transition({a,b},{hold={2,1},duration=1,style="slide",curve="linear"}
 return root
 `);
     for (const time of [1, 2, 2.25, 2.5, 3, 3.5, 4]) {
-        const outputs = [livePath, liveTwinPath].map((path, i) => {
-            const output = join(directory, `live-${i}.png`);
-            const result = spawnSync(cliPath, ["render", path, "--time", String(time), "-o", output], { encoding: "utf8" });
-            assert.equal(result.status, 0, result.stderr);
-            return readFileSync(output);
-        });
-        assert.deepEqual(outputs[0], outputs[1], `live transition twin at ${time}`);
+        assert.deepEqual(renderFrame(live.path, time), renderFrame(liveTwinPath, time), `live transition twin at ${time}`);
     }
-    const liveInspect = spawnSync(cliPath, ["inspect", livePath], { encoding: "utf8" });
-    assert.equal(liveInspect.status, 0, liveInspect.stderr);
-    assert.equal(JSON.parse(liveInspect.stdout).duration, 4);
-    const liveResult = spawnSync(cliPath, ["layout", livePath, "--time", "2.25"], { encoding: "utf8" });
-    assert.equal(liveResult.status, 0, liveResult.stderr);
-    assert.ok(Math.abs(JSON.parse(liveResult.stdout).report.visuals[0].paintBounds.x - 45.75) < 0.01);
+    assert.equal(live.scene.duration, 4);
+    assert.ok(Math.abs(layoutAt(live.path, 2.25).report.visuals[0].paintBounds.x - 45.75) < 0.01);
 
     // A quarter into the fade the incoming card shows at a quarter, on its own; halfway into
     // the match the cards pair.
-    const styledPath = join(directory, "styled.lua");
-    writeFileSync(styledPath, styledLua);
-    const styledLayout = (time) => {
-        const result = spawnSync(cliPath, ["layout", styledPath, "--time", String(time)], { encoding: "utf8" });
-        assert.equal(result.status, 0, result.stderr);
-        return JSON.parse(result.stdout).report;
-    };
-    const fading = styledLayout(0.25);
+    const styledPath = writeScript("styled.lua", styledLua);
+    const fading = layoutAt(styledPath, 0.25).report;
     const stagePaths = fading.scenes.slice(1).map((entry) => entry.path);
     assert.deepEqual(stagePaths, ["root/transition:0", "root/transition:1"]);
     for (const entry of fading.scenes.slice(1)) {
@@ -4419,15 +4203,11 @@ return root
     }
     const arriving = fading.visuals.find((visual) => visual.kind === "fade-in");
     assert.ok(arriving && arriving.counterpart === null && Math.abs(arriving.opacity - 64 / 255) < 1e-4);
-    assert.ok(styledLayout(1.5).visuals.some((visual) => visual.kind === "morph"));
+    assert.ok(layoutAt(styledPath, 1.5).report.visuals.some((visual) => visual.kind === "morph"));
 
     // A quarter into a slide from the top, the incoming stage has come a quarter of the
     // viewport down and pushed the outgoing one as far.
-    const slidePath = join(directory, "slide.lua");
-    writeFileSync(slidePath, slideLua);
-    const slideResult = spawnSync(cliPath, ["layout", slidePath, "--time", "0.25"], { encoding: "utf8" });
-    assert.equal(slideResult.status, 0, slideResult.stderr);
-    const sliding = JSON.parse(slideResult.stdout).report.scenes.slice(1);
+    const sliding = layoutAt(writeScript("slide.lua", slideLua), 0.25).report.scenes.slice(1);
     assert.deepEqual(
         sliding.map((entry) => entry.bounds),
         [
@@ -4437,20 +4217,12 @@ return root
     );
 
     // Halfway into a slide that also matches, the cards travel as one morph.
-    const pairPath = join(directory, "pairs.lua");
-    writeFileSync(pairPath, pairLua);
-    const pairResult = spawnSync(cliPath, ["layout", pairPath, "--time", "0.5"], { encoding: "utf8" });
-    assert.equal(pairResult.status, 0, pairResult.stderr);
-    const pairVisuals = JSON.parse(pairResult.stdout).report.visuals;
+    const pairVisuals = layoutAt(writeScript("pairs.lua", pairLua), 0.5).report.visuals;
     assert.equal(pairVisuals.filter((visual) => visual.kind === "morph").length, 1);
 
     // Halfway into the zoom, the outgoing stage has grown twice and the incoming one fills the
     // area at twice its first size.
-    const zoomPath = join(directory, "zoom.lua");
-    writeFileSync(zoomPath, zoomLua);
-    const zoomResult = spawnSync(cliPath, ["layout", zoomPath, "--time", "0.5"], { encoding: "utf8" });
-    assert.equal(zoomResult.status, 0, zoomResult.stderr);
-    const zooming = JSON.parse(zoomResult.stdout).report.scenes.slice(1);
+    const zooming = layoutAt(writeScript("zoom.lua", zoomLua), 0.5).report.scenes.slice(1);
     const expected = [
         [20 - 320 / 3, 0, 320, 120],
         [20 + 160 / 3, 30, 80, 30],
@@ -4462,51 +4234,29 @@ return root
     });
 
     for (const [index, { objectLua, areaLua }] of exactZooms.entries()) {
-        const reports = [objectLua, areaLua].map((source, form) => {
-            const path = join(directory, `exact-zoom-${index}-${form}.lua`);
-            writeFileSync(path, source);
-            const result = spawnSync(cliPath, ["layout", path, "--time", "0.5"], { encoding: "utf8" });
-            assert.equal(result.status, 0, result.stderr);
-            return JSON.parse(result.stdout).report;
-        });
+        const reports = [objectLua, areaLua].map((source, form) =>
+            layoutAt(writeScript(`exact-zoom-${index}-${form}.lua`, source), 0.5).report);
         assert.deepEqual(reports[0].scenes, reports[1].scenes);
         assert.deepEqual(reports[0].visuals, reports[1].visuals);
         assert.deepEqual(reports[0].paths, reports[1].paths);
     }
 
-    const viewportPath = join(directory, "viewport.lua");
-    writeFileSync(viewportPath, viewportLua);
-    const viewportResult = spawnSync(cliPath, ["inspect", viewportPath], { encoding: "utf8" });
-    assert.equal(viewportResult.status, 0, viewportResult.stderr);
-    const inspectedViewport = JSON.parse(viewportResult.stdout);
+    const { path: viewportPath, scene: inspectedViewport } = inspectScript("viewport.lua", viewportLua);
     assert.equal(inspectedViewport.viewports.length, 1);
     assert.equal(inspectedViewport.viewports[0].scene.viewports.length, 1);
-    const viewportBenchmark = spawnSync(cliPath, ["benchmark", viewportPath, "--frames", "1", "--warmup", "0"], {
-        encoding: "utf8",
-    });
-    assert.equal(viewportBenchmark.status, 0, viewportBenchmark.stderr);
+    const viewportBenchmark = cli(["benchmark", viewportPath, "--frames", "1", "--warmup", "0"]);
     assert.equal(JSON.parse(viewportBenchmark.stdout).objects, 5);
     for (const invalidFrames of ["+1", "-1", " 1", "4294967296", "18446744073709551616"]) {
-        const invalidBenchmark = spawnSync(cliPath, ["benchmark", viewportPath, "--frames", invalidFrames], {
-            encoding: "utf8",
-        });
-        assert.equal(invalidBenchmark.status, 2, `Accepted invalid frame count ${JSON.stringify(invalidFrames)}`);
+        const invalid = spawnSync(cliPath, ["benchmark", viewportPath, "--frames", invalidFrames], { encoding: "utf8" });
+        assert.equal(invalid.status, 2, `Accepted invalid frame count ${JSON.stringify(invalidFrames)}`);
     }
 
     const maximumDuration = vis.scene({ width: 16, height: 16 });
     maximumDuration.wait(3.4028234663852886e38);
-    const maximumDurationPath = join(directory, "maximum-duration.lua");
-    writeFileSync(maximumDurationPath, compileScene(maximumDuration));
-    const maximumDurationBenchmark = spawnSync(
-        cliPath,
-        ["benchmark", maximumDurationPath, "--frames", "3", "--warmup", "0"],
-        { encoding: "utf8" },
-    );
-    assert.equal(maximumDurationBenchmark.status, 0, maximumDurationBenchmark.stderr);
+    const maximumDurationPath = writeScript("maximum-duration.lua", compileScene(maximumDuration));
+    cli(["benchmark", maximumDurationPath, "--frames", "3", "--warmup", "0"]);
 
-    const diagramFont = resolve(repoRoot, "src/examples/assets/Pretendard.ttf");
-    const textPath = join(directory, "text.lua");
-    writeFileSync(textPath, [
+    const textPath = writeScript("text.lua", [
         "local scene = vis.scene { width = 64, height = 32 }",
         "scene:text { text = \"x\" }",
         "scene:text { text = \"y\", font = \"Missing Family\", point = {1, 0} }",
@@ -4514,19 +4264,14 @@ return root
     ].join("\n"));
     const textPng = join(directory, "text.png");
     // Text in a font that is not loaded is drawn in the default font, with a warning per font.
-    const unfonted = spawnSync(cliPath, ["render", textPath, "-o", textPng], { encoding: "utf8" });
-    assert.equal(unfonted.status, 0, unfonted.stderr);
+    const unfonted = cli(["render", textPath, "-o", textPng]);
     assert.ok(existsSync(textPng));
     assert.match(unfonted.stderr, /the font 'Pretendard' is not loaded/);
     assert.match(unfonted.stderr, /the font 'Missing Family' is not loaded, so its text is drawn in the default font; pass its file, such as Missing Family\.ttf, with --font/);
-    const misnamed = spawnSync(cliPath, ["layout", textPath, "--font", diagramFont], { encoding: "utf8" });
-    assert.equal(misnamed.status, 0, misnamed.stderr);
+    const misnamed = cli(["layout", textPath, "--font", font]);
     assert.match(misnamed.stderr, /the font 'Missing Family' is not loaded/);
     assert.doesNotMatch(misnamed.stderr, /'Pretendard'/);
-    const unreadable = spawnSync(cliPath, ["render", textPath, "--font", join(directory, "none.ttf")], {
-        encoding: "utf8",
-    });
-    assert.equal(unreadable.status, 3);
+    const unreadable = cli(["render", textPath, "--font", join(directory, "none.ttf")], 3);
     assert.match(unreadable.stderr, /could not load the font file '.*none\.ttf'/);
     const unknownOutput = spawnSync(cliPath, ["render", textPath, "-o", join(directory, "text.webm")], {
         encoding: "utf8",
@@ -4536,34 +4281,16 @@ return root
         assert.doesNotMatch(failure.stderr, /NonSupport|InvalidArguments|InsufficientCondition|IoError/);
     }
     const secondFont = join(directory, "Missing Family.ttf");
-    copyFileSync(diagramFont, secondFont);
-    const bothFonts = ["--font", diagramFont, "--font", secondFont];
-    const twoFamilies = spawnSync(cliPath, ["render", textPath, "-o", textPng, ...bothFonts], { encoding: "utf8" });
-    assert.equal(twoFamilies.status, 0, twoFamilies.stderr);
+    copyFileSync(font, secondFont);
+    const bothFonts = ["--font", font, "--font", secondFont];
+    cli(["render", textPath, "-o", textPng, ...bothFonts]);
     for (const command of [["layout", textPath], ["benchmark", textPath, "--frames", "1", "--warmup", "0"]]) {
-        const result = spawnSync(cliPath, [...command, ...bothFonts], { encoding: "utf8" });
-        assert.equal(result.status, 0, `${command[0]}: ${result.stderr}`);
+        cli([...command, ...bothFonts]);
     }
-    const tooMany = spawnSync(cliPath, ["render", textPath, ...Array(65).fill(["--font", diagramFont]).flat()], {
-        encoding: "utf8",
-    });
-    assert.equal(tooMany.status, 2);
+    const tooMany = cli(["render", textPath, ...Array(65).fill(["--font", font]).flat()], 2);
     assert.match(tooMany.stderr, /at most 64 --font options/);
-    const themeLayout = spawnSync(
-        cliPath,
-        [
-            "layout",
-            resolve(repoRoot, "src/examples/lua/theme_showcase.lua"),
-            "--padding",
-            "4",
-            "--font",
-            diagramFont,
-            "--font",
-            monoFont,
-        ],
-        { encoding: "utf8" },
-    );
-    assert.equal(themeLayout.status, 0, `theme-showcase/layout: ${themeLayout.stderr}`);
+    const themeLayout = cli(["layout", resolve(repoRoot, "src/examples/lua/theme_showcase.lua"), "--padding", "4",
+        ...fontOptions]);
     const themeReport = JSON.parse(themeLayout.stdout).scene;
     assert.equal(themeReport.viewports.length, 6);
     for (const viewport of themeReport.viewports) {
@@ -4578,20 +4305,8 @@ return root
             "theme-showcase arrowhead overlaps its endpoint marker",
         );
     }
-    const objectGalleryLayout = spawnSync(
-        cliPath,
-        [
-            "layout",
-            resolve(repoRoot, "src/examples/lua/object_gallery.lua"),
-            "--font",
-            diagramFont,
-            "--font",
-            monoFont,
-        ],
-        { encoding: "utf8" },
-    );
-    assert.equal(objectGalleryLayout.status, 0, `object-gallery/layout: ${objectGalleryLayout.stderr}`);
-    const galleryLayout = JSON.parse(objectGalleryLayout.stdout);
+    const galleryLayout = JSON.parse(cli(["layout", resolve(repoRoot, "src/examples/lua/object_gallery.lua"),
+        ...fontOptions]).stdout);
     const galleryReport = galleryLayout.scene;
     assert.ok(galleryLayout.report.visuals.length > 0, "object-gallery layout report has no rendered visuals");
     for (const visual of galleryLayout.report.visuals) {
@@ -4664,8 +4379,7 @@ return root
     for (let frame = 0; frame < 4800; frame++) tone.writeInt16LE(8192, 44 + frame * 2);
     const tonePath = join(directory, "tone.wav");
     writeFileSync(tonePath, tone);
-    const soundPath = join(directory, "sound.lua");
-    writeFileSync(soundPath, [
+    const soundPath = writeScript("sound.lua", [
         "local scene = vis.scene { width = 16, height = 16, fps = 10 }",
         "vis.audio.cue(scene, { asset = \"tone.wav\", begin = 0.1, gain = 0.5 })",
         "scene:wait(0.3)",
@@ -4695,31 +4409,21 @@ return root
         VIS_TEST_SOUNDTRACK: soundtrackPath,
     };
     const sample = (frame, channel) => readFileSync(soundtrackPath).readInt16LE(44 + frame * 4 + channel * 2);
+    // Renders with the stand-in ffmpeg.
+    const render = (args, expected = 0) => cli(["render", ...args], expected, { env });
 
     // --audio hands a scene without cues its file as it is, and needs a readable file and an MP4.
-    const plainPath = join(directory, "plain.lua");
-    writeFileSync(plainPath, "local scene = vis.scene { width = 16, height = 16 }\nscene:wait(0.1)\nreturn scene\n");
-    const narrated = spawnSync(cliPath, ["render", plainPath, "-o", join(directory, "plain.mp4"), "--audio", tonePath], {
-        encoding: "utf8",
-        env,
-    });
-    assert.equal(narrated.status, 0, narrated.stderr);
+    const plainPath = writeScript("plain.lua",
+        "local scene = vis.scene { width = 16, height = 16 }\nscene:wait(0.1)\nreturn scene\n");
+    render([plainPath, "-o", join(directory, "plain.mp4"), "--audio", tonePath]);
     const toneArgument = tonePath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     assert.match(readFileSync(argumentsPath, "utf8"), new RegExp(`\\n-i\\n${toneArgument}\\n-map\\n0:v:0\\n-map\\n1:a:0\\n`));
     assert.deepEqual(readFileSync(soundtrackPath), readFileSync(tonePath));
-    const narratedGif = spawnSync(cliPath, ["render", plainPath, "-o", join(directory, "plain.gif"), "--audio", tonePath], {
-        encoding: "utf8",
-        env,
-    });
-    assert.equal(narratedGif.status, 2);
+    const narratedGif = render([plainPath, "-o", join(directory, "plain.gif"), "--audio", tonePath], 2);
     assert.match(narratedGif.stderr, /--audio needs an \.mp4 output/);
-    const unheard = spawnSync(cliPath, ["render", plainPath, "-o", join(directory, "plain.mp4"), "--audio",
-        join(directory, "none.wav")], { encoding: "utf8", env });
-    assert.equal(unheard.status, 3);
+    const unheard = render([plainPath, "-o", join(directory, "plain.mp4"), "--audio", join(directory, "none.wav")], 3);
     assert.match(unheard.stderr, /could not read the --audio file .*none\.wav/);
-    const twice = spawnSync(cliPath, ["render", plainPath, "-o", join(directory, "plain.mp4"), "--audio", tonePath,
-        "--audio", tonePath], { encoding: "utf8", env });
-    assert.equal(twice.status, 2);
+    const twice = render([plainPath, "-o", join(directory, "plain.mp4"), "--audio", tonePath, "--audio", tonePath], 2);
     assert.match(twice.stderr, /--audio may be given only once/);
 
     // A JS scene with cues loads with or without the audio module, here hidden from the script;
@@ -4731,11 +4435,7 @@ return root
 
     // With the Audio module, an MP4 carries the cues a scene declares.
     if (spawnSync(cliPath, ["inspect", soundPath], { encoding: "utf8" }).status === 0) {
-        const voiced = spawnSync(cliPath, ["render", soundPath, "-o", join(directory, "sound.mp4")], {
-            encoding: "utf8",
-            env,
-        });
-        assert.equal(voiced.status, 0, voiced.stderr);
+        render([soundPath, "-o", join(directory, "sound.mp4")]);
         assert.match(readFileSync(argumentsPath, "utf8"), /\n-map\n1:a:0\n/);
         const soundtrack = readFileSync(soundtrackPath);
         assert.equal(soundtrack.toString("ascii", 0, 4), "RIFF");
@@ -4751,34 +4451,21 @@ return root
         assert.deepEqual(readdirSync(directory).filter((name) => name.includes(".vis-")), []);
 
         // With cues, the --audio file joins the mix from time 0 at full gain.
-        const mixed = spawnSync(cliPath, ["render", soundPath, "-o", join(directory, "sound.mp4"), "--audio", tonePath], {
-            encoding: "utf8",
-            env,
-        });
-        assert.equal(mixed.status, 0, mixed.stderr);
+        render([soundPath, "-o", join(directory, "sound.mp4"), "--audio", tonePath]);
         for (const [frame, expected] of [[0, 8192], [4799, 8192], [4800, 4096], [9600, 0]]) {
             assert.equal(sample(frame, 0), expected, `mixed sample ${frame}`);
         }
 
-        const silent = spawnSync(cliPath, ["render", soundPath, "-o", join(directory, "sound.gif")], {
-            encoding: "utf8",
-            env,
-        });
-        assert.equal(silent.status, 0, silent.stderr);
+        render([soundPath, "-o", join(directory, "sound.gif")]);
         assert.doesNotMatch(readFileSync(argumentsPath, "utf8"), /1:a:0/);
 
-        const missingPath = join(directory, "missing-sound.lua");
-        writeFileSync(missingPath, [
+        const missingPath = writeScript("missing-sound.lua", [
             "local scene = vis.scene { width = 16, height = 16 }",
             "vis.audio.cue(scene, { asset = \"missing.wav\" })",
             "scene:wait(0.1)",
             "return scene",
         ].join("\n"));
-        const missing = spawnSync(cliPath, ["render", missingPath, "-o", join(directory, "missing.mp4")], {
-            encoding: "utf8",
-            env,
-        });
-        assert.equal(missing.status, 3);
+        const missing = render([missingPath, "-o", join(directory, "missing.mp4")], 3);
         assert.match(missing.stderr, /could not read the audio asset 'missing\.wav' at .*missing\.wav/);
     }
 } finally {

@@ -7,18 +7,9 @@
 #include <initializer_list>
 
 #include "vis.h"
+#include "testCheck.h"
 
 using namespace vis;
-
-static int failures = 0;
-
-#define CHECK(condition)                                                                       \
-    do {                                                                                       \
-        if (!(condition)) {                                                                    \
-            std::fprintf(stderr, "%s:%d: check failed: %s\n", __FILE__, __LINE__, #condition); \
-            failures++;                                                                        \
-        }                                                                                      \
-    } while (false)
 
 static constexpr Color Black = {0, 0, 0, 255};
 static constexpr Color Red = {255, 0, 0, 255};
@@ -73,17 +64,6 @@ static bool _near(Color color, Color expected, int tolerance = 3)
            && std::abs(color.b - expected.b) <= tolerance;
 }
 
-static bool _equal(const Surface& first, const Surface& second)
-{
-    if (first.width() != second.width() || first.height() != second.height()) return false;
-    for (auto y = 0u; y < first.height(); y++) {
-        auto a = first.data() + static_cast<size_t>(y) * first.stride();
-        auto b = second.data() + static_cast<size_t>(y) * second.stride();
-        if (std::memcmp(a, b, first.width() * sizeof(uint32_t)) != 0) return false;
-    }
-    return true;
-}
-
 static bool _render(const Scene* scene, float time, Surface& surface)
 {
     auto renderer = Renderer::gen();
@@ -103,7 +83,7 @@ static void _retained(Renderer* reused, const Scene* scene, float time, const ch
     auto first = reused->render(scene, time, kept);
     CHECK(first == Result::Success);
     if (first != Result::Success || !_render(scene, time, fresh)) return;
-    auto same = _equal(kept, fresh);
+    auto same = equal(kept, fresh);
     if (!same) std::fprintf(stderr, "retained frame differs: %s t=%g\n", label, time);
     CHECK(same);
 }
@@ -759,6 +739,5 @@ int main()
     maskRules();
     blendModes();
     effects();
-    if (failures) std::fprintf(stderr, "%d checks failed\n", failures);
-    return failures ? 1 : 0;
+    return report();
 }

@@ -8,23 +8,9 @@
 #include "vis_lua_runtime.h"
 #endif
 #include "testLuaCollector.h"
+#include "testCheck.h"
 
 using namespace vis;
-
-static int failures = 0;
-
-#define CHECK(condition)                                                                           \
-    do {                                                                                           \
-        if (!(condition)) {                                                                        \
-            std::fprintf(stderr, "%s:%d: check failed: %s\n", __FILE__, __LINE__, #condition);     \
-            failures++;                                                                            \
-        }                                                                                          \
-    } while (false)
-
-static bool _near(float lhs, float rhs, float epsilon = 1.0e-4f)
-{
-    return std::fabs(lhs - rhs) <= epsilon;
-}
 
 static void _standalone()
 {
@@ -65,7 +51,7 @@ return scene
         auto object = scene->object("target");
         CHECK(object != nullptr);
         CHECK(controller->sample(object, state) == Result::Success);
-        CHECK(_near(state.shift.x, 0.5f));
+        CHECK(near(state.shift.x, 0.5f));
         CHECK(controller->eventCount() == 1u);
     }
     delete scene;
@@ -196,7 +182,7 @@ return scene
         for (auto i = 0u; i < 4u; i++) {
             states::State state;
             CHECK(context.controller->sample(scene->object(ids[i]), state) == Result::Success);
-            CHECK(_near(state.opacity, opacities[i]));
+            CHECK(near(state.opacity, opacities[i]));
         }
     }
     delete scene;
@@ -244,12 +230,12 @@ return scene
         states::State state;
         auto object = scene->object("target");
         CHECK(context.states.controller->sample(object, state) == Result::Success);
-        CHECK(_near(state.shift.x, 1.0f));
-        CHECK(_near(state.shift.y, 0.0f));
+        CHECK(near(state.shift.x, 1.0f));
+        CHECK(near(state.shift.y, 0.0f));
         CHECK(context.runtime.runtime->advance(0.5f) == Result::Success);
         CHECK(context.states.controller->sample(object, state) == Result::Success);
-        CHECK(_near(state.shift.x, 1.0f));
-        CHECK(_near(state.shift.y, 1.0f));
+        CHECK(near(state.shift.x, 1.0f));
+        CHECK(near(state.shift.y, 1.0f));
         CHECK(context.states.controller->eventCount() == 2u);
     }
     delete scene;
@@ -264,6 +250,5 @@ int main()
 #if defined(VIS_LUA_RUNTIME)
     _retainedRuntime();
 #endif
-    if (failures) std::fprintf(stderr, "%d states Lua test(s) failed\n", failures);
-    return failures ? 1 : 0;
+    return report();
 }

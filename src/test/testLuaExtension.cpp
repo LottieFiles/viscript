@@ -9,19 +9,9 @@ extern "C" {
 
 #include "visLuaExtension.h"
 #include "testLuaCollector.h"
+#include "testCheck.h"
 
 using namespace vis;
-
-static int failures = 0;
-
-static void check(bool condition, const char* expression, int line)
-{
-    if (condition) return;
-    std::fprintf(stderr, "%s:%d: CHECK(%s) failed\n", __FILE__, line, expression);
-    failures++;
-}
-
-#define CHECK(condition) check((condition), #condition, __LINE__)
 
 struct HookContext
 {
@@ -322,7 +312,7 @@ static Scene* loadSpans(const char* source, const char* name, char* error, uint3
     return scene;
 }
 
-static bool near(float a, float b)
+static bool _near(float a, float b)
 {
     return a - b < 1e-3f && b - a < 1e-3f;
 }
@@ -375,11 +365,11 @@ return scene
             auto box = static_cast<Rectangle*>(wide);
             // The box starts where the text before it ends, on its baseline, and the next text
             // starts where it ends.
-            CHECK(near(box->center.x, first->point.x + first->box.x + 20.0f));
-            CHECK(near(box->center.y, first->point.y + 7.0f));
-            CHECK(near(box->size.x, 40.0f) && near(box->size.y, 22.0f));
-            CHECK(near(after->point.x, first->point.x + first->box.x + 40.0f));
-            CHECK(near(after->point.y, first->point.y));
+            CHECK(_near(box->center.x, first->point.x + first->box.x + 20.0f));
+            CHECK(_near(box->center.y, first->point.y + 7.0f));
+            CHECK(_near(box->size.x, 40.0f) && _near(box->size.y, 22.0f));
+            CHECK(_near(after->point.x, first->point.x + first->box.x + 40.0f));
+            CHECK(_near(after->point.y, first->point.y));
             CHECK(wide->parent() == scene->object("row") && unnamed->parent() == wide->parent());
             // A box takes its own color, or else the row's.
             CHECK(wide->style.stroke.r == 255 && wide->style.stroke.g == 0);
@@ -391,8 +381,8 @@ return scene
         if (small) small->size = 10.0f;
         CHECK(small && scene->measure(small, blank) == Result::Success && blank.ascent < 20.0f);
         delete small;
-        CHECK(near(baselineOf(scene, "tall/1") - baselineOf(scene, "tall/2"), blank.descent + 20.0f));
-        CHECK(near(baselineOf(scene, "tall/3"), baselineOf(scene, "tall/2")));
+        CHECK(_near(baselineOf(scene, "tall/1") - baselineOf(scene, "tall/2"), blank.descent + 20.0f));
+        CHECK(_near(baselineOf(scene, "tall/3"), baselineOf(scene, "tall/2")));
     }
     delete scene;
 
@@ -412,18 +402,18 @@ return scene
     if (!scene) std::fprintf(stderr, "spans-box-wrap.lua: %s\n", error);
     if (scene) {
         auto glued = baselineOf(scene, "glued/1");
-        CHECK(near(baselineOf(scene, "glued/2"), glued) && near(baselineOf(scene, "glued/3"), glued));
+        CHECK(_near(baselineOf(scene, "glued/2"), glued) && _near(baselineOf(scene, "glued/3"), glued));
         // one | two | box and comma | three
         auto two = baselineOf(scene, "words/2");
         auto box = baselineOf(scene, "words/3");
         CHECK(baselineOf(scene, "words/1") > two && two > box);
-        CHECK(near(baselineOf(scene, "words/4"), box));
+        CHECK(_near(baselineOf(scene, "words/4"), box));
         CHECK(box > baselineOf(scene, "words/5"));
         // Blanks inside the strings let the line break on either side of the box.
         CHECK(baselineOf(scene, "whole/1") > baselineOf(scene, "whole/2"));
         CHECK(baselineOf(scene, "whole/2") > baselineOf(scene, "whole/3"));
         auto line = baselineOf(scene, "wide/1");
-        CHECK(near(baselineOf(scene, "wide/2"), line));
+        CHECK(_near(baselineOf(scene, "wide/2"), line));
         CHECK(line > baselineOf(scene, "wide/3") && baselineOf(scene, "wide/3") > baselineOf(scene, "wide/4"));
         // Texts alone break between any two of them, as before.
         CHECK(baselineOf(scene, "texts/1") > baselineOf(scene, "texts/2"));
@@ -456,16 +446,16 @@ return scene
         auto lineHeight = blank.ascent + blank.descent;
         auto clear = 0.1f * lineHeight;
         // The box rises 60 above its baseline, far past the pitch below a.
-        CHECK(near(baselineOf(scene, "lead/1") - baselineOf(scene, "lead/2"), 60.0f - ink[1].bottom + clear));
-        CHECK(near(baselineOf(scene, "lead/2") - baselineOf(scene, "lead/3"), 1.5f * lineHeight));
-        CHECK(near(baselineOf(scene, "lead/3") - baselineOf(scene, "lead/4"), 1.5f * lineHeight));
+        CHECK(_near(baselineOf(scene, "lead/1") - baselineOf(scene, "lead/2"), 60.0f - ink[1].bottom + clear));
+        CHECK(_near(baselineOf(scene, "lead/2") - baselineOf(scene, "lead/3"), 1.5f * lineHeight));
+        CHECK(_near(baselineOf(scene, "lead/3") - baselineOf(scene, "lead/4"), 1.5f * lineHeight));
         // Below a descender, and above a capital where the box reaches 4 below its baseline.
-        CHECK(near(baselineOf(scene, "under/1") - baselineOf(scene, "under/2"), 20.0f - ink[2].bottom + clear));
-        CHECK(near(baselineOf(scene, "over/1") - baselineOf(scene, "over/2"), ink[3].top + 4.0f + clear));
+        CHECK(_near(baselineOf(scene, "under/1") - baselineOf(scene, "under/2"), 20.0f - ink[2].bottom + clear));
+        CHECK(_near(baselineOf(scene, "over/1") - baselineOf(scene, "over/2"), ink[3].top + 4.0f + clear));
         // A box that fits in the pitch leaves it as it is, though its line box is taller.
         CHECK(20.0f > blank.ascent);
-        CHECK(near(baselineOf(scene, "short/1") - baselineOf(scene, "short/2"), 1.5f * lineHeight));
-        CHECK(near(baselineOf(scene, "short/2") - baselineOf(scene, "short/3"), 1.5f * lineHeight));
+        CHECK(_near(baselineOf(scene, "short/1") - baselineOf(scene, "short/2"), 1.5f * lineHeight));
+        CHECK(_near(baselineOf(scene, "short/2") - baselineOf(scene, "short/3"), 1.5f * lineHeight));
     }
     delete scene;
 
@@ -727,11 +717,9 @@ return vis.scene {theme = {text = {h1 = {font = "Serif Display", size = 40}}}}
     // Spans measure their texts in the fonts renderers load.
     auto renderer = Renderer::gen();
     CHECK(renderer && renderer->font(VIS_TEST_FONT) == Result::Success);
-#ifdef VIS_TEST_MONO_FONT
     CHECK(renderer && renderer->font(VIS_TEST_MONO_FONT) == Result::Success);
-#endif
     spanBoxes();
     delete renderer;
 #endif
-    return failures ? 1 : 0;
+    return report();
 }

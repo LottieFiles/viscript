@@ -22,13 +22,7 @@ for i = 4, 64 do
 end
 return root
 )lua";
-    char error[512] = {};
-    Scene* scene = nullptr;
-    auto status = Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "viewports.lua",
-                            &scene, error, sizeof(error));
-    CHECK(status == Result::Success);
-    CHECK(scene != nullptr);
-    if (status != Result::Success) std::fprintf(stderr, "viewports.lua: %s\n", error);
+    auto scene = _loaded(source, "viewports.lua");
     if (scene) {
         CHECK(scene->viewportCount() == 64);
         CHECK(scene->count() == 0);
@@ -38,8 +32,8 @@ return root
         Surface surface;
         CHECK(renderer->render(scene, scene->duration(), surface) == Result::Success);
         if (surface.data()) {
-            CHECK(surface.data()[50u * surface.stride() + 20u] == _pixel(Color::hex("#d84040")));
-            CHECK(surface.data()[50u * surface.stride() + 180u] == _pixel(Color::hex("#4080d8")));
+            CHECK(surface.data()[50u * surface.stride() + 20u] == pixel(Color::hex("#d84040")));
+            CHECK(surface.data()[50u * surface.stride() + 180u] == pixel(Color::hex("#4080d8")));
         }
     }
     delete scene;
@@ -65,13 +59,7 @@ root:scene_transition({first, second}, {
 if math.abs(root:duration() - 1.0) > 0.0001 then error("transition duration mismatch") end
 return root
 )lua";
-    char error[512] = {};
-    Scene* scene = nullptr;
-    auto status = Lua::load(source, static_cast<uint32_t>(std::strlen(source)),
-                            "scene-transition.lua", &scene, error, sizeof(error));
-    CHECK(status == Result::Success);
-    CHECK(scene != nullptr);
-    if (status != Result::Success) std::fprintf(stderr, "scene-transition.lua: %s\n", error);
+    auto scene = _loaded(source, "scene-transition.lua");
     if (scene) {
         LayoutReport report;
         CHECK(renderer->layout(scene, 0.05f, report) == Result::Success);
@@ -83,11 +71,11 @@ return root
         CHECK(std::fabs(scene->duration() - 1.0f) < 1.0e-4f);
         Surface surface;
         CHECK(renderer->render(scene, 0.1f, surface) == Result::Success);
-        CHECK(_changed(surface, scene->config().background) > 100u);
+        CHECK(changed(surface, scene->config().background) > 100u);
         CHECK(renderer->render(scene, 0.5f, surface) == Result::Success);
-        CHECK(_changed(surface, scene->config().background) > 100u);
+        CHECK(changed(surface, scene->config().background) > 100u);
         CHECK(renderer->render(scene, 0.9f, surface) == Result::Success);
-        CHECK(_changed(surface, scene->config().background) > 100u);
+        CHECK(changed(surface, scene->config().background) > 100u);
     }
     delete scene;
 }
@@ -110,12 +98,7 @@ root:scene_transition({stage("#000000"), stage("#101010"), stage("#303030")}, {
 })
 return root
 )lua";
-    char error[512] = {};
-    Scene* scene = nullptr;
-    auto status = Lua::load(source, static_cast<uint32_t>(std::strlen(source)),
-                            "transition-styles.lua", &scene, error, sizeof(error));
-    CHECK(status == Result::Success);
-    if (status != Result::Success) std::fprintf(stderr, "transition-styles.lua: %s\n", error);
+    auto scene = _loaded(source, "transition-styles.lua");
     if (scene) {
         Surface surface;
         CHECK(renderer->render(scene, 0.25f, surface) == Result::Success);
@@ -134,14 +117,10 @@ root:scene_transition({plain("#000000"), plain("#ffffff"), plain("#000000")}, {
 })
 return root
 )lua";
-    scene = nullptr;
-    status = Lua::load(slides, static_cast<uint32_t>(std::strlen(slides)), "transition-slides.lua",
-                       &scene, error, sizeof(error));
-    CHECK(status == Result::Success);
-    if (status != Result::Success) std::fprintf(stderr, "transition-slides.lua: %s\n", error);
+    scene = _loaded(slides, "transition-slides.lua");
     if (scene) {
-        auto white = _pixel(Color::hex("#ffffff"));
-        auto black = _pixel(Color::hex("#000000"));
+        auto white = pixel(Color::hex("#ffffff"));
+        auto black = pixel(Color::hex("#000000"));
         Surface surface;
         CHECK(renderer->render(scene, 0.25f, surface) == Result::Success);
         CHECK(surface.data() && surface.data()[5u * surface.stride() + 60u] == white);
@@ -171,18 +150,14 @@ root:scene_transition({first, plain("#ffffff", "#ffffff"), plain("#000000", "#00
 })
 return root
 )lua";
-    scene = nullptr;
-    status = Lua::load(zooms, static_cast<uint32_t>(std::strlen(zooms)), "transition-zooms.lua",
-                       &scene, error, sizeof(error));
-    CHECK(status == Result::Success);
-    if (status != Result::Success) std::fprintf(stderr, "transition-zooms.lua: %s\n", error);
+    scene = _loaded(zooms, "transition-zooms.lua");
     if (scene) {
-        auto white = _pixel(Color::hex("#ffffff"));
-        auto black = _pixel(Color::hex("#000000"));
+        auto white = pixel(Color::hex("#ffffff"));
+        auto black = pixel(Color::hex("#000000"));
         Surface surface;
         // Before a tenth of the way the incoming scene has not shown; halfway it fills the card.
         CHECK(renderer->render(scene, 0.05f, surface) == Result::Success);
-        CHECK(surface.data() && surface.data()[30u * surface.stride() + 60u] == _pixel(Color::hex("#0000ff")));
+        CHECK(surface.data() && surface.data()[30u * surface.stride() + 60u] == pixel(Color::hex("#0000ff")));
         CHECK(renderer->render(scene, 0.5f, surface) == Result::Success);
         CHECK(surface.data() && surface.data()[30u * surface.stride() + 60u] == white);
         // Halfway out, the outgoing scene lies over the middle and the incoming one around it.
@@ -211,16 +186,12 @@ root:scene_transition({plain("#ffffff", "#0000ff", -6, 4), plain("#000000", "#00
 })
 return root
 )lua";
-    scene = nullptr;
-    status = Lua::load(zoomOut, static_cast<uint32_t>(std::strlen(zoomOut)), "transition-zoom-out.lua",
-                       &scene, error, sizeof(error));
-    CHECK(status == Result::Success);
-    if (status != Result::Success) std::fprintf(stderr, "transition-zoom-out.lua: %s\n", error);
+    scene = _loaded(zoomOut, "transition-zoom-out.lua");
     if (scene) {
         Surface surface;
         CHECK(renderer->render(scene, 0.5f, surface) == Result::Success);
-        CHECK(surface.data() && surface.data()[30u * surface.stride() + 5u] == _pixel(Color::hex("#000000")));
-        CHECK(surface.data() && surface.data()[30u * surface.stride() + 60u] == _pixel(Color::hex("#ffffff")));
+        CHECK(surface.data() && surface.data()[30u * surface.stride() + 5u] == pixel(Color::hex("#000000")));
+        CHECK(surface.data() && surface.data()[30u * surface.stride() + 60u] == pixel(Color::hex("#ffffff")));
     }
     delete scene;
 
@@ -248,11 +219,7 @@ local root=stage('#202020')
 root:scene_transition({a,b},{duration=1,curve='linear',style='%s',area=%s%s})
 return root
 )lua", kind, static_cast<double>(width), kind, area, mode ? ",area_margin=0" : "");
-                scene = nullptr;
-                status = Lua::load(source, static_cast<uint32_t>(std::strlen(source)),
-                                   "transition-exact-area.lua", &scene, error, sizeof(error));
-                CHECK(status == Result::Success);
-                if (status != Result::Success) std::fprintf(stderr, "transition-exact-area.lua: %s\n", error);
+                scene = _loaded(source, "transition-exact-area.lua");
                 if (scene) {
                     LayoutReport report;
                     CHECK(renderer->layout(scene, 0.5f, report) == Result::Success);
@@ -298,11 +265,7 @@ root:scene_transition({plain("#000000", "#ffffff"), plain("#ffffff", "#000000")}
 })
 return root
 )lua";
-    scene = nullptr;
-    status = Lua::load(pairs, static_cast<uint32_t>(std::strlen(pairs)), "transition-pairs.lua",
-                       &scene, error, sizeof(error));
-    CHECK(status == Result::Success);
-    if (status != Result::Success) std::fprintf(stderr, "transition-pairs.lua: %s\n", error);
+    scene = _loaded(pairs, "transition-pairs.lua");
     if (scene) {
         Surface surface;
         CHECK(renderer->render(scene, 0.5f, surface) == Result::Success);
@@ -386,11 +349,7 @@ return root
     for (auto source : plainSources) {
         char script[512];
         std::snprintf(script, sizeof(script), "%s%s; return p", prefix, source);
-        scene = nullptr;
-        status = Lua::load(script, static_cast<uint32_t>(std::strlen(script)), "transition-no-options.lua", &scene,
-                           error, sizeof(error));
-        CHECK(status == Result::Success);
-        if (status != Result::Success) std::fprintf(stderr, "%s: %s\n", source, error);
+        scene = _loaded(script, "transition-no-options.lua");
         CHECK(scene && scene->duration() == 1.0f);
         delete scene;
     }
@@ -471,13 +430,7 @@ if math.abs(scene:duration() - 1.5) > 0.0001 then error("composite duration mism
 return scene
 )lua";
 
-    char error[1024] = {};
-    Scene* scene = nullptr;
-    auto status = Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "scene-tree.lua",
-                            &scene, error, sizeof(error));
-    CHECK(status == Result::Success);
-    CHECK(scene != nullptr);
-    if (status != Result::Success) std::fprintf(stderr, "scene-tree.lua: %s\n", error);
+    auto scene = _loaded(source, "scene-tree.lua");
     if (!scene) return;
 
     CHECK(scene->count() == 22);
@@ -571,6 +524,6 @@ return scene
 
     Surface surface;
     CHECK(renderer->render(scene, scene->duration(), surface) == Result::Success);
-    CHECK(_changed(surface, scene->config().background) > 500);
+    CHECK(changed(surface, scene->config().background) > 500);
     delete scene;
 }

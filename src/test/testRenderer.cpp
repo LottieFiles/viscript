@@ -1,21 +1,11 @@
 #include <cstdio>
-#include <cstdlib>
 #include <cstring>
 #include <type_traits>
 
 #include "vis.h"
+#include "testCheck.h"
 
 using namespace vis;
-
-static auto failures = 0;
-
-#define CHECK(condition)                                                                       \
-    do {                                                                                       \
-        if (!(condition)) {                                                                    \
-            std::fprintf(stderr, "%s:%d: check failed: %s\n", __FILE__, __LINE__, #condition); \
-            failures++;                                                                        \
-        }                                                                                      \
-    } while (false)
 
 static_assert(!std::is_copy_constructible<Renderer>::value, "Renderer owns a canvas");
 static_assert(!std::is_copy_assignable<Renderer>::value, "Renderer owns a canvas");
@@ -113,6 +103,5 @@ int main()
     _savingArguments();
     _fontDiagnostics();
 
-    if (failures) std::fprintf(stderr, "%d renderer check(s) failed\n", failures);
-    return failures ? EXIT_FAILURE : EXIT_SUCCESS;
+    return report();
 }

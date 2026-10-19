@@ -46,7 +46,6 @@ void countingText(Renderer* renderer)
     }
     delete text;
 
-#ifdef VIS_TEST_FONT
     // Tabular text uses the widest digit advance, including spaces used to pad a counter.
     {
         Config cfg;
@@ -189,9 +188,6 @@ void countingText(Renderer* renderer)
         CHECK(counter->value() == 0.0f && std::strcmp(counter->text(), "0") == 0);
     }
     delete scene;
-#else
-    (void)renderer;
-#endif
 }
 
 // Plays a linear text change of one second on a new text and checks what it shows a quarter,
@@ -312,7 +308,6 @@ void textChanges(Renderer* renderer)
     CHECK(scene->text(counter, 0.0f, room, sizeof(room)) == 1u && std::strcmp(room, "0") == 0);
     CHECK(scene->text(label, -1.0f, room, sizeof(room)) == 0u);
     CHECK(scene->text(nullptr, 0.0f, room, sizeof(room)) == 0u);
-#ifdef VIS_TEST_FONT
     // The renderer draws the string the time shows, pinned to the text's point by its align as
     // the width changes: about the center by default, from the left edge here.
     BBox shorter;
@@ -328,9 +323,6 @@ void textChanges(Renderer* renderer)
     TextExtent horse;
     CHECK(label->measure("hat", hat) == Result::Success && label->measure("horse", horse) == Result::Success);
     CHECK(hat.width < horse.width && label->measure(nullptr, hat) == Result::InvalidArguments);
-#else
-    (void)renderer;
-#endif
     delete scene;
 }
 
@@ -420,7 +412,6 @@ void matchedPieces(Renderer* renderer)
         delete twins;
     }
 
-#ifdef VIS_TEST_FONT
     // Texts that read the same travel; a given pair cross-fades; the rest fades.
     auto scene = Scene::gen(config);
     auto source = Group::gen();
@@ -551,9 +542,6 @@ void matchedPieces(Renderer* renderer)
         }
     }
     delete scene;
-#else
-    (void)renderer;
-#endif
 }
 
 // A group of lines, each a group of the texts of one string split at spaces, set at one unit
@@ -669,7 +657,6 @@ void diffedLines(Renderer* renderer)
     }
     delete crowded;
 
-#ifdef VIS_TEST_FONT
     // An edit: a line comes in above, the kept lines move down, and a changed line keeps the
     // words it shares while the rest fades.
     const char* const before[] = {"x = 1", "y = 2", "end"};
@@ -747,9 +734,6 @@ void diffedLines(Renderer* renderer)
         delete target;
     }
     delete scene;
-#else
-    (void)renderer;
-#endif
 }
 
 // A match and a cross-fade record that their objects hand over while they play.

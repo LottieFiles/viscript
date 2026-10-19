@@ -4,18 +4,9 @@
 #include "testGlContext.h"
 #include "vis.h"
 #include "vis_gl.h"
+#include "testCheck.h"
 
 using namespace vis;
-
-static auto failures = 0;
-
-#define CHECK(condition)                                                                       \
-    do {                                                                                       \
-        if (!(condition)) {                                                                    \
-            std::fprintf(stderr, "%s:%d: check failed: %s\n", __FILE__, __LINE__, #condition); \
-            failures++;                                                                        \
-        }                                                                                      \
-    } while (false)
 
 int main()
 {
@@ -112,5 +103,5 @@ int main()
     delete renderer;
 
     delete scene;
-    return failures ? 1 : 0;
+    return report();
 }

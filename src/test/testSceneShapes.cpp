@@ -131,7 +131,6 @@ void arcsAndAngles(Renderer* renderer)
 
 void mathSymbolFallback(Renderer* renderer)
 {
-    CHECK(renderer->font(VIS_TEST_FONT) == Result::Success);
     Config config; config.width = 400; config.height = 100; config.camera.orthoHeight = 100.0f;
     auto scene = Scene::gen(config);
     auto text = Text::gen("\xe2\x88\xa0" "APB = 35\xc2\xb0", {});
@@ -322,13 +321,11 @@ void shapeProperties(Renderer* renderer)
     auto left = _pixelAt(surface, 21u, 20u);
     CHECK((left & 0xffu) > 110u && (left & 0xffu) < 145u);
     CHECK(((left >> 8u) & 0xffu) > 110u && ((left >> 8u) & 0xffu) < 145u && ((left >> 16u) & 0xffu) < 20u);
-#ifdef VIS_TEST_FONT
     BBox small;
     BBox large;
     CHECK(renderer->bounds(styled, label, 0.0f, small) == Result::Success);
     CHECK(renderer->bounds(styled, label, 1.0f, large) == Result::Success);
     CHECK(large.width > small.width * 2.5f && large.height > small.height * 2.5f);
-#endif
 
     // A gradient with stops owns the colors, so only their alpha may change.
     CHECK(styled->play(AnimationTarget::from(bar).fill(red), 1.0f) == Result::InvalidArguments);
@@ -436,7 +433,6 @@ void zeroLengthArrows(Renderer* renderer)
     config.height = 100;
     config.camera.orthoHeight = 5.0f;
     config.background = Color::hex("#000000");
-    CHECK(renderer->font(VIS_TEST_FONT) == Result::Success);
 
     for (auto kind = 0; kind < 2; kind++) {
         for (auto degenerate = 0; degenerate < 4; degenerate++) {

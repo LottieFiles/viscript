@@ -7,41 +7,26 @@
 #include <initializer_list>
 
 #include "vis.h"
+#include "testCheck.h"
 
 using namespace vis;
-
-extern int _failures;
-
-static inline void _check(bool condition, const char* expression, const char* file, int line)
-{
-    if (condition) return;
-    std::fprintf(stderr, "%s:%d: CHECK(%s) failed\n", file, line, expression);
-    _failures++;
-}
-
-#define CHECK(condition) _check((condition), #condition, __FILE__, __LINE__)
-
-static inline uint32_t _changed(const Surface& surface, Color background)
-{
-    auto pixel = static_cast<uint32_t>(background.a) << 24 | static_cast<uint32_t>(background.b) << 16 | static_cast<uint32_t>(background.g) << 8 | background.r;
-    auto count = 0u;
-    for (auto y = 0u; y < surface.height(); y++) {
-        for (auto x = 0u; x < surface.width(); x++) {
-            if (surface.data()[static_cast<size_t>(y) * surface.stride() + x] != pixel) count++;
-        }
-    }
-    return count;
-}
-
-static inline uint32_t _pixel(Color color)
-{
-    return static_cast<uint32_t>(color.a) << 24 | static_cast<uint32_t>(color.b) << 16
-        | static_cast<uint32_t>(color.g) << 8 | color.r;
-}
 
 static inline bool _near(float lhs, float rhs)
 {
     return std::fabs(lhs - rhs) < 1.0e-4f;
+}
+
+// The scene a script makes. A script that does not load fails the check and says why.
+static inline Scene* _loaded(const char* source, const char* name, Lua::AssetResolver resolver = nullptr,
+                             void* resolverData = nullptr)
+{
+    char error[1024] = {};
+    Scene* scene = nullptr;
+    auto status = Lua::load(source, static_cast<uint32_t>(std::strlen(source)), name, &scene, error, sizeof(error),
+                            resolver, resolverData);
+    CHECK(status == Result::Success && scene);
+    if (status != Result::Success) std::fprintf(stderr, "%s: %s\n", name, error);
+    return scene;
 }
 
 static inline void _error(const char* source, const char* name, Lua::AssetResolver resolver = nullptr,
@@ -77,18 +62,7 @@ static inline void _scriptError(const char* source, const char* expected)
 // The script must load.
 static inline void _scriptLoads(const char* source)
 {
-    char error[512] = {};
-    Scene* scene = nullptr;
-    auto status = Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "loads.lua", &scene, error,
-                            sizeof(error));
-    CHECK(status == Result::Success && scene != nullptr);
-    if (status != Result::Success) std::fprintf(stderr, "  expected the script to load, got: %s\n", error);
-    delete scene;
-}
-
-static inline bool _same(Color first, Color second)
-{
-    return first.r == second.r && first.g == second.g && first.b == second.b && first.a == second.a;
+    delete _loaded(source, "loads.lua");
 }
 
 // The texts of a spans group, in order.
@@ -119,11 +93,6 @@ static inline const char* _shows(Scene* scene, const char* id, float time)
     auto text = static_cast<const Text*>(scene->object(id));
     if (!text || scene->text(text, time, output, sizeof(output)) >= sizeof(output)) return "?";
     return output;
-}
-
-static inline bool _sameColor(const Color& first, const Color& second)
-{
-    return first.r == second.r && first.g == second.g && first.b == second.b && first.a == second.a;
 }
 
 static inline bool _near(const Vec3& value, float x, float y, float z, float tolerance = 1.0e-4f)

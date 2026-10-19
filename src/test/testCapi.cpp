@@ -2,16 +2,7 @@
 #include <cstring>
 
 #include "vis_capi.h"
-
-static auto failures = 0;
-
-#define CHECK(condition)                                                                       \
-    do {                                                                                       \
-        if (!(condition)) {                                                                    \
-            std::fprintf(stderr, "%s:%d: check failed: %s\n", __FILE__, __LINE__, #condition); \
-            failures++;                                                                        \
-        }                                                                                      \
-    } while (false)
+#include "testCheck.h"
 
 int main()
 {
@@ -210,6 +201,5 @@ return root
     CHECK(std::strcmp(vis_missing_fonts(nullptr), "") == 0);
 
     vis_destroy(engine);
-    if (failures) std::fprintf(stderr, "%d C API checks failed\n", failures);
-    return failures ? 1 : 0;
+    return report();
 }

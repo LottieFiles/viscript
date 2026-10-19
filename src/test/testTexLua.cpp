@@ -7,19 +7,9 @@
 #include "vis.h"
 #include "vis_tex.h"
 #include "visLuaHost.h"
+#include "testCheck.h"
 
 using namespace vis;
-
-static int failures = 0;
-
-static void check(bool condition, const char* expression, int line)
-{
-    if (condition) return;
-    std::fprintf(stderr, "%s:%d: CHECK(%s) failed\n", __FILE__, line, expression);
-    failures++;
-}
-
-#define CHECK(condition) check((condition), #condition, __LINE__)
 
 static Scene* _load(const char* source, const char* name)
 {
@@ -54,24 +44,6 @@ static const Text* _text(const Scene* scene, const char* id)
     return object && object->type() == Type::Text ? static_cast<const Text*>(object) : nullptr;
 }
 
-static bool _same(const Color& lhs, const Color& rhs)
-{
-    return lhs.r == rhs.r && lhs.g == rhs.g && lhs.b == rhs.b && lhs.a == rhs.a;
-}
-
-static uint32_t _changed(const Surface& surface, Color background)
-{
-    auto pixel = static_cast<uint32_t>(background.a) << 24 | static_cast<uint32_t>(background.b) << 16
-                 | static_cast<uint32_t>(background.g) << 8 | background.r;
-    auto count = 0u;
-    for (auto y = 0u; y < surface.height(); y++) {
-        for (auto x = 0u; x < surface.width(); x++) {
-            if (surface.data()[static_cast<size_t>(y) * surface.stride() + x] != pixel) count++;
-        }
-    }
-    return count;
-}
-
 // One source: a typeset group of glyphs named after it, set in the role's color, its box
 // pinned to the point.
 static void _single(Renderer* renderer)
@@ -91,7 +63,7 @@ return scene
     if (!scene) return;
     auto root = scene->object("eq");
     CHECK(root && root->type() == Type::Group && static_cast<const Group*>(root)->typeset);
-    if (root) CHECK(_same(root->style.fill, scene->theme().h2.color));
+    if (root) CHECK(same(root->style.fill, scene->theme().h2.color));
     auto a = _text(scene, "eq/1");
     auto two = _text(scene, "eq/2");
     CHECK(a && std::strcmp(a->text(), "a") == 0 && two && std::strcmp(two->text(), "2") == 0);
@@ -110,7 +82,7 @@ return scene
 
     Surface surface;
     CHECK(renderer->render(scene, 0.0f, surface) == Result::Success);
-    CHECK(_changed(surface, scene->config().background) > 500u);
+    CHECK(changed(surface, scene->config().background) > 500u);
     CHECK(Saver::png(surface, "test-tex-lua.png") == Result::Success);
     delete scene;
 }
@@ -144,10 +116,10 @@ return scene
     CHECK(scene->object("eq/1") && scene->object("eq/2") && scene->object("eq/4"));
     auto b = scene->object("eq/3");
     auto hyp = scene->object("hyp");
-    CHECK(b && _same(b->style.fill, Color{255, 0, 0, 255}));
-    CHECK(hyp && _same(hyp->style.fill, Color{0, 255, 0, 255}) && hyp->opacity == 0.5f);
+    CHECK(b && same(b->style.fill, Color{255, 0, 0, 255}));
+    CHECK(hyp && same(hyp->style.fill, Color{0, 255, 0, 255}) && hyp->opacity == 0.5f);
     auto plus = scene->object("eq/2");
-    CHECK(plus && _same(plus->style.fill, Color{0, 0, 255, 255}));
+    CHECK(plus && same(plus->style.fill, Color{0, 0, 255, 255}));
     auto c = _text(scene, "hyp/1");
     CHECK(c && std::strcmp(c->text(), "c") == 0 && c->parent() == hyp);
     CHECK(_text(scene, "eq/1/1") && _text(scene, "eq/3/2") && !scene->object("eq/1/3"));
@@ -477,9 +449,9 @@ return s
     auto eq = scene->object("eq");
     CHECK(eq && eq->type() == Type::Group && eq->parent() == scene->object("row"));
     // The formula takes the row's color, and its group's fill colors it as fill plays it.
-    CHECK(eq && static_cast<const Group*>(eq)->typeset && _same(eq->style.fill, Color{255, 255, 255, 255}));
+    CHECK(eq && static_cast<const Group*>(eq)->typeset && same(eq->style.fill, Color{255, 255, 255, 255}));
     auto sum = scene->object("list/2");
-    CHECK(sum && _same(sum->style.fill, Color{0x33, 0x66, 0x99, 255}));
+    CHECK(sum && same(sum->style.fill, Color{0x33, 0x66, 0x99, 255}));
     // Inline formulas take text style in the row's size, as scene:tex does with display = false.
     auto a = _text(scene, "eq/1");
     CHECK(a && a->size == 30.0f);
@@ -505,7 +477,7 @@ return s
         CHECK(comma->point.x > two->point.x + advance.width && comma->point.x < two->point.x + advance.width + 3.0f);
     }
     auto plus = scene->object("plus");
-    CHECK(plus && plus->parent() == scene->object("list/2") && _same(plus->style.fill, Color{255, 0, 0, 255}));
+    CHECK(plus && plus->parent() == scene->object("list/2") && same(plus->style.fill, Color{255, 0, 0, 255}));
 
     // A formula alone on a line keeps the line as tall as a line of text.
     auto first = _baseline(scene, "lines/1");
@@ -713,7 +685,7 @@ return s
     if (!scene) return;
     auto x = scene->object("m/1/2");
     CHECK(x && x->type() == Type::Group && static_cast<const Group*>(x)->typeset && x->parent() == scene->object("m/1"));
-    CHECK(x && _same(x->style.fill, Color{0x33, 0x66, 0x99, 255}));
+    CHECK(x && same(x->style.fill, Color{0x33, 0x66, 0x99, 255}));
     auto glyph = _text(scene, "m/1/2/1");
     CHECK(glyph && glyph->size == 30.0f);
     // A number counts as before, and a blank entry is a text.
@@ -819,12 +791,8 @@ int main()
     auto renderer = Renderer::gen();
     CHECK(renderer != nullptr);
     if (renderer) {
-#ifdef VIS_TEST_FONT
         CHECK(renderer->font(VIS_TEST_FONT) == Result::Success);
-#ifdef VIS_TEST_MONO_FONT
         CHECK(renderer->font(VIS_TEST_MONO_FONT) == Result::Success);
-#endif
-#endif
         _single(renderer);
         _parts();
         _shapes();
@@ -842,6 +810,5 @@ int main()
         _host();
     }
     delete renderer;
-    if (failures) std::fprintf(stderr, "%d check(s) failed\n", failures);
-    return failures ? 1 : 0;
+    return report();
 }

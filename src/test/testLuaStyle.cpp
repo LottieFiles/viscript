@@ -12,12 +12,7 @@ local c = s:circle {radius = 0.25, opacity = 0}
 s:transition(b, c, 0.5)
 return s
 )lua";
-    char error[512] = {};
-    Scene* scene = nullptr;
-    auto status = Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "cross-fades.lua", &scene, error,
-                            sizeof(error));
-    CHECK(status == Result::Success);
-    if (status != Result::Success) std::fprintf(stderr, "cross-fades.lua: %s\n", error);
+    auto scene = _loaded(source, "cross-fades.lua");
     CHECK(scene && scene->duration() == 1.5f);
     delete scene;
 }
@@ -32,12 +27,7 @@ scene:text {text = "body", id = "body"}
 scene:text {text = "title", role = "h1", id = "title"}
 return scene
 )lua";
-    char error[256] = {};
-    Scene* scene = nullptr;
-    auto status = Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "text-size.lua",
-                            &scene, error, sizeof(error));
-    CHECK(status == Result::Success);
-    if (status != Result::Success) std::fprintf(stderr, "text-size.lua: %s\n", error);
+    auto scene = _loaded(source, "text-size.lua");
     if (scene) {
         auto theme = Theme::preset(ThemePreset::ProWhite);
         auto sized = static_cast<Text*>(scene->object("sized"));
@@ -62,20 +52,15 @@ scene:play({target = g, fill = "#0000ff"}, 1)
 scene:stroke(g, "#ffffff", 0.5)
 return scene
 )lua";
-    char error[256] = {};
-    Scene* scene = nullptr;
-    auto status = Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "group-style.lua",
-                            &scene, error, sizeof(error));
-    CHECK(status == Result::Success);
-    if (status != Result::Success) std::fprintf(stderr, "group-style.lua: %s\n", error);
+    auto scene = _loaded(source, "group-style.lua");
     if (scene) {
         auto circle = scene->object("circle");
         auto own = scene->object("own");
         auto label = scene->object("label");
-        CHECK(circle && _same(circle->style.stroke, Color::hex("#ffffff")));
-        CHECK(circle && _same(circle->style.fill, Color::hex("#0000ff")) && circle->style.width == 6.0f);
-        CHECK(own && _same(own->style.stroke, Color::hex("#ffff00")) && _same(own->style.fill, Color::hex("#0000ff")));
-        CHECK(label && _same(label->style.fill, Theme::preset(ThemePreset::ProWhite).text.color));
+        CHECK(circle && same(circle->style.stroke, Color::hex("#ffffff")));
+        CHECK(circle && same(circle->style.fill, Color::hex("#0000ff")) && circle->style.width == 6.0f);
+        CHECK(own && same(own->style.stroke, Color::hex("#ffff00")) && same(own->style.fill, Color::hex("#0000ff")));
+        CHECK(label && same(label->style.fill, Theme::preset(ThemePreset::ProWhite).text.color));
     }
     delete scene;
 
@@ -94,23 +79,19 @@ scene:play({target = row, fill = "#0000ff"}, 1)
 scene:set {target = inner, fill = "#ffffff"}
 return scene
 )lua";
-    scene = nullptr;
-    status = Lua::load(blocks, static_cast<uint32_t>(std::strlen(blocks)), "group-blocks.lua", &scene, error,
-                       sizeof(error));
-    CHECK(status == Result::Success);
-    if (status != Result::Success) std::fprintf(stderr, "group-blocks.lua: %s\n", error);
+    scene = _loaded(blocks, "group-blocks.lua");
     if (scene) {
         auto role = Theme::preset(ThemePreset::ProWhite).text.color;
         auto text = [scene](const char* tag) { return scene->object(tag); };
-        CHECK(text("set") && _same(text("set")->style.fill, Color::hex("#ff0000")));
-        CHECK(text("innerText") && _same(text("innerText")->style.fill, Color::hex("#ffffff")));
-        CHECK(text("ownText") && _same(text("ownText")->style.fill, Color::hex("#ffff00")));
+        CHECK(text("set") && same(text("set")->style.fill, Color::hex("#ff0000")));
+        CHECK(text("innerText") && same(text("innerText")->style.fill, Color::hex("#ffffff")));
+        CHECK(text("ownText") && same(text("ownText")->style.fill, Color::hex("#ffff00")));
         // A fill set above the block stays out of it, as it stays out of any text.
-        CHECK(text("plainText") && _same(text("plainText")->style.fill, role));
+        CHECK(text("plainText") && same(text("plainText")->style.fill, role));
         Text* words[2] = {};
         CHECK(_spanTexts(scene, "row", words, 2) == 2u);
-        CHECK(words[0] && _same(words[0]->style.fill, Color::hex("#0000ff")));
-        CHECK(words[1] && _same(words[1]->style.fill, Color::hex("#00ffff")));
+        CHECK(words[0] && same(words[0]->style.fill, Color::hex("#0000ff")));
+        CHECK(words[1] && same(words[1]->style.fill, Color::hex("#00ffff")));
         // The play adds a clip for the row and its first word, the set one for the group and its text.
         CHECK(scene->clipCount() == 4u);
     }
@@ -140,12 +121,7 @@ for i, p in ipairs(points) do
 end
 return s
 )lua";
-    char error[256] = {};
-    Scene* scene = nullptr;
-    auto status = Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "points.lua", &scene,
-                            error, sizeof(error));
-    CHECK(status == Result::Success);
-    if (status != Result::Success) std::fprintf(stderr, "points.lua: %s\n", error);
+    auto scene = _loaded(source, "points.lua");
     CHECK(scene && scene->count() == 2000u && scene->clipCount() == 2000u && scene->sampleWork() == 2000u);
     delete scene;
     // Each move of a group of a thousand points is read for the group and each point.
@@ -194,12 +170,7 @@ local glass = scene:rectangle {size = {2, 1}, blur = 3, shadow = {color = "#ff00
 scene:play({{target = card2, blur = 5, shadow = {offset = {0, -12}}}, {target = glass, shadow = {blur = 10}}}, 1)
 return scene
 )lua";
-    char error[256] = {};
-    Scene* scene = nullptr;
-    auto status = Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "composition.lua",
-                            &scene, error, sizeof(error));
-    CHECK(status == Result::Success);
-    if (status != Result::Success) std::fprintf(stderr, "composition.lua: %s\n", error);
+    auto scene = _loaded(source, "composition.lua");
     if (scene) {
         auto card = scene->object("card");
         auto panel = scene->object("panel");
@@ -263,9 +234,7 @@ s:bind(m, t, function(v) return {vertex = {v, 0}, from = {v - 1, 0.2}, to = {v -
 s:track(t, 1, 1, "linear")
 return s
 )lua";
-    Scene* scene = nullptr; char error[1024];
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "arcs-and-angles.lua", &scene, error, sizeof(error)) == Result::Success);
-    if (!scene) std::fprintf(stderr, "%s\n", error);
+    auto scene = _loaded(source, "arcs-and-angles.lua");
     if (scene) {
         CHECK(scene->objectAt(0)->type() == Type::Arc && scene->objectAt(1)->type() == Type::Angle);
         auto arc = static_cast<Arc*>(scene->objectAt(0));
@@ -308,12 +277,7 @@ scene:play({
 scene:play({target = r, size = 2}, 1)
 return scene
 )lua";
-    char error[256] = {};
-    Scene* scene = nullptr;
-    auto status = Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "shape-properties.lua",
-                            &scene, error, sizeof(error));
-    CHECK(status == Result::Success);
-    if (status != Result::Success) std::fprintf(stderr, "shape-properties.lua: %s\n", error);
+    auto scene = _loaded(source, "shape-properties.lua");
     if (scene) {
         auto circle = static_cast<Circle*>(scene->object("circle"));
         auto box = static_cast<Rectangle*>(scene->object("box"));
@@ -327,8 +291,8 @@ return scene
         CHECK(label && label->size == 40.0f);
         CHECK(dot && dot->style.radius == 9.0f);
         CHECK(heir && heir->style.width == 7.0f);
-        CHECK(bar && _same(bar->style.gradient.stops[0].color, Color::hex("#00ff00")));
-        CHECK(ramp && _same(ramp->style.gradientEnd, Color::hex("#00ff00")));
+        CHECK(bar && same(bar->style.gradient.stops[0].color, Color::hex("#00ff00")));
+        CHECK(ramp && same(ramp->style.gradientEnd, Color::hex("#00ff00")));
     }
     delete scene;
     _scriptError("local s=vis.scene{}; local c=s:circle{radius=1}; s:play({target=c, size=2}, 1); return s",
@@ -369,12 +333,7 @@ s:play({target = r, fill = "#ff0000"}, 1)
 s:set {{target = r, size = {2, 1}}, {target = g, width = 5}}
 return s
 )lua";
-    char error[256] = {};
-    Scene* scene = nullptr;
-    auto status = Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "instant-set.lua", &scene,
-                            error, sizeof(error));
-    CHECK(status == Result::Success);
-    if (status != Result::Success) std::fprintf(stderr, "instant-set.lua: %s\n", error);
+    auto scene = _loaded(source, "instant-set.lua");
     if (scene) {
         auto circle = static_cast<Circle*>(scene->object("c"));
         auto box = static_cast<Rectangle*>(scene->object("r"));
@@ -443,15 +402,9 @@ local solid = scene:line {from = {0, -1.5}, to = {2, -1.5}, gradient = false, id
 return scene
 )lua";
 
-    char error[1024] = {};
-    Scene* scene = nullptr;
-    auto status = Lua::load(source, static_cast<uint32_t>(std::strlen(source)),
-                            "theme.lua", &scene, error, sizeof(error));
-    CHECK(status == Result::Success);
-    CHECK(scene != nullptr);
-    if (status != Result::Success) std::fprintf(stderr, "theme.lua: %s\n", error);
+    auto scene = _loaded(source, "theme.lua");
     if (scene) {
-        CHECK(_pixel(scene->config().background) == _pixel(Color::hex("#fafafa")));
+        CHECK(pixel(scene->config().background) == pixel(Color::hex("#fafafa")));
         CHECK(scene->theme().objectCount == 2u);
         CHECK(_near(scene->theme().roundness, 0.25f));
         auto title = static_cast<Text*>(scene->object("title"));
@@ -470,29 +423,29 @@ return scene
             CHECK(title->role == TextRole::H1 && _near(title->size, 33.0f));
             CHECK(code->role == TextRole::Code && _near(code->size, 14.0f));
             CHECK(std::strcmp(title->font(), "Pretendard") == 0);
-            CHECK(_pixel(title->style.fill) == _pixel(Color::hex("#17191d")));
-            CHECK(_pixel(code->style.fill) == _pixel(Color::hex("#8a3b12")));
-            CHECK(_pixel(axes->axisX) == _pixel(Color::hex("#aa3311")));
-            CHECK(_pixel(axes->axisY) == _pixel(Color::hex("#227744")));
-            CHECK(_pixel(axes->axisZ) == _pixel(Color::hex("#335599")));
-            CHECK(_pixel(first->style.stroke) == _pixel(Color::hex("#112233")));
+            CHECK(pixel(title->style.fill) == pixel(Color::hex("#17191d")));
+            CHECK(pixel(code->style.fill) == pixel(Color::hex("#8a3b12")));
+            CHECK(pixel(axes->axisX) == pixel(Color::hex("#aa3311")));
+            CHECK(pixel(axes->axisY) == pixel(Color::hex("#227744")));
+            CHECK(pixel(axes->axisZ) == pixel(Color::hex("#335599")));
+            CHECK(pixel(first->style.stroke) == pixel(Color::hex("#112233")));
             CHECK(_near(first->style.width, 3.25f));
-            CHECK(_pixel(explicitLine->style.stroke) == _pixel(Color::hex("#abcdef")));
+            CHECK(pixel(explicitLine->style.stroke) == pixel(Color::hex("#abcdef")));
             CHECK(_near(explicitLine->style.width, 5.0f));
-            CHECK(_pixel(second->style.stroke) == _pixel(Color::hex("#445566")));
+            CHECK(pixel(second->style.stroke) == pixel(Color::hex("#445566")));
             CHECK(_near(second->style.width, 3.25f));
-            CHECK(_pixel(wrapped->style.stroke) == _pixel(Color::hex("#112233")));
-            CHECK(_pixel(wrapped->style.fill) == _pixel(Color::hex("#112233")));
+            CHECK(pixel(wrapped->style.stroke) == pixel(Color::hex("#112233")));
+            CHECK(pixel(wrapped->style.fill) == pixel(Color::hex("#112233")));
             CHECK(first->style.gradient.enabled());
-            CHECK(_pixel(first->style.gradientEnd) == _pixel(Color::hex("#778899")));
+            CHECK(pixel(first->style.gradientEnd) == pixel(Color::hex("#778899")));
             CHECK(customGradient->style.gradient.enabled());
-            CHECK(_pixel(customGradient->style.gradientEnd)
-                  == _pixel(Color::hex("#fedcba")));
+            CHECK(pixel(customGradient->style.gradientEnd)
+                  == pixel(Color::hex("#fedcba")));
             CHECK(!solid->style.gradient.enabled());
         }
         Surface surface;
         CHECK(renderer->render(scene, 0.0f, surface) == Result::Success);
-        CHECK(_changed(surface, scene->config().background) > 100u);
+        CHECK(changed(surface, scene->config().background) > 100u);
     }
     delete scene;
 
@@ -504,30 +457,24 @@ legacy:point {point = {0, 0}, id = "legacy-point"}
 scene:viewport(legacy, {x = 0, y = 0, width = 1, height = 1})
 return scene
 )lua";
-    error[0] = '\0';
-    scene = nullptr;
-    status = Lua::load(blackSource, static_cast<uint32_t>(std::strlen(blackSource)),
-                       "theme-pro-black.lua", &scene, error, sizeof(error));
-    CHECK(status == Result::Success);
-    CHECK(scene != nullptr);
-    if (status != Result::Success) std::fprintf(stderr, "theme-pro-black.lua: %s\n", error);
+    scene = _loaded(blackSource, "theme-pro-black.lua");
     if (scene) {
-        CHECK(_pixel(scene->config().background) == _pixel(Color::hex("#000000")));
+        CHECK(pixel(scene->config().background) == pixel(Color::hex("#000000")));
         auto point = scene->object("point");
         CHECK(point != nullptr);
         if (point) {
-            CHECK(_pixel(point->style.stroke) == _pixel(Color::hex("#f28e2b")));
-            CHECK(_pixel(point->style.fill) == _pixel(Color::hex("#f28e2b")));
+            CHECK(pixel(point->style.stroke) == pixel(Color::hex("#f28e2b")));
+            CHECK(pixel(point->style.fill) == pixel(Color::hex("#f28e2b")));
         }
         auto legacy = scene->sceneAt(0);
         CHECK(legacy != nullptr);
         if (legacy) {
-            CHECK(_pixel(legacy->config().background) == _pixel(Color::hex("#ffffff")));
+            CHECK(pixel(legacy->config().background) == pixel(Color::hex("#ffffff")));
             auto legacyPoint = legacy->object("legacy-point");
             CHECK(legacyPoint != nullptr);
             if (legacyPoint) {
-                CHECK(_pixel(legacyPoint->style.stroke) == _pixel(Color::hex("#b45f06")));
-                CHECK(_pixel(legacyPoint->style.fill) == _pixel(Color::hex("#b45f06")));
+                CHECK(pixel(legacyPoint->style.stroke) == pixel(Color::hex("#b45f06")));
+                CHECK(pixel(legacyPoint->style.fill) == pixel(Color::hex("#b45f06")));
             }
         }
     }
@@ -545,21 +492,21 @@ return scene
     adaptive.objects[0] = Color::hex("#62b0ff");
     adaptive.objectCount = 1u;
     bool adaptiveUsed = false;
-    error[0] = '\0';
+    char error[1024] = {};
     scene = nullptr;
-    status = Lua::load(adaptiveSource, static_cast<uint32_t>(std::strlen(adaptiveSource)),
-                       "theme-adaptive-vscode.lua", &scene, error, sizeof(error), nullptr,
-                       nullptr, &adaptive, &adaptiveUsed);
+    auto status = Lua::load(adaptiveSource, static_cast<uint32_t>(std::strlen(adaptiveSource)),
+                            "theme-adaptive-vscode.lua", &scene, error, sizeof(error), nullptr,
+                            nullptr, &adaptive, &adaptiveUsed);
     CHECK(status == Result::Success);
     CHECK(scene != nullptr);
     CHECK(adaptiveUsed);
     if (scene) {
-        CHECK(_pixel(scene->config().background) == _pixel(Color::hex("#101820")));
+        CHECK(pixel(scene->config().background) == pixel(Color::hex("#101820")));
         auto title = static_cast<Text*>(scene->object("title"));
         auto line = scene->object("line");
         CHECK(title && line);
-        if (title) CHECK(_pixel(title->style.fill) == _pixel(Color::hex("#e8edf2")));
-        if (line) CHECK(_pixel(line->style.stroke) == _pixel(Color::hex("#62b0ff")));
+        if (title) CHECK(pixel(title->style.fill) == pixel(Color::hex("#e8edf2")));
+        if (line) CHECK(pixel(line->style.stroke) == pixel(Color::hex("#62b0ff")));
     }
     delete scene;
 
@@ -571,7 +518,7 @@ return scene
     CHECK(status == Result::Success);
     CHECK(scene != nullptr);
     CHECK(adaptiveUsed);
-    if (scene) CHECK(_pixel(scene->config().background) == _pixel(Color::hex("#ffffff")));
+    if (scene) CHECK(pixel(scene->config().background) == pixel(Color::hex("#ffffff")));
     delete scene;
 
     static constexpr auto namedSource = R"lua(
@@ -579,30 +526,22 @@ local named = vis.scene {theme = "pro_black"}
 named:point {point = {0, 0}, id = "named-point"}
 return named
 )lua";
-    scene = nullptr;
-    status = Lua::load(namedSource, static_cast<uint32_t>(std::strlen(namedSource)),
-                       "theme-pro-black.lua", &scene, error, sizeof(error));
-    CHECK(status == Result::Success);
-    CHECK(scene != nullptr);
+    scene = _loaded(namedSource, "theme-pro-black.lua");
     if (scene) {
-        CHECK(_pixel(scene->config().background) == _pixel(Color::hex("#000000")));
+        CHECK(pixel(scene->config().background) == pixel(Color::hex("#000000")));
         CHECK(scene->theme().roundness == 0.0f);
         auto point = scene->object("named-point");
-        CHECK(point && _pixel(point->style.fill) == _pixel(Color::hex("#f28e2b")));
+        CHECK(point && pixel(point->style.fill) == pixel(Color::hex("#f28e2b")));
     }
     delete scene;
     _scriptError("return vis.scene {theme = '3_blue_1_eyes'}",
                  "theme preset must be 'pro_white', 'pro_black' or 'adaptive_vscode'");
 
     static constexpr auto implicitSource = "return vis.scene {}";
-    scene = nullptr;
-    status = Lua::load(implicitSource, static_cast<uint32_t>(std::strlen(implicitSource)),
-                       "theme-implicit.lua", &scene, error, sizeof(error));
-    CHECK(status == Result::Success);
-    CHECK(scene != nullptr);
+    scene = _loaded(implicitSource, "theme-implicit.lua");
     if (scene) {
-        CHECK(_pixel(scene->config().background) == _pixel(Color::hex("#ffffff")));
-        CHECK(_pixel(scene->theme().objects[0]) == _pixel(Color::hex("#b45f06")));
+        CHECK(pixel(scene->config().background) == pixel(Color::hex("#ffffff")));
+        CHECK(pixel(scene->theme().objects[0]) == pixel(Color::hex("#b45f06")));
         CHECK(scene->theme().roundness == 0.0f);
     }
     delete scene;
@@ -632,40 +571,35 @@ scene:stroke(animated, "success", 0.1)
 scene:indicate(accent, {duration = 0.1})
 return scene
 )lua";
-    scene = nullptr;
-    status = Lua::load(semanticSource, static_cast<uint32_t>(std::strlen(semanticSource)),
-                       "theme-semantic.lua", &scene, error, sizeof(error));
-    CHECK(status == Result::Success);
-    CHECK(scene != nullptr);
-    if (status != Result::Success) std::fprintf(stderr, "theme-semantic.lua: %s\n", error);
+    scene = _loaded(semanticSource, "theme-semantic.lua");
     if (scene) {
-        CHECK(_pixel(scene->theme().colors.accent) == _pixel(Color::hex("#123456")));
-        CHECK(_pixel(scene->theme().colors.danger) == _pixel(Color::hex("#bb2233")));
-        CHECK(_pixel(scene->theme().colors.result) == _pixel(Color::hex("#886600")));
-        CHECK(_pixel(scene->theme().colors.focus) == _pixel(Color::hex("#336699")));
+        CHECK(pixel(scene->theme().colors.accent) == pixel(Color::hex("#123456")));
+        CHECK(pixel(scene->theme().colors.danger) == pixel(Color::hex("#bb2233")));
+        CHECK(pixel(scene->theme().colors.result) == pixel(Color::hex("#886600")));
+        CHECK(pixel(scene->theme().colors.focus) == pixel(Color::hex("#336699")));
         auto accent = scene->object("accent");
         auto warning = scene->object("warning");
         auto panel = scene->object("panel");
         auto semanticSpace = static_cast<Space*>(scene->object("semantic-space"));
         CHECK(accent && warning && panel && semanticSpace);
         if (accent) {
-            CHECK(_pixel(accent->style.stroke) == _pixel(Color::hex("#123456")));
+            CHECK(pixel(accent->style.stroke) == pixel(Color::hex("#123456")));
             CHECK(accent->style.gradient.enabled());
-            CHECK(_pixel(accent->style.gradientEnd) == _pixel(Color::hex("#654321")));
+            CHECK(pixel(accent->style.gradientEnd) == pixel(Color::hex("#654321")));
         }
         if (warning) {
-            CHECK(_pixel(warning->style.stroke) == _pixel(Color::hex("#aa7700")));
-            CHECK(_pixel(warning->style.fill) == _pixel(Color::hex("#aa7700")));
+            CHECK(pixel(warning->style.stroke) == pixel(Color::hex("#aa7700")));
+            CHECK(pixel(warning->style.fill) == pixel(Color::hex("#aa7700")));
         }
         if (panel) {
-            CHECK(_pixel(panel->style.stroke) == _pixel(Color::hex("#ccd0d4")));
-            CHECK(_pixel(panel->style.fill) == _pixel(Color::hex("#f0f1f2")));
+            CHECK(pixel(panel->style.stroke) == pixel(Color::hex("#ccd0d4")));
+            CHECK(pixel(panel->style.fill) == pixel(Color::hex("#f0f1f2")));
         }
         if (semanticSpace) {
-            CHECK(_pixel(semanticSpace->axisX) == _pixel(Color::hex("#bb2233")));
-            CHECK(_pixel(semanticSpace->axisY) == _pixel(Color::hex("#118833")));
-            CHECK(_pixel(semanticSpace->axisZ) == _pixel(Color::hex("#2277aa")));
-            CHECK(_pixel(semanticSpace->numberColor) == _pixel(Color::hex("#777777")));
+            CHECK(pixel(semanticSpace->axisX) == pixel(Color::hex("#bb2233")));
+            CHECK(pixel(semanticSpace->axisY) == pixel(Color::hex("#118833")));
+            CHECK(pixel(semanticSpace->axisZ) == pixel(Color::hex("#2277aa")));
+            CHECK(pixel(semanticSpace->numberColor) == pixel(Color::hex("#777777")));
         }
         CHECK(_near(scene->duration(), 0.2f));
     }
@@ -713,13 +647,7 @@ if xy_calls ~= 27 or xy_first_time ~= 0 or xy_last_time ~= 1 then
 end
 return scene
 )lua";
-    char error[1024] = {};
-    Scene* scene = nullptr;
-    auto status = Lua::load(source, static_cast<uint32_t>(std::strlen(source)),
-                            "cell-voxel.lua", &scene, error, sizeof(error));
-    CHECK(status == Result::Success);
-    CHECK(scene != nullptr);
-    if (status != Result::Success) std::fprintf(stderr, "cell-voxel.lua: %s\n", error);
+    auto scene = _loaded(source, "cell-voxel.lua");
     if (scene) {
         CHECK(scene->count() == 7u);
         CHECK(scene->duration() == 2.0f);
@@ -733,9 +661,9 @@ return scene
         CHECK(cells && cells->childCount() == 1u);
         Surface surface;
         CHECK(renderer->render(scene, 0.5f, surface) == Result::Success);
-        CHECK(_changed(surface, scene->config().background) > 1000u);
+        CHECK(changed(surface, scene->config().background) > 1000u);
         CHECK(renderer->render(scene, scene->duration(), surface) == Result::Success);
-        CHECK(_changed(surface, scene->config().background) > 1000u);
+        CHECK(changed(surface, scene->config().background) > 1000u);
     }
     delete scene;
 }
@@ -770,12 +698,7 @@ scene:circle {center = {0, 0}, radius = 1, id = "conic",
 scene:circle {center = {0, 0}, radius = 1, id = "legacy", gradient = "warning"}
 return scene
 )lua";
-    char error[256] = {};
-    Scene* scene = nullptr;
-    auto status = Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "gradients.lua",
-                            &scene, error, sizeof(error));
-    CHECK(status == Result::Success);
-    if (status != Result::Success) std::fprintf(stderr, "  %s\n", error);
+    auto scene = _loaded(source, "gradients.lua");
     if (scene) {
         auto even = scene->object("even");
         auto radial = scene->object("radial");
@@ -786,8 +709,8 @@ return scene
             auto& linear = even->style.gradient;
             CHECK(linear.type == GradientType::Linear && linear.stopCount == 3u && linear.line);
             CHECK(_near(linear.stops[1].offset, 0.5f) && _near(linear.stops[2].offset, 1.0f));
-            CHECK(_pixel(linear.stops[0].color) == _pixel(Color::hex("#112233")));
-            CHECK(_pixel(linear.stops[2].color) == _pixel(Color::hex("#445566")));
+            CHECK(pixel(linear.stops[0].color) == pixel(Color::hex("#112233")));
+            CHECK(pixel(linear.stops[2].color) == pixel(Color::hex("#445566")));
             CHECK(_near(linear.from.x, -1.0f) && _near(linear.to.x, 1.0f));
             auto& r = radial->style.gradient;
             CHECK(r.type == GradientType::Radial && r.stopCount == 3u && r.centered && r.sized
@@ -799,7 +722,7 @@ return scene
                   && _near(c.angle, 45.0f) && _near(c.center.y, 2.0f));
             CHECK(legacy->style.gradient.type == GradientType::Linear
                   && legacy->style.gradient.stopCount == 0u);
-            CHECK(_pixel(legacy->style.gradientEnd) == _pixel(Color::hex("#445566")));
+            CHECK(pixel(legacy->style.gradientEnd) == pixel(Color::hex("#445566")));
         }
     }
     delete scene;

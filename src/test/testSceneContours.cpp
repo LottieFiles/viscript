@@ -106,7 +106,6 @@ void contourPlots(Renderer* renderer)
 // Labels remain centered on sampled curves, with retained text and real stroke gaps.
 void contourLabels(Renderer* renderer)
 {
-    CHECK(renderer->font(VIS_TEST_FONT) == Result::Success);
     Range range{-2.0f, 2.0f, 0.25f};
     double values[289];
     for (auto y = 0u; y < 17u; y++) for (auto x = 0u; x < 17u; x++) values[y * 17u + x] = -4.0 + (x + y) * 0.25;

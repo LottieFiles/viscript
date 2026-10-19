@@ -20,14 +20,8 @@ static Result _takeCamera(float, Camera& camera, CameraView& view, void* data) n
 // Loads a scene whose camera sample reads at each _cameraAt call.
 static Scene* _cameraScene(const char* source, const char* name, CameraSample& sample)
 {
-    char error[512] = {};
-    Scene* scene = nullptr;
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), name, &scene, error, sizeof(error))
-          == Result::Success);
-    if (!scene) {
-        std::fprintf(stderr, "%s: %s\n", name, error);
-        return nullptr;
-    }
+    auto scene = _loaded(source, name);
+    if (!scene) return nullptr;
     RuntimeModifier hook;
     hook.camera = _takeCamera;
     hook.data = &sample;
@@ -316,11 +310,7 @@ lens:fade(0.5, 1)
 strip:focus()
 return s
 )lua";
-    char error[512] = {};
-    Scene* scene = nullptr;
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "views.lua", &scene, error, sizeof(error))
-          == Result::Success);
-    if (!scene) std::fprintf(stderr, "views.lua: %s\n", error);
+    auto scene = _loaded(source, "views.lua");
     if (scene) {
         CHECK(scene->viewCount() == 5u && std::fabs(scene->duration() - 5.0f) < 1.0e-4f);
         SceneView view;
@@ -357,11 +347,11 @@ return s
             auto at = [&](uint32_t x, uint32_t y) { return surface.data()[y * surface.stride() + x]; };
             // The dot at the center of the lens, the hidden circle left out of it, the square on
             // a higher layer over it, and the dot where the scene's camera puts it.
-            CHECK(at(150u, 75u) == _pixel(Color::hex("#ff0000")));
-            CHECK(at(130u, 65u) == _pixel(Color::hex("#0000ff")));
-            CHECK(at(175u, 85u) == _pixel(Color::hex("#00ff00")));
-            CHECK(at(120u, 40u) == _pixel(Color::hex("#ff0000")));
-            CHECK(at(115u, 37u) == _pixel(Color::hex("#ffff00")));
+            CHECK(at(150u, 75u) == pixel(Color::hex("#ff0000")));
+            CHECK(at(130u, 65u) == pixel(Color::hex("#0000ff")));
+            CHECK(at(175u, 85u) == pixel(Color::hex("#00ff00")));
+            CHECK(at(120u, 40u) == pixel(Color::hex("#ff0000")));
+            CHECK(at(115u, 37u) == pixel(Color::hex("#ffff00")));
         }
     }
     delete scene;

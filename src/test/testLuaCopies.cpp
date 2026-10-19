@@ -33,19 +33,15 @@ s:at(0.5, function()
 end)
 return s
 )lua";
-    char error[512] = {};
-    Scene* scene = nullptr;
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "clone.lua", &scene, error, sizeof(error))
-          == Result::Success);
-    if (!scene) std::fprintf(stderr, "clone.lua: %s\n", error);
+    auto scene = _loaded(source, "clone.lua");
     if (scene) {
         // The overrides apply to the copy, and a group passes its stroke to the copies that
         // take theirs from it.
         auto pair = scene->object("pair");
         auto red = Color::hex("#ff0000");
         CHECK(pair && pair->childCount() == 2u && _near(pair->model.e[7], -2.0f) && _near(pair->opacity, 0.5f));
-        CHECK(pair && _sameColor(pair->childAt(0)->style.stroke, red));
-        CHECK(pair && _sameColor(pair->childAt(1)->style.stroke, Color::hex("#0000ff")));
+        CHECK(pair && same(pair->childAt(0)->style.stroke, red));
+        CHECK(pair && same(pair->childAt(1)->style.stroke, Color::hex("#0000ff")));
         CHECK(pair && _tagged(pair->childAt(0), "pair/a") && _tagged(pair->childAt(1), "pair/b"));
         auto masked = scene->object("masked");
         CHECK(masked && masked->mask() == scene->object("r"));
@@ -100,11 +96,7 @@ to:circle {center = {3, -1}, radius = 0.5, id = "to/dot"}
 s:match_transform(from, to, 1, "linear", {copy = true, shapes = true})
 return s
 )lua";
-    char error[512] = {};
-    Scene* scene = nullptr;
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "copy.lua", &scene, error, sizeof(error))
-          == Result::Success);
-    if (!scene) std::fprintf(stderr, "copy.lua: %s\n", error);
+    auto scene = _loaded(source, "copy.lua");
     if (scene) {
         // Each source keeps showing to the end while its copies transform and leave.
         CHECK(std::fabs(scene->duration() - 4.5f) < 1.0e-4f);
@@ -159,10 +151,7 @@ local guide=s:route {points={{-200,0},{0,80},{200,0}},opacity=0}
 s:match_transform(snapshot,b,1,"linear"%s)
 return s
 )lua", variant);
-        char error[256] = {};
-        Scene* scene = nullptr;
-        CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "match-billboard.lua",
-                        &scene, error, sizeof(error)) == Result::Success);
+        auto scene = _loaded(source, "match-billboard.lua");
         if (scene) {
             BBox before; BBox actual;
             CHECK(renderer->bounds(scene, scene->object("source"), 0.499f, before) == Result::Success);
@@ -196,10 +185,7 @@ s:match_transform(from, to, 1, "linear", {copy = true, shapes = true, path = gui
 s:shift(guide, {1, -1}, 1)
 return s
 )lua";
-    char error[256] = {};
-    Scene* scene = nullptr;
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "match-path.lua", &scene, error, sizeof(error))
-          == Result::Success);
+    auto scene = _loaded(source, "match-path.lua");
     if (scene) {
         BBox start;
         BBox middle;
@@ -238,11 +224,7 @@ local third = s:spans {{"c", color = "#ff0000"}, " = ", "√(", "a²", " + ", "b
 s:match_transform(second, third, 1, "smooth", {pairs = {{s:find("second/1"), s:find("third/1")}}, lag = 0.1})
 return s
 )lua";
-    char error[256] = {};
-    Scene* scene = nullptr;
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "match.lua", &scene, error, sizeof(error))
-          == Result::Success);
-    if (!scene) std::fprintf(stderr, "match.lua: %s\n", error);
+    auto scene = _loaded(source, "match.lua");
     if (scene) {
         // Seven pieces of the last row, a tenth of a second apart.
         CHECK(std::fabs(scene->duration() - 4.6f) < 1.0e-4f);
@@ -283,9 +265,7 @@ to:text {text = "x", point = {1, 0}}
 s:match_transform(from, to, 1, "smooth", {strings = false})
 return s
 )lua";
-    scene = nullptr;
-    CHECK(Lua::load(twins, static_cast<uint32_t>(std::strlen(twins)), "twins.lua", &scene, error, sizeof(error))
-          == Result::Success);
+    scene = _loaded(twins, "twins.lua");
     CHECK(scene && scene->clipCount() == 2u);
     delete scene;
 
@@ -302,9 +282,7 @@ local after = s:code {text = "c\nb a", language = "lua"}
 s:match_transform(before, after, 1, "smooth", {diff = %s, fade = 0.4})
 return s
 )lua", diff);
-        scene = nullptr;
-        CHECK(Lua::load(edited, static_cast<uint32_t>(std::strlen(edited)), "edited.lua", &scene, error, sizeof(error))
-              == Result::Success);
+        scene = _loaded(edited, "edited.lua");
         CHECK(scene && scene->clipCount() == (diff[0] == 't' ? 5u : 3u));
         delete scene;
     }
@@ -324,9 +302,7 @@ for i = 1, 4 do four:rectangle {center = {i - 2.5, 0}, size = {0.8, 1}} end
 s:match_transform(two, four, 1, "smooth", {shapes = %s})
 return s
 )lua", shapes);
-        scene = nullptr;
-        CHECK(Lua::load(split, static_cast<uint32_t>(std::strlen(split)), "split.lua", &scene, error, sizeof(error))
-              == Result::Success);
+        scene = _loaded(split, "split.lua");
         CHECK(scene && scene->clipCount() == (shapes[0] == 't' ? 4u : 6u));
         delete scene;
     }
@@ -395,15 +371,7 @@ local high = s:point {id = "high", point = {0.5, 1, 2}, radius = 6}
 s:warp({dot, high}, {x_range = {0, 1, 1}, y_range = {0, 1, 1}, values = {{0, 0}, {2, 0}, {0, 2}, {2, 2}}}, 0.5)
 return s
 )lua";
-    auto load = [](const char* name, const char* script) {
-        char error[256] = {};
-        Scene* scene = nullptr;
-        CHECK(Lua::load(script, static_cast<uint32_t>(std::strlen(script)), name, &scene, error, sizeof(error))
-              == Result::Success);
-        if (!scene) std::fprintf(stderr, "%s: %s\n", name, error);
-        return scene;
-    };
-    auto background = _pixel(Color::hex("#000000"));
+    auto background = pixel(Color::hex("#000000"));
     Surface surface;
     // Whether any of the nine pixels nearest world point (x, y) shows something, or none of the
     // 25 nearest does.
@@ -435,7 +403,7 @@ return s
         for (auto& point : gone) CHECK(!shows(point[0], point[1], 2));
     };
     Bounds bounds;
-    auto scene = load("warp.lua", source);
+    auto scene = _loaded(source, "warp.lua");
     if (scene) {
         bends(scene);
         // A list moves the dot by one, a third number lifts the other off the plane, and the
@@ -449,7 +417,7 @@ return s
         CHECK(_near(scene->duration(), 2.5f) && scene->clipCount() == 4u);
     }
     delete scene;
-    scene = load("sampled.lua", sampled);
+    scene = _loaded(sampled, "sampled.lua");
     if (scene) {
         bends(scene);
         auto inner = scene->object("inner");
@@ -527,11 +495,7 @@ local slab = s:rectangle {center = {-4, -3}, size = {2, 1}, id = "slab"}
 s:match_transform(bar, slab, 1, "linear", {copy = true, shapes = true})
 return s
 )lua";
-    char error[512] = {};
-    Scene* scene = nullptr;
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "warped-clone.lua", &scene, error,
-                    sizeof(error)) == Result::Success);
-    if (!scene) std::fprintf(stderr, "warped-clone.lua: %s\n", error);
+    auto scene = _loaded(source, "warped-clone.lua");
     if (scene) {
         // The pixel bounds of the object named id at time, and whether they are those of
         // reference moved by dx and dy pixels.

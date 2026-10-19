@@ -11,18 +11,9 @@
 #include "vis_ui.h"
 #endif
 #include "testLuaCollector.h"
+#include "testCheck.h"
 
 using namespace vis;
-
-static int failures = 0;
-
-#define CHECK(condition)                                                                       \
-    do {                                                                                       \
-        if (!(condition)) {                                                                    \
-            std::fprintf(stderr, "%s:%d: check failed: %s\n", __FILE__, __LINE__, #condition); \
-            failures++;                                                                        \
-        }                                                                                      \
-    } while (false)
 
 static Result load(const char* source, Scene*& scene, char* error,
                    uint32_t errorSize, detail::LuaHostContext& context)
@@ -339,6 +330,5 @@ int main()
     numericDiagramText();
     diagramThemeCorners();
 #endif
-    if (failures) std::fprintf(stderr, "%d authoring module checks failed\n", failures);
-    return failures ? 1 : 0;
+    return report();
 }

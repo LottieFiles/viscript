@@ -24,11 +24,7 @@ local late = s:code {id = "late", text = "one two", size = 20, point = {0, 3}}
 s:write(late:children()[1]:children(), 1)
 return s
 )lua";
-    char error[256] = {};
-    Scene* scene = nullptr;
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "code.lua", &scene, error, sizeof(error))
-          == Result::Success);
-    if (!scene) std::fprintf(stderr, "code.lua: %s\n", error);
+    auto scene = _loaded(source, "code.lua");
     if (scene) {
         auto& theme = scene->theme();
         auto blank = Text::gen(" ");
@@ -54,9 +50,9 @@ return s
         const char* first[] = {"def", "area", "(", "r", ")", ":"};
         for (auto i = 0u; i < 6u; i++) CHECK(texts[i] && std::strcmp(texts[i]->text(), first[i]) == 0);
         CHECK(texts[0] && texts[0]->tag() && std::strcmp(texts[0]->tag(), "py/1/1") == 0);
-        CHECK(texts[0] && _sameColor(texts[0]->style.fill, theme.color(ThemeColorRole::Secondary)));
-        CHECK(texts[1] && _sameColor(texts[1]->style.fill, theme.color(ThemeColorRole::Accent)));
-        CHECK(texts[2] && _sameColor(texts[2]->style.fill, theme.color(ThemeColorRole::Foreground)));
+        CHECK(texts[0] && same(texts[0]->style.fill, theme.color(ThemeColorRole::Secondary)));
+        CHECK(texts[1] && same(texts[1]->style.fill, theme.color(ThemeColorRole::Accent)));
+        CHECK(texts[2] && same(texts[2]->style.fill, theme.color(ThemeColorRole::Foreground)));
         CHECK(texts[0] && texts[0]->role == TextRole::Code && texts[0]->size == 20.0f);
         auto lead = texts[0];
         // A space leaves the blank of the code font, and neighbors without one touch.
@@ -74,7 +70,7 @@ return s
         // A string runs on across lines, and its later lines keep their indent.
         CHECK(_spanTexts(scene, "py/2", texts, 8) == 1u);
         CHECK(texts[0] && std::strcmp(texts[0]->text(), "\"\"\"Circle") == 0);
-        CHECK(texts[0] && _sameColor(texts[0]->style.fill, theme.color(ThemeColorRole::Success)));
+        CHECK(texts[0] && same(texts[0]->style.fill, theme.color(ThemeColorRole::Success)));
         CHECK(_spanTexts(scene, "py/3", texts, 8) == 1u);
         CHECK(texts[0] && std::strcmp(texts[0]->text(), "area.\"\"\"") == 0);
         Bounds indented;
@@ -85,12 +81,12 @@ return s
         CHECK(_spanTexts(scene, "py/4", texts, 8) == 7u);
         const char* fourth[] = {"return", "3.14", "*", "r", "**", "2", "# pi"};
         for (auto i = 0u; i < 7u; i++) CHECK(texts[i] && std::strcmp(texts[i]->text(), fourth[i]) == 0);
-        CHECK(texts[1] && _sameColor(texts[1]->style.fill, theme.color(ThemeColorRole::Danger)));
-        CHECK(texts[6] && _sameColor(texts[6]->style.fill, theme.color(ThemeColorRole::Muted)));
+        CHECK(texts[1] && same(texts[1]->style.fill, theme.color(ThemeColorRole::Danger)));
+        CHECK(texts[6] && same(texts[6]->style.fill, theme.color(ThemeColorRole::Muted)));
         // A builtin reads as a type; a name called is a function.
         CHECK(_spanTexts(scene, "py/6", texts, 8) == 7u);
-        CHECK(texts[0] && _sameColor(texts[0]->style.fill, theme.color(ThemeColorRole::Warning)));
-        CHECK(texts[2] && _sameColor(texts[2]->style.fill, theme.color(ThemeColorRole::Accent)));
+        CHECK(texts[0] && same(texts[0]->style.fill, theme.color(ThemeColorRole::Warning)));
+        CHECK(texts[2] && same(texts[2]->style.fill, theme.color(ThemeColorRole::Accent)));
 
         // Lua long comments close mid-line; leading spreads the lines.
         CHECK(_spanTexts(scene, "lua/1", texts, 8) == 1u);
@@ -105,7 +101,7 @@ return s
         // color sets every class, and colors sets the classes it names.
         CHECK(_spanTexts(scene, "tint", texts, 8) == 1u);
         CHECK(_spanTexts(scene, "tint/1", texts, 8) == 3u);
-        CHECK(texts[0] && _sameColor(texts[0]->style.fill, theme.color(ThemeColorRole::Accent)));
+        CHECK(texts[0] && same(texts[0]->style.fill, theme.color(ThemeColorRole::Accent)));
         CHECK(texts[1] && texts[1]->style.fill.b == 0xff && texts[1]->style.fill.r == 0);
         CHECK(texts[2] && texts[2]->style.fill.g == 0xff && texts[2]->style.fill.r == 0);
 
@@ -118,7 +114,7 @@ return s
               && texts[2]->bounds(b));
         CHECK(std::fabs(equals.min.x - a.max.x - 2.0f * space.width) < 1.0e-4f);
         CHECK(std::fabs(b.min.x - equals.max.x - 4.0f * space.width) < 1.0e-4f);
-        CHECK(texts[1] && _sameColor(texts[1]->style.fill, theme.color(ThemeColorRole::Foreground)));
+        CHECK(texts[1] && same(texts[1]->style.fill, theme.color(ThemeColorRole::Foreground)));
 
         // Code nests below a group, and a block added mid-timeline animates.
         auto nested = scene->object("nested");
@@ -164,11 +160,7 @@ local b = g:code {text = "a\n\nb", point = {5, 7}, align = {0, 1}, baseline = tr
 s:edit(b, {replace = "a", with = "wide"}, 1)
 return s
 )lua";
-    char error[256] = {};
-    Scene* scene = nullptr;
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "code-baselines.lua", &scene,
-                    error, sizeof(error)) == Result::Success);
-    if (!scene) std::fprintf(stderr, "code-baselines.lua: %s\n", error);
+    auto scene = _loaded(source, "code-baselines.lua");
     if (scene) {
         CHECK(std::fabs(_baselineOf(scene, "pin/1/1") - 110.0f) < 1.0e-4f);
         CHECK(std::fabs(_baselineOf(scene, "pin/1/2") - 110.0f) < 1.0e-4f);
@@ -214,11 +206,7 @@ s:mark("clear")
 s:highlight(block)
 return s
 )lua";
-    char error[256] = {};
-    Scene* scene = nullptr;
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "highlight.lua", &scene, error, sizeof(error))
-          == Result::Success);
-    if (!scene) std::fprintf(stderr, "highlight.lua: %s\n", error);
+    auto scene = _loaded(source, "highlight.lua");
     if (scene) {
         // Lines 2 and 3 stay, the other six tokens dim; then one token of the first line
         // brightens while lines 2 and 3 dim; then two tokens of the last line take over,
@@ -305,11 +293,7 @@ s:highlight(block, block:search("total", {match = "all"}))
 s:indicate(block:search("total", {match = "all"}), {duration = 0.5})
 return s
 )lua";
-    char error[256] = {};
-    Scene* scene = nullptr;
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "search.lua", &scene, error, sizeof(error))
-          == Result::Success);
-    if (!scene) std::fprintf(stderr, "search.lua: %s\n", error);
+    auto scene = _loaded(source, "search.lua");
     if (scene) {
         // The highlight dims the 17 other tokens, and the four found indicate at once.
         CHECK(std::fabs(scene->duration() - 2.0f) < 1.0e-5f);
@@ -407,11 +391,7 @@ local edited = s:edit(bare, {replace = "1", with = "2"}, {duration = 0.5})
 if edited:search("2")[1] ~= edited:children()[1]:children()[3] then error("a bare edit") end
 return s
 )lua";
-    char error[256] = {};
-    Scene* scene = nullptr;
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "edit.lua", &scene, error, sizeof(error))
-          == Result::Success);
-    if (!scene) std::fprintf(stderr, "edit.lua: %s\n", error);
+    auto scene = _loaded(source, "edit.lua");
     if (scene) {
         CHECK(std::fabs(scene->duration() - 5.0f) < 1.0e-5f);
         auto holder = scene->object("holder");

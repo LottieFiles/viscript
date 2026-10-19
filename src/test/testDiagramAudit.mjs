@@ -1,30 +1,18 @@
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
+import { auditor, font } from "./testNode.mjs";
 
-const [cliArg, fontArg, goodArg, failureArg, pathsArg, autoRouteArg, sampledArg] = process.argv.slice(2);
-if (!cliArg || !fontArg || !goodArg || !failureArg || !pathsArg || !autoRouteArg || !sampledArg) {
-    throw new Error(
-        "Usage: testDiagramAudit.mjs <viscript> <font> <good> <failure> <paths> <auto-route> <sampled>",
-    );
+const [cliArg, goodArg, failureArg, pathsArg, autoRouteArg, sampledArg] = process.argv.slice(2);
+if (!cliArg || !goodArg || !failureArg || !pathsArg || !autoRouteArg || !sampledArg) {
+    throw new Error("Usage: testDiagramAudit.mjs <viscript> <good> <failure> <paths> <auto-route> <sampled>");
 }
 
-const cli = resolve(cliArg);
-const font = resolve(fontArg);
+const run = auditor(resolve(cliArg), ["--font", font]);
 const good = resolve(goodArg);
 const failure = resolve(failureArg);
 const paths = resolve(pathsArg);
 const autoRoute = resolve(autoRouteArg);
 const sampled = resolve(sampledArg);
-
-function run(scene, extra = [], expected = 0) {
-    const result = spawnSync(cli, ["audit", scene, "--font", font, ...extra], {
-        encoding: "utf8",
-        maxBuffer: 32 * 1024 * 1024,
-    });
-    assert.equal(result.status, expected, result.stderr || result.stdout);
-    return result;
-}
 
 const passed = JSON.parse(run(good).stdout);
 assert.equal(passed.valid, true);

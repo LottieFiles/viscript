@@ -16,11 +16,7 @@ world:plot {id = "partial", fn = function(x) if x <= 0.5 then return x end end, 
 world:plot {id = "plain", fn = function(x) return x * x end, x_range = {0, 1, 0.25}}
 return s
 )lua";
-    char error[256] = {};
-    Scene* scene = nullptr;
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "breaks.lua", &scene, error, sizeof(error))
-          == Result::Success);
-    if (!scene) std::fprintf(stderr, "breaks.lua: %s\n", error);
+    auto scene = _loaded(source, "breaks.lua");
     if (scene) {
         auto plot = [&](const char* id) {
             auto object = scene->object(id);
@@ -118,11 +114,7 @@ s:set {target=graph, points={}}
 s:wait(1)
 return s
 )lua";
-    char error[256] = {};
-    Scene* scene = nullptr;
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "plot-endpoint.lua",
-                    &scene, error, sizeof(error)) == Result::Success);
-    if (!scene) std::fprintf(stderr, "plot-endpoint.lua: %s\n", error);
+    auto scene = _loaded(source, "plot-endpoint.lua");
     if (scene) {
         auto graph = static_cast<Plot*>(scene->object("graph"));
         auto copy = static_cast<Plot*>(scene->object("copy"));
@@ -180,11 +172,7 @@ s:at(4,function() s:create({group,space},1,"linear") end)
 s:seek(5)
 return s
 )lua";
-    Scene* scene = nullptr;
-    char error[256] = {};
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "endpoint-progress.lua",
-                    &scene, error, sizeof(error)) == Result::Success);
-    if (!scene) std::fprintf(stderr, "endpoint-progress.lua: %s\n", error);
+    auto scene = _loaded(source, "endpoint-progress.lua");
     if (scene) {
         for (auto time : {0.0f, 1.0f, 1.25f, 1.5f, 2.0f, 2.5f, 3.0f, 3.5f, 4.0f, 4.5f, 5.0f, 0.0f}) {
             for (auto id : {"down", "up", "stay", "grouped", "spaced", "reset", "future"}) {
@@ -216,11 +204,7 @@ world:plot {id = "first", fn = math.ceil, x_range = {0, 1, 0.25}, discontinuitie
 world:plot {id = "twice", fn = function(x) return x end, x_range = {0, 1, 0.1}, discontinuities = {0.5, 0.5}}
 return s
 )lua";
-    char error[256] = {};
-    Scene* scene = nullptr;
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "jumps.lua", &scene, error, sizeof(error))
-          == Result::Success);
-    if (!scene) std::fprintf(stderr, "jumps.lua: %s\n", error);
+    auto scene = _loaded(source, "jumps.lua");
     if (scene) {
         auto plot = [&](const char* id) {
             auto object = scene->object(id);
@@ -297,11 +281,7 @@ local late = world:labels {x = {{3, "late"}}}
 if #late ~= 1 or late[1] ~= world:children()[6] then error("late labels returned the wrong handle") end
 return s
 )lua";
-    char error[256] = {};
-    Scene* scene = nullptr;
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "axes.lua", &scene, error, sizeof(error))
-          == Result::Success);
-    if (!scene) std::fprintf(stderr, "axes.lua: %s\n", error);
+    auto scene = _loaded(source, "axes.lua");
     if (scene) {
         auto world = scene->object("world");
         auto every = scene->object("every");
@@ -374,10 +354,7 @@ s:parallel(function() s:track(x, 4, 4, "linear") end,
     function() s:wait(1) axes:labels {x = {{1, "one"}}} s:track(z, 3, 1, "linear") end)
 return s
 )lua";
-    scene = nullptr;
-    CHECK(Lua::load(tracked, static_cast<uint32_t>(std::strlen(tracked)), "tracked.lua", &scene, error,
-                    sizeof(error)) == Result::Success);
-    if (!scene) std::fprintf(stderr, "tracked.lua: %s\n", error);
+    scene = _loaded(tracked, "tracked.lua");
     if (scene) {
         auto number = scene->object("n");
         auto axes = scene->object("axes");
@@ -427,7 +404,6 @@ return s
 
 void _spaceScreenLabels(Renderer* renderer)
 {
-#ifdef VIS_TEST_FONT
     static constexpr auto script = R"lua(
 local s = vis.scene {width = 320, height = 180, camera = {mode = "fixed", view = "2d", height = 6}}
 local axes = s:space {id = "axes", x = {-2, 2, 1}, y = {-1, 1, 1},
@@ -440,10 +416,7 @@ axes:labels {placement = "screen", x = {{2, "late"}}, gap = 10}
 s:warp(axes, function(x, y, z) return x + 3, y, z end, 1, "linear")
 return s
 )lua";
-    Scene* scene = nullptr;
-    char error[512];
-    CHECK(Lua::load(script, static_cast<uint32_t>(std::strlen(script)), "screen-labels.lua",
-                    &scene, error, sizeof(error)) == Result::Success);
+    auto scene = _loaded(script, "screen-labels.lua");
     if (scene) {
         auto label = scene->object("axes/label/x/1");
         CHECK(label && label->parent() == scene->object("axes"));
@@ -474,9 +447,6 @@ return s
         }
     }
     delete scene;
-#else
-    (void) renderer;
-#endif
     _scriptError("local s=vis.scene{}; local a=s:space{}; a:labels{placement='other'}; return s",
                  "labels placement must be 'world' or 'screen'");
     _scriptError("local s=vis.scene{}; local a=s:space{}; a:labels{placement='screen',side={x='above'}}; return s",
@@ -518,11 +488,7 @@ local anonymous = s:space {labels = {x = {{1, "anonymous"}}}}
 if #anonymous:labels {x = {{2, "another"}}} ~= 1 then error("id-less labels failed") end
 return s
 )lua";
-    char error[256] = {};
-    Scene* scene = nullptr;
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "label-ids.lua", &scene, error, sizeof(error))
-          == Result::Success);
-    if (!scene) std::fprintf(stderr, "label-ids.lua: %s\n", error);
+    auto scene = _loaded(source, "label-ids.lua");
     if (scene) {
         auto axes = scene->object("axes");
         CHECK(axes && axes->childCount() == 6u);
@@ -546,11 +512,7 @@ space:area {id = "lifted", fn = f, x_range = {0, 1, 0.4}, base = -1}
 space:area {id = "between", fn = f, x_range = {1, 2, 0.5}, base = function(x) return x / 2 end}
 return s
 )lua";
-    char error[256] = {};
-    Scene* scene = nullptr;
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "area.lua", &scene, error, sizeof(error))
-          == Result::Success);
-    if (!scene) std::fprintf(stderr, "area.lua: %s\n", error);
+    auto scene = _loaded(source, "area.lua");
     if (scene) {
         auto polygon = [&](const char* id) {
             auto object = scene->object(id);
@@ -608,11 +570,7 @@ space:riemann {id = "middle", fn = f, x_range = {0, 1.2, 0.5}, sample = "midpoin
 space:riemann {id = "given", values = {2, 0}, x_range = {0, 1, 0.5}, stroke = "#ffffff", width = 1}
 return s
 )lua";
-    char error[256] = {};
-    Scene* scene = nullptr;
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "riemann.lua", &scene, error, sizeof(error))
-          == Result::Success);
-    if (!scene) std::fprintf(stderr, "riemann.lua: %s\n", error);
+    auto scene = _loaded(source, "riemann.lua");
     if (scene) {
         auto bar = [&](const char* id, float x, float y, float width, float height) {
             auto object = scene->object(id);
@@ -676,18 +634,11 @@ s:surface {id = "function", points = points, size = {2, 2},
 s:surface {id = "list", points = points, size = {2, 2}, colors = {"#000", "#fff", "#00ff0080", "danger"}}
 return s
 )lua";
-    char error[256] = {};
-    Scene* scene = nullptr;
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "colors.lua", &scene, error, sizeof(error))
-          == Result::Success);
-    if (!scene) std::fprintf(stderr, "colors.lua: %s\n", error);
+    auto scene = _loaded(source, "colors.lua");
     if (scene) {
         auto surface = [&](const char* id) {
             auto object = scene->object(id);
             return object && object->type() == Type::SurfaceMesh ? static_cast<SurfaceMesh*>(object) : nullptr;
-        };
-        auto same = [](const Color& a, const Color& b) {
-            return a.r == b.r && a.g == b.g && a.b == b.b && a.a == b.a;
         };
         // A name runs the map over the heights of the points, from the lowest to the highest.
         auto named = surface("named");
@@ -764,10 +715,7 @@ s:surface {id = "wire", points = points, size = {7, 5}, mode = "mesh", mesh = {4
 s:surface {id = "lined", points = points, size = {7, 5}, mode = "solid_mesh", mesh = {7, 2}}
 return s
 )lua";
-    scene = nullptr;
-    CHECK(Lua::load(meshed, static_cast<uint32_t>(std::strlen(meshed)), "mesh.lua", &scene, error, sizeof(error))
-          == Result::Success);
-    if (!scene) std::fprintf(stderr, "mesh.lua: %s\n", error);
+    scene = _loaded(meshed, "mesh.lua");
     if (scene) {
         auto wire = static_cast<SurfaceMesh*>(scene->object("wire"));
         auto lined = static_cast<SurfaceMesh*>(scene->object("lined"));
@@ -791,10 +739,7 @@ s:surface {id = "lit", points = points, size = {2, 2}, light = {direction = {-1,
 s:surface {id = "dim", points = points, size = {2, 2}, light = {direction = {x = 0, y = 0, z = 2}, ambient = 0.2}}
 return s
 )lua";
-    scene = nullptr;
-    CHECK(Lua::load(lit, static_cast<uint32_t>(std::strlen(lit)), "light.lua", &scene, error, sizeof(error))
-          == Result::Success);
-    if (!scene) std::fprintf(stderr, "light.lua: %s\n", error);
+    scene = _loaded(lit, "light.lua");
     if (scene) {
         auto first = static_cast<SurfaceMesh*>(scene->object("lit"));
         auto second = static_cast<SurfaceMesh*>(scene->object("dim"));
@@ -836,10 +781,7 @@ s:passing_flash(p, {duration = 0.2})
 s:fade_in(c, {duration = 0.2})
 return s
 )lua";
-    char error[256] = {};
-    Scene* scene = nullptr;
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "contour.lua", &scene, error, sizeof(error)) == Result::Success);
-    if (!scene) std::fprintf(stderr, "contour.lua: %s\n", error);
+    auto scene = _loaded(source, "contour.lua");
     if (scene) {
         auto group = scene->object("c");
         CHECK(group && group->type() == Type::Group && group->childCount() == 3u);
@@ -859,11 +801,11 @@ return s
             }
         }
         CHECK(scene->object("c/1") == group->childAt(0));
-        CHECK(_sameColor(scene->object("c/1")->style.stroke, Color{255, 0, 0, 255}));
-        CHECK(_sameColor(scene->object("c/2")->style.stroke, Color{0, 255, 0, 255}));
-        CHECK(_sameColor(scene->object("v/1")->style.stroke, Color{68, 1, 84, 255}));
-        CHECK(_sameColor(scene->object("v/2")->style.stroke, Color{253, 231, 37, 255}));
-        CHECK(_sameColor(scene->object("plain/1")->style.stroke, Color::hex("#123456")));
+        CHECK(same(scene->object("c/1")->style.stroke, Color{255, 0, 0, 255}));
+        CHECK(same(scene->object("c/2")->style.stroke, Color{0, 255, 0, 255}));
+        CHECK(same(scene->object("v/1")->style.stroke, Color{68, 1, 84, 255}));
+        CHECK(same(scene->object("v/2")->style.stroke, Color{253, 231, 37, 255}));
+        CHECK(same(scene->object("plain/1")->style.stroke, Color::hex("#123456")));
     }
     delete scene;
     auto fails = [](const char* options, const char* expected) {
@@ -922,10 +864,7 @@ s:play({target=empty:children()[1], fn=function(x,y) return (x*x-1)^2+y*y end, l
 s:play({target=empty:children()[1], fn=function(x,y) return (x*x-1)^2+y*y end, level=-1}, 0.5, "linear")
 return s
 )lua";
-    char error[512] = {};
-    Scene* scene = nullptr;
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "contour-labels.lua", &scene, error, sizeof(error)) == Result::Success);
-    if (!scene) std::fprintf(stderr, "contour-labels.lua: %s\n", error);
+    auto scene = _loaded(source, "contour-labels.lua");
     if (scene) {
         auto child = static_cast<Plot*>(scene->object("labels/1"));
         auto label = static_cast<Text*>(scene->object("labels/1/label/1"));
@@ -986,10 +925,7 @@ s:set {target = copy, values = {0,1,1,2}, level = 0.5, x_range = {0,1,1}, y_rang
 s:play({target = copy, values = {0,1,1,2}, level = 1.5}, 0.25, "linear")
 return s
 )lua";
-    char error[512] = {};
-    Scene* scene = nullptr;
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "bound-contour.lua", &scene, error, sizeof(error)) == Result::Success);
-    if (!scene) std::fprintf(stderr, "bound-contour.lua: %s\n", error);
+    auto scene = _loaded(source, "bound-contour.lua");
     if (scene) {
         auto ellipse = scene->object("ellipse/1");
         uint32_t order[] = {4u, 0u, 2u, 1u, 3u};
@@ -1058,11 +994,7 @@ s:vector_field {id = "t", values = {{1e-4, 0}, {1, 0}}, x_range = {0, 1, 1}, y_r
 s:vector_field {id = "k", values = {{1e-4, 0}, {1, 0}}, x_range = {0, 1, 1}, y_range = {0, 0, 1}, scale = 2}
 return s
 )lua";
-    char error[256] = {};
-    Scene* scene = nullptr;
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "field.lua", &scene, error, sizeof(error))
-          == Result::Success);
-    if (!scene) std::fprintf(stderr, "field.lua: %s\n", error);
+    auto scene = _loaded(source, "field.lua");
     if (scene) {
         auto& theme = scene->theme();
         auto arrow = [&](const char* id) {
@@ -1084,7 +1016,7 @@ return s
         CHECK(corner && _near(corner->value.y, -drawn / std::sqrt(2.0f)));
         CHECK(corner && corner->layer == 2 && _near(corner->opacity, 1.0f) && _near(corner->tip, 10.0f));
         // The greatest magnitude takes the last of the theme's field colors.
-        CHECK(corner && _sameColor(corner->style.stroke, theme.color(ThemeColorRole::Danger)));
+        CHECK(corner && same(corner->style.stroke, theme.color(ThemeColorRole::Danger)));
         auto edge = arrow("f/2/1");
         CHECK(edge && _near(edge->value.x, 0.8f * std::tanh(1.0f / 0.8f)) && _near(edge->value.y, 0.0f));
         // An arrow anchored in the middle is centered on its sample; scale keeps lengths in
@@ -1094,19 +1026,19 @@ return s
         CHECK(scene->object("m") && scene->object("m")->childCount() == 2u);
         CHECK(one && _near(one->value.x, 0.5f) && _near(one->origin.x, 0.75f) && _near(one->tip, 4.0f));
         CHECK(two && _near(two->value.x, 1.0f) && _near(two->origin.x, 1.5f));
-        CHECK(one && _sameColor(one->style.stroke, Color{128, 128, 128, 255}));
-        CHECK(two && _sameColor(two->style.stroke, Color{255, 255, 255, 255}));
+        CHECK(one && same(one->style.stroke, Color{128, 128, 128, 255}));
+        CHECK(two && same(two->style.stroke, Color{255, 255, 255, 255}));
         // Given vectors, and one color for every arrow.
         auto given = arrow("v/1/1");
         CHECK(given && _near(given->value.x, 0.6f * std::tanh(5.0f)) && _near(given->value.y, 0.8f * std::tanh(5.0f)));
-        CHECK(given && _sameColor(given->style.stroke, Color{255, 0, 0, 255}) && _near(given->style.width, 3.0f));
+        CHECK(given && same(given->style.stroke, Color{255, 0, 0, 255}) && _near(given->style.width, 3.0f));
         auto up = arrow("v/2/1");
-        CHECK(up && _near(up->value.y, std::tanh(1.0f)) && _sameColor(up->style.stroke, Color{255, 0, 0, 255}));
+        CHECK(up && _near(up->value.y, std::tanh(1.0f)) && same(up->style.stroke, Color{255, 0, 0, 255}));
         // magnitude sets the range the colors spread over.
         auto low = arrow("r/1/1");
         auto high = arrow("r/2/1");
-        CHECK(low && _sameColor(low->style.stroke, Color{64, 64, 64, 255}));
-        CHECK(high && _sameColor(high->style.stroke, Color{128, 128, 128, 255}));
+        CHECK(low && same(low->style.stroke, Color{64, 64, 64, 255}));
+        CHECK(high && same(high->style.stroke, Color{128, 128, 128, 255}));
         // A grid symmetric about zero samples the origin a float rounding away from it; the
         // arrow there, and any under a thousandth of the length or of the longest scaled arrow,
         // would be a speck and is left out.
@@ -1161,11 +1093,7 @@ s:stream_lines {id = "b", fn = U, seeds = {{0, 0}}, time = 1, dt = 0.5, directio
 s:stream_lines {id = "w", fn = U, seeds = {{0, 0}}, time = 1, dt = 0.5, direction = "both"}
 return s
 )lua";
-    char error[256] = {};
-    Scene* scene = nullptr;
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "stream.lua", &scene, error, sizeof(error))
-          == Result::Success);
-    if (!scene) std::fprintf(stderr, "stream.lua: %s\n", error);
+    auto scene = _loaded(source, "stream.lua");
     if (scene) {
         auto line = [&](const char* id) {
             auto object = scene->object(id);
@@ -1185,8 +1113,8 @@ return s
         CHECK(at(unit, 64, -1.0f, 0.0f) && at(unit, 128, 1.0f, 0.0f));
         CHECK(at(line("c/3"), 32, 0.0f, 2.0f));
         // Each line takes the color of its mean speed over the range from zero to the fastest.
-        CHECK(unit && _sameColor(unit->style.stroke, Color{128, 128, 128, 255}));
-        CHECK(line("c/3") && _sameColor(line("c/3")->style.stroke, Color{255, 255, 255, 255}));
+        CHECK(unit && same(unit->style.stroke, Color{128, 128, 128, 255}));
+        CHECK(line("c/3") && same(line("c/3")->style.stroke, Color{255, 255, 255, 255}));
         CHECK(unit && unit->layer == 2 && _near(unit->style.width, 3.0f) && circles && circles->layer == 2);
         // A grid seeds the lines and bounds them: lines stop at its edge, and the seeds on the
         // edge the field leaves by have none.
@@ -1194,11 +1122,11 @@ return s
         CHECK(grid && grid->childCount() == 2u && line("u/1") && line("u/3") && !scene->object("u/2"));
         CHECK(line("u/1") && line("u/1")->count() == 5u && at(line("u/1"), 4, 1.0f, 0.0f));
         CHECK(at(line("u/3"), 2, 0.5f, 1.0f));
-        CHECK(line("u/1") && _sameColor(line("u/1")->style.stroke, scene->theme().color(ThemeColorRole::Danger)));
+        CHECK(line("u/1") && same(line("u/1")->style.stroke, scene->theme().color(ThemeColorRole::Danger)));
         // Backward lines still run with the field, toward their seeds.
         auto back = line("b/1");
         CHECK(back && back->count() == 3u && at(back, 0, -1.0f, 0.0f) && at(back, 2, 0.0f, 0.0f));
-        CHECK(back && _sameColor(back->style.stroke, Color{255, 0, 0, 255}));
+        CHECK(back && same(back->style.stroke, Color{255, 0, 0, 255}));
         auto both = line("w/1");
         CHECK(both && both->count() == 5u && at(both, 0, -1.0f, 0.0f));
         CHECK(at(both, 2, 0.0f, 0.0f) && at(both, 4, 1.0f, 0.0f));
@@ -1250,11 +1178,7 @@ local graph = s:plot {id = "graph", points = {{2, -1}, {0, -1.5}, {-2, -1}}}
 s:morph(line, graph, 1)
 return s
 )lua";
-    char error[256] = {};
-    Scene* scene = nullptr;
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "shape-morph.lua", &scene, error,
-                    sizeof(error)) == Result::Success);
-    if (!scene) std::fprintf(stderr, "shape-morph.lua: %s\n", error);
+    auto scene = _loaded(source, "shape-morph.lua");
     if (scene) {
         CHECK(std::fabs(scene->duration() - 3.5f) < 1.0e-4f);
         CHECK(scene->clipCount() == 3u);
@@ -1277,11 +1201,7 @@ for _, command in ipairs({square(1)}) do commands[#commands + 1] = command end
 s:path {id = "ring", commands = commands, fill = "#2563eb"}
 return s
 )lua";
-    char error[256] = {};
-    Scene* scene = nullptr;
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "ring.lua", &scene, error, sizeof(error))
-          == Result::Success);
-    if (!scene) std::fprintf(stderr, "ring.lua: %s\n", error);
+    auto scene = _loaded(source, "ring.lua");
     if (scene) {
         auto ring = scene->object("ring");
         CHECK(ring && ring->type() == Type::Path);
@@ -1322,11 +1242,7 @@ holder:difference {id = "local", of = {inner, hole}}
 s:difference {id = "world", of = {inner, hole}}
 return s
 )lua";
-    char error[256] = {};
-    Scene* scene = nullptr;
-    CHECK(Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "regions.lua", &scene, error, sizeof(error))
-          == Result::Success);
-    if (!scene) std::fprintf(stderr, "regions.lua: %s\n", error);
+    auto scene = _loaded(source, "regions.lua");
     if (scene) {
         struct Expected { const char* id; uint32_t contours; uint32_t count; float minX; float maxX; };
         Expected regions[] = {{"union", 1u, 4u, -1.5f, 1.5f},     {"intersection", 1u, 4u, -0.5f, 0.5f},
