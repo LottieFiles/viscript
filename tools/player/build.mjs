@@ -7,7 +7,7 @@
 // `runtime` is a runtime bundle directory (client.js, bindings.js, vis-wasm.js) as
 // scripts/sync-wasm.mjs writes it, the skill's unless given. The server bundle includes the runtime's JavaScript; the
 // host fetches vis-wasm.wasm itself and hands it to the server. The compiler bundle has only the
-// JavaScript API (bindings.js), no runtime.
+// JavaScript API (bindings.js), no runtime, and the main-thread module only the client's key names.
 import {build} from "esbuild";
 import {mkdir, writeFile} from "node:fs/promises";
 import {dirname, join, resolve} from "node:path";
@@ -16,13 +16,18 @@ import {fileURLToPath} from "node:url";
 const here = dirname(fileURLToPath(import.meta.url));
 
 // Sources import the runtime as "vis-wasm-bundle" and its JavaScript API alone as
-// "vis-wasm-bindings"; tsconfig.json maps both to the typings.
-function runtime(runtimeDir) {
+// "vis-wasm-bindings"; tsconfig.json maps both to the typings. The runtime's modules do nothing
+// when imported, so a bundle that uses only some of the client, as the main thread uses its key
+// names, leaves out the rest.
+export function runtime(runtimeDir) {
+    const client = resolve(runtimeDir, "client.js");
     return {
         name: "vis-wasm-bundle",
         setup(build) {
-            build.onResolve({filter: /^vis-wasm-bundle$/}, () => ({path: resolve(runtimeDir, "client.js")}));
+            build.onResolve({filter: /^vis-wasm-bundle$/}, () => ({path: client, sideEffects: false}));
             build.onResolve({filter: /^vis-wasm-bindings$/}, () => ({path: resolve(runtimeDir, "bindings.js")}));
+            build.onResolve({filter: /^\.\/(?:vis-wasm|bindings)\.js$/}, ({path, importer}) =>
+                importer === client ? {path: resolve(runtimeDir, path), sideEffects: false} : undefined);
         },
     };
 }
@@ -65,7 +70,8 @@ export async function bundleCompiler({runtimeDir, minify = true}) {
 }
 
 /** The main-thread module as one ES module. */
-export async function bundlePlayer({minify = true} = {}) {
+export async function bundlePlayer({runtimeDir, minify = true}) {
+    if (!runtimeDir) throw new Error("bundlePlayer needs runtimeDir");
     const result = await build({
         entryPoints: [join(here, "src/index.ts")],
         bundle: true,
@@ -74,6 +80,7 @@ export async function bundlePlayer({minify = true} = {}) {
         platform: "browser",
         target: "es2022",
         minify,
+        plugins: [runtime(runtimeDir)],
         logLevel: "warning",
     });
     return result.outputFiles[0].text;
@@ -82,7 +89,7 @@ export async function bundlePlayer({minify = true} = {}) {
 /** Writes player.js, player-worker.js and player-compiler.js to `outdir`. */
 export async function buildWeb({outdir, runtimeDir, minify = true}) {
     const [player, server, compiler] = await Promise.all([
-        bundlePlayer({minify}), bundleServer({runtimeDir, minify}), bundleCompiler({runtimeDir, minify}),
+        bundlePlayer({runtimeDir, minify}), bundleServer({runtimeDir, minify}), bundleCompiler({runtimeDir, minify}),
     ]);
     await mkdir(outdir, {recursive: true});
     await Promise.all([

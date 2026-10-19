@@ -80,21 +80,7 @@ return scene
 const runtime = await createVis(source, "runtime-ui.lua", {wasmBinary});
 try {
     assert.equal(typeof runtime.input, "function");
-    const event = (type, x, y, fields = {}) => runtime.input({
-        type,
-        x,
-        y,
-        dx: 0,
-        dy: 0,
-        wheelX: 0,
-        wheelY: 0,
-        button: -1,
-        buttons: 0,
-        modifiers: 0,
-        pointerId: 6,
-        time: 0,
-        ...fields,
-    });
+    const event = (type, x, y, fields = {}) => runtime.input({type, x, y, pointerId: 6, time: 0, ...fields});
     const sampleDown = event("pointerdown", 60, 50, {button: 0, buttons: 1, pointerId: 5});
     assert.equal(sampleDown.sample, undefined, "sampling resolves only after a completed click");
     const sampleUp = event("pointerup", 60, 50, {button: 0, pointerId: 5});
@@ -158,35 +144,9 @@ try {
     assert.ok(Math.abs(center(toggleOff) - center(toggleInitial)) < 0.1);
 
     const before = runtime.bounds("target", 0);
-    const down = runtime.input({
-        type: "pointerdown",
-        x: 100,
-        y: 10,
-        dx: 0,
-        dy: 0,
-        wheelX: 0,
-        wheelY: 0,
-        button: 0,
-        buttons: 1,
-        modifiers: 0,
-        pointerId: 7,
-        time: 0,
-    });
+    const down = runtime.input({type: "pointerdown", x: 100, y: 10, button: 0, buttons: 1, pointerId: 7, time: 0});
     assert.deepEqual(down, {handled: true, redraw: true, capture: true, release: false});
-    const up = runtime.input({
-        type: "pointerup",
-        x: 100,
-        y: 10,
-        dx: 0,
-        dy: 0,
-        wheelX: 0,
-        wheelY: 0,
-        button: 0,
-        buttons: 0,
-        modifiers: 0,
-        pointerId: 7,
-        time: 0,
-    });
+    const up = runtime.input({type: "pointerup", x: 100, y: 10, button: 0, pointerId: 7, time: 0});
     assert.equal(up.handled, true);
     assert.equal(up.release, true);
     const after = runtime.bounds("target", 0);

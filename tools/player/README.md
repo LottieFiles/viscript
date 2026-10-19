@@ -73,6 +73,10 @@ Fonts come from the host's `fonts` provider, by the names scenes set text in (se
 and `select` picks the ones each scene loads; a host with images of its own, such as the Obsidian
 plugin, implements the player's `resources` and the host's `assets` itself.
 
+`player.js` exports what a page uses: `VisPlayer`, `createRenderHost`, `createSandboxCompiler`,
+`createCatalog`, and the font providers `fontTable`, `runtimeFonts` and `chainFonts`. A host that
+bundles the sources, as the Obsidian plugin does, imports the other modules itself.
+
 ### The render host
 
 `createRenderHost` starts the render server the first time a player opens a session.
@@ -179,17 +183,18 @@ null>`, so providers carry over between the two. TrueType (`"ttf"`) and OpenType
 
 - `fontTable({name: url | () => bytes})` serves a fixed table, each font fetched once.
 - `runtimeFonts(base)` serves JetBrains Mono, the code font shipped with the runtime.
-- `FontsourceProvider` fetches any family [Fontsource](https://fontsource.org) has from jsDelivr,
-  as WebCanvas's provider does, in the nearest weight and in a font's Korean, Japanese or Chinese
-  file where it has one, which holds its Latin letters too. Where `fetch` cannot reach the CDN,
-  the host passes its own `request` function; the Obsidian plugin passes `requestUrl`.
+- `FontsourceProvider` (`fonts/fontsource.ts`) fetches any family
+  [Fontsource](https://fontsource.org) has from jsDelivr, as WebCanvas's provider does, in the
+  nearest weight and in a font's Korean, Japanese or Chinese file where it has one, which holds
+  its Latin letters too. Where `fetch` cannot reach the CDN, the host passes its own `request`
+  function; the Obsidian plugin passes `requestUrl`.
 - `chainFonts(...providers)` asks each in turn and answers with the first font.
 
-`THEME_FONTS` names the families the engine's themes set text in: `Pretendard` for text,
-`JetBrainsMono` for code, and `Source Serif 4` with `IBM Plex Sans KR` in `adaptive_vscode`. The
-documentation site serves Pretendard Std under `Pretendard`, and the full Pretendard once a scene
-shows Hangul. The Obsidian plugin ships all four, the files the VS Code extension ships, and
-answers other names from the vault's font folder and Fontsource.
+`THEME_FONTS` (`fonts/provider.ts`) names the families the engine's themes set text in:
+`Pretendard` for text, `JetBrainsMono` for code, and `Source Serif 4` with `IBM Plex Sans KR` in
+`adaptive_vscode`. The documentation site serves Pretendard Std under `Pretendard`, and the full
+Pretendard once a scene shows Hangul. The Obsidian plugin ships all four, the files the VS Code
+extension ships, and answers other names from the vault's font folder and Fontsource.
 
 `fonts/sfnt.ts` reads a font's names, characters and whether it is monospaced, and splits a face
 out of a collection; `FontLibrary` indexes a host's font files by family and loads only the faces
@@ -214,15 +219,17 @@ node build.mjs --runtime ../skill/vis-skills/assets/wasm --out dist --no-minify
 
 The server bundle includes the runtime's JavaScript (`client.js`, `bindings.js`, `vis-wasm.js`)
 from `--runtime`, by default the skill's bundle (`tools/skill/vis-skills/assets/wasm`), and the
-compiler bundle its JavaScript API (`bindings.js`); both are classic scripts. The host fetches `vis-wasm.wasm` itself. Other builds call `build.mjs`: the
+compiler bundle its JavaScript API (`bindings.js`); both are classic scripts. The main-thread
+module takes only the client's key names. The host fetches `vis-wasm.wasm` itself. Other builds call `build.mjs`: the
 documentation site's `scripts/build-page.mjs` writes the files with `buildWeb`, and the Obsidian
-plugin embeds the server's and the compiler's source with `bundleServer` and `bundleCompiler`.
+plugin embeds the server's and the compiler's source with `bundleServer` and `bundleCompiler` and
+resolves the runtime for its own bundle with `runtime`.
 
 ## Test
 
 ```sh
 npm run check            # TypeScript
-npm test                 # policy, theme, fonts and font providers, the instance pool, the server and the host
+npm test                 # policy, theme, key names, fonts and font providers, the instance pool, the server and the host
 npm run test:browser     # Chromium: worker and main thread, fonts, input, a hung worker, scrolling, the sandbox
 ```
 

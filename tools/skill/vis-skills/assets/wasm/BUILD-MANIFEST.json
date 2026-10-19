@@ -41,13 +41,13 @@
     },
     {
       "path": "client.js",
-      "bytes": 29411,
-      "sha256": "8d6388647c028426be34aebf045ed13be501670872ce8fe6db8ff712d0258854"
+      "bytes": 31383,
+      "sha256": "2cf7361deb994bc5bc47d4ec4ec4174b85541b89ebbcc22055c85d648ec84c23"
     },
     {
       "path": "client.d.ts",
-      "bytes": 12713,
-      "sha256": "852df7ae168f3655853989dddd67de4c07477ada9673394c8e22d8e63287d8e7"
+      "bytes": 13567,
+      "sha256": "f1b385d1d7fa8134d4c23f373c63a2f5390a5e650b5be89073cfb4c4c9de6e5c"
     },
     {
       "path": "bindings.js",

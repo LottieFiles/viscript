@@ -12,7 +12,7 @@ import {builtinModules} from "node:module";
 import {dirname, join, resolve} from "node:path";
 import {fileURLToPath} from "node:url";
 import {gzipSync} from "node:zlib";
-import {bundleCompiler, bundleServer} from "../player/build.mjs";
+import {bundleCompiler, bundleServer, runtime} from "../player/build.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "../..");
@@ -160,7 +160,7 @@ const options = {
     sourcemap: watch ? "inline" : false,
     banner: {js: await banner()},
     external: EXTERNAL,
-    plugins: [embedded({minify}), ...vault ? [copyToVault(vault)] : []],
+    plugins: [embedded({minify}), runtime(runtimeDir), ...vault ? [copyToVault(vault)] : []],
     logLevel: "info",
 };
 

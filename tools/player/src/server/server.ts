@@ -28,9 +28,6 @@ const STOPPED = "The viscript runtime stopped after an error; load the scene aga
 /** Fonts one load asks for at most, and the longest name asked for. */
 const MAX_FONTS = 16, MAX_FONT_NAME = 256;
 
-// Fields every input event carries; a host sends only what differs.
-const INPUT = {x: 0, y: 0, dx: 0, dy: 0, wheelX: 0, wheelY: 0, button: -1, buttons: 0, modifiers: 0, pointerId: 0};
-
 /** A failure to fetch bytes, as opposed to a failure inside the runtime. */
 class ResourceError extends Error {}
 
@@ -344,7 +341,7 @@ export class RenderServer {
             try {
                 if (session.consumed) engine.beginInputFrame?.(engine.runtimeTime);
                 if (frame.releaseInput) engine.releaseInput?.(engine.runtimeTime);
-                for (const event of frame.input ?? []) engine.input?.({...INPUT, ...event, time: engine.runtimeTime});
+                for (const event of frame.input ?? []) engine.input?.({...event, time: engine.runtimeTime});
                 const step = frame.advance !== undefined ? engine.advanceRuntime?.(frame.advance) : null;
                 session.consumed = !step || step.steps > 0;
                 result = {runtimeTime: engine.runtimeTime, ...(step?.sounds.length ? {sounds: step.sounds} : {})};

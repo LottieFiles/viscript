@@ -50,7 +50,7 @@ export interface SceneInfo {
  * An input event without its time, which the server stamps from the runtime clock. Fields left
  * out are 0, except `button`, which is -1.
  */
-export type InputEvent = Pick<VisInputEvent, "type"> & Partial<Omit<VisInputEvent, "type" | "time">>;
+export type InputEvent = Omit<VisInputEvent, "time">;
 
 /** Backing-store size in device pixels, and the integer scale WASM rasterizes at. */
 export interface FramePlan {

@@ -1,44 +1,9 @@
 // Colors for scenes that follow the host's theme (theme = "adaptive_vscode" and the like), read
-// from the host's CSS custom properties with a fallback for each.
+// from the host's CSS custom properties. A color none of its properties give stays unset, and the
+// runtime takes its own light or dark one.
 import type {HostThemePalette} from "vis-wasm-bundle";
 
 type Color = Exclude<keyof HostThemePalette, "dark" | "objects">;
-
-export const LIGHT_PALETTE: HostThemePalette = Object.freeze({
-    dark: false,
-    background: "#ffffff",
-    foreground: "#202124",
-    muted: "#555b64",
-    accent: "#005fb8",
-    secondary: "#6750a4",
-    success: "#2e7d32",
-    warning: "#8a5d00",
-    danger: "#b3261e",
-    info: "#00639b",
-    surface: "#f5f6f8",
-    line: "#d8dadd",
-    result: "#8a6500",
-    focus: "#315f8c",
-    objects: Object.freeze(["#b45f06", "#b63a3c", "#2e7f7a", "#815681"]),
-});
-
-export const DARK_PALETTE: HostThemePalette = Object.freeze({
-    dark: true,
-    background: "#1e1e1e",
-    foreground: "#cccccc",
-    muted: "#9d9d9d",
-    accent: "#4daafc",
-    secondary: "#c8a7ff",
-    success: "#7ee787",
-    warning: "#e3b341",
-    danger: "#ff7b72",
-    info: "#79c0ff",
-    surface: "#252526",
-    line: "#454545",
-    result: "#edc948",
-    focus: "#6ea8fe",
-    objects: Object.freeze(["#f28e2b", "#ff6b6b", "#7bc96f", "#c29bc0"]),
-});
 
 /** For each color, the custom properties to try in order. */
 export type PaletteVariables = {readonly [K in Color]?: readonly string[]} & {
@@ -51,23 +16,13 @@ const COLORS: readonly Color[] = [
     "surface", "line", "result", "focus",
 ];
 
-/**
- * The palette from `read` (a custom property's value, or empty), taking the light or dark
- * fallback for any color none of its properties give.
- */
+/** The palette from `read` (a custom property's value, or empty). */
 export function resolvePalette(dark: boolean, read: (name: string) => string | undefined,
     variables: PaletteVariables): HostThemePalette {
-    const fallback = dark ? DARK_PALETTE : LIGHT_PALETTE;
-    const first = (names: readonly string[] | undefined, otherwise: string) => {
-        for (const name of names ?? []) {
-            const value = read(name)?.trim();
-            if (value) return value;
-        }
-        return otherwise;
-    };
+    const first = (names: readonly string[] = []) => names.map((name) => read(name)?.trim()).find(Boolean);
     const palette: Record<string, unknown> = {dark};
-    for (const color of COLORS) palette[color] = first(variables[color], fallback[color]);
-    palette.objects = Object.freeze(fallback.objects.map((color, i) => first(variables.objects?.[i], color)));
+    for (const color of COLORS) palette[color] = first(variables[color]);
+    palette.objects = Object.freeze(Array.from({length: 4}, (_, i) => first(variables.objects?.[i])));
     return Object.freeze(palette) as unknown as HostThemePalette;
 }
 
@@ -107,5 +62,5 @@ export function readPalette(element: Element, dark: boolean, variables: PaletteV
 
 /** Equal for equal palettes, so a host reloads scenes only when the colors changed. */
 export function paletteKey(palette: HostThemePalette): string {
-    return [palette.dark, ...COLORS.map((color) => palette[color]), ...palette.objects].join("\u0000");
+    return [palette.dark, ...COLORS.map((color) => palette[color]), ...palette.objects ?? []].join("\u0000");
 }

@@ -32,19 +32,7 @@ assert.equal(interactive.cameraInput("view2d"), true);
 assert.equal(interactive.cameraView, "2d");
 assert.equal(interactive.cameraInput("reset"), true);
 if (interactive.input) {
-    const baseInput = {
-        x: 0,
-        y: 0,
-        dx: 0,
-        dy: 0,
-        wheelX: 0,
-        wheelY: 0,
-        button: 0,
-        buttons: 0,
-        modifiers: 0,
-        pointerId: 1,
-        time: 0,
-    };
+    const baseInput = {button: 0, pointerId: 1, time: 0};
     assert.deepEqual(interactive.input({...baseInput, type: "pointerdown", buttons: 1}), {
         handled: false,
         redraw: false,

@@ -61,21 +61,7 @@ const center = (box) => ({
 });
 
 const runtime = await createVis(source, "runtime-retained-lua.lua", {wasmBinary});
-const event = (type, fields = {}) => runtime.input({
-    type,
-    x: 0,
-    y: 0,
-    dx: 0,
-    dy: 0,
-    wheelX: 0,
-    wheelY: 0,
-    button: -1,
-    buttons: 0,
-    modifiers: 0,
-    pointerId: 1,
-    time: runtime.runtimeTime,
-    ...fields,
-});
+const event = (type, fields = {}) => runtime.input({type, pointerId: 1, time: runtime.runtimeTime, ...fields});
 
 try {
     runtime.font("Source Serif 4", sourceSerif, "ttf");

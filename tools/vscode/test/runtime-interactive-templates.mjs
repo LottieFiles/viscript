@@ -32,21 +32,7 @@ const center = (box) => ({
     y: box.y + box.height / 2,
 });
 
-const event = (runtime, type, fields = {}) => runtime.input({
-    type,
-    x: 0,
-    y: 0,
-    dx: 0,
-    dy: 0,
-    wheelX: 0,
-    wheelY: 0,
-    button: -1,
-    buttons: 0,
-    modifiers: 0,
-    pointerId: 1,
-    time: 0,
-    ...fields,
-});
+const event = (runtime, type, fields = {}) => runtime.input({type, pointerId: 1, time: 0, ...fields});
 
 async function loadTemplate(name) {
     const source = fs.readFileSync(path.join(templateRoot, name), "utf8");

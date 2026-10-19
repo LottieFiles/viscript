@@ -106,8 +106,3 @@ export function schedulerFor(node: Node): Scheduler {
     if (!scheduler) schedulers.set(window, scheduler = new Scheduler(window));
     return scheduler;
 }
-
-/** Whether this window is a phone's or has a coarse pointer. */
-export function isMobile(): boolean {
-    return schedulerFor(document).isMobile();
-}

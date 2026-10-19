@@ -39,11 +39,15 @@ assert.deepEqual(dark, {
     objects: ["#e89432", "#ef6464", "#72bd78", "#b390d4"],
 });
 
-const fallback = resolveAdaptiveVscodeTheme({dark: false, read: () => ""});
-assert.equal(fallback.background, "#ffffff");
-assert.equal(fallback.foreground, "#202124");
-assert.deepEqual(fallback.objects, ["#b45f06", "#b63a3c", "#2e7f7a", "#815681"]);
-assert.notEqual(adaptiveVscodeThemeKey(dark), adaptiveVscodeThemeKey(fallback));
+// A color the theme does not define stays unset for the runtime to fill.
+const unset = resolveAdaptiveVscodeTheme({dark: false, read: (name) => name === "--vscode-charts-red" ? "#ef6464" : ""});
+assert.deepEqual(unset, {
+    dark: false,
+    ...Object.fromEntries(Object.keys(dark).filter((key) => key !== "dark" && key !== "objects").map((key) => [key, undefined])),
+    objects: [undefined, "#ef6464", undefined, undefined],
+});
+assert.notEqual(adaptiveVscodeThemeKey(dark), adaptiveVscodeThemeKey(unset));
+assert.notEqual(adaptiveVscodeThemeKey(unset), adaptiveVscodeThemeKey({...unset, dark: true}));
 assert.equal(adaptiveVscodeThemeKey(dark), adaptiveVscodeThemeKey({...dark}));
 
 console.log("Adaptive VS Code palette resolution passed");

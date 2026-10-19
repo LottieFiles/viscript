@@ -33,8 +33,6 @@ export interface PlayerScene {
 
 export interface PlaybackOptions {
     readonly end?: EndBehavior;
-    /** Milliseconds a crossfade replay takes. */
-    readonly crossfade?: number;
     /** Frames drawn per second at most; 60, or 30 on phones, unless given. */
     readonly maxFps?: number;
     readonly quality?: Quality;
@@ -68,8 +66,6 @@ export interface PlayerOptions extends PlaybackOptions {
     readonly releaseDelay?: number;
     /** Grows the viewport the player counts as in view, as an IntersectionObserver rootMargin. */
     readonly rootMargin?: string;
-    /** Whether the lighter phone policy applies; a media query decides unless given. */
-    readonly mobile?: () => boolean;
 }
 
 export interface FrameDetail {
@@ -123,6 +119,8 @@ interface Scene {
 }
 
 const PLACEHOLDER_SIZE = [960, 540] as const;
+// Milliseconds a crossfade replay takes.
+const CROSSFADE = 700;
 const NO_RESOURCES: SceneResources = {assets: []};
 
 const errorText = (error: unknown): string => error instanceof Error ? error.message : String(error);
@@ -137,7 +135,6 @@ export class VisPlayer extends EventTarget implements Tickable {
     readonly #interactive: boolean;
     readonly #releaseDelay: number;
     readonly #rootMargin: string;
-    readonly #mobile: () => boolean;
     /** The loop and observers of the window the canvas is in. */
     readonly #scheduler: Scheduler;
     #playback: Required<Omit<PlaybackOptions, "maxFps">> & Pick<PlaybackOptions, "maxFps">;
@@ -191,7 +188,7 @@ export class VisPlayer extends EventTarget implements Tickable {
         this.#releaseDelay = options.releaseDelay ?? 2000;
         this.#rootMargin = options.rootMargin ?? "0px";
         this.#playing = options.autoplay ?? true;
-        this.#playback = {end: "auto", crossfade: 700, quality: "auto", maxRatio: 3};
+        this.#playback = {end: "auto", quality: "auto", maxRatio: 3};
 
         let canvas = options.canvas;
         if (!canvas) {
@@ -205,7 +202,6 @@ export class VisPlayer extends EventTarget implements Tickable {
         if (options.label) canvas.setAttribute("aria-label", options.label);
         this.#canvas = canvas;
         const scheduler = this.#scheduler = schedulerFor(canvas);
-        this.#mobile = options.mobile ?? (() => scheduler.isMobile());
         this.configure(options);
         this.#resize = scheduler.resizeObserver(() => {
             const width = this.#canvas.clientWidth;
@@ -352,7 +348,6 @@ export class VisPlayer extends EventTarget implements Tickable {
         const playback = this.#playback;
         this.#playback = {
             end: options.end ?? playback.end,
-            crossfade: options.crossfade ?? playback.crossfade,
             // Given as undefined, the default rate applies again.
             maxFps: "maxFps" in options ? options.maxFps : playback.maxFps,
             quality: options.quality ?? playback.quality,
@@ -400,7 +395,7 @@ export class VisPlayer extends EventTarget implements Tickable {
         if (!this.#dirty && !moving) return false;
         if (!this.#dirty && now < this.#nextDraw - 0.5) return moving;
         this.#draw(duration);
-        const interval = frameInterval(this.#mobile(), this.#playback.maxFps);
+        const interval = frameInterval(this.#scheduler.isMobile(), this.#playback.maxFps);
         // Keeps the cadence through animation frame jitter, without catching up on missed frames.
         this.#nextDraw = this.#nextDraw > 0 && now >= this.#nextDraw
             ? now + interval - ((now - this.#nextDraw) % interval) : now + interval;
@@ -456,7 +451,7 @@ export class VisPlayer extends EventTarget implements Tickable {
         const time = Math.min(this.#time, duration);
         const plan = fitPlan({
             width: this.#canvasWidth, logicalWidth: info.width, logicalHeight: info.height,
-            dpr: this.#scheduler.window.devicePixelRatio || 1, mobile: this.#mobile(), maxRatio: this.#playback.maxRatio,
+            dpr: this.#scheduler.window.devicePixelRatio || 1, mobile: this.#scheduler.isMobile(), maxRatio: this.#playback.maxRatio,
             quality: this.#playback.quality,
         });
         const frame: FrameRequest = {
@@ -464,7 +459,7 @@ export class VisPlayer extends EventTarget implements Tickable {
             ...(this.#live ? {advance: this.#advance} : {}),
             ...(this.#input.length ? {input: this.#input} : {}),
             ...(this.#releaseInput ? {releaseInput: true} : {}),
-            ...(this.#crossfadeNext ? {crossfade: this.#playback.crossfade} : {}),
+            ...(this.#crossfadeNext ? {crossfade: CROSSFADE} : {}),
         };
         this.#input = [];
         this.#advance = 0;

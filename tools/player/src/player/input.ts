@@ -1,4 +1,5 @@
 // Pointer and key events on a canvas, as the runtime's input events in logical scene pixels.
+import {inputKeyName} from "vis-wasm-bundle";
 import type {InputEvent} from "../protocol.ts";
 
 export interface InputSink {
@@ -9,14 +10,6 @@ export interface InputSink {
     queue(event: InputEvent): void;
     /** Focus left the canvas: queued input is dropped and every held key and button let go. */
     releaseAll(): void;
-}
-
-const KEYS = new Set(["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", " ", "Enter", "Escape", "Shift", "Tab", "+", "-"]);
-
-/** The runtime's name for a key, or null for one it does not take. */
-export function keyName(event: KeyboardEvent): string | null {
-    if (KEYS.has(event.key)) return event.key;
-    return /^[a-z0-9]$/i.test(event.key) ? event.key.toUpperCase() : null;
 }
 
 const modifiers = (event: MouseEvent | KeyboardEvent): number =>
@@ -36,7 +29,7 @@ export function bindInput(canvas: HTMLCanvasElement, sink: InputSink): () => voi
     };
     const pointer = (type: InputEvent["type"], event: PointerEvent, button = -1): InputEvent => {
         buttons = event.buttons;
-        return {type, ...at(event), button, buttons, modifiers: modifiers(event), pointerId: 0};
+        return {type, ...at(event), button, buttons, modifiers: modifiers(event)};
     };
 
     canvas.addEventListener("pointerdown", (event) => {
@@ -61,7 +54,7 @@ export function bindInput(canvas: HTMLCanvasElement, sink: InputSink): () => voi
     }, options);
     for (const type of ["keydown", "keyup"] as const) {
         canvas.addEventListener(type, (event) => {
-            const key = keyName(event);
+            const key = inputKeyName(event.key, event.code);
             if (!sink.live() || !key || event.metaKey || event.ctrlKey || event.altKey) return;
             event.preventDefault();
             // Retained input state ignores repeats; a held key is already down.

@@ -7,11 +7,11 @@ import {
     canvasLogicalPoint,
     createCanvasInputRouter,
     inputKeyAction,
-    inputKeyName,
     inputModifiers,
     inputResult,
     isHostKeyTarget,
 } from "../media/canvas-input.mjs";
+import {inputKeyName} from "../runtime/client.js";
 
 class EventTargetStub {
     constructor() {
@@ -125,6 +125,8 @@ assert.equal(inputKeyAction("Escape"), undefined);
 assert.equal(inputKeyName("ArrowLeft"), "ArrowLeft");
 assert.equal(inputKeyName("w"), "W");
 assert.equal(inputKeyName("="), "Plus");
+assert.equal(inputKeyName("_"), "Minus");
+assert.equal(inputKeyName(" "), "Space");
 assert.equal(inputKeyName("Escape"), "Escape");
 assert.equal(inputKeyName("Shift", "ShiftLeft"), "Shift");
 assert.equal(inputKeyName("Tab"), "Tab");
@@ -179,6 +181,7 @@ const router = createCanvasInputRouter({
     getRuntime: () => runtime,
     getSceneSize: () => [800, 400],
     getTime: () => 1.25,
+    keyName: inputKeyName,
     isBusy: () => busy,
     isFit: () => fit,
     camera: (...command) => {
@@ -267,8 +270,6 @@ assert.deepEqual(inputs[capturedInputStart], {
     y: 200,
     dx: 0,
     dy: 0,
-    wheelX: 0,
-    wheelY: 0,
     button: 0,
     buttons: 1,
     modifiers: 1,
@@ -440,6 +441,14 @@ const handledKeyUp = keyTarget.emit("keyup", {key: "w"});
 assert.equal(handledKeyUp.defaultPrevented, true);
 assert.equal(inputs.at(-1).type, "keyup");
 assert.equal(inputs.at(-1).key, "W");
+// "=" is the Plus key and "_" the Minus key, so a held "=" lets go when the key reads "+".
+keyTarget.emit("keydown", {key: "="});
+assert.equal(inputs.at(-1).key, "Plus");
+keyTarget.emit("keyup", {key: "+"});
+assert.deepEqual([inputs.at(-1).type, inputs.at(-1).key], ["keyup", "Plus"]);
+keyTarget.emit("keydown", {key: "_"});
+keyTarget.emit("keyup", {key: "-"});
+assert.deepEqual(inputs.slice(-2).map((event) => [event.type, event.key]), [["keydown", "Minus"], ["keyup", "Minus"]]);
 
 keyTarget.emit("keydown", {key: "d"});
 busy = true;

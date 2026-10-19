@@ -7,7 +7,7 @@ const extensionRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)))
 const runtimeRoot = process.env.VIS_RUNTIME_ROOT
     ? path.resolve(process.env.VIS_RUNTIME_ROOT)
     : path.join(extensionRoot, "runtime");
-const {createVis} = await import(pathToFileURL(path.join(runtimeRoot, "client.js")));
+const {createVis, createVisModule} = await import(pathToFileURL(path.join(runtimeRoot, "client.js")));
 const wasmBinary = fs.readFileSync(path.join(runtimeRoot, "vis-wasm.wasm"));
 const source = `
 local scene = vis.scene {
@@ -72,21 +72,7 @@ const center = (box) => ({
     x: box.x + box.width / 2,
     y: box.y + box.height / 2,
 });
-const event = (type, fields = {}) => runtime.input({
-    type,
-    x: 0,
-    y: 0,
-    dx: 0,
-    dy: 0,
-    wheelX: 0,
-    wheelY: 0,
-    button: -1,
-    buttons: 0,
-    modifiers: 0,
-    pointerId: 1,
-    time: 0,
-    ...fields,
-});
+const event = (type, fields = {}) => runtime.input({type, pointerId: 1, time: 0, ...fields});
 
 try {
     assert.equal(typeof runtime.input, "function");
@@ -191,6 +177,25 @@ try {
     );
 } finally {
     runtime.destroy();
+}
+
+// A number an event leaves out is 0, except the button, which is -1; the time is required.
+const module = await createVisModule({wasmBinary});
+const forward = module._vis_input;
+let forwarded;
+module._vis_input = (engine, ...values) => {
+    forwarded = values;
+    return forward(engine, ...values);
+};
+const bare = await createVis({module});
+try {
+    bare.input({type: "keydown", key: "A", time: 0.5});
+    assert.deepEqual(forwarded, [5, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 8, 0, 0.5]);
+    bare.input({type: "wheel", x: 3, wheelY: -2, modifiers: 1, repeat: true, time: 1});
+    assert.deepEqual(forwarded, [4, 3, 0, 0, 0, 0, -2, -1, 0, 1, 0, 0, 1, 1]);
+    assert.throws(() => bare.input({type: "pointermove"}), /time must be finite/);
+} finally {
+    bare.destroy();
 }
 
 console.log("runtime Input bridge passed");

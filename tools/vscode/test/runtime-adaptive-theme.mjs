@@ -124,5 +124,29 @@ assert.ok(runtime.bounds("automatic-serif-code").width > 0);
 assert.ok(runtime.bounds("automatic-korean").width > 0);
 assert.ok(runtime.render(0).some((value, index) => index % 4 !== 3 && value !== 255));
 
+// A color the host leaves undefined or empty is the runtime's light or dark one, and object colors
+// keep the number given. Two lines take the first two object colors; the third is the danger color.
+const hostColors = (palette) => {
+    runtime.hostTheme(palette);
+    runtime.load(`local s = vis.scene {width = 64, height = 64, theme = "adaptive_vscode", camera = {height = 4}}
+s:line {from = {-2, 1}, to = {2, 1}, width = 8}
+s:line {from = {-2, 0}, to = {2, 0}, width = 8}
+s:line {from = {-2, -1}, to = {2, -1}, stroke = "danger", width = 8}
+return s`, "host-colors.lua");
+    const pixels = runtime.render(0);
+    return [4, 16, 32, 48].map((row) => [...pixels.slice((row * 64 + 32) * 4, (row * 64 + 32) * 4 + 4)]);
+};
+assert.deepEqual(hostColors({dark: true}), [[30, 30, 30, 255], [242, 142, 43, 255], [255, 107, 107, 255], [255, 123, 114, 255]]);
+assert.deepEqual(
+    hostColors({dark: false, danger: "", objects: [undefined, "#00ff00"]}),
+    [[255, 255, 255, 255], [180, 95, 6, 255], [0, 255, 0, 255], [179, 38, 30, 255]],
+);
+assert.deepEqual(
+    hostColors({dark: true, background: "#101820", danger: "#123456", objects: ["#0000ff"]}),
+    [[16, 24, 32, 255], [0, 0, 255, 255], [0, 0, 255, 255], [18, 52, 86, 255]],
+);
+assert.throws(() => runtime.hostTheme({dark: true, objects: Array(5)}), /Host theme object color 5 must be a CSS color string/);
+assert.throws(() => runtime.hostTheme({background: "#101820"}), /boolean dark value/);
+
 runtime.destroy();
 console.log("Adaptive VS Code WASM theme passed");

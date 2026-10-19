@@ -78,8 +78,9 @@ function fakeRuntime() {
                     canvas.height = (scene.height ?? 16) * ratio;
                     canvas.calls.push(`draw ${time}`);
                 },
-                input: (event: {type: string; key?: string; time: number; button: number}) =>
-                    log.push(`input ${event.type}${event.key ? ` ${event.key}` : ""} at ${event.time} button ${event.button}`),
+                input: (event: {type: string; key?: string; time: number; button?: number}) =>
+                    log.push(`input ${event.type}${event.key ? ` ${event.key}` : ""} at ${event.time}`
+                        + (event.button === undefined ? "" : ` button ${event.button}`)),
                 beginInputFrame: (time: number) => log.push(`begin ${time}`),
                 releaseInput: (time: number) => log.push(`release ${time}`),
                 advanceRuntime(dt: number) {
@@ -273,7 +274,7 @@ test("a live frame begins input, lets go, applies input at the runtime time, the
     assert.equal(framed.result.runtimeTime, 0.75);
     assert.deepEqual(runtime.log.filter((line) => /^(begin|release|input|advance)/.test(line)), [
         "begin 0", "advance 0.5",
-        "begin 0.5", "release 0.5", "input keydown A at 0.5 button -1", "input pointerdown at 0.5 button 0", "advance 0.25",
+        "begin 0.5", "release 0.5", "input keydown A at 0.5", "input pointerdown at 0.5 button 0", "advance 0.25",
     ]);
 });
 

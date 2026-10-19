@@ -121,6 +121,7 @@ const BOOTSTRAP = `return vis.scene { width = 16, height = 16, loop = false }`;
 const PLAYER_MENU_WIDTH = 174;
 
 let createVis;
+let inputKeyName;
 let runtime;
 let wasmBinary;
 const sceneFonts = createFontCache(config.fonts);
@@ -193,7 +194,7 @@ function describeError(error) {
 
 async function boot() {
     try {
-        ({createVis} = await import(config.client));
+        ({createVis, inputKeyName} = await import(config.client));
         const wasmResponse = await fetch(config.wasm);
         if (!wasmResponse.ok) throw new Error(`Bundled WASM failed to load (${wasmResponse.status})`);
         wasmBinary = new Uint8Array(await wasmResponse.arrayBuffer());
@@ -1627,6 +1628,7 @@ const canvasInputRouter = createCanvasInputRouter({
     getRuntime: () => runtime,
     getSceneSize: () => [sceneWidth, sceneHeight],
     getTime: sceneTime,
+    keyName: (key, code) => inputKeyName?.(key, code),
     isBusy: () => busy,
     isFit: () => previewFits,
     camera: (action, x, y) => moveCamera(action, x, y, false),

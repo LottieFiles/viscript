@@ -228,17 +228,17 @@ export function scanSource(source: string, language: SceneLanguage): ScannedSour
     return language === "js" ? scanJs(source) : scanLua(source);
 }
 
-const IMAGE = /\.(png|jpe?g|webp|svg)$/i;
+// The image types the runtime decodes.
+const IMAGE = /\.(png|svg)$/i;
 
-/** Images the scene loads by name: literals that are a file name or path with an image extension. */
+/** Images the scene loads by name: literals that are a file name or path ending in .png or .svg. */
 export function imageNames(scanned: ScannedSource): string[] {
     return [...new Set(scanned.literals.filter((literal) => IMAGE.test(literal) && !/[\n"<>|]/.test(literal)))];
 }
 
 /** The runtime's type name for an image file, from its extension. */
 export function imageMime(name: string): string {
-    const extension = IMAGE.exec(name)?.[1]?.toLowerCase() ?? "";
-    return extension === "jpeg" ? "jpg" : extension;
+    return IMAGE.exec(name)?.[1]?.toLowerCase() ?? "";
 }
 
 /** Whether the source looks like a viscript scene at all: it calls into `vis`. */

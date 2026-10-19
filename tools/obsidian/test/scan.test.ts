@@ -36,13 +36,17 @@ test("the comment-free code keeps the source's length and lines", () => {
     assert.equal(code.split("\n").length, source.split("\n").length);
 });
 
-test("images are literals with an image extension", () => {
+test("images are literals naming a PNG or SVG file, the types the runtime decodes", () => {
     const scanned = scanSource(`s:picture {asset = "earth.png"}
-s:picture {asset = 'img/photo.JPEG'}
+s:picture {asset = 'img/LOGO.SVG'}
+s:picture {asset = "photo.jpg"}
+s:picture {asset = "img/photo.JPEG"}
+s:picture {asset = "photo.webp"}
+s:picture {asset = "anim.gif"}
 s:text {text = "not an image.png\\nreally"}`, "lua");
-    assert.deepEqual(imageNames(scanned), ["earth.png", "img/photo.JPEG"]);
-    assert.equal(imageMime("img/photo.JPEG"), "jpg");
-    assert.equal(imageMime("a.svg"), "svg");
+    assert.deepEqual(imageNames(scanned), ["earth.png", "img/LOGO.SVG"]);
+    assert.equal(imageMime("img/LOGO.SVG"), "svg");
+    assert.equal(imageMime("earth.png"), "png");
 });
 
 test("a scene calls into vis outside comments", () => {

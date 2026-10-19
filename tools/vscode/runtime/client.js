@@ -8,8 +8,10 @@ import {compileScene} from "./bindings.js";
 
 export {compileScene, evaluateScene, SceneBuilder, vis} from "./bindings.js";
 
-const CAMERA_ACTIONS = Object.freeze({pan: 0, orbit: 1, zoom: 2, reset: 3, view2d: 4, view3d: 5});
-const INPUT_TYPES = Object.freeze({
+// The tables stay plain and private, and the module does nothing when imported, so a bundle that
+// takes only inputKeyName leaves the rest out.
+const CAMERA_ACTIONS = {pan: 0, orbit: 1, zoom: 2, reset: 3, view2d: 4, view3d: 5};
+const INPUT_TYPES = {
     pointerdown: 0,
     pointermove: 1,
     pointerup: 2,
@@ -17,35 +19,85 @@ const INPUT_TYPES = Object.freeze({
     wheel: 4,
     keydown: 5,
     keyup: 6,
-});
-const INPUT_KEYS = Object.freeze({
+};
+// The keys input() takes by name, as the runtime numbers them; A to Z and 0 to 9 follow.
+const INPUT_KEYS = {
     ArrowLeft: 1,
     ArrowRight: 2,
     ArrowUp: 3,
     ArrowDown: 4,
     Space: 5,
-    " ": 5,
     Enter: 6,
     Escape: 7,
     Plus: 44,
-    "+": 44,
-    "=": 44,
     Minus: 45,
-    "-": 45,
-    "_": 45,
     Shift: 46,
     Tab: 47,
-});
-const encoder = new TextEncoder();
+};
+// The names browsers give some of those keys, as KeyboardEvent.key and KeyboardEvent.code.
+const KEY_NAMES = {" ": "Space", "+": "Plus", "=": "Plus", "-": "Minus", "_": "Minus"};
+const CODE_NAMES = {Space: "Space", NumpadAdd: "Plus", NumpadSubtract: "Minus"};
+// The image types asset() takes, as a file extension or a MIME type, by the runtime's name for
+// each; the browser runtime decodes no others.
+const IMAGE_TYPES = {png: "png", "image/png": "png", svg: "svg", "image/svg+xml": "svg"};
+// The colors hostTheme gives those the host leaves unset, close to VS Code's default Light and
+// Dark themes, in the order _vis_host_theme takes them.
+const HOST_THEMES = {
+    light: {
+        background: "#ffffff",
+        foreground: "#202124",
+        muted: "#555b64",
+        accent: "#005fb8",
+        secondary: "#6750a4",
+        success: "#2e7d32",
+        warning: "#8a5d00",
+        danger: "#b3261e",
+        info: "#00639b",
+        surface: "#f5f6f8",
+        line: "#d8dadd",
+        result: "#8a6500",
+        focus: "#315f8c",
+        objects: ["#b45f06", "#b63a3c", "#2e7f7a", "#815681"],
+    },
+    dark: {
+        background: "#1e1e1e",
+        foreground: "#cccccc",
+        muted: "#9d9d9d",
+        accent: "#4daafc",
+        secondary: "#c8a7ff",
+        success: "#7ee787",
+        warning: "#e3b341",
+        danger: "#ff7b72",
+        info: "#79c0ff",
+        surface: "#252526",
+        line: "#454545",
+        result: "#edc948",
+        focus: "#6ea8fe",
+        objects: ["#f28e2b", "#ff6b6b", "#7bc96f", "#c29bc0"],
+    },
+};
+
+// The name input() takes for a key a browser reports as KeyboardEvent key and code, or undefined
+// for a key the runtime does not take. The code tells where the key is when the layout does not
+// give it a Latin letter or digit.
+export function inputKeyName(key, code) {
+    if (typeof key === "string") {
+        const name = Object.hasOwn(KEY_NAMES, key) ? KEY_NAMES[key] : key;
+        if (Object.hasOwn(INPUT_KEYS, name)) return name;
+        if (/^[a-z0-9]$/i.test(key)) return key.toUpperCase();
+    }
+    if (typeof code !== "string") return undefined;
+    if (/^(?:Key[A-Z]|Digit[0-9])$/.test(code)) return code.at(-1);
+    return Object.hasOwn(CODE_NAMES, code) ? CODE_NAMES[code] : undefined;
+}
 
 function inputKey(value) {
     if (value === undefined || value === null || value === "") return 0;
     if (typeof value !== "string") throw new TypeError("Input key must be a string");
-    const named = INPUT_KEYS[value];
-    if (named !== undefined) return named;
-    if (/^[a-z]$/i.test(value)) return 8 + value.toUpperCase().charCodeAt(0) - 65;
-    if (/^[0-9]$/.test(value)) return 34 + value.charCodeAt(0) - 48;
-    throw new TypeError(`Unsupported input key '${value}'`);
+    const name = inputKeyName(value);
+    if (name === undefined) throw new TypeError(`Unsupported input key '${value}'`);
+    if (Object.hasOwn(INPUT_KEYS, name)) return INPUT_KEYS[name];
+    return /^[A-Z]$/.test(name) ? 8 + name.charCodeAt(0) - 65 : 34 + name.charCodeAt(0) - 48;
 }
 
 function colorChannel(value, label) {
@@ -126,6 +178,7 @@ export async function createVis(...args) {
     const assertAlive = () => {
         if (!engine) throw new Error("viscript instance has been destroyed");
     };
+    const encoder = new TextEncoder();
     const lastError = () => module.UTF8ToString(module._vis_last_error(engine));
     const check = (result, operation) => {
         if (result !== 0) throw new Error(lastError() || `${operation} failed (${result})`);
@@ -238,7 +291,13 @@ export async function createVis(...args) {
         assertAlive();
         return module.UTF8ToString(module._vis_missing_fonts(engine)).split("\n").filter(Boolean);
     };
-    const asset = (name, data, mime) => resource(module._vis_load_asset, "Asset", name, data, mime);
+    const asset = (name, data, mime) => {
+        const type = String(mime).toLowerCase();
+        if (!Object.hasOwn(IMAGE_TYPES, type)) {
+            throw new TypeError(`Unsupported image type '${mime}' for asset '${name}'; the runtime decodes PNG and SVG`);
+        }
+        resource(module._vis_load_asset, "Asset", name, data, IMAGE_TYPES[type]);
+    };
     const audioExportNames = [
         "_vis_audio_load",
         "_vis_audio_start",
@@ -363,45 +422,25 @@ export async function createVis(...args) {
         if (!event || typeof event !== "object") throw new TypeError("Input must be an event object");
         const type = INPUT_TYPES[event.type];
         if (type === undefined) throw new TypeError(`Unknown input type '${event.type}'`);
-        const numbers = [
-            event.x,
-            event.y,
-            event.dx,
-            event.dy,
-            event.wheelX,
-            event.wheelY,
-            event.time,
-        ];
-        if (!numbers.every(Number.isFinite) || event.time < 0) {
+        const {
+            x = 0, y = 0, dx = 0, dy = 0, wheelX = 0, wheelY = 0,
+            button = -1, buttons = 0, modifiers = 0, pointerId = 0, repeat, time,
+        } = event;
+        if (![x, y, dx, dy, wheelX, wheelY, time].every(Number.isFinite) || time < 0) {
             throw new TypeError("Input coordinates, deltas, wheel values, and time must be finite and time must be non-negative");
         }
-        if (!Number.isInteger(event.button) || event.button < -1 || event.button > 0x7fffffff
-            || !Number.isInteger(event.buttons) || event.buttons < 0 || event.buttons > 0xffffffff
-            || !Number.isInteger(event.modifiers) || event.modifiers < 0 || event.modifiers > 0xffffffff
-            || !Number.isInteger(event.pointerId) || event.pointerId < 0 || event.pointerId > 0xffffffff) {
+        if (!Number.isInteger(button) || button < -1 || button > 0x7fffffff
+            || !Number.isInteger(buttons) || buttons < 0 || buttons > 0xffffffff
+            || !Number.isInteger(modifiers) || modifiers < 0 || modifiers > 0xffffffff
+            || !Number.isInteger(pointerId) || pointerId < 0 || pointerId > 0xffffffff) {
             throw new TypeError("Input button, buttons, modifiers, and pointer ID must be valid integers");
         }
         const key = inputKey(event.key);
         if (type >= INPUT_TYPES.keydown && key === 0) {
             throw new TypeError("Input key is required for keydown and keyup events");
         }
-        const flags = module._vis_input(
-            engine,
-            type,
-            event.x,
-            event.y,
-            event.dx,
-            event.dy,
-            event.wheelX,
-            event.wheelY,
-            event.button,
-            event.buttons,
-            event.modifiers,
-            event.pointerId,
-            key,
-            event.repeat ? 1 : 0,
-            event.time,
-        ) >>> 0;
+        const flags = module._vis_input(engine, type, x, y, dx, dy, wheelX, wheelY, button, buttons, modifiers,
+            pointerId, key, repeat ? 1 : 0, time) >>> 0;
         let sample;
         if (flags & 16) {
             const getters = [
@@ -523,28 +562,19 @@ export async function createVis(...args) {
     const hostTheme = (palette) => {
         assertAlive();
         if (!palette || typeof palette !== "object" || typeof palette.dark !== "boolean") {
-            throw new TypeError("Host theme must include a boolean dark value and color strings");
+            throw new TypeError("Host theme must include a boolean dark value");
         }
-        if (!Array.isArray(palette.objects) || !palette.objects.length || palette.objects.length > 10) {
+        const {objects: fallbackObjects, ...fallback} = HOST_THEMES[palette.dark ? "dark" : "light"];
+        // A color the host leaves undefined or empty is the fallback's.
+        const color = (value, otherwise, label) => rgba(value === undefined || value === "" ? otherwise : value, label);
+        const given = palette.objects ?? fallbackObjects;
+        if (!Array.isArray(given) || !given.length || given.length > 10) {
             throw new TypeError("Host theme objects must contain 1 to 10 colors");
         }
-        const objects = Uint32Array.from(palette.objects, (color, index) =>
-            rgba(color, `Host theme object color ${index + 1}`));
-        const colors = [
-            rgba(palette.background, "Host theme background"),
-            rgba(palette.foreground, "Host theme foreground"),
-            rgba(palette.muted, "Host theme muted color"),
-            rgba(palette.accent, "Host theme accent"),
-            rgba(palette.secondary, "Host theme secondary color"),
-            rgba(palette.success, "Host theme success color"),
-            rgba(palette.warning, "Host theme warning color"),
-            rgba(palette.danger, "Host theme danger color"),
-            rgba(palette.info, "Host theme info color"),
-            rgba(palette.surface, "Host theme surface color"),
-            rgba(palette.line, "Host theme line color"),
-            rgba(palette.result, "Host theme result color"),
-            rgba(palette.focus, "Host theme focus color"),
-        ];
+        const objects = Uint32Array.from(given, (value, index) =>
+            color(value, fallbackObjects[index], `Host theme object color ${index + 1}`));
+        const colors = Object.entries(fallback).map(([name, otherwise]) =>
+            color(palette[name], otherwise, `Host theme ${name} color`));
         check(withMemory([new Uint8Array(objects.buffer)], (objectsPtr) => module._vis_host_theme(
             engine, palette.dark ? 1 : 0, ...colors, objectsPtr, objects.length)), "Host theme");
     };

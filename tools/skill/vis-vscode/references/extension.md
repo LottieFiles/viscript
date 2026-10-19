@@ -84,7 +84,7 @@ API completion, hover documentation, and signature help work in the Scene that t
 
 ## Verify before delivery
 
-Run the vis-skills review (`inspect`, `render`, `audit`) on every Scene. Then run the host review, which renders a Scene as the Viewer does: the same WASM runtime and fonts, with the extension's fallback Light and Dark palettes. They approximate the default themes; a workbench theme's own colors can differ.
+Run the vis-skills review (`inspect`, `render`, `audit`) on every Scene. Then run the host review, which renders a Scene as the Viewer does: the same WASM runtime and fonts, with the runtime's light and dark host colors. They approximate the default Light and Dark themes; a workbench theme's own colors can differ.
 
 ```sh
 node <skill>/scripts/host-review.mjs .vscode/vis/<series>/animations/<scene>.lua --time 0 --time T --time end

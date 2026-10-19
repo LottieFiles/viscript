@@ -1,8 +1,8 @@
 // Renders a Lua Scene the way the VS Code Viewer does: the same WASM runtime, the same fonts
-// (Source Serif 4 for the adaptive_vscode heading and body roles), and the extension's fallback
-// palettes, which approximate the default Light and Dark themes; a workbench theme's own colors
-// can differ. Writes one PNG per time and prints one line per time with the text that overlaps,
-// is clipped, or leaves its box.
+// (Source Serif 4 for the adaptive_vscode heading and body roles), and the runtime's light and
+// dark host colors, which approximate the default Light and Dark themes; a workbench theme's own
+// colors can differ. Writes one PNG per time and prints one line per time with the text that
+// overlaps, is clipped, or leaves its box.
 // Usage: node host-review.mjs <scene.lua> [--time SEC|end]... [--theme light|dark|both]
 //        [--contain TEXT PANEL [INSET]]... [--padding PX] [--out DIR] [--runtime DIR]
 import {mkdirSync, readFileSync, writeFileSync} from "node:fs";
@@ -10,43 +10,6 @@ import {tmpdir} from "node:os";
 import {basename, extname, join, resolve} from "node:path";
 import {fileURLToPath, pathToFileURL} from "node:url";
 import {deflateSync} from "node:zlib";
-
-// The extension's fallback palettes (tools/vscode/media/adaptive-theme.mjs); the skill check
-// keeps them equal.
-export const PALETTES = {
-    light: {
-        background: "#ffffff",
-        foreground: "#202124",
-        muted: "#555b64",
-        accent: "#005fb8",
-        secondary: "#6750a4",
-        success: "#2e7d32",
-        warning: "#8a5d00",
-        danger: "#b3261e",
-        info: "#00639b",
-        surface: "#f5f6f8",
-        line: "#d8dadd",
-        result: "#8a6500",
-        focus: "#315f8c",
-        objects: ["#b45f06", "#b63a3c", "#2e7f7a", "#815681"],
-    },
-    dark: {
-        background: "#1e1e1e",
-        foreground: "#cccccc",
-        muted: "#9d9d9d",
-        accent: "#4daafc",
-        secondary: "#c8a7ff",
-        success: "#7ee787",
-        warning: "#e3b341",
-        danger: "#ff7b72",
-        info: "#79c0ff",
-        surface: "#252526",
-        line: "#454545",
-        result: "#edc948",
-        focus: "#6ea8fe",
-        objects: ["#f28e2b", "#ff6b6b", "#7bc96f", "#c29bc0"],
-    },
-};
 
 // Font families and files, by the names the Viewer registers them under. The Viewer registers
 // only those a scene sets text in, which draws the same as registering all of them here.
@@ -216,7 +179,7 @@ export async function main(argv) {
     for (const mode of options.themes) {
         const runtime = await createVis({wasmBinary});
         try {
-            runtime.hostTheme({dark: mode === "dark", ...PALETTES[mode]});
+            runtime.hostTheme({dark: mode === "dark"});
             for (const [family, bytes] of fonts) runtime.font(family, bytes, "ttf");
             runtime.load(source, basename(options.scene));
             const [width, height] = runtime.size();

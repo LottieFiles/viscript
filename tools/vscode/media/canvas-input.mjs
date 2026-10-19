@@ -50,35 +50,6 @@ export function inputKeyAction(key) {
     return actions[key];
 }
 
-export function inputKeyName(key, code) {
-    const named = {
-        ArrowLeft: "ArrowLeft",
-        ArrowRight: "ArrowRight",
-        ArrowUp: "ArrowUp",
-        ArrowDown: "ArrowDown",
-        " ": "Space",
-        Space: "Space",
-        Enter: "Enter",
-        Escape: "Escape",
-        Shift: "Shift",
-        Tab: "Tab",
-        "+": "Plus",
-        "=": "Plus",
-        Minus: "Minus",
-        "-": "Minus",
-        _: "Minus",
-    };
-    if (named[key]) return named[key];
-    if (typeof key === "string" && /^[a-z]$/i.test(key)) return key.toUpperCase();
-    if (typeof key === "string" && /^[0-9]$/.test(key)) return key;
-    if (typeof code === "string" && /^Key[A-Z]$/.test(code)) return code.slice(3);
-    if (typeof code === "string" && /^Digit[0-9]$/.test(code)) return code.slice(5);
-    if (code === "Space") return "Space";
-    if (code === "NumpadAdd") return "Plus";
-    if (code === "NumpadSubtract") return "Minus";
-    return undefined;
-}
-
 export function canvasLogicalPoint(canvas, sceneWidth, sceneHeight, clientX, clientY) {
     const bounds = canvas.getBoundingClientRect();
     if (![bounds.left, bounds.top, bounds.width, bounds.height, sceneWidth, sceneHeight, clientX, clientY]
@@ -123,6 +94,8 @@ export function createCanvasInputRouter(options) {
         getRuntime,
         getSceneSize,
         getTime,
+        // The runtime's name for a key event's key and code, as the client's inputKeyName gives it.
+        keyName,
         isBusy,
         isFit,
         camera,
@@ -208,22 +181,8 @@ export function createCanvasInputRouter(options) {
         const value = Number(getTime?.());
         return Number.isFinite(value) && value >= 0 ? value : 0;
     };
-    const dispatchKey = (type, key, button, modifiers, repeat, allowBusy = false) => runtimeInput({
-        type,
-        x: 0,
-        y: 0,
-        dx: 0,
-        dy: 0,
-        wheelX: 0,
-        wheelY: 0,
-        button,
-        buttons: 0,
-        modifiers,
-        pointerId: 0,
-        key,
-        repeat,
-        time: eventTime(),
-    }, allowBusy);
+    const dispatchKey = (type, key, button, modifiers, repeat, allowBusy = false) =>
+        runtimeInput({type, button, modifiers, key, repeat, time: eventTime()}, allowBusy);
     const releaseHeldKeys = () => {
         const entries = [...heldKeys];
         heldKeys.clear();
@@ -246,8 +205,6 @@ export function createCanvasInputRouter(options) {
         y: point.y,
         dx: delta.x,
         dy: delta.y,
-        wheelX: 0,
-        wheelY: 0,
         button: Number.isInteger(event.button) ? event.button : -1,
         buttons: Number.isInteger(event.buttons) && event.buttons >= 0 ? event.buttons : 0,
         modifiers: inputModifiers(event),
@@ -267,15 +224,7 @@ export function createCanvasInputRouter(options) {
         if (!passivePointer) return;
         const pointer = passivePointer;
         passivePointer = undefined;
-        dispatchPointer("pointercancel", {
-            button: -1,
-            buttons: 0,
-            pointerId: pointer.id,
-            shiftKey: false,
-            ctrlKey: false,
-            altKey: false,
-            metaKey: false,
-        }, {x: pointer.sceneX, y: pointer.sceneY}, {x: 0, y: 0}, true);
+        dispatchPointer("pointercancel", {pointerId: pointer.id}, {x: pointer.sceneX, y: pointer.sceneY}, {x: 0, y: 0}, true);
     };
     const cancelActivePointer = () => {
         if (!activePointer) return;
@@ -283,15 +232,7 @@ export function createCanvasInputRouter(options) {
         activePointer = undefined;
         passivePointer = undefined;
         if (pointer.kind === "ui") {
-            dispatchPointer("pointercancel", {
-                button: -1,
-                buttons: 0,
-                pointerId: pointer.id,
-                shiftKey: false,
-                ctrlKey: false,
-                altKey: false,
-                metaKey: false,
-            }, {x: pointer.sceneX, y: pointer.sceneY}, {x: 0, y: 0}, true);
+            dispatchPointer("pointercancel", {pointerId: pointer.id}, {x: pointer.sceneX, y: pointer.sceneY}, {x: 0, y: 0}, true);
         } else if (pointer.kind === "preview-pan") {
             previewPan?.("end", 0, 0);
         }
@@ -453,14 +394,9 @@ export function createCanvasInputRouter(options) {
             type: "wheel",
             x: point.x,
             y: point.y,
-            dx: 0,
-            dy: 0,
             wheelX: wheelDelta(event, "deltaX", canvas.clientWidth),
             wheelY: wheelDelta(event, "deltaY", canvas.clientHeight),
-            button: -1,
-            buttons: 0,
             modifiers: inputModifiers(event),
-            pointerId: 0,
             time: eventTime(),
         });
         if (result.handled) {
@@ -475,7 +411,7 @@ export function createCanvasInputRouter(options) {
         if (ignoreKey?.(event)) return;
         if (event.altKey) return;
         const keyAction = inputKeyAction(event.key);
-        const key = inputKeyName(event.key, event.code);
+        const key = keyName?.(event.key, event.code);
         if (key !== undefined) {
             const button = keyAction ?? -1;
             const result = dispatchKey(
@@ -513,7 +449,7 @@ export function createCanvasInputRouter(options) {
         event.preventDefault();
     });
     listen(keyTarget, "keyup", (event) => {
-        const key = inputKeyName(event.key, event.code);
+        const key = keyName?.(event.key, event.code);
         if (key === undefined) return;
         if (ignoreKey?.(event) && !heldKeys.has(key)) return;
         const result = dispatchKey(

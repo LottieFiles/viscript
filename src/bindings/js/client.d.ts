@@ -125,43 +125,49 @@ export interface LayoutReport {
     readonly containments: readonly LayoutContainmentInfo[];
 }
 
+/**
+ * Colors for scenes that follow the host's theme. A color left undefined or empty takes the
+ * runtime's light or dark one, by `dark`, which are close to VS Code's default themes.
+ */
 export interface HostThemePalette {
     readonly dark: boolean;
-    readonly background: string;
-    readonly foreground: string;
-    readonly muted: string;
-    readonly accent: string;
-    readonly secondary: string;
-    readonly success: string;
-    readonly warning: string;
-    readonly danger: string;
-    readonly info: string;
-    readonly surface: string;
-    readonly line: string;
-    readonly result: string;
-    readonly focus: string;
-    readonly objects: readonly string[];
+    readonly background?: string;
+    readonly foreground?: string;
+    readonly muted?: string;
+    readonly accent?: string;
+    readonly secondary?: string;
+    readonly success?: string;
+    readonly warning?: string;
+    readonly danger?: string;
+    readonly info?: string;
+    readonly surface?: string;
+    readonly line?: string;
+    readonly result?: string;
+    readonly focus?: string;
+    /** 1 to 10 colors, each unset one the runtime's at its index; the runtime's four when left out. */
+    readonly objects?: readonly (string | undefined)[];
 }
 
 export type VisInputType = "pointerdown" | "pointermove" | "pointerup" | "pointercancel" | "wheel" | "keydown" | "keyup";
 
+/** An input event. A number left out is 0, except `button`, which is -1; `time` is required. */
 export interface VisInputEvent {
     readonly type: VisInputType;
     /** Logical Scene coordinates; passive pointermove uses the same space as captured drag. */
-    readonly x: number;
-    readonly y: number;
+    readonly x?: number;
+    readonly y?: number;
     /** Logical Scene-coordinate movement since the previous event for this pointer. */
-    readonly dx: number;
-    readonly dy: number;
-    readonly wheelX: number;
-    readonly wheelY: number;
+    readonly dx?: number;
+    readonly dy?: number;
+    readonly wheelX?: number;
+    readonly wheelY?: number;
     /** The pointer button that changed, 0 to 31, for pointerdown and pointerup; -1 for other events. */
-    readonly button: number;
-    readonly buttons: number;
+    readonly button?: number;
+    readonly buttons?: number;
     /** Shift, Ctrl, Alt, and Meta use bits 0 through 3. */
-    readonly modifiers: number;
-    readonly pointerId: number;
-    /** Logical key name; required for keydown/keyup: ArrowLeft, Space, Enter, Escape, Shift, Tab, A-Z, 0-9, Plus, or Minus. */
+    readonly modifiers?: number;
+    readonly pointerId?: number;
+    /** A key name as inputKeyName gives it, required for keydown and keyup: an arrow, Space, Enter, Escape, Shift, Tab, A-Z, 0-9, Plus or Minus. */
     readonly key?: string;
     /** True for an auto-repeated keydown event; retained Input state ignores repeats. */
     readonly repeat?: boolean;
@@ -277,8 +283,12 @@ export interface VisScene {
     font(name: string, data: Uint8Array | ArrayBuffer, mime?: "ttf" | "otf" | string): void;
     /** Fonts the loaded scene's text names that are not registered, so are drawn in the default font. */
     missingFonts(): string[];
-    /** Register before loading an asset-dependent scene. WASM resolves bytes through the host, not a filesystem. */
-    asset(name: string, data: Uint8Array | ArrayBuffer, mime: string): void;
+    /**
+     * Register before loading an asset-dependent scene. WASM resolves bytes through the host, not a filesystem.
+     * `mime` is `png` or `svg`, or `image/png` or `image/svg+xml`: the runtime decodes no other image type, and
+     * throws a TypeError for one.
+     */
+    asset(name: string, data: Uint8Array | ArrayBuffer, mime: "png" | "svg" | string): void;
     /** Applies interactive camera input. Returns false for fixed scenes or when UI and Input are absent. */
     cameraInput(action: "pan" | "orbit" | "zoom" | "reset" | "view2d" | "view3d", x?: number, y?: number): boolean;
     /** Available when UI or Input is compiled. UI consumes control events before Input receives unhandled events. */
@@ -295,6 +305,12 @@ export interface VisScene {
     resize(width: number, height: number): void;
     destroy(): void;
 }
+
+/**
+ * The name `input` takes for a key a browser reports as KeyboardEvent `key` and `code`, or
+ * undefined for a key the runtime does not take.
+ */
+export function inputKeyName(key: string, code?: string): string | undefined;
 
 /** Loads the WebAssembly runtime once, for `createVis({module})`. */
 export function createVisModule(moduleOptions?: VisModuleOptions): Promise<VisModule>;
