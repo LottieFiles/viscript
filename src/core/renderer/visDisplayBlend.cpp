@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cstring>
 #include <limits>
+#include <memory>
 #include <new>
 
 #include "visDisplayColor.h"
@@ -12,10 +13,18 @@
 namespace vis
 {
 
+// How many points a blend of two paths takes evenly along each of them.
+static constexpr uint32_t BLEND_SAMPLES = 64u;
+
+// The commands one object draws in a list, count of them from begin. An object of the incoming
+// list also keeps whether a match drew it, and the outgoing object it fades in for.
 struct CommandSpan
 {
+    const Object* object = nullptr;
     uint32_t begin = UINT32_MAX;
     uint32_t count = 0;
+    const Object* counterpart = nullptr;
+    bool morphed = false;
 };
 
 static bool _same(const char* first, const char* second)
@@ -237,35 +246,6 @@ static void _align(const Vec2* from, const Vec2* to, uint32_t count,
     }
 }
 
-static Result _blendPath(DisplayList& list, const DrawCommand& from,
-                         const DrawCommand& to, const Vec2& fromSize,
-                         const Vec2& toSize, float progress)
-{
-    constexpr auto count = 64u;
-    Vec2 first[count];
-    Vec2 second[count];
-    Vec2 points[count];
-    if (!_sample(from, fromSize, fromSize, first, count)
-        || !_sample(to, toSize, fromSize, second, count)) {
-        return Result::NonSupport;
-    }
-    auto offset = 0u;
-    auto reverse = false;
-    if (from.closed) _align(first, second, count, offset, reverse);
-    for (auto i = 0u; i < count; i++) {
-        auto target = from.closed ? _target(i, offset, reverse, count) : i;
-        points[i] = first[i] + (second[target] - first[i]) * progress;
-    }
-    auto firstStyle = _scale(from.style, fromSize, fromSize, 1.0f);
-    auto secondStyle = _scale(to.style, toSize, fromSize, 1.0f);
-    auto style = _mix(firstStyle, secondStyle, progress);
-    auto bounded = _clamp(progress);
-    auto layer = bounded < 0.5f ? from.layer : to.layer;
-    auto cap = bounded < 0.5f ? from.cap : to.cap;
-    return list.path(points, count, from.closed, style, layer,
-                     _mix(from.depth, to.depth, progress), cap);
-}
-
 static Result _blend(DisplayList& list, const DrawCommand& from, const DrawCommand& to,
                      const Vec2& fromSize, const Vec2& toSize, float progress)
 {
@@ -276,12 +256,8 @@ static Result _blend(DisplayList& list, const DrawCommand& from, const DrawComma
     list.composite = from.composite;
     list.visualKind = LayoutVisualKind::Morph;
     list.visualOpacity = 255u;
-    if (from.type == CommandType::Path) {
-        return _blendPath(list, from, to, fromSize, toSize, progress);
-    }
-    auto firstStyle = _scale(from.style, fromSize, fromSize, 1.0f);
-    auto secondStyle = _scale(to.style, toSize, fromSize, 1.0f);
-    auto style = _mix(firstStyle, secondStyle, progress);
+    auto style = _mix(_scale(from.style, fromSize, fromSize, 1.0f), _scale(to.style, toSize, fromSize, 1.0f),
+                      progress);
     auto first = _scale(from.center, fromSize, fromSize);
     auto second = _scale(to.center, toSize, fromSize);
     auto center = first + (second - first) * progress;
@@ -289,6 +265,25 @@ static Result _blend(DisplayList& list, const DrawCommand& from, const DrawComma
     auto layer = bounded < 0.5f ? from.layer : to.layer;
     auto depth = _mix(from.depth, to.depth, progress);
     switch (from.type) {
+        case CommandType::Path: {
+            // Both paths are sampled evenly along them, a closed one from where the samples of
+            // the other lie nearest, and each sample moves toward its counterpart.
+            Vec2 points[BLEND_SAMPLES];
+            Vec2 targets[BLEND_SAMPLES];
+            if (!_sample(from, fromSize, fromSize, points, BLEND_SAMPLES)
+                || !_sample(to, toSize, fromSize, targets, BLEND_SAMPLES)) {
+                return Result::NonSupport;
+            }
+            auto offset = 0u;
+            auto reverse = false;
+            if (from.closed) _align(points, targets, BLEND_SAMPLES, offset, reverse);
+            for (auto i = 0u; i < BLEND_SAMPLES; i++) {
+                auto target = from.closed ? _target(i, offset, reverse, BLEND_SAMPLES) : i;
+                points[i] = points[i] + (targets[target] - points[i]) * progress;
+            }
+            return list.path(points, BLEND_SAMPLES, from.closed, style, layer, depth,
+                             bounded < 0.5f ? from.cap : to.cap);
+        }
         case CommandType::Circle:
             return list.circle(center, _mix(from.radius, to.radius * factor, bounded),
                                style, layer, depth);
@@ -356,33 +351,24 @@ Result DisplayList::blend(const DisplayList& from, const DisplayList& to,
         || toSize.x <= 0.0f || toSize.y <= 0.0f || !std::isfinite(progress)) {
         return Result::InvalidArguments;
     }
-    auto fromSpans = fromObjects ? new (std::nothrow) CommandSpan[fromObjects] : nullptr;
-    auto toSpans = toObjects ? new (std::nothrow) CommandSpan[toObjects] : nullptr;
-    auto morphed = toObjects ? new (std::nothrow) bool[toObjects] : nullptr;
-    auto counterparts = toObjects ? new (std::nothrow) const Object*[toObjects] : nullptr;
-    if ((fromObjects && !fromSpans)
-        || (toObjects && (!toSpans || !morphed || !counterparts))) {
-        delete[] fromSpans;
-        delete[] toSpans;
-        delete[] morphed;
-        delete[] counterparts;
-        return Result::OutOfMemory;
-    }
-    for (auto i = 0u; i < toObjects; i++) {
-        morphed[i] = false;
-        counterparts[i] = nullptr;
-    }
+    auto fromSpans = std::unique_ptr<CommandSpan[]>(new (std::nothrow) CommandSpan[fromObjects]);
+    auto toSpans = std::unique_ptr<CommandSpan[]>(new (std::nothrow) CommandSpan[toObjects]);
+    if (!fromSpans || !toSpans) return Result::OutOfMemory;
     auto spans = [](const DisplayList& list, CommandSpan* output, uint32_t size) {
         for (auto i = 0u; i < list.count; i++) {
-            auto id = list.commands[i].object ? list.commands[i].object->id() : 0u;
+            auto object = list.commands[i].object;
+            auto id = object ? object->id() : 0u;
             if (!id || id > size) continue;
             auto& span = output[id - 1u];
-            if (!span.count) span.begin = i;
+            if (!span.count) {
+                span.object = object;
+                span.begin = i;
+            }
             span.count++;
         }
     };
-    spans(from, fromSpans, fromObjects);
-    spans(to, toSpans, toObjects);
+    spans(from, fromSpans.get(), fromObjects);
+    spans(to, toSpans.get(), toObjects);
 
     auto layers = [this](const DisplayList& input) {
         auto offset = layerCount;
@@ -405,57 +391,40 @@ Result DisplayList::blend(const DisplayList& from, const DisplayList& to,
     auto offset = from.layerCount;
     if (!layers(from) || !layers(to)) result = Result::OutOfMemory;
     auto bounded = _clamp(progress);
+    // A failure stops both loops, so what they leave in the spans is never read.
     for (auto i = 0u; result == Result::Success && i < fromObjects; i++) {
-        auto target = matches[i];
-        if (target < toObjects && _compatible(from, fromSpans[i], to, toSpans[target])) {
-            for (auto j = 0u; (parts & BLEND_MATCHED) && j < fromSpans[i].count; j++) {
-                result = _blend(*this, from.commands[fromSpans[i].begin + j],
-                                to.commands[toSpans[target].begin + j],
+        auto& source = fromSpans[i];
+        auto target = matches[i] < toObjects ? &toSpans[matches[i]] : nullptr;
+        if (target && _compatible(from, source, to, *target)) {
+            target->morphed = true;
+            if (!(parts & BLEND_MATCHED)) continue;
+            for (auto j = 0u; result == Result::Success && j < source.count; j++) {
+                result = _blend(*this, from.commands[source.begin + j], to.commands[target->begin + j],
                                 fromSize, toSize, progress);
-                if (result != Result::Success) break;
             }
-            if (result == Result::Success) morphed[target] = true;
-        } else if (target < toObjects && text(from, fromSpans[i])
-                   && text(to, toSpans[target])) {
-            if (!(parts & BLEND_MATCHED)) {
-                morphed[target] = true;
-                continue;
-            }
-            auto outgoing = _clamp(1.0f - bounded * 2.0f);
-            auto incoming = _clamp(bounded * 2.0f - 1.0f);
-            auto fromObject = fromSpans[i].count
-                            ? from.commands[fromSpans[i].begin].object : nullptr;
-            auto toObject = toSpans[target].count
-                          ? to.commands[toSpans[target].begin].object : nullptr;
-            result = _copy(*this, from, fromSpans[i], fromSize, fromSize, outgoing,
-                           LayoutVisualKind::FadeOut, toObject);
+        } else if (target && text(from, source) && text(to, *target)) {
+            // Texts that differ cross-fade, the outgoing one out by halfway and the incoming one in after.
+            target->morphed = true;
+            if (!(parts & BLEND_MATCHED)) continue;
+            result = _copy(*this, from, source, fromSize, fromSize, _clamp(1.0f - bounded * 2.0f),
+                           LayoutVisualKind::FadeOut, target->object);
             if (result == Result::Success) {
-                result = _copy(*this, to, toSpans[target], toSize, fromSize, incoming,
-                               LayoutVisualKind::FadeIn, fromObject, offset);
+                result = _copy(*this, to, *target, toSize, fromSize, _clamp(bounded * 2.0f - 1.0f),
+                               LayoutVisualKind::FadeIn, source.object, offset);
             }
-            if (result == Result::Success) morphed[target] = true;
         } else {
-            auto counterpart = target < toObjects && toSpans[target].count
-                             ? to.commands[toSpans[target].begin].object : nullptr;
             if (parts & BLEND_FROM) {
-                result = _copy(*this, from, fromSpans[i], fromSize, fromSize,
-                               1.0f - bounded, LayoutVisualKind::FadeOut, counterpart);
+                result = _copy(*this, from, source, fromSize, fromSize, 1.0f - bounded,
+                               LayoutVisualKind::FadeOut, target ? target->object : nullptr);
             }
-            if (target < toObjects) {
-                counterparts[target] = fromSpans[i].count
-                                     ? from.commands[fromSpans[i].begin].object : nullptr;
-            }
+            if (target) target->counterpart = source.object;
         }
     }
     for (auto i = 0u; result == Result::Success && (parts & BLEND_TO) && i < toObjects; i++) {
-        if (morphed[i]) continue;
-        result = _copy(*this, to, toSpans[i], toSize, fromSize, bounded,
-                       LayoutVisualKind::FadeIn, counterparts[i], offset);
+        if (toSpans[i].morphed) continue;
+        result = _copy(*this, to, toSpans[i], toSize, fromSize, bounded, LayoutVisualKind::FadeIn,
+                       toSpans[i].counterpart, offset);
     }
-    delete[] fromSpans;
-    delete[] toSpans;
-    delete[] morphed;
-    delete[] counterparts;
     object = nullptr;
     counterpart = nullptr;
     composite = 0u;

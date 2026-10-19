@@ -1,19 +1,19 @@
-#include <algorithm>
-#include <cmath>
-#include <cstring>
-#include <limits>
-#include <new>
-
-#include "vis.h"
-#include "visDisplayList.h"
-#include "../common/visGrow.h"
-#include "../common/visSort.h"
-
 // DisplayList::split(): the painter's order of a 3D scene sorts every drawing as one piece, so a
 // stroke partly behind a surface would draw wholly in front of it or wholly behind it. split()
 // tests each stroke against the faces under it every few pixels, as a depth buffer would at that
 // resolution, and gives it the depth that draws it after the faces it lies in front of and before
 // the faces that hide it, cutting it only where no one depth does.
+#include <algorithm>
+#include <cmath>
+#include <cstring>
+#include <limits>
+#include <new>
+#include <utility>
+
+#include "vis.h"
+#include "visDisplayList.h"
+#include "../common/visGrow.h"
+#include "../common/visSort.h"
 
 namespace vis
 {
@@ -65,7 +65,7 @@ struct DepthGroup
     uint32_t* faces = nullptr;
     Vec2 min;
     Vec2 max;
-    Vec2 origin;
+    // The side of a cell of the grid, which starts at min, in pixels.
     float cell = 1.0f;
     uint32_t columns = 0;
     uint32_t rows = 0;
@@ -73,6 +73,20 @@ struct DepthGroup
     uint32_t* items = nullptr;
     bool indexed = false;
     bool failed = false;
+
+    // The columns x0 to x1 and the rows y0 to y1 of the cells that the box from low to high
+    // covers, kept inside the grid.
+    void span(const Vec2& low, const Vec2& high, uint32_t& x0, uint32_t& x1, uint32_t& y0, uint32_t& y1) const
+    {
+        auto at = [this](float value, float origin, uint32_t cells) {
+            auto index = std::fmax((value - origin) / cell, 0.0f);
+            return std::min(static_cast<uint32_t>(std::fmin(index, 1e9f)), cells - 1u);
+        };
+        x0 = at(low.x, min.x, columns);
+        x1 = at(high.x, min.x, columns);
+        y0 = at(low.y, min.y, rows);
+        y1 = at(high.y, min.y, rows);
+    }
 };
 
 // The keys a drawing may take at a point: above lo, the largest key among the faces in front
@@ -107,8 +121,6 @@ struct DepthRun
 struct DepthCamera
 {
     bool perspective = false;
-    double near = 0.0;
-    double far = 1.0;
     // The world units a pixel spans at a distance of 1 from a perspective camera, or anywhere
     // before an orthographic one.
     double pixel = 0.0;
@@ -202,6 +214,17 @@ struct DepthLine
     }
 };
 
+// What split() does to one command: nothing, a new key and layer, or a cut into runs.
+struct DepthPlan
+{
+    uint32_t first = 0;
+    uint32_t count = 0;
+    float key = 0.0f;
+    int32_t layer = 0;
+    bool moved = false;
+    bool lifted = false;
+};
+
 struct DepthState
 {
     DepthCamera camera;
@@ -214,6 +237,12 @@ struct DepthState
     uint32_t groupCount = 0;
     // The faces near the point _range() tests, one for each face at most, and room to sort them.
     DepthVote* votes = nullptr;
+    // The plan of each command, the runs of the strokes they cut, and room for the pieces of one.
+    DepthPlan* plans = nullptr;
+    DepthRun* runs = nullptr;
+    uint32_t runCount = 0;
+    uint32_t runCapacity = 0;
+    DepthRun* pieces = nullptr;
 
     DepthState() = default;
     DepthState(const DepthState&) = delete;
@@ -229,9 +258,12 @@ struct DepthState
         delete[] stamps;
         delete[] groups;
         delete[] votes;
+        delete[] plans;
+        delete[] runs;
+        delete[] pieces;
     }
 
-    const DepthGroup* find(uint32_t composite, int32_t layer) const
+    DepthGroup* find(uint32_t composite, int32_t layer)
     {
         for (auto i = 0u; i < groupCount; i++) {
             if (groups[i].composite == composite && groups[i].layer == layer) return groups + i;
@@ -312,27 +344,22 @@ bool _index(DepthState& state, DepthGroup& group)
     group.failed = true;
     auto width = std::fmax(group.max.x - group.min.x, 1.0f);
     auto height = std::fmax(group.max.y - group.min.y, 1.0f);
-    auto cell = std::fmax(4.0f, 2.0f * std::sqrt(width * height / static_cast<float>(group.count)));
-    cell = std::fmax(cell, std::fmax(width, height) / 256.0f);
-    if (!std::isfinite(cell)) return false;
+    group.cell = std::fmax(4.0f, 2.0f * std::sqrt(width * height / static_cast<float>(group.count)));
+    group.cell = std::fmax(group.cell, std::fmax(width, height) / 256.0f);
+    if (!std::isfinite(group.cell)) return false;
     uint64_t items = 0;
-    auto cellOf = [&](float value, float origin) {
-        return static_cast<uint32_t>(std::fmax((value - origin) / cell, 0.0f));
-    };
     for (auto attempt = 0u; attempt < 16u; attempt++) {
-        group.columns = static_cast<uint32_t>(width / cell) + 1u;
-        group.rows = static_cast<uint32_t>(height / cell) + 1u;
+        group.columns = static_cast<uint32_t>(width / group.cell) + 1u;
+        group.rows = static_cast<uint32_t>(height / group.cell) + 1u;
         items = 0;
         for (auto i = 0u; i < group.count; i++) {
             auto& face = state.faces[group.faces[i]];
-            auto x0 = std::min(cellOf(face.min.x, group.min.x), group.columns - 1u);
-            auto x1 = std::min(cellOf(face.max.x, group.min.x), group.columns - 1u);
-            auto y0 = std::min(cellOf(face.min.y, group.min.y), group.rows - 1u);
-            auto y1 = std::min(cellOf(face.max.y, group.min.y), group.rows - 1u);
+            uint32_t x0, x1, y0, y1;
+            group.span(face.min, face.max, x0, x1, y0, y1);
             items += static_cast<uint64_t>(x1 - x0 + 1u) * (y1 - y0 + 1u);
         }
         if (items <= GRID_ITEMS) break;
-        cell *= 2.0f;
+        group.cell *= 2.0f;
     }
     if (items > GRID_ITEMS) return false;
     auto cells = group.columns * group.rows;
@@ -343,10 +370,8 @@ bool _index(DepthState& state, DepthGroup& group)
     auto visit = [&](auto&& each) {
         for (auto i = 0u; i < group.count; i++) {
             auto& face = state.faces[group.faces[i]];
-            auto x0 = std::min(cellOf(face.min.x, group.min.x), group.columns - 1u);
-            auto x1 = std::min(cellOf(face.max.x, group.min.x), group.columns - 1u);
-            auto y0 = std::min(cellOf(face.min.y, group.min.y), group.rows - 1u);
-            auto y1 = std::min(cellOf(face.max.y, group.min.y), group.rows - 1u);
+            uint32_t x0, x1, y0, y1;
+            group.span(face.min, face.max, x0, x1, y0, y1);
             for (auto y = y0; y <= y1; y++) {
                 for (auto x = x0; x <= x1; x++) each(y * group.columns + x, group.faces[i]);
             }
@@ -359,8 +384,6 @@ bool _index(DepthState& state, DepthGroup& group)
     for (auto i = 0u; i < cells; i++) filled[i] = group.starts[i];
     visit([&](uint32_t cellIndex, uint32_t face) { group.items[filled[cellIndex]++] = face; });
     delete[] filled;
-    group.origin = group.min;
-    group.cell = cell;
     group.indexed = true;
     group.failed = false;
     return true;
@@ -385,14 +408,8 @@ DepthRange _range(DepthState& state, const DepthGroup& group, const Vec2& p, flo
     }
     auto distance = state.camera.distance(measure);
     if (!std::isfinite(distance) || distance <= 0.0) return range;
-    auto cellOf = [&](float value, float origin, uint32_t cells) {
-        auto index = std::fmax((value - origin) / group.cell, 0.0f);
-        return std::min(static_cast<uint32_t>(std::fmin(index, 1e9f)), cells - 1u);
-    };
-    auto x0 = cellOf(p.x - radius, group.origin.x, group.columns);
-    auto x1 = cellOf(p.x + radius, group.origin.x, group.columns);
-    auto y0 = cellOf(p.y - radius, group.origin.y, group.rows);
-    auto y1 = cellOf(p.y + radius, group.origin.y, group.rows);
+    uint32_t x0, x1, y0, y1;
+    group.span({p.x - radius, p.y - radius}, {p.x + radius, p.y + radius}, x0, x1, y0, y1);
     auto stamp = ++state.stamp;
     for (auto y = y0; y <= y1; y++) {
         for (auto x = x0; x <= x1; x++) {
@@ -515,9 +532,9 @@ float _snap(const Style& style, float position, float reach)
 uint32_t _runs(DepthState& state, const DepthGroup& group, const DrawCommand& command,
                const DepthLine& line, bool lifted, DepthRun* runs, uint32_t limit)
 {
-    auto steps = static_cast<uint32_t>(std::ceil(line.total / SPACING));
-    if (steps > SAMPLES) steps = SAMPLES;
-    if (steps < 1u) steps = 1u;
+    // At least one test, the line being longer than SHORTEST, and at most SAMPLES, bounded
+    // before the cast, which a line too long for uint32_t to count its tests would overflow.
+    auto steps = static_cast<uint32_t>(std::fmin(std::ceil(line.total / SPACING), static_cast<float>(SAMPLES)));
     auto spacing = line.total / static_cast<float>(steps);
     auto radius = command.style.width * 0.5f + spacing * 0.5f + 0.75f;
     auto sample = [&](float position) {
@@ -590,80 +607,20 @@ uint32_t _tidy(DepthRun* runs, uint32_t count)
     return kept;
 }
 
-// Fixes the explicit geometry of a gradient on the pieces of a stroke where the renderer would
-// derive it from the whole stroke, so the gradient runs across the pieces as it did across it.
-void _pin(Style& style, const DrawCommand& whole)
-{
-    auto& gradient = style.gradient;
-    if (!gradient.enabled()) return;
-    Vec2 min = whole.points[0];
-    Vec2 max = whole.points[0];
-    for (auto i = 1u; i < whole.count; i++) {
-        min.x = std::fmin(min.x, whole.points[i].x);
-        min.y = std::fmin(min.y, whole.points[i].y);
-        max.x = std::fmax(max.x, whole.points[i].x);
-        max.y = std::fmax(max.y, whole.points[i].y);
-    }
-    if (gradient.type == GradientType::Linear && !gradient.line) {
-        Vec2 from;
-        Vec2 to;
-        if (!whole.closed && whole.count > 1u) {
-            from = whole.points[0];
-            to = whole.points[whole.count - 1u];
-        }
-        if (whole.closed || (std::fabs(to.x - from.x) < 1e-6f && std::fabs(to.y - from.y) < 1e-6f)) {
-            from = min;
-            to = max;
-        }
-        if (std::fabs(to.x - from.x) < 1e-6f && std::fabs(to.y - from.y) < 1e-6f) to.x = from.x + 1.0f;
-        gradient.from = {from.x, from.y, 0.0f};
-        gradient.to = {to.x, to.y, 0.0f};
-        gradient.line = true;
-    }
-    if (gradient.type == GradientType::Radial || gradient.type == GradientType::Conic) {
-        if (!gradient.centered) {
-            gradient.center = {(min.x + max.x) * 0.5f, (min.y + max.y) * 0.5f, 0.0f};
-            gradient.centered = true;
-        }
-        if (gradient.type == GradientType::Radial && !gradient.sized) {
-            auto radius = (max - min).length() * 0.5f;
-            gradient.radius = radius < 1e-3f ? 1.0f : radius;
-            gradient.sized = true;
-        }
-    }
-}
-
+// The box a command draws in: a path's points, half its stroke and a pixel around them, or the
+// reach of a point or a number around its center.
 void _box(const DrawCommand& command, Vec2& min, Vec2& max)
 {
-    if (command.type != CommandType::Path) {
-        auto reach = command.type == CommandType::Circle ? command.radius + command.style.width * 0.5f
-                                                         : command.size;
-        min = {command.center.x - reach, command.center.y - reach};
-        max = {command.center.x + reach, command.center.y + reach};
-        return;
-    }
-    min = max = command.points[0];
-    for (auto i = 1u; i < command.count; i++) {
-        min.x = std::fmin(min.x, command.points[i].x);
-        min.y = std::fmin(min.y, command.points[i].y);
-        max.x = std::fmax(max.x, command.points[i].x);
-        max.y = std::fmax(max.y, command.points[i].y);
-    }
     auto reach = command.style.width * 0.5f + 1.0f;
+    if (command.type == CommandType::Path) {
+        extent(command.points, command.count, min, max);
+    } else {
+        min = max = command.center;
+        reach = command.type == CommandType::Circle ? command.radius + command.style.width * 0.5f : command.size;
+    }
     min = {min.x - reach, min.y - reach};
     max = {max.x + reach, max.y + reach};
 }
-
-// What split() does to one command: nothing, a new key and layer, or a cut into runs.
-struct DepthPlan
-{
-    uint32_t first = 0;
-    uint32_t count = 0;
-    float key = 0.0f;
-    int32_t layer = 0;
-    bool moved = false;
-    bool lifted = false;
-};
 
 }  // namespace
 
@@ -678,12 +635,10 @@ Result DisplayList::split(const Config& config) noexcept
 
     auto& camera = config.camera;
     state.camera.perspective = camera.projection == Projection::Perspective;
-    state.camera.near = camera.near;
-    state.camera.far = camera.far;
     state.camera.pixel = state.camera.perspective
                        ? 2.0 * std::tan(static_cast<double>(camera.fov) * 0.5) / config.height
                        : static_cast<double>(camera.orthoHeight) / config.height;
-    if (!(state.camera.far > state.camera.near) || !std::isfinite(state.camera.pixel)) return Result::Success;
+    if (!(camera.far > camera.near) || !std::isfinite(state.camera.pixel)) return Result::Success;
 
     // The faces, gathered by the layer and the composite they draw in.
     state.faces = new (std::nothrow) DepthFace[state.faceCount];
@@ -697,19 +652,15 @@ Result DisplayList::split(const Config& config) noexcept
         auto& command = commands[i];
         if (!_face(command)) continue;
         auto& face = state.faces[faceIndex];
-        face.min = face.max = command.points[0];
         for (auto j = 0u; j < 4u; j++) {
             face.points[j] = command.points[j];
             face.depths[j] = command.depths[j];
-            face.min.x = std::fmin(face.min.x, command.points[j].x);
-            face.min.y = std::fmin(face.min.y, command.points[j].y);
-            face.max.x = std::fmax(face.max.x, command.points[j].x);
-            face.max.y = std::fmax(face.max.y, command.points[j].y);
         }
+        extent(face.points, 4u, face.min, face.max);
         face.key = command.depth;
         face.size = std::fmax((face.points[2] - face.points[0]).length(), (face.points[3] - face.points[1]).length());
         state.stamps[faceIndex] = 0u;
-        auto group = const_cast<DepthGroup*>(state.find(command.composite, command.layer));
+        auto group = state.find(command.composite, command.layer);
         if (!group) {
             group = state.groups + state.groupCount++;
             group->composite = command.composite;
@@ -733,25 +684,17 @@ Result DisplayList::split(const Config& config) noexcept
     for (auto i = 0u; i < count; i++) {
         auto& command = commands[i];
         if (!_face(command)) continue;
-        auto group = const_cast<DepthGroup*>(state.find(command.composite, command.layer));
+        auto group = state.find(command.composite, command.layer);
         group->faces[group->count++] = faceIndex++;
     }
 
     // What becomes of each drawing a surface of its layer overlaps.
-    auto plans = new (std::nothrow) DepthPlan[count];
-    auto runs = new (std::nothrow) DepthRun[PIECES];
-    if (!plans || !runs) {
-        delete[] plans;
-        delete[] runs;
-        return Result::OutOfMemory;
-    }
-    DepthRun* allRuns = nullptr;
-    auto allCount = 0u;
-    auto allCapacity = 0u;
+    state.plans = new (std::nothrow) DepthPlan[count];
+    state.pieces = new (std::nothrow) DepthRun[PIECES];
+    if (!state.plans || !state.pieces) return Result::OutOfMemory;
     auto added = 0u;
     auto changed = false;
-    auto result = Result::Success;
-    for (auto i = 0u; i < count && result == Result::Success; i++) {
+    for (auto i = 0u; i < count; i++) {
         auto& command = commands[i];
         if (!command.depths || _face(command)
             || (command.object && command.object->type() == Type::SurfaceMesh)) {
@@ -775,7 +718,7 @@ Result DisplayList::split(const Config& config) noexcept
         if (max.x < group->min.x || min.x > group->max.x || max.y < group->min.y || min.y > group->max.y) {
             continue;
         }
-        if (!_index(state, const_cast<DepthGroup&>(*group))) continue;
+        if (!_index(state, *group)) continue;
         auto lowered = lifted
                      ? static_cast<int32_t>(static_cast<int64_t>(command.layer) - command.lift)
                      : command.layer;
@@ -806,16 +749,17 @@ Result DisplayList::split(const Config& config) noexcept
             if (lifted && !range.hidden) continue;
             auto key = _pick(command.depth, range);
             if (key == command.depth && lowered == command.layer) continue;
-            plans[i] = {0u, 0u, key, lowered, true, lifted};
+            state.plans[i] = {0u, 0u, key, lowered, true, lifted};
             changed = true;
             continue;
         }
         if (command.style.width <= 0.0f || !command.style.stroke.a || command.ends) continue;
         DepthLine line;
         if (!line.make(command)) {
-            if (!line.points || !line.depths || !line.lengths) result = Result::OutOfMemory;
+            if (!line.points || !line.depths || !line.lengths) return Result::OutOfMemory;
             continue;
         }
+        auto runs = state.pieces;
         auto made = _runs(state, *group, command, line, lifted, runs, PIECES);
         // A closed stroke joins its last run to its first across the point it starts at, unless
         // a dash, which starts again there, would no longer fit.
@@ -838,65 +782,55 @@ Result DisplayList::split(const Config& config) noexcept
             auto key = lifted && !runs[0].lowered ? command.depth : _pick(command.depth, runs[0].range);
             auto layer = lifted && !runs[0].lowered ? command.layer : lowered;
             if (key == command.depth && layer == command.layer) continue;
-            plans[i] = {0u, 0u, key, layer, true, lifted};
+            state.plans[i] = {0u, 0u, key, layer, true, lifted};
             changed = true;
             continue;
         }
         if (added + made - 1u > ADDED || count + added + made - 1u > DISPLAY_COMMAND_LIMIT) continue;
-        if (!grow(allRuns, allCount, allCapacity, made, 64u)) {
-            result = Result::OutOfMemory;
-            break;
-        }
-        std::memcpy(allRuns + allCount, runs, sizeof(DepthRun) * made);
-        plans[i] = {allCount, made, command.depth, lowered, true, lifted};
-        allCount += made;
+        if (!grow(state.runs, state.runCount, state.runCapacity, made, 64u)) return Result::OutOfMemory;
+        std::memcpy(state.runs + state.runCount, runs, sizeof(DepthRun) * made);
+        state.plans[i] = {state.runCount, made, command.depth, lowered, true, lifted};
+        state.runCount += made;
         added += made - 1u;
         changed = true;
     }
-    delete[] runs;
-    if (result != Result::Success || !changed) {
-        delete[] plans;
-        delete[] allRuns;
-        return result;
-    }
+    if (!changed) return Result::Success;
 
-    // The list again, each cut stroke in its pieces where it stood, numbered in order.
-    auto total = count + added;
-    auto output = new (std::nothrow) DrawCommand[total];
-    if (!output) {
-        delete[] plans;
-        delete[] allRuns;
-        return Result::OutOfMemory;
-    }
-    auto written = 0u;
-    for (auto i = 0u; i < count && result == Result::Success; i++) {
+    // The list again, each cut stroke in its pieces where it stood, numbered in order. Output
+    // owns what it holds until it hands it over, so a failure frees what was written; commands
+    // not yet moved stay with the old array.
+    DisplayList output;
+    output.commands = new (std::nothrow) DrawCommand[count + added];
+    if (!output.commands) return Result::OutOfMemory;
+    output.capacity = count + added;
+    for (auto i = 0u; i < count; i++) {
         auto& command = commands[i];
-        auto& plan = plans[i];
+        auto& plan = state.plans[i];
         if (!plan.moved || !plan.count) {
-            output[written] = command;
+            auto& kept = output.commands[output.count];
+            kept = command;
             if (plan.moved) {
-                output[written].depth = plan.key;
-                output[written].layer = plan.layer;
-                output[written].piece = 1u;
-                output[written].whole = command.depth;
+                kept.depth = plan.key;
+                kept.layer = plan.layer;
+                kept.piece = 1u;
+                kept.whole = command.depth;
             }
+            kept.order = output.count++;
             command.points = nullptr;
             command.ends = nullptr;
             command.buffer = nullptr;
             command.depths = nullptr;
-            output[written].order = written;
-            written++;
             continue;
         }
         DepthLine line;
-        if (!line.make(command)) {
-            result = Result::OutOfMemory;
-            break;
-        }
+        if (!line.make(command)) return Result::OutOfMemory;
+        // The pieces keep the gradient of the whole stroke, fixed where the renderer would
+        // derive it from each piece.
+        placeGradient(command, command.style.gradient);
         auto opaque = command.style.stroke.a == 255u;
         auto dashed = command.style.dashCount > 0u;
         for (auto r = 0u; r < plan.count; r++) {
-            auto& run = allRuns[plan.first + r];
+            auto& run = state.runs[plan.first + r];
             auto start = run.start;
             auto end = run.end;
             auto cutStart = command.closed || r > 0u;
@@ -933,21 +867,15 @@ Result DisplayList::split(const Config& config) noexcept
                 wraps = true;
             }
             auto room = wraps ? line.count * 2u + 4u : line.count + 2u;
-            auto piece = output + written;
+            auto piece = output.commands + output.count;
             *piece = command;
+            piece->order = output.count++;
             piece->points = new (std::nothrow) Vec2[room];
             piece->depths = new (std::nothrow) float[room];
             piece->ends = nullptr;
             piece->contours = 0u;
             piece->buffer = nullptr;
-            if (!piece->points || !piece->depths) {
-                delete[] piece->points;
-                delete[] piece->depths;
-                piece->points = nullptr;
-                piece->depths = nullptr;
-                result = Result::OutOfMemory;
-                break;
-            }
+            if (!piece->points || !piece->depths) return Result::OutOfMemory;
             uint32_t n;
             if (!wraps) {
                 n = line.copy(start, end, piece->points, piece->depths);
@@ -961,37 +889,21 @@ Result DisplayList::split(const Config& config) noexcept
             piece->closed = false;
             piece->cap = cap;
             piece->style.dashOffset = command.style.dashOffset + start;
-            _pin(piece->style, command);
             auto down = !plan.lifted || run.lowered;
             piece->layer = down ? plan.layer : command.layer;
             piece->depth = down ? _pick(command.depth, run.range) : command.depth;
             piece->piece = r ? 2u : 1u;
             piece->whole = command.depth;
-            piece->order = written;
-            written++;
         }
         delete[] command.points;
         delete[] command.depths;
         command.points = nullptr;
         command.depths = nullptr;
     }
-    delete[] plans;
-    delete[] allRuns;
-    if (result != Result::Success) {
-        // Commands not yet moved stay with the old array; free what was written.
-        for (auto i = 0u; i < written; i++) {
-            delete[] output[i].points;
-            delete[] output[i].ends;
-            delete[] output[i].buffer;
-            delete[] output[i].depths;
-        }
-        delete[] output;
-        return result;
-    }
-    delete[] commands;
-    commands = output;
-    count = written;
-    capacity = total;
+    // Output takes the old array, which holds nothing now, and frees it.
+    std::swap(commands, output.commands);
+    std::swap(count, output.count);
+    std::swap(capacity, output.capacity);
     return Result::Success;
 }
 

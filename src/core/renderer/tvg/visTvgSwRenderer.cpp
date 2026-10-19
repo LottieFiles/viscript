@@ -282,14 +282,9 @@ struct RasterPresence
             || (command.object->type() != Type::Arrow
                 && command.object->type() != Type::Vector)) return true;
         auto matrix = transform ? *transform : tvg::Matrix{1, 0, 0, 0, 1, 0, 0, 0, 1};
-        Vec2 minimum = command.points[0];
-        Vec2 maximum = minimum;
-        for (auto i = 1u; i < command.count; i++) {
-            minimum.x = std::fmin(minimum.x, command.points[i].x);
-            minimum.y = std::fmin(minimum.y, command.points[i].y);
-            maximum.x = std::fmax(maximum.x, command.points[i].x);
-            maximum.y = std::fmax(maximum.y, command.points[i].y);
-        }
+        Vec2 minimum;
+        Vec2 maximum;
+        extent(command.points, command.count, minimum, maximum);
         if ((maximum.x - minimum.x) * matrix.e11 >= 1.0f
             || (maximum.y - minimum.y) * matrix.e22 >= 1.0f) return true;
 
@@ -508,16 +503,10 @@ static Result _layoutContour(const DrawCommand& command, uint32_t visual,
     auto count = end - first;
     auto points = new (std::nothrow) Vec2[count];
     if (!points) return Result::OutOfMemory;
-    auto minimum = _layoutMap(command.points[first], transform);
-    auto maximum = minimum;
-    points[0] = minimum;
-    for (auto i = 1u; i < count; i++) {
-        points[i] = _layoutMap(command.points[first + i], transform);
-        minimum.x = std::fmin(minimum.x, points[i].x);
-        minimum.y = std::fmin(minimum.y, points[i].y);
-        maximum.x = std::fmax(maximum.x, points[i].x);
-        maximum.y = std::fmax(maximum.y, points[i].y);
-    }
+    for (auto i = 0u; i < count; i++) points[i] = _layoutMap(command.points[first + i], transform);
+    Vec2 minimum;
+    Vec2 maximum;
+    extent(points, count, minimum, maximum);
     auto stroked = command.style.stroke.a && command.style.width > 0.0f;
     auto halfX = stroked ? command.style.width * transform.scaleX * 0.5f : 0.0f;
     auto halfY = stroked ? command.style.width * transform.scaleY * 0.5f : 0.0f;

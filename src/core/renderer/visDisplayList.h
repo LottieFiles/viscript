@@ -3,6 +3,8 @@
 #ifndef _VIS_DISPLAY_LIST_H_
 #define _VIS_DISPLAY_LIST_H_
 
+#include <cmath>
+
 #include "vis.h"
 
 namespace vis
@@ -128,6 +130,61 @@ struct DrawCommand
     PathCap cap = PathCap::Round;
     LayoutVisualKind visualKind = LayoutVisualKind::Stable;
 };
+
+// The box around count points, or a box of no size at the origin around none.
+static inline void extent(const Vec2* points, uint32_t count, Vec2& min, Vec2& max)
+{
+    min = max = count ? points[0] : Vec2{};
+    for (auto i = 1u; i < count; i++) {
+        min = {std::fmin(min.x, points[i].x), std::fmin(min.y, points[i].y)};
+        max = {std::fmax(max.x, points[i].x), std::fmax(max.y, points[i].y)};
+    }
+}
+
+// Fills in the geometry that the gradient of a path or circle command leaves to the shape, as
+// the renderers draw it (see Gradient): a linear gradient runs between the ends of an open path,
+// or else across the box around the shape, and a radial or conic one centers on the circle or
+// the box, a radial one reaching the circle or half the box's diagonal. A line of no length
+// runs one pixel to the right, and a radius under a thousandth of one is one.
+static inline void placeGradient(const DrawCommand& command, Gradient& gradient)
+{
+    if (!gradient.enabled()) return;
+    auto circle = command.type == CommandType::Circle;
+    Vec2 min{command.center.x - command.radius, command.center.y - command.radius};
+    Vec2 max{command.center.x + command.radius, command.center.y + command.radius};
+    if (!circle) extent(command.points, command.count, min, max);
+    if (gradient.type == GradientType::Linear) {
+        auto same = [](const Vec2& a, const Vec2& b) {
+            return std::fabs(b.x - a.x) < 1e-6f && std::fabs(b.y - a.y) < 1e-6f;
+        };
+        Vec2 from{gradient.from.x, gradient.from.y};
+        Vec2 to{gradient.to.x, gradient.to.y};
+        if (!gradient.line) {
+            auto open = !circle && !command.closed && command.count > 1u;
+            from = open ? command.points[0] : min;
+            to = open ? command.points[command.count - 1u] : max;
+            if (same(from, to)) {
+                from = min;
+                to = max;
+            }
+        }
+        if (same(from, to)) to.x = from.x + 1.0f;
+        gradient.from = {from.x, from.y, 0.0f};
+        gradient.to = {to.x, to.y, 0.0f};
+        gradient.line = true;
+        return;
+    }
+    if (!gradient.centered) {
+        auto center = circle ? command.center : Vec2{(min.x + max.x) * 0.5f, (min.y + max.y) * 0.5f};
+        gradient.center = {center.x, center.y, 0.0f};
+        gradient.centered = true;
+    }
+    if (gradient.type == GradientType::Radial) {
+        if (!gradient.sized) gradient.radius = circle ? command.radius : (max - min).length() * 0.5f;
+        if (gradient.radius < 1e-3f) gradient.radius = 1.0f;
+        gradient.sized = true;
+    }
+}
 
 static constexpr uint32_t DISPLAY_LAYER_LIMIT = 4096;
 

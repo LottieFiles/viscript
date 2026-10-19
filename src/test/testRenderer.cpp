@@ -1,8 +1,10 @@
 #include <cstdio>
 #include <cstring>
+#include <memory>
 #include <type_traits>
 
 #include "vis.h"
+#include "visDisplayList.h"
 #include "visLayoutJson.h"
 #include "testCheck.h"
 
@@ -142,6 +144,37 @@ static void _layoutJson()
     delete renderer;
 }
 
+// A stroke too long for uint32_t to count its depth tests, 2^34 pixels, which a 3D scene seen
+// up close may project, is still tested all along. Lifted over a surface, as an axis is, it
+// drops below the surface's layer only where a face hides it, so it splits in three.
+static void _depthSplitLength()
+{
+    const Vec3 grid[4] = {{0.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f, 0.0f}};
+    std::unique_ptr<SurfaceMesh> mesh(SurfaceMesh::gen(grid, 2u, 2u));
+    CHECK(mesh != nullptr);
+    if (!mesh) return;
+    DisplayList list;
+    Style face;
+    face.fill = {255, 255, 255, 255};
+    const Vec2 corners[4] = {{0.0f, 0.0f}, {100.0f, 0.0f}, {100.0f, 100.0f}, {0.0f, 100.0f}};
+    const float faceDepths[4] = {5.0f, 5.0f, 5.0f, 5.0f};
+    list.object = mesh.get();
+    CHECK(list.path(corners, 4u, true, face, 0, 5.0f, PathCap::Round, nullptr, 0u, faceDepths) == Result::Success);
+    const Vec2 ends[2] = {{-8589934592.0f, 50.0f}, {8589934592.0f, 50.0f}};
+    const float strokeDepths[2] = {10.0f, 10.0f};
+    list.object = nullptr;
+    list.lift = 1u;
+    CHECK(list.path(ends, 2u, false, Style{}, 1, 10.0f, PathCap::Round, nullptr, 0u, strokeDepths) == Result::Success);
+    Config config;
+    config.cameraView = CameraView::ThreeD;
+    CHECK(list.split(config) == Result::Success);
+    CHECK(list.count == 4u);
+    if (list.count != 4u) return;
+    auto& hidden = list.commands[2];
+    CHECK(list.commands[1].layer == 1 && hidden.layer == 0 && list.commands[3].layer == 1);
+    CHECK(hidden.points[0].x < 0.0f && hidden.points[hidden.count - 1u].x > 100.0f);
+}
+
 int main()
 {
     auto renderer = Renderer::gen();
@@ -157,6 +190,7 @@ int main()
     _savingArguments();
     _fontDiagnostics();
     _layoutJson();
+    _depthSplitLength();
 
     return report();
 }

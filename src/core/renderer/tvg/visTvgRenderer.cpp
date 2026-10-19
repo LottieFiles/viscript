@@ -54,45 +54,6 @@ static void _missingFont()
     std::snprintf(_reason, sizeof(_reason), "text needs a font, and none is loaded; load a .ttf or .otf file first");
 }
 
-static void _extent(const DrawCommand& command, Vec2& min, Vec2& max)
-{
-    if (command.type == CommandType::Circle) {
-        min = {command.center.x - command.radius, command.center.y - command.radius};
-        max = {command.center.x + command.radius, command.center.y + command.radius};
-        return;
-    }
-    min = max = command.count ? command.points[0] : Vec2{};
-    for (auto i = 1u; i < command.count; i++) {
-        min.x = std::fmin(min.x, command.points[i].x);
-        min.y = std::fmin(min.y, command.points[i].y);
-        max.x = std::fmax(max.x, command.points[i].x);
-        max.y = std::fmax(max.y, command.points[i].y);
-    }
-}
-
-static void _linearAxis(const DrawCommand& command, Vec2& from, Vec2& to)
-{
-    auto& gradient = command.style.gradient;
-    if (gradient.line) {
-        from = {gradient.from.x, gradient.from.y};
-        to = {gradient.to.x, gradient.to.y};
-    } else if (command.type == CommandType::Circle) {
-        _extent(command, from, to);
-    } else if (command.count) {
-        if (!command.closed && command.count > 1u) {
-            from = command.points[0];
-            to = command.points[command.count - 1u];
-        }
-        if (command.closed || (std::fabs(to.x - from.x) < 1e-6f
-                               && std::fabs(to.y - from.y) < 1e-6f)) {
-            _extent(command, from, to);
-        }
-    }
-    if (std::fabs(to.x - from.x) < 1e-6f && std::fabs(to.y - from.y) < 1e-6f) {
-        to.x = from.x + 1.0f;
-    }
-}
-
 static uint32_t _stops(const DrawCommand& command, Color paint,
                        tvg::Fill::ColorStop (&stops)[Gradient::StopLimit])
 {
@@ -133,26 +94,16 @@ struct FillSpec
 static void _spec(const DrawCommand& command, Color paint, FillSpec& spec)
 {
     std::memset(&spec, 0, sizeof(FillSpec));
-    auto& gradient = command.style.gradient;
     spec.count = _stops(command, paint, spec.stops);
-    Vec2 min;
-    Vec2 max;
-    _extent(command, min, max);
-    auto mid = Vec2{(min.x + max.x) * 0.5f, (min.y + max.y) * 0.5f};
-    auto center = gradient.centered ? Vec2{gradient.center.x, gradient.center.y}
-                  : command.type == CommandType::Circle ? command.center
-                                                        : mid;
+    auto gradient = command.style.gradient;
+    placeGradient(command, gradient);
     switch (gradient.type) {
         case GradientType::Radial: {
+            auto focal = gradient.focused ? gradient.focal : gradient.center;
             spec.type = GradientType::Radial;
-            auto radius = gradient.sized ? gradient.radius
-                          : command.type == CommandType::Circle ? command.radius
-                                                                : (max - min).length() * 0.5f;
-            if (radius < 1e-3f) radius = 1.0f;
-            auto focal = gradient.focused ? Vec2{gradient.focal.x, gradient.focal.y} : center;
-            spec.values[0] = center.x;
-            spec.values[1] = center.y;
-            spec.values[2] = radius;
+            spec.values[0] = gradient.center.x;
+            spec.values[1] = gradient.center.y;
+            spec.values[2] = gradient.radius;
             spec.values[3] = focal.x;
             spec.values[4] = focal.y;
             spec.values[5] = gradient.focalRadius;
@@ -160,20 +111,17 @@ static void _spec(const DrawCommand& command, Color paint, FillSpec& spec)
         }
         case GradientType::Conic: {
             spec.type = GradientType::Conic;
-            spec.values[0] = center.x;
-            spec.values[1] = center.y;
+            spec.values[0] = gradient.center.x;
+            spec.values[1] = gradient.center.y;
             spec.values[2] = gradient.angle;
             break;
         }
         default: {
             spec.type = GradientType::Linear;
-            Vec2 from;
-            Vec2 to;
-            _linearAxis(command, from, to);
-            spec.values[0] = from.x;
-            spec.values[1] = from.y;
-            spec.values[2] = to.x;
-            spec.values[3] = to.y;
+            spec.values[0] = gradient.from.x;
+            spec.values[1] = gradient.from.y;
+            spec.values[2] = gradient.to.x;
+            spec.values[3] = gradient.to.y;
             break;
         }
     }
