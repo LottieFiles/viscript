@@ -38,6 +38,18 @@ static inline vis::Scene* _loaded(const char* source, const char* name, vis::Lua
     return _loaded(source, name, context, resolver, resolverData);
 }
 
+// The scene the script file at path makes, with its assets resolved beside the file.
+static inline vis::Scene* _loadedFile(const char* path)
+{
+    char error[1024] = {};
+    vis::Scene* scene = nullptr;
+    vis::detail::LuaHostContext context;
+    auto status = vis::detail::luaHostLoadFile(path, &scene, error, sizeof(error), context);
+    CHECK(status == vis::Result::Success && scene);
+    if (status != vis::Result::Success) std::fprintf(stderr, "%s: %s\n", path, error);
+    return scene;
+}
+
 // The script must fail, and its message must name the script at the line.
 static inline void _error(const char* source, const char* name, vis::Lua::AssetResolver resolver = nullptr,
                           void* resolverData = nullptr)

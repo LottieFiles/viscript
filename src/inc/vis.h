@@ -228,8 +228,7 @@ enum struct ThemePreset : uint8_t
 {
     ProWhite = 0,
     ProBlack,
-    AdaptiveVscode,
-    Pro = ProWhite
+    AdaptiveVscode
 };
 
 enum struct ThemeColorRole : uint8_t
@@ -2420,7 +2419,6 @@ struct Lua
     // a runtime module retains it until scene destruction and seals authoring.
     // One load shares scene/object/clip/point budgets and separate 64 MiB Lua/native budgets.
     // Text-only source needs a returned owning root scene; bytecode is rejected.
-    static Result load(const char* path, Scene** scene, char* error, uint32_t errorSize) noexcept;
     static Result load(const char* source, uint32_t size, const char* name, Scene** scene,
                        char* error, uint32_t errorSize, AssetResolver resolver = nullptr,
                        void* resolverData = nullptr, const Theme* adaptiveTheme = nullptr,

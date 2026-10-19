@@ -100,15 +100,15 @@ const TRACKER_CLIP_LIMIT = 65536;
 const TRACKER_EPSILON = 1e-4;
 // Flush pending track samples before this budget is exceeded.
 const TRACKER_PENDING_LIMIT = 32768;
-const ROTATE_OPTIONS = ["about", "axis", "shift", "arc", "duration", "easing", "curve", "lag"];
-const ORBIT_OPTIONS = ["axis", "duration", "easing", "curve"];
-const FOCUS_OPTIONS = ["padding", "duration", "easing", "curve"];
+const ROTATE_OPTIONS = ["about", "axis", "shift", "arc", "duration", "curve", "lag"];
+const ORBIT_OPTIONS = ["axis", "duration", "curve"];
+const FOCUS_OPTIONS = ["padding", "duration", "curve"];
 const VIEW_OPTIONS = ["camera", "optical", "background", "opacity", "layer", "hide", "follow"];
 // Cap repeated rendering of the same scene through inset views.
 const VIEW_LIMIT = 8;
 const VIEW_HIDDEN_LIMIT = 256;
-const SCALE_OPTIONS = ["about", "shift", "arc", "duration", "easing", "curve", "lag"];
-const MOVE_ALONG_OPTIONS = ["from", "to", "orient", "duration", "easing", "curve", "lag"];
+const SCALE_OPTIONS = ["about", "shift", "arc", "duration", "curve", "lag"];
+const MOVE_ALONG_OPTIONS = ["from", "to", "orient", "duration", "curve", "lag"];
 const CREATE_DIRECTIONS = new Set(["forward", "reverse", "clockwise", "counterclockwise"]);
 // The sides an object grows from and a slide transition comes in from.
 const SIDES = new Set(["left", "right", "bottom", "top"]);
@@ -121,12 +121,12 @@ const FADE_OPTIONS = Object.freeze({
     shift: [0, 0, 0],
     scale: 1,
     duration: 1,
-    easing: "smooth",
+    curve: "smooth",
 });
 const MATCH_OPTIONS = Object.freeze(["arc", "lag", "pairs", "strings", "diff", "shapes", "fade", "copy", "path"]);
 const SEARCH_OPTIONS = Object.freeze(["match", "lines", "whole"]);
 const EDIT_OPTIONS = Object.freeze(["id", "arc", "lag", "fade"]);
-const HIGHLIGHT_OPTIONS = Object.freeze(["dim", "duration", "easing", "curve"]);
+const HIGHLIGHT_OPTIONS = Object.freeze(["dim", "duration", "curve"]);
 const WARP_OPTIONS = Object.freeze(["x_range", "y_range", "step"]);
 // Cap mapping samples to keep emitted Lua near one megabyte.
 const WARP_SAMPLE_LIMIT = 65536;
@@ -149,14 +149,14 @@ const INDICATE_OPTIONS = Object.freeze({
     color: "focus",
     scale: 1.2,
     duration: 1,
-    easing: "smooth",
+    curve: "smooth",
 });
 const WIGGLE_OPTIONS = Object.freeze({
     scale: 1.1,
     angle: 0.0628318531,
     swings: 6,
     duration: 2,
-    easing: "smooth",
+    curve: "smooth",
 });
 const CIRCUMSCRIBE_OPTIONS = Object.freeze({
     shape: "rectangle",
@@ -165,14 +165,14 @@ const CIRCUMSCRIBE_OPTIONS = Object.freeze({
     padding: 0.1,
     window: 0.3,
     duration: 1,
-    easing: "smooth",
+    curve: "smooth",
 });
 const PASSING_FLASH_OPTIONS = Object.freeze({
     color: "focus",
     width: 6,
     window: 0.3,
     duration: 1,
-    easing: "smooth",
+    curve: "smooth",
 });
 const FLASH_OPTIONS = Object.freeze({
     color: "focus",
@@ -181,7 +181,7 @@ const FLASH_OPTIONS = Object.freeze({
     size: 0.2,
     lines: 12,
     duration: 1,
-    easing: "smooth",
+    curve: "smooth",
 });
 const RIPPLE_OPTIONS = Object.freeze({
     color: "focus",
@@ -189,7 +189,7 @@ const RIPPLE_OPTIONS = Object.freeze({
     padding: 0,
     size: 0.4,
     duration: 1,
-    easing: "snappy",
+    curve: "snappy",
 });
 
 const SCENE_OWNERS = new WeakMap();
@@ -940,11 +940,8 @@ function _curveEase(value) {
 }
 
 function _timingValues(options, fallback = 1, zero = false, name = "Timing") {
-    if (Object.hasOwn(options, "easing") && Object.hasOwn(options, "curve")) {
-        throw new TypeError("Timing options must use either easing or curve, not both");
-    }
     const duration = options.duration === undefined ? fallback : options.duration;
-    const curve = options.curve ?? options.easing ?? "smooth";
+    const curve = options.curve ?? "smooth";
     const lag = options.lag === undefined ? 0 : options.lag;
     if (!Number.isFinite(duration) || (zero ? duration < 0 : duration <= 0)) {
         throw new RangeError(`${name} duration must be a finite ${zero ? "non-negative" : "positive"} number of seconds`);
@@ -958,7 +955,7 @@ function _timing(options, fallback = 1, stagger = false, zero = false, fields = 
     if (!_plain(options)) {
         throw new TypeError(`${name} options must be a plain object`);
     }
-    _known(options, ["duration", "curve", "easing", ...(stagger ? ["lag"] : []), ...fields], `Unknown ${name} option`);
+    _known(options, ["duration", "curve", ...(stagger ? ["lag"] : []), ...fields], `Unknown ${name} option`);
     return {..._timingValues(options, fallback, zero, name),
         options: Object.fromEntries(fields.filter((key) => Object.hasOwn(options, key)).map((key) => [key, options[key]]))};
 }
@@ -967,10 +964,9 @@ function _effectOptions(value, defaults, name, minimumScale) {
     if (!_plain(value)) {
         throw new TypeError(`${name} options must be a plain object`);
     }
-    _known(value, [...Object.keys(defaults), "curve"], `Unknown ${name} option`);
+    _known(value, Object.keys(defaults), `Unknown ${name} option`);
     _timingValues(value, defaults.duration, false, name);
     const options = { ...defaults, ...value };
-    if (Object.hasOwn(value, "curve")) delete options.easing;
     if (Object.hasOwn(defaults, "scale") && (!Number.isFinite(options.scale) || options.scale <= minimumScale)) {
         const comparison = minimumScale === 1 ? "greater than 1" : "positive";
         throw new RangeError(`${name} scale must be a finite ${comparison} number`);
@@ -2977,11 +2973,8 @@ export class SceneBuilder {
         if (!_plain(options)) {
             throw new TypeError("Scene transition options must be a plain object");
         }
-        const fields = ["duration", "hold", "live", "easing", "curve", "viewport", "styles"];
+        const fields = ["duration", "hold", "live", "curve", "viewport", "styles"];
         _known(options, [...fields, ...TRANSITION_STYLE_OPTIONS], "Unknown scene transition option");
-        if (Object.hasOwn(options, "easing") && Object.hasOwn(options, "curve")) {
-            throw new TypeError("Scene transition options must use either easing or curve, not both");
-        }
         const normalized = { ...options };
         if (Object.hasOwn(options, "styles")) {
             const single = TRANSITION_STYLE_OPTIONS.find((key) => Object.hasOwn(options, key));
@@ -3003,9 +2996,7 @@ export class SceneBuilder {
         }
         if (!Object.hasOwn(normalized, "duration")) normalized.duration = 1;
         if (!Object.hasOwn(normalized, "hold")) normalized.hold = 0;
-        if (!Object.hasOwn(normalized, "easing") && !Object.hasOwn(normalized, "curve")) {
-            normalized.easing = "smooth";
-        }
+        if (!Object.hasOwn(normalized, "curve")) normalized.curve = "smooth";
         if (!Number.isFinite(normalized.duration) || normalized.duration <= 0) {
             throw new RangeError("Scene transition duration must be a finite positive number");
         }
@@ -3506,9 +3497,6 @@ export class SceneBuilder {
         }
         if (options.duration !== undefined && !(Number.isFinite(options.duration) && options.duration > 0)) {
             throw new RangeError("Highlight duration must be a positive number of seconds");
-        }
-        if (options.easing !== undefined && options.curve !== undefined) {
-            throw new TypeError("Highlight takes easing or curve, not both");
         }
         const shape = "Highlight selects children by number, a handle, or a non-empty array of handles";
         const picked = [];

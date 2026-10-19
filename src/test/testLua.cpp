@@ -473,6 +473,15 @@ return scene
         CHECK(changed(surface, scene->config().background) > 2000);
     }
     delete scene;
+    // A picture's width is its size, not a stroke width.
+    scene = _loaded("local s=vis.scene{}; s:picture{pixels={'#fff'},size={1,1},width=3,id='sized'}; "
+                    "s:picture{pixels={'#fff'},size={1,1},id='plain'}; return s", "picture-width.lua");
+    if (scene) {
+        auto sized = static_cast<Picture*>(scene->object("sized"));
+        auto plain = scene->object("plain");
+        CHECK(sized && plain && sized->width == 3.0f && sized->style.width == plain->style.width);
+    }
+    delete scene;
 
     _error("local s=vis.scene{}; s:picture{asset='pixels',filter={}}; return s",
            "picture-filter.lua", _asset, asset);
@@ -652,13 +661,12 @@ int main()
     _error("local s=vis.scene{}; local r=s:rectangle{}; s:fade_out(r,{unknown=true}); return s", "fade-out-option.lua");
     _error("local s=vis.scene{}; local r=s:rectangle{}; s:fade_in(r,0.5); return s", "fade-in-options-type.lua");
     _error("local s=vis.scene{}; local r=s:rectangle{}; s:indicate(r,{scale=1}); return s", "indicate-scale.lua");
-    _error("local s=vis.scene{}; local r=s:rectangle{}; s:indicate(r,{easing='warp'}); return s", "indicate-easing.lua");
+    _error("local s=vis.scene{}; local r=s:rectangle{}; s:indicate(r,{curve='warp'}); return s", "indicate-curve.lua");
     _error("local s=vis.scene{}; local r=s:rectangle{}; s:shift(r,{1,0},1,{preset='back',strength=2.1}); return s", "curve-strength.lua");
     _error("local s=vis.scene{}; local r=s:rectangle{}; s:shift(r,{1,0},1,{preset='back',reverse=1}); return s", "curve-reverse.lua");
     _error("local s=vis.scene{}; local r=s:rectangle{}; s:shift(r,{1,0},1,'smooth'..string.char(0)..'x'); return s", "curve-zero.lua");
     _error("local s=vis.scene{}; local r=s:rectangle{}; s:shift(r,{1,0},1,{bezier={-0.1,0,1,1}}); return s", "curve-bezier-x.lua");
     _error("local s=vis.scene{}; local r=s:rectangle{}; s:shift(r,{1,0},1,{preset='back',bezier={0,0,1,1}}); return s", "curve-choice.lua");
-    _error("local s=vis.scene{}; local r=s:rectangle{}; s:fade_in(r,{easing='smooth',curve={preset='back'}}); return s", "curve-alias.lua");
     _error("local s=vis.scene{}; local r=s:rectangle{}; s:grow_from_center(r,0); return s", "grow-duration.lua");
     _error(R"lua(
 local s = vis.scene {}

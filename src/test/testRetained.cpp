@@ -6,7 +6,7 @@
 #include <cstring>
 
 #include "vis.h"
-#include "testCheck.h"
+#include "testLuaLoad.h"
 
 using namespace vis;
 
@@ -18,16 +18,11 @@ static const char* Scenes[] = {
 };
 static constexpr uint32_t SceneCount = sizeof(Scenes) / sizeof(Scenes[0]);
 
-static Scene* _load(const char* name)
+static Scene* _example(const char* name)
 {
     char path[1024];
     std::snprintf(path, sizeof(path), "%s/%s.lua", VIS_TEST_EXAMPLES, name);
-    char error[1024] = {};
-    Scene* scene = nullptr;
-    auto status = Lua::load(path, &scene, error, sizeof(error));
-    if (status != Result::Success) std::fprintf(stderr, "load %s: %s\n", path, error);
-    CHECK(status == Result::Success && scene);
-    return scene;
+    return _loadedFile(path);
 }
 
 static Renderer* _renderer()
@@ -66,7 +61,7 @@ static void _sequence()
     Surface surface;
     Scene* scenes[SceneCount] = {};
     for (auto i = 0u; i < SceneCount; i++)
-        scenes[i] = _load(Scenes[i]);
+        scenes[i] = _example(Scenes[i]);
 
     // Forward playback, then seeks backwards and at random, for every scene in turn
     // (each switch also changes the Scene the retained tree belongs to).
@@ -130,7 +125,7 @@ static void _sequence()
         if (!scenes[i]) continue;
         _frame(reused, surface, scenes[i], scenes[i]->duration() * 0.5f, Scenes[i]);
         delete scenes[i];
-        scenes[i] = _load(Scenes[(i + 1u) % SceneCount]);
+        scenes[i] = _example(Scenes[(i + 1u) % SceneCount]);
         if (scenes[i]) _frame(reused, surface, scenes[i], scenes[i]->duration() * 0.5f, "reload");
     }
 

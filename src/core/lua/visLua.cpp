@@ -560,7 +560,8 @@ static void _looks(lua_State* lua, Scene* scene, Object* object, int index)
     if (_has(lua, index, "width")) {
         auto width = _fieldNumber(lua, index, "width", object->style.width);
         if (width < 0.0f) luaL_error(lua, "width cannot be negative");
-        object->strokeWidth(width);
+        // A picture's width is its size, which its factory reads; it has no stroke.
+        if (object->type() != Type::Picture) object->strokeWidth(width);
     }
     object->style.radius = _fieldNumber(lua, index, "radius", object->style.radius);
     auto dashOffset = _fieldNumber(lua, index, "dash_offset", 0.0f);
@@ -3123,9 +3124,10 @@ static int _vector(lua_State* lua)
 static int _groupGen(lua_State* lua)
 {
     auto space = _factory(lua, {"matrix", "typeset"});
-    if (_has(lua, 2, "color") || _has(lua, 2, "radius") || _has(lua, 2, "dash")
-        || _has(lua, 2, "dash_offset")) {
-        return luaL_error(lua, "a group draws nothing itself, so color, radius, dash and dash_offset are unsupported; the stroke, fill and width it sets pass to the shapes below it");
+    for (auto shape : {"color", "radius", "dash", "dash_offset"}) {
+        if (_has(lua, 2, shape)) {
+            return luaL_error(lua, "a group draws nothing itself, so color, radius, dash and dash_offset are unsupported; the stroke, fill and width it sets pass to the shapes below it");
+        }
     }
     auto typeset = _fieldBool(lua, 2, "typeset", false);
     auto owner = _owner(lua, space.scene);
@@ -3170,7 +3172,7 @@ static Vec3 _spaceTicks(lua_State* lua, int index, const Space* space)
     return ticks;
 }
 
-// The labels of a space, from the labels option or space:labels{...} at index: x, y and z list
+// The labels of a space, from space:labels{...}, the table at index: x, y and z list
 // {value, label} pairs, each label a string, which becomes a text below the space in the size
 // and color of its numbers unless size and color say otherwise, or the handle of an object of
 // the scene. Each goes beside the tick at its value, gap pixels past it, on the side side names
@@ -3179,7 +3181,6 @@ static void _spaceLabels(lua_State* lua, LuaScene* scene, Space* space, int inde
 {
     static constexpr auto SIDE = "labels side must be {x = 'below' or 'above', y = 'left' or 'right', z = 'left' or 'right'}";
     index = lua_absindex(lua, index);
-    if (!lua_istable(lua, index)) luaL_error(lua, "labels must be a table of x, y and z lists of {value, label}");
     _options(lua, index, {"x", "y", "z", "gap", "size", "color", "side", "placement"}, false);
     static constexpr LuaName<bool> PLACEMENTS[] = {{"world", false}, {"screen", true}};
     auto screen = _fieldEnum(lua, index, "placement", false, PLACEMENTS, "labels placement");
@@ -3288,7 +3289,7 @@ static int _labelsMethod(lua_State* lua)
 static int _spaceGen(lua_State* lua)
 {
     auto space = _factory(lua, {"x", "y", "z", "matrix", "axis_x", "axis_y", "axis_z", "numbers", "number_mode",
-                                "number_size", "number_color", "ticks", "tick_length", "labels", "axis_width"});
+                                "number_size", "number_color", "ticks", "tick_length", "axis_width"});
     auto x = _fieldRange(lua, 2, "x", {});
     auto y = _fieldRange(lua, 2, "y", {});
     auto z = _fieldRange(lua, 2, "z", {});
@@ -3318,12 +3319,7 @@ static int _spaceGen(lua_State* lua)
         object->tickLength = _fieldNumber(lua, 2, "tick_length", object->tickLength);
         if (object->tickLength < 0.0f) return luaL_error(lua, "tick_length must be zero or more pixels");
     }
-    _add(lua, space, owner, object, 2, "space");
-    auto handle = lua_gettop(lua);
-    lua_getfield(lua, 2, "labels");
-    if (!lua_isnil(lua, -1)) _spaceLabels(lua, space.scene, object, -1);
-    lua_settop(lua, handle);
-    return 1;
+    return _add(lua, space, owner, object, 2, "space");
 }
 
 // ---------- Circles, arcs, angles and polygons ----------
@@ -5498,10 +5494,10 @@ static const char* _assetReason(Result result)
 static int _picture(lua_State* lua)
 {
     auto space = _factory(lua, {"asset", "pixels", "size", "center", "filter"});
-    if (_has(lua, 2, "color") || _has(lua, 2, "stroke") || _has(lua, 2, "fill")
-        || _has(lua, 2, "radius") || _has(lua, 2, "dash")
-        || _has(lua, 2, "dash_offset")) {
-        return luaL_error(lua, "picture preserves source colors; color, stroke, fill, radius, dash and dash_offset are unsupported");
+    for (auto shape : {"color", "stroke", "fill", "radius", "dash", "dash_offset"}) {
+        if (_has(lua, 2, shape)) {
+            return luaL_error(lua, "picture preserves source colors; color, stroke, fill, radius, dash and dash_offset are unsupported");
+        }
     }
     auto hasAsset = _has(lua, 2, "asset");
     auto hasPixels = _has(lua, 2, "pixels");
@@ -5574,10 +5570,10 @@ static int _cell(lua_State* lua)
 {
     auto space = _factory(lua, {"origin", "size", "mode", "padding", "depth", "texture", "source", "destination",
                                 "patches"});
-    if (_has(lua, 2, "stroke") || _has(lua, 2, "fill") || _has(lua, 2, "width")
-        || _has(lua, 2, "radius") || _has(lua, 2, "dash")
-        || _has(lua, 2, "dash_offset")) {
-        return luaL_error(lua, "cell uses color, texture and patches; stroke, fill, width, radius, dash and dash_offset are unsupported");
+    for (auto shape : {"stroke", "fill", "width", "radius", "dash", "dash_offset"}) {
+        if (_has(lua, 2, shape)) {
+            return luaL_error(lua, "cell uses color, texture and patches; stroke, fill, width, radius, dash and dash_offset are unsupported");
+        }
     }
     if (!_has(lua, 2, "texture") && (_has(lua, 2, "source") || _has(lua, 2, "destination"))) {
         return luaL_error(lua, "cell source and destination require texture");
@@ -6002,20 +5998,11 @@ AnimCurve detail::luaAnimCurve(lua_State* lua, int index)
     return _curve(lua, index);
 }
 
-static const char* _curveField(lua_State* lua, int index)
-{
-    auto hasEasing = _has(lua, index, "easing");
-    auto hasCurve = _has(lua, index, "curve");
-    if (hasEasing && hasCurve) luaL_error(lua, "use either 'easing' or 'curve', not both");
-    return hasEasing ? "easing" : "curve";
-}
-
-// The curve the easing or curve option of the table at index names, or fallback without either.
+// The curve the curve option of the table at index names, or fallback without it.
 static AnimCurve _fieldCurve(lua_State* lua, int index,
                              const AnimCurve& fallback = AnimCurve::preset(AnimCurvePreset::Smooth))
 {
-    index = lua_absindex(lua, index);
-    lua_getfield(lua, index, _curveField(lua, index));
+    lua_getfield(lua, index, "curve");
     auto curve = lua_isnil(lua, -1) ? fallback : _curve(lua, -1);
     lua_pop(lua, 1);
     return curve;
@@ -6032,20 +6019,19 @@ bool detail::luaTiming(lua_State* lua, int index, int options, bool stagger,
     while (lua_next(lua, index)) {
         if (lua_type(lua, -2) != LUA_TSTRING) luaL_error(lua, "option names must be strings");
         auto name = lua_tostring(lua, -2);
-        if (!_option(name, {"duration", "curve", "easing"}, false)
+        if (!_option(name, {"duration", "curve"}, false)
             && !(stagger && std::strcmp(name, "lag") == 0) && !_option(name, fields, false)) {
             luaL_error(lua, "unknown option '%s'", name);
         }
         lua_pop(lua, 1);
     }
-    auto curve = _curveField(lua, index);
     auto last = std::max(index + (stagger ? 2 : 1), options);
     lua_settop(lua, last);
     lua_pushvalue(lua, index);
     auto table = lua_gettop(lua);
     lua_getfield(lua, table, "duration");
     lua_replace(lua, index);
-    lua_getfield(lua, table, curve);
+    lua_getfield(lua, table, "curve");
     lua_replace(lua, index + 1);
     if (stagger && options != index + 2) {
         lua_getfield(lua, table, "lag");
@@ -7346,7 +7332,7 @@ static int _rotate(lua_State* lua)
     auto angle = _number(lua, 3, "angle");
     uint32_t count;
     auto animations = _motionTargets(lua, scene, 2, count);
-    auto options = _motionOptions(lua, 4, {"about", "axis", "shift", "arc", "duration", "easing", "curve", "lag"});
+    auto options = _motionOptions(lua, 4, {"about", "axis", "shift", "arc", "duration", "curve", "lag"});
     auto axis = Vec3{0.0f, 0.0f, 1.0f};
     if (!lua_isnoneornil(lua, 4)) axis = _fieldWorld(lua, 4, "axis", axis);
     if (!(axis.length() > 0.0f)) return luaL_error(lua, "axis must be a non-zero vector");
@@ -7379,7 +7365,7 @@ static int _scale(lua_State* lua)
     auto factors = _factors(lua, 3);
     uint32_t count;
     auto animations = _motionTargets(lua, scene, 2, count);
-    auto options = _motionOptions(lua, 4, {"about", "shift", "arc", "duration", "easing", "curve", "lag"});
+    auto options = _motionOptions(lua, 4, {"about", "shift", "arc", "duration", "curve", "lag"});
     for (auto i = 0u; i < count; i++) {
         animations[i] = Animation::rescale(animations[i].target, factors);
         _pivotOptions(lua, scene, 4, animations[i]);
@@ -7396,7 +7382,7 @@ static int _moveAlong(lua_State* lua)
     uint32_t count;
     auto animations = _motionTargets(lua, scene, 2, count);
     auto path = _object(lua, scene, 3);
-    auto options = _motionOptions(lua, 4, {"from", "to", "orient", "duration", "easing", "curve", "lag"});
+    auto options = _motionOptions(lua, 4, {"from", "to", "orient", "duration", "curve", "lag"});
     auto from = 0.0f;
     auto to = 1.0f;
     auto orient = false;
@@ -7430,8 +7416,8 @@ static int _advect(lua_State* lua)
     uint32_t count;
     auto animations = _motionTargets(lua, scene, 2, count);
     if (!lua_isfunction(lua, 3)) return luaL_error(lua, "advect requires fn, a function of x and y");
-    auto options = _motionOptions(lua, 4, {"duration", "speed", "easing", "curve"});
-    auto timed = lua_istable(lua, 4) && (_has(lua, 4, "easing") || _has(lua, 4, "curve"));
+    auto options = _motionOptions(lua, 4, {"duration", "speed", "curve"});
+    auto timed = lua_istable(lua, 4) && _has(lua, 4, "curve");
     auto curve = timed ? options.curve : AnimCurve::preset(AnimCurvePreset::Linear);
     auto speed = lua_istable(lua, 4) ? _fieldNumber(lua, 4, "speed", 1.0f) : 1.0f;
     if (speed == 0.0f) return luaL_error(lua, "speed must be a nonzero number; a negative one runs the flow backward");
@@ -7789,7 +7775,7 @@ static FadeOptions _fadeOptions(lua_State* lua, int index)
     if (lua_isnoneornil(lua, index)) return options;
     luaL_checktype(lua, index, LUA_TTABLE);
     index = lua_absindex(lua, index);
-    _options(lua, index, {"shift", "scale", "duration", "easing", "curve"}, false);
+    _options(lua, index, {"shift", "scale", "duration", "curve"}, false);
     options.shift = _fieldWorld(lua, index, "shift", {});
     options.scale = _fieldNumber(lua, index, "scale", options.scale);
     if (options.scale <= 0.0f) luaL_error(lua, "scale must be positive");
@@ -7850,7 +7836,7 @@ static int _indicate(lua_State* lua)
     auto curve = AnimCurve::preset(AnimCurvePreset::Smooth);
     if (styled) {
         luaL_checktype(lua, 3, LUA_TTABLE);
-        _options(lua, 3, {"color", "scale", "duration", "easing", "curve"}, false);
+        _options(lua, 3, {"color", "scale", "duration", "curve"}, false);
         _fieldColor(lua, 3, "color", color, &box->scene->theme());
         scale = _fieldNumber(lua, 3, "scale", scale);
         if (scale <= 1.0f) return luaL_error(lua, "indicate scale must be greater than 1");
@@ -7873,7 +7859,7 @@ static int _wiggle(lua_State* lua)
     auto curve = AnimCurve::preset(AnimCurvePreset::Smooth);
     if (!lua_isnoneornil(lua, 3)) {
         luaL_checktype(lua, 3, LUA_TTABLE);
-        _options(lua, 3, {"scale", "angle", "swings", "duration", "easing", "curve"}, false);
+        _options(lua, 3, {"scale", "angle", "swings", "duration", "curve"}, false);
         scale = _fieldNumber(lua, 3, "scale", scale);
         if (scale <= 0.0f) return luaL_error(lua, "wiggle scale must be positive");
         angle = _fieldNumber(lua, 3, "angle", angle);
@@ -7942,14 +7928,14 @@ static int _circumscribe(lua_State* lua)
 {
     auto box = _scene(lua);
     return _emphasize(lua, box, "circumscribe", Emphasis::circumscribe(_object(lua, box->scene, 2)),
-                      {"shape", "color", "width", "padding", "window", "duration", "easing", "curve"});
+                      {"shape", "color", "width", "padding", "window", "duration", "curve"});
 }
 
 static int _passingFlash(lua_State* lua)
 {
     auto box = _scene(lua);
     return _emphasize(lua, box, "passing_flash", Emphasis::passingFlash(_object(lua, box->scene, 2)),
-                      {"color", "width", "window", "duration", "easing", "curve"});
+                      {"color", "width", "window", "duration", "curve"});
 }
 
 static int _flash(lua_State* lua)
@@ -7959,14 +7945,14 @@ static int _flash(lua_State* lua)
     auto emphasis = lua_type(lua, 2) == LUA_TTABLE ? Emphasis::flash(_world(lua, 2, "flash point"))
                                                    : Emphasis::flash(_object(lua, box->scene, 2));
     return _emphasize(lua, box, "flash", emphasis,
-                      {"color", "width", "padding", "size", "lines", "duration", "easing", "curve"});
+                      {"color", "width", "padding", "size", "lines", "duration", "curve"});
 }
 
 static int _ripple(lua_State* lua)
 {
     auto box = _scene(lua);
     return _emphasize(lua, box, "ripple", Emphasis::ripple(_object(lua, box->scene, 2)),
-                      {"color", "width", "padding", "size", "duration", "easing", "curve"});
+                      {"color", "width", "padding", "size", "duration", "curve"});
 }
 
 // The steps of the progress of a morph of two surfaces at which their color functions are
@@ -8534,7 +8520,7 @@ static int _highlight(lua_State* lua)
     auto curve = AnimCurve::preset(AnimCurvePreset::Smooth);
     if (!lua_isnoneornil(lua, optionsIndex)) {
         luaL_checktype(lua, optionsIndex, LUA_TTABLE);
-        _options(lua, optionsIndex, {"dim", "duration", "easing", "curve"}, false);
+        _options(lua, optionsIndex, {"dim", "duration", "curve"}, false);
         dim = _fieldNumber(lua, optionsIndex, "dim", dim);
         if (dim < 0.0f || dim > 1.0f) return luaL_error(lua, "dim must be an opacity from 0 to 1");
         duration = _fieldDuration(lua, optionsIndex, "duration", duration);
@@ -8957,7 +8943,7 @@ static int _orbitCamera(lua_State* lua, const LuaCamera& target)
     auto box = target.box;
     lua_settop(lua, 3);
     auto angle = _number(lua, 2, "angle");
-    auto options = _motionOptions(lua, 3, {"axis", "duration", "easing", "curve"});
+    auto options = _motionOptions(lua, 3, {"axis", "duration", "curve"});
     auto axis = target.camera.up;
     if (!lua_isnil(lua, 3)) axis = _fieldWorld(lua, 3, "axis", axis);
     _fit(lua, box, LUA_CAMERA_CHARGE);
@@ -9416,7 +9402,7 @@ static int _sceneTransition(lua_State* lua)
     }
     auto options = 3;
     _options(lua, options,
-             {"duration", "hold", "easing", "curve", "viewport", "style", "from", "area", "area_margin", "match",
+             {"duration", "hold", "curve", "viewport", "style", "from", "area", "area_margin", "match",
               "styles", "live"}, false);
     auto duration = _fieldDuration(lua, options, "duration", 1.0f);
     float holds[LUA_VIEWPORT_LIMIT] = {};
@@ -9764,11 +9750,11 @@ static int _focusCamera(lua_State* lua, const LuaCamera& target)
         lua_pushnil(lua);
     } else {
         luaL_checktype(lua, 3, LUA_TTABLE);
-        _options(lua, 3, {"padding", "duration", "easing", "curve"}, false);
+        _options(lua, 3, {"padding", "duration", "curve"}, false);
         padding = _fieldNumber(lua, 3, "padding", padding);
         duration = _fieldNumber(lua, 3, "duration", duration);
         if (!std::isfinite(padding) || padding < 0.0f) return luaL_error(lua, "padding must be a non-negative number");
-        lua_getfield(lua, 3, _curveField(lua, 3));
+        lua_getfield(lua, 3, "curve");
     }
     if (home && (target.cameraView != CameraView::TwoD || openingView != CameraView::TwoD)) {
         // Outside the 2D view the whole opening camera comes back, its view and lens included.
@@ -9917,7 +9903,6 @@ static ThemePreset _themePreset(lua_State* lua, int index)
     size_t size;
     auto value = luaL_checklstring(lua, index, &size);
     if (std::strlen(value) != size) luaL_error(lua, "theme preset cannot contain zero bytes");
-    if (std::strcmp(value, "pro") == 0) return ThemePreset::ProWhite;
     return _enum(lua, index, "theme preset", PRESETS);
 }
 
@@ -10556,11 +10541,6 @@ Result detail::luaLoadFile(const char* path, Scene** scene, char* error,
     delete assets.asset;
     delete[] data;
     return result;
-}
-
-Result Lua::load(const char* path, Scene** scene, char* error, uint32_t errorSize) noexcept
-{
-    return detail::luaLoadFile(path, scene, error, errorSize);
 }
 
 Result Lua::load(const char* source, uint32_t size, const char* name, Scene** scene,

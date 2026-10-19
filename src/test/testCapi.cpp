@@ -88,7 +88,7 @@ local second = vis.scene {width = 160, height = 90, background = "#00000000"}
 second:rectangle {center = {-0.5, 0}, size = {1.5, 1}, fill = "#ffffff", id = "morph"}
 second:rectangle {center = {1, 0}, size = {1, 1}, fill = "#ffffff", id = "fade"}
 
-root:scene_transition({first, second}, {duration = 1, easing = "linear"})
+root:scene_transition({first, second}, {duration = 1, curve = "linear"})
 return root
     )lua";
     CHECK(vis_load_lua(engine, visualSource, sizeof(visualSource) - 1u, "layout-visuals.lua")

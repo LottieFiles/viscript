@@ -33,7 +33,7 @@ Scene and Object handles share child factories. The receiver becomes the parent.
 | Factory | Main options |
 |---|---|
 | `group` | `matrix`, `typeset` |
-| `space` | `x`, `y`, `z`, axis/grid style, `ticks`, `labels` |
+| `space` | `x`, `y`, `z`, axis/grid style, `ticks` |
 | `point` | `point`, pixel `radius` |
 | `line`, `arrow` | `from`, `to`, `trim_distance`; arrow `tail`, `tip` |
 | `vector` | `value`, `origin`, `trim_distance`, `tail`, `tip` |

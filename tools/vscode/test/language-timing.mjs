@@ -32,11 +32,11 @@ try {
         return providers.CompletionItem.provideCompletionItems(document, new Position(3, call.length))
             ?.map((item) => item.label).sort();
     };
-    assert.deepEqual(fields("scene:shift(a, {1, 0}, {"), ["curve", "duration", "easing"]);
-    assert.deepEqual(fields("scene:create({a, b}, {"), ["curve", "direction", "duration", "easing", "lag"]);
-    assert.deepEqual(fields("scene:morph(a, b, {"), ["copy", "curve", "duration", "easing", "lag", "pairs"]);
-    assert.deepEqual(fields("scene:arrange({a, b}, {"), ["center", "curve", "direction", "duration", "easing", "gap"]);
-    assert.deepEqual(fields("scene:shift(a, {1, 0}, {duration = 1, "), ["curve", "easing"]);
+    assert.deepEqual(fields("scene:shift(a, {1, 0}, {"), ["curve", "duration"]);
+    assert.deepEqual(fields("scene:create({a, b}, {"), ["curve", "direction", "duration", "lag"]);
+    assert.deepEqual(fields("scene:morph(a, b, {"), ["copy", "curve", "duration", "lag", "pairs"]);
+    assert.deepEqual(fields("scene:arrange({a, b}, {"), ["center", "curve", "direction", "duration", "gap"]);
+    assert.deepEqual(fields("scene:shift(a, {1, 0}, {duration = 1, "), ["curve"]);
     assert.ok(fields("scene:rectangle {").includes("size"));
     const signature = (call) => providers.SignatureHelp.provideSignatureHelp({
         getText: () => `local scene = vis.scene{}\n${call}`,

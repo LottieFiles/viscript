@@ -112,7 +112,7 @@ return scene;
 
 A string becomes a text beside the tick; a handle, such as a `tex` formula, moves there and keeps its parent.
 
-Pass `labels` when making the space, or call `space:labels` later and animate the handles it returns.
+Call `space:labels` once the space is made and animate the handles it returns.
 
 ```lua live
 local scene = vis.scene {

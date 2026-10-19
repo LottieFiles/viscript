@@ -193,14 +193,14 @@ fade:fade_in(fadeCard, {
     shift = { 0, -0.42 },
     scale = 0.86,
     duration = 1.20,
-    easing = "ease_out",
+    curve = "ease_out",
 })
 fade:wait(0.35)
 fade:fade_out(fadeCard, {
     shift = { 0, 0.42 },
     scale = 0.86,
     duration = 1.00,
-    easing = "ease_in",
+    curve = "ease_in",
 })
 fade:wait(0.55)
 
@@ -377,7 +377,7 @@ replacement:indicate(replacementTarget, {
     color = p.gold,
     scale = 1.16,
     duration = 1.00,
-    easing = "ease_in_out",
+    curve = "ease_in_out",
 })
 replacement:wait(0.55)
 
@@ -447,14 +447,14 @@ indicate:indicate(indicateSubject, {
     color = p.gold,
     scale = 1.16,
     duration = 1.20,
-    easing = "ease_in_out",
+    curve = "ease_in_out",
 })
 indicate:wait(0.35)
 indicate:indicate(indicateResult, {
     color = p.gold,
     scale = 1.12,
     duration = 1.00,
-    easing = "ease_in_out",
+    curve = "ease_in_out",
 })
 indicate:wait(0.55)
 

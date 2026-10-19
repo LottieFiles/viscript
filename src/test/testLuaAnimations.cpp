@@ -39,7 +39,7 @@ return s
     fails("s:wiggle(r, {scale = 0})", "wiggle scale must be positive");
     fails("s:wiggle(r, {swings = 0})", "wiggle swings must be positive");
     fails("s:wiggle(r, {spin = 1})", "unknown option 'spin'");
-    fails("s:wiggle(r, {easing = 'smooth', curve = 'linear'})", "use either 'easing' or 'curve', not both");
+    fails("s:wiggle(r, {easing = 'smooth'})", "unknown option 'easing'");
     fails("s:wiggle(r, 2)", "table expected");
 
     // A circumscribe inside parallel frames the box where it stands when the track begins,
@@ -246,7 +246,7 @@ scene:shrink_to_center(growing, 0.1, "smooth")
 local indicated = scene:rectangle {
     center = {2.5, 0.5}, size = {1.0, 0.7}, fill = "#4cc9f0", id = "indicated"
 }
-scene:indicate(indicated, {color = "#ffd166", scale = 1.25, duration = 0.2, easing = "smooth"})
+scene:indicate(indicated, {color = "#ffd166", scale = 1.25, duration = 0.2, curve = "smooth"})
 
 local morph_source = scene:polygon {
     points = {{-3, -2.5}, {-1.8, -2.5}, {-2.4, -1.3}},

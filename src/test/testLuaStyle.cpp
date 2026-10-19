@@ -452,9 +452,9 @@ return scene
     static constexpr auto blackSource = R"lua(
 local scene = vis.scene {theme = "pro_black"}
 scene:point {point = {0, 0}, id = "point"}
-local legacy = vis.scene {theme = "pro"}
-legacy:point {point = {0, 0}, id = "legacy-point"}
-scene:viewport(legacy, {x = 0, y = 0, width = 1, height = 1})
+local white = vis.scene {theme = "pro_white"}
+white:point {point = {0, 0}, id = "white-point"}
+scene:viewport(white, {x = 0, y = 0, width = 1, height = 1})
 return scene
 )lua";
     scene = _loaded(blackSource, "theme-pro-black.lua");
@@ -466,15 +466,16 @@ return scene
             CHECK(pixel(point->style.stroke) == pixel(Color::hex("#f28e2b")));
             CHECK(pixel(point->style.fill) == pixel(Color::hex("#f28e2b")));
         }
-        auto legacy = scene->sceneAt(0);
-        CHECK(legacy != nullptr);
-        if (legacy) {
-            CHECK(pixel(legacy->config().background) == pixel(Color::hex("#ffffff")));
-            auto legacyPoint = legacy->object("legacy-point");
-            CHECK(legacyPoint != nullptr);
-            if (legacyPoint) {
-                CHECK(pixel(legacyPoint->style.stroke) == pixel(Color::hex("#b45f06")));
-                CHECK(pixel(legacyPoint->style.fill) == pixel(Color::hex("#b45f06")));
+        // A child Scene keeps its own Theme.
+        auto white = scene->sceneAt(0);
+        CHECK(white != nullptr);
+        if (white) {
+            CHECK(pixel(white->config().background) == pixel(Color::hex("#ffffff")));
+            auto whitePoint = white->object("white-point");
+            CHECK(whitePoint != nullptr);
+            if (whitePoint) {
+                CHECK(pixel(whitePoint->style.stroke) == pixel(Color::hex("#b45f06")));
+                CHECK(pixel(whitePoint->style.fill) == pixel(Color::hex("#b45f06")));
             }
         }
     }

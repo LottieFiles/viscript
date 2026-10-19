@@ -148,7 +148,7 @@ definition.uncreate(point, 0.6, "smooth", 0, "reverse");
 definition.fillReveal(arrow, 0.3, "ease_out");
 definition.drawBorderThenFill(arrow, 0.8, "ease_in_out", 0, "clockwise");
 definition.write(arrow, 0.8, "gentle", 0, "forward");
-definition.fadeIn(point, {shift: [0, 0.5], scale: 0.9, duration: 0.5, easing: "ease_out"});
+definition.fadeIn(point, {shift: [0, 0.5], scale: 0.9, duration: 0.5, curve: "ease_out"});
 definition.fadeOut(point, {shift: [0, -0.5], scale: 1.1});
 definition.growFromCenter(point, 0.5, "ease_out");
 definition.growFromEdge(point, "bottom", 0.5, "ease_out");
@@ -156,10 +156,10 @@ definition.shrinkToCenter(point, 0.5, "ease_in");
 definition.indicate(point, {color: "warning", scale: 1.2, duration: 0.7});
 definition.wiggle(point, {scale: 1.2, angle: 0.1, swings: 4, duration: 1, curve: "linear"});
 definition.circumscribe(point, {shape: "ellipse", color: "focus", width: 2, padding: 0.2, window: 0.4});
-definition.passingFlash(point, {color: "accent", width: 5, window: 0.2, duration: 0.8, easing: "linear"});
+definition.passingFlash(point, {color: "accent", width: 5, window: 0.2, duration: 0.8, curve: "linear"});
 definition.flash(point, {lines: 8, size: 0.3, padding: 0.15, width: 2, curve: "smooth"});
 definition.flash([1, 2], {color: "warning"});
-definition.ripple(point, {color: "accent", width: 2, padding: 0.1, size: 0.5, duration: 0.8, easing: "snappy"});
+definition.ripple(point, {color: "accent", width: 2, padding: 0.1, size: 0.5, duration: 0.8, curve: "snappy"});
 definition.warp([point, arrow], (x, y) => [x * x - y * y, 2 * x * y], {x_range: [-4, 4, 0.5], y_range: {min: -3, max: 3, step: 0.5}});
 definition.warp(point, (x, y) => [x, y + Math.sin(x)], 2, "linear", {x_range: [-4, 4, 0.1], y_range: [-3, 3, 0.1], step: 0.02});
 // @ts-expect-error a warp needs the samples it calls fn at.
@@ -520,11 +520,11 @@ definition.table({header: ["n"]});
 paragraph.code({text: "a = b"});
 definition.highlight(listing, 1, 2, {dim: 0.2, duration: 0.4, curve: "linear"});
 definition.highlight(listing, 2);
-definition.highlight(listing, tokens[0], {easing: "smooth"});
+definition.highlight(listing, tokens[0], {curve: "smooth"});
 definition.highlight(listing, tokens);
 definition.highlight(listing);
-// @ts-expect-error a highlight takes easing or curve, not both.
-definition.highlight(listing, {easing: "smooth", curve: "linear"});
+// @ts-expect-error a highlight takes its curve as curve, not easing.
+definition.highlight(listing, {easing: "smooth"});
 // @ts-expect-error the selection is a number, a handle or handles.
 definition.highlight(listing, "line");
 // @ts-expect-error code holds only text, which has no stroke.
@@ -564,13 +564,13 @@ random(1, 2, 3);
 // @ts-expect-error A generator needs a seed.
 vis.random();
 definition.rotate(rectangle, Math.PI / 2, {about: "bottom_left", duration: 0.5});
-definition.rotate([rectangle, sibling], Math.PI, {about: [0, 0], axis: [0, 1, 0], easing: "linear"});
+definition.rotate([rectangle, sibling], Math.PI, {about: [0, 0], axis: [0, 1, 0], curve: "linear"});
 definition.rotate(sibling, Math.PI, {about: rectangle, shift: [1, 0], arc: Math.PI / 2, lag: 0.1});
 definition.scale(rectangle, 1.5, {about: "top"});
 definition.scale(sibling, [2, 0.5], {about: [1, 1], curve: backCurve});
 definition.moveAlong(point, sibling, {from: 1, to: 0, orient: true, duration: 2});
-definition.moveAlong([point, label], sibling, {lag: 0.25, easing: "linear"});
-definition.orbit(2 * Math.PI, {axis: [0, 1, 0], duration: 6, easing: "linear"});
+definition.moveAlong([point, label], sibling, {lag: 0.25, curve: "linear"});
+definition.orbit(2 * Math.PI, {axis: [0, 1, 0], duration: 6, curve: "linear"});
 definition.orbit(-Math.PI);
 const foundHandle: ObjectHandle | null = definition.find("card");
 const childHandles: ObjectHandle[] = rectangle.children();
@@ -582,9 +582,9 @@ definition.clone(rectangle, {size: [1, 1]});
 definition.orbit(Math.PI, {about: [0, 0, 0]});
 definition.focus(rectangle, {padding: 0.3, duration: 0.8, curve: backCurve});
 definition.focus([rectangle, sibling]).focus(null, {duration: 0.5}).focus();
+definition.focus(rectangle, {curve: "linear"});
+// @ts-expect-error All timing options take their curve as curve, not easing.
 definition.focus(rectangle, {easing: "linear"});
-// @ts-expect-error All timing options take one curve spelling at a time.
-definition.focus(rectangle, {easing: "linear", curve: "smooth"});
 // @ts-expect-error padding is a share of the span.
 definition.focus(rectangle, {padding: "wide"});
 definition.look({target: rectangle, height: 3}, 1, "linear");
@@ -625,8 +625,8 @@ definition.circle({radius: 0.5, blend: "burn"});
 // @ts-expect-error Mask modes are named.
 definition.rectangle({size: [2, 2], mask: {target: maskTarget, mode: "glow"}});
 
-// @ts-expect-error Effect options cannot specify both easing and curve.
-definition.fadeOut(point, {easing: "smooth", curve: "bounce"});
+// @ts-expect-error Effect options take their curve as curve, not easing.
+definition.fadeOut(point, {easing: "smooth"});
 // @ts-expect-error Picture sources use either an asset or an inline pixel buffer.
 definition.picture({asset: "pixels", pixels: ["#fff"], size: [1, 1]});
 // @ts-expect-error Inline picture pixels require their buffer dimensions.
@@ -684,16 +684,16 @@ definition.fadeOut(rectangle, {spin: 1});
 definition.play({target: rectangle, opacity: 0.5, arc: 1});
 // @ts-expect-error Pivot anchors are a closed string union.
 definition.scale(rectangle, 2, {about: "middle"});
-// @ts-expect-error Rotation options cannot specify both easing and curve.
-definition.rotate(rectangle, 1, {easing: "linear", curve: "smooth"});
+// @ts-expect-error Rotation options take their curve as curve, not easing.
+definition.rotate(rectangle, 1, {easing: "linear"});
 // @ts-expect-error Paths are object handles.
 definition.moveAlong(rectangle, [0, 0]);
 // @ts-expect-error Motion along a path has no pivot.
 definition.moveAlong(rectangle, sibling, {about: "center"});
 // @ts-expect-error Indicate color must be a color string.
 definition.indicate(rectangle, {color: 42});
-// @ts-expect-error Wiggle options cannot specify both easing and curve.
-definition.wiggle(rectangle, {easing: "linear", curve: "smooth"});
+// @ts-expect-error Wiggle options take their curve as curve, not easing.
+definition.wiggle(rectangle, {easing: "linear"});
 // @ts-expect-error A circumscribe frame is a rectangle or an ellipse.
 definition.circumscribe(rectangle, {shape: "circle"});
 // @ts-expect-error A passing flash runs along the outline itself, with no padding.
@@ -816,7 +816,7 @@ inset.look({target: rectangle}, timing).fade(0.5, timing);
 music.gain(0.5, 0, timing);
 // @ts-expect-error Simple timing does not stagger one shift.
 definition.shift(rectangle, [0, 1], {duration: 1, lag: 0.2});
-// @ts-expect-error Timing options take one curve spelling at a time.
-definition.create(rectangle, {curve: "linear", easing: "smooth"});
+// @ts-expect-error Timing options take their curve as curve, not easing.
+definition.create(rectangle, {easing: "smooth"});
 // @ts-expect-error Named timing goes in the options form, not a positional options tail.
 definition.morph(rectangle, sibling, 1, "linear", {duration: 0.5});

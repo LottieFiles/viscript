@@ -52,13 +52,13 @@
     },
     {
       "path": "bindings.js",
-      "bytes": 210113,
-      "sha256": "f855d269032208cd2d9a5403dc9d400b85f8d2f4e655fbbca20632b909ea974f"
+      "bytes": 209334,
+      "sha256": "9a6203d5200b0c7f2aaabfbf3c8c9fe5cf49f3f41c485b5cfe81a48310e7b2aa"
     },
     {
       "path": "bindings.d.ts",
-      "bytes": 70442,
-      "sha256": "c261aeab836dcbd1723e98ff078d257181943e7a86e73d49e3ddcd5322638a76"
+      "bytes": 70314,
+      "sha256": "6eda18bbdde67877bd7c6f5982487f95a693a82809414ba8523c14a481721c7f"
     },
     {
       "path": "Pretendard.ttf",

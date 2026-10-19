@@ -47,7 +47,6 @@ static void _lua(Renderer* renderer)
         {"s:save({a,b}); s:shift(a,{0,1}); s:restore({a,b},.4,'linear',.25)", "s:save({a,b}); s:shift(a,{0,1}); s:restore({a,b},stagger)"},
         {"s:save(a); s:shift(a,{0,1}); s:restore(a)", "s:save(a); s:shift(a,{0,1}); s:restore(a,{})"},
         {"s:look({target={1,0},height=4},.4,'linear')", "s:look({target={1,0},height=4},timing)"},
-        {"s:focus(a,{duration=.4,curve='linear'})", "s:focus(a,{duration=.4,easing='linear'})"},
         {"s:shift(a,{0,1})", "s:shift(a,{0,1},{})"},
         {"local t=s:tracker(0); s:bind(a,t,function(x) return {shift={x,0}} end); s:track(t,1,.4,'linear')",
          "local t=s:tracker(0); s:bind(a,t,function(x) return {shift={x,0}} end); s:track(t,1,timing)"},
@@ -75,7 +74,7 @@ static void _lua(Renderer* renderer)
     static const char* const invalid[] = {
         "s:shift(a,{0,1},{duration=0})", "s:shift(a,{0,1},{duration=-1})",
         "s:shift(a,{0,1},{duration=math.huge})", "s:shift(a,{0,1},{lag=.25})",
-        "s:shift(a,{0,1},{curve='smooth',easing='linear'})", "s:shift(a,{0,1},{curve='unknown'})",
+        "s:shift(a,{0,1},{easing='linear'})", "s:shift(a,{0,1},{curve='unknown'})",
         "s:shift(a,{0,1},timing,'linear')", "s:create(a,{lag=-.1})",
         "s:fill_reveal(a,{direction='reverse'})", "s:track({{s:tracker(0),1}},{lag=.2})",
     };

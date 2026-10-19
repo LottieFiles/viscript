@@ -269,8 +269,8 @@ void _spaceTicksAndLabels()
 {
     static constexpr auto source = R"lua(
 local s = vis.scene {width = 600, height = 300, camera = {mode = "fixed", view = "2d", height = 6}}
-local world = s:space {id = "world", x = {-3, 3, 1}, y = {-2, 2, 0.5}, ticks = {x = 2, y = true}, tick_length = 12, axis_width = 2,
-    labels = {x = {{1, "one"}, {-2, "minus two"}}, y = {{1, "up"}}}}
+local world = s:space {id = "world", x = {-3, 3, 1}, y = {-2, 2, 0.5}, ticks = {x = 2, y = true}, tick_length = 12, axis_width = 2}
+world:labels {x = {{1, "one"}, {-2, "minus two"}}, y = {{1, "up"}}}
 s:space {id = "every", x = {-3, 3, 1}, y = {-2, 2, 0.5}, z = {-1, 1, 0.25}, ticks = true}
 local bar = s:rectangle {id = "bar", size = {1, 0.5}}
 local made = world:labels {x = {{2, bar}, {-1, "left"}}, y = {{-1, "down"}}, side = {x = "above", y = "right"},
@@ -382,7 +382,7 @@ return s
     fails("s:space{ticks = {x = -1}}", "ticks x must be zero or more");
     fails("s:space{ticks = {w = 1}}", "unknown option 'w'");
     fails("s:space{tick_length = -1}", "tick_length must be zero or more pixels");
-    fails("s:space{labels = 5}", "labels must be a table of x, y and z lists of {value, label}");
+    fails("s:space{labels = {}}", "unknown option 'labels'");
     fails("w:labels(5)", "table expected");
     fails("w:labels{x = 5}", "labels x must be a list of {value, label}");
     fails("w:labels{x = {5}}", "labels x entry 1 must be {value, label}, a number and a string or handle");
@@ -406,8 +406,8 @@ void _spaceScreenLabels(Renderer* renderer)
 {
     static constexpr auto script = R"lua(
 local s = vis.scene {width = 320, height = 180, camera = {mode = "fixed", view = "2d", height = 6}}
-local axes = s:space {id = "axes", x = {-2, 2, 1}, y = {-1, 1, 1},
-    labels = {placement = "screen", x = {{-2, "x"}}, gap = 10, size = 18}}
+local axes = s:space {id = "axes", x = {-2, 2, 1}, y = {-1, 1, 1}}
+axes:labels {placement = "screen", x = {{-2, "x"}}, gap = 10, size = 18}
 local supplied = axes:text {id = "supplied", text = "y", size = 24}
 local labels = axes:labels {placement = "screen", y = {{1, supplied}}, gap = 10}
 if labels[1] ~= supplied then error("screen labels changed a supplied handle") end
@@ -463,7 +463,7 @@ return s
                  "before the first play");
     _scriptError("local s=vis.scene{}; local a=s:space{}; s:warp(a,function(x,y,z) return x+3,y,z end); a:labels{placement='screen',x={{-2,'late'}}}; return s",
                  "before the space's first warp");
-    _scriptError("local s=vis.scene{}; local a=s:space{labels={placement='screen',x={{-2,'x'}}}}; s:warp(a,function(x,y,z) return x+3,y,z end); a:labels{placement='screen',x={{-2,'late'}}}; return s",
+    _scriptError("local s=vis.scene{}; local a=s:space{}; a:labels{placement='screen',x={{-2,'x'}}}; s:warp(a,function(x,y,z) return x+3,y,z end); a:labels{placement='screen',x={{-2,'late'}}}; return s",
                  "before the space's first warp");
 }
 
@@ -472,8 +472,8 @@ void _spaceLabelIds()
     static constexpr auto source = R"lua(
 local s = vis.scene {camera = {mode = "fixed", view = "2d", height = 6}}
 local kept = s:text {id = "axes/label/x/1", text = "kept"}
-local axes = s:space {id = "axes", x = {-2, 2, 1}, y = {-2, 2, 1}, z = {-2, 2, 1},
-    labels = {x = {{1, kept}, {-1, "first"}}, y = {{1, "up"}}, z = {{1, "depth"}}}}
+local axes = s:space {id = "axes", x = {-2, 2, 1}, y = {-2, 2, 1}, z = {-2, 2, 1}}
+axes:labels {x = {{1, kept}, {-1, "first"}}, y = {{1, "up"}}, z = {{1, "depth"}}}
 local first = s:find("axes/label/x/2")
 if first ~= axes:children()[1] then error("generated label id was not registered") end
 local more = axes:labels {x = {{1, "second"}, {-1, kept}}, y = {{-1, "down"}}}
@@ -484,7 +484,8 @@ if s:find("axes/label/x/2") ~= first or s:find("axes/label/x/3") ~= more[1]
 if s:find("axes/label/y/1") ~= axes:children()[2]
     or s:find("axes/label/y/2") ~= more[3]
     or s:find("axes/label/z/1") ~= axes:children()[3] then error("axis label ids differ") end
-local anonymous = s:space {labels = {x = {{1, "anonymous"}}}}
+local anonymous = s:space {}
+anonymous:labels {x = {{1, "anonymous"}}}
 if #anonymous:labels {x = {{2, "another"}}} ~= 1 then error("id-less labels failed") end
 return s
 )lua";

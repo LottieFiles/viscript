@@ -531,7 +531,7 @@
       "color": {"type": "Color|ThemeColor", "description": "Apply one literal or semantic Theme color to available stroke and fill paints."},
       "fill": {"type": "Color|ThemeColor", "description": "Literal or semantic Theme fill color."},
       "stroke": {"type": "Color|ThemeColor", "description": "Literal or semantic Theme stroke color."},
-      "gradient": {"type": "boolean|Color|ThemeColor|GradientConfig", "description": "true/false toggles the legacy two-stop linear ramp, a color sets its end stop, or a GradientConfig table selects a linear, radial, or conic gradient."},
+      "gradient": {"type": "boolean|Color|ThemeColor|GradientConfig", "description": "true/false toggles a two-stop linear ramp from the paint color to the Theme's end_gradient_stop, a color sets its end stop, or a GradientConfig table selects a linear, radial, or conic gradient."},
       "width": {"type": "number", "description": "Stroke width in pixels."},
       "radius": {"type": "number", "description": "Style radius in pixels."},
       "dash": {"type": "number[]", "description": "Stroke dash pattern."},
@@ -545,7 +545,7 @@
       "shadow": {"type": "{color?: Color|ThemeColor, offset?: Vec2, blur?: number}", "description": "Shadow beneath the object, offset in screen pixels."}
     },
     "GroupConfig": {"matrix": {"type": "Mat4", "description": "Local-to-parent transform."}, "id": {"type": "string", "description": "Stable object identifier."}, "typeset": {"type": "boolean", "description": "Audit every text below this Group as one typeset block."}},
-    "SpaceConfig": {"axis_width": {"type": "number", "description": "Axis and tick stroke width in pixels, finite and non-negative; zero hides strokes. Defaults to max(grid width, 1.5)."}, "x": {"type": "Range", "description": "Horizontal world range."}, "y": {"type": "Range", "description": "Vertical world range."}, "z": {"type": "Range", "description": "Depth world range."}, "axis_x": {"type": "Color|ThemeColor", "description": "X-axis literal or semantic Theme color."}, "axis_y": {"type": "Color|ThemeColor", "description": "Y-axis literal or semantic Theme color."}, "axis_z": {"type": "Color|ThemeColor", "description": "Z-axis literal or semantic Theme color."}, "numbers": {"type": "boolean", "description": "Draw axis numbers."}, "number_mode": {"type": "\"fixed\"|\"relative\"", "description": "Number label sizing mode."}, "number_size": {"type": "number", "description": "Number label size in points (em = 4/3 × size pixels)."}, "number_color": {"type": "Color|ThemeColor", "description": "Number label literal or semantic Theme color."}, "ticks": {"type": "boolean|SpaceTicksConfig", "description": "Ticks across the axes: true for one at every step of each range, or a step for each axis."}, "tick_length": {"type": "number", "description": "Tick length in pixels, centered on the axis; 8 by default."}, "labels": {"type": "SpaceLabelsConfig", "description": "Labels beside the ticks, as Space:labels takes them."}, "matrix": {"type": "Mat4", "description": "Local-to-parent transform."}, "id": {"type": "string", "description": "Stable object identifier."}},
+    "SpaceConfig": {"axis_width": {"type": "number", "description": "Axis and tick stroke width in pixels, finite and non-negative; zero hides strokes. Defaults to max(grid width, 1.5)."}, "x": {"type": "Range", "description": "Horizontal world range."}, "y": {"type": "Range", "description": "Vertical world range."}, "z": {"type": "Range", "description": "Depth world range."}, "axis_x": {"type": "Color|ThemeColor", "description": "X-axis literal or semantic Theme color."}, "axis_y": {"type": "Color|ThemeColor", "description": "Y-axis literal or semantic Theme color."}, "axis_z": {"type": "Color|ThemeColor", "description": "Z-axis literal or semantic Theme color."}, "numbers": {"type": "boolean", "description": "Draw axis numbers."}, "number_mode": {"type": "\"fixed\"|\"relative\"", "description": "Number label sizing mode."}, "number_size": {"type": "number", "description": "Number label size in points (em = 4/3 × size pixels)."}, "number_color": {"type": "Color|ThemeColor", "description": "Number label literal or semantic Theme color."}, "ticks": {"type": "boolean|SpaceTicksConfig", "description": "Ticks across the axes: true for one at every step of each range, or a step for each axis."}, "tick_length": {"type": "number", "description": "Tick length in pixels, centered on the axis; 8 by default."}, "matrix": {"type": "Mat4", "description": "Local-to-parent transform."}, "id": {"type": "string", "description": "Stable object identifier."}},
     "SpaceTicksConfig": {"x": {"type": "number|boolean", "description": "Step between x ticks, which sit at its multiples inside the range but not at 0; 0 or false for none, true for the step of the range."}, "y": {"type": "number|boolean", "description": "Step between y ticks, which sit at its multiples inside the range but not at 0; 0 or false for none, true for the step of the range."}, "z": {"type": "number|boolean", "description": "Step between z ticks, which sit at its multiples inside the range but not at 0; 0 or false for none, true for the step of the range."}},
     "SpaceLabelsConfig": {"placement": {"type": "\"world\"|\"screen\"", "description": "World placement is authored once (default). Screen placement keeps billboard Text ink outward from the projected space origin with a pixel gap at every sampled camera. Handles must be direct Text children of the Space. Place screen labels before authoring the Space's first warp; later warps retain its origin with the existing anchors. Adding or repositioning labels after a Space warp is refused even after seeking earlier. Screen placement does not take side or avoid other drawings or the canvas."}, "x": {"type": "{[1]: number, [2]: string|Object}[]", "description": "{value, label} pairs for the x axis: a string becomes a text in the space, and a handle keeps its parent and moves beside its tick."}, "y": {"type": "{[1]: number, [2]: string|Object}[]", "description": "{value, label} pairs for the y axis."}, "z": {"type": "{[1]: number, [2]: string|Object}[]", "description": "{value, label} pairs for the z axis."}, "gap": {"type": "number", "description": "Pixels between the end of a tick and its label; 4 by default."}, "size": {"type": "number", "description": "Size of the texts made from strings; the space's number_size by default."}, "color": {"type": "Color|ThemeColor", "description": "Fill of the texts made from strings; the space's number_color by default."}, "side": {"type": "{x?: \"below\"|\"above\", y?: \"left\"|\"right\", z?: \"left\"|\"right\"}", "description": "Side of each axis its labels sit on; below x and left of y and z by default."}},
     "PointConfig": {"point": {"type": "Vec2|Vec3", "required": true, "description": "Point in parent coordinates."}, "radius": {"type": "number", "description": "Marker radius in pixels."}},
@@ -591,7 +591,6 @@
     "SceneTransitionConfig": {
       "duration": {"type": "number", "description": "Transition duration in seconds."},
       "curve": {"type": "Curve", "description": "Animation curve."},
-      "easing": {"type": "Curve", "description": "Alias for curve; supply only one spelling."},
       "hold": {"type": "number|number[]", "description": "Seconds fully shown: one non-negative value for all stages or one per stage."},
       "live": {"type": "boolean", "description": "Play stages from the start of their incoming transition, holding the last frame when finished; true by default. False shows completed frames."},
       "viewport": {"type": "ViewportConfig", "description": "Normalized viewport."},
@@ -606,14 +605,12 @@
     "FadeConfig": {
       "duration": {"type": "number", "description": "Duration in seconds."},
       "curve": {"type": "Curve", "description": "Animation curve."},
-      "easing": {"type": "Curve", "description": "Alias for curve; supply only one spelling."},
       "shift": {"type": "Vec2|Vec3", "description": "Parent-space offset."},
       "scale": {"type": "number", "description": "Relative scale."}
     },
     "RotateConfig": {
       "duration": {"type": "number", "description": "Duration in seconds."},
       "curve": {"type": "Curve", "description": "Animation curve."},
-      "easing": {"type": "Curve", "description": "Alias for curve; supply only one spelling."},
       "lag": {"type": "number", "description": "Delay of each later target in seconds."},
       "about": {"type": "\"center\"|\"left\"|\"right\"|\"top\"|\"bottom\"|\"top_left\"|\"top_right\"|\"bottom_left\"|\"bottom_right\"|Vec2|Vec3|Object", "description": "Pivot: an anchor of the target's bounds, a parent-space point, or another object's center."},
       "axis": {"type": "Vec3", "description": "Rotation axis."},
@@ -623,7 +620,6 @@
     "ScaleConfig": {
       "duration": {"type": "number", "description": "Duration in seconds."},
       "curve": {"type": "Curve", "description": "Animation curve."},
-      "easing": {"type": "Curve", "description": "Alias for curve; supply only one spelling."},
       "lag": {"type": "number", "description": "Delay of each later target in seconds."},
       "about": {"type": "\"center\"|\"left\"|\"right\"|\"top\"|\"bottom\"|\"top_left\"|\"top_right\"|\"bottom_left\"|\"bottom_right\"|Vec2|Vec3|Object", "description": "Pivot: an anchor of the target's bounds, a parent-space point, or another object's center."},
       "shift": {"type": "Vec2|Vec3", "description": "Parent-space shift in the same clip."},
@@ -632,7 +628,6 @@
     "MoveAlongConfig": {
       "duration": {"type": "number", "description": "Duration in seconds."},
       "curve": {"type": "Curve", "description": "Animation curve."},
-      "easing": {"type": "Curve", "description": "Alias for curve; supply only one spelling."},
       "lag": {"type": "number", "description": "Delay of each later target in seconds."},
       "from": {"type": "number", "description": "Fraction of the outline to start at."},
       "to": {"type": "number", "description": "Fraction of the outline to end at; below from travels backwards."},
@@ -641,7 +636,6 @@
     "AdvectConfig": {
       "duration": {"type": "number", "description": "Duration in seconds."},
       "curve": {"type": "Curve", "description": "Curve of the field time; linear by default."},
-      "easing": {"type": "Curve", "description": "Alias for curve; supply only one spelling."},
       "speed": {"type": "number", "description": "Field time per second; negative runs the flow backward."}
     },
     "WarpConfig": {"step": {"type": "number", "description": "Longest straight piece, in the parent space of each target, that the warp maps without cutting it first; 0.05 by default."}},
@@ -654,7 +648,6 @@
     "HighlightConfig": {
       "duration": {"type": "number", "description": "Duration in seconds."},
       "curve": {"type": "Curve", "description": "Animation curve."},
-      "easing": {"type": "Curve", "description": "Alias for curve; supply only one spelling."},
       "dim": {"type": "number", "description": "Opacity of what is not highlighted."}
     },
     "ArrangeConfig": {"direction": {"type": "Vec2|Vec3", "description": "Direction of the row."}, "gap": {"type": "number", "description": "Space between neighbors in world units."}, "center": {"type": "Vec2|Vec3", "description": "Point the row centers on in the parent."}},
@@ -662,13 +655,11 @@
     "OrbitConfig": {
       "duration": {"type": "number", "description": "Duration in seconds."},
       "curve": {"type": "Curve", "description": "Animation curve."},
-      "easing": {"type": "Curve", "description": "Alias for curve; supply only one spelling."},
       "axis": {"type": "Vec3", "description": "Axis to orbit about; the camera's up by default."}
     },
     "FocusConfig": {
       "duration": {"type": "number", "description": "Duration in seconds."},
       "curve": {"type": "Curve", "description": "Animation curve."},
-      "easing": {"type": "Curve", "description": "Alias for curve; supply only one spelling."},
       "padding": {"type": "number", "description": "Margin on each side as a fraction of the framed span."}
     },
     "CloneConfig": {
@@ -679,7 +670,7 @@
       "color": {"type": "Color|ThemeColor", "description": "Apply one literal or semantic Theme color to available stroke and fill paints."},
       "fill": {"type": "Color|ThemeColor", "description": "Literal or semantic Theme fill color."},
       "stroke": {"type": "Color|ThemeColor", "description": "Literal or semantic Theme stroke color."},
-      "gradient": {"type": "boolean|Color|ThemeColor|GradientConfig", "description": "true/false toggles the legacy two-stop linear ramp, a color sets its end stop, or a GradientConfig table selects a linear, radial, or conic gradient."},
+      "gradient": {"type": "boolean|Color|ThemeColor|GradientConfig", "description": "true/false toggles a two-stop linear ramp from the paint color to the Theme's end_gradient_stop, a color sets its end stop, or a GradientConfig table selects a linear, radial, or conic gradient."},
       "width": {"type": "number", "description": "Stroke width in pixels."},
       "radius": {"type": "number", "description": "Style radius in pixels."},
       "dash": {"type": "number[]", "description": "Stroke dash pattern."},
@@ -695,14 +686,12 @@
     "IndicateConfig": {
       "duration": {"type": "number", "description": "Duration in seconds."},
       "curve": {"type": "Curve", "description": "Animation curve."},
-      "easing": {"type": "Curve", "description": "Alias for curve; supply only one spelling."},
       "color": {"type": "Color|ThemeColor", "description": "Temporary emphasis color; defaults to the Theme focus role."},
       "scale": {"type": "number", "description": "Temporary scale."}
     },
     "CircumscribeConfig": {
       "duration": {"type": "number", "description": "Duration in seconds; 1 by default."},
       "curve": {"type": "Curve", "description": "Animation curve."},
-      "easing": {"type": "Curve", "description": "Alias for curve; supply only one spelling."},
       "shape": {"type": "\"rectangle\"|\"ellipse\"", "description": "The frame; an ellipse passes through the corners of the padded bounds. Rectangle by default."},
       "color": {"type": "Color|ThemeColor", "description": "Frame color; defaults to the Theme focus role."},
       "width": {"type": "number", "description": "Frame stroke width in pixels, 3 by default; the bright stretch is twice as wide."},
@@ -712,7 +701,6 @@
     "PassingFlashConfig": {
       "duration": {"type": "number", "description": "Duration in seconds; 1 by default."},
       "curve": {"type": "Curve", "description": "Animation curve."},
-      "easing": {"type": "Curve", "description": "Alias for curve; supply only one spelling."},
       "color": {"type": "Color|ThemeColor", "description": "Stretch color; defaults to the Theme focus role."},
       "width": {"type": "number", "description": "Stretch stroke width in pixels; 6 by default."},
       "window": {"type": "number", "description": "Share of the outline the bright stretch covers, greater than 0 and at most 1; 0.3 by default."}
@@ -720,7 +708,6 @@
     "FlashConfig": {
       "duration": {"type": "number", "description": "Duration in seconds; 1 by default."},
       "curve": {"type": "Curve", "description": "Animation curve."},
-      "easing": {"type": "Curve", "description": "Alias for curve; supply only one spelling."},
       "color": {"type": "Color|ThemeColor", "description": "Line color; defaults to the Theme focus role."},
       "width": {"type": "number", "description": "Line stroke width in pixels; 3 by default."},
       "padding": {"type": "number", "description": "World units between the target's bounds, or the point, and where the lines start; 0.1 by default."},
@@ -730,7 +717,6 @@
     "RippleConfig": {
       "duration": {"type": "number", "description": "Duration in seconds; 1 by default."},
       "curve": {"type": "Curve", "description": "Curve of the growth, snappy by default; the fade runs evenly."},
-      "easing": {"type": "Curve", "description": "Alias for curve; supply only one spelling."},
       "color": {"type": "Color|ThemeColor", "description": "Ring color; defaults to the Theme focus role."},
       "width": {"type": "number", "description": "Ring stroke width in pixels; 3 by default."},
       "padding": {"type": "number", "description": "World units between the target's outline and where the ring starts; 0 by default."},
@@ -739,7 +725,6 @@
     "WiggleConfig": {
       "duration": {"type": "number", "description": "Duration in seconds; 2 by default."},
       "curve": {"type": "Curve", "description": "Animation curve."},
-      "easing": {"type": "Curve", "description": "Alias for curve; supply only one spelling."},
       "scale": {"type": "number", "description": "Peak growth about the bounds center; 1.1 by default."},
       "angle": {"type": "number", "description": "Widest turn either way in radians; 0.0628 by default."},
       "swings": {"type": "number", "description": "How many times the target tips to a side; 6 by default."}
@@ -825,26 +810,22 @@
     "SampleConfig": {"mode": {"type": "string", "description": "Sampling display mode."}, "padding": {"type": "number", "description": "Gap between cells."}, "duration": {"type": "number", "description": "Sampling duration in seconds."}, "fps": {"type": "number", "description": "Sampling frame rate."}},
     "TimingOptions": {
       "duration": {"type": "number", "description": "Seconds; omitted keeps the operation's default."},
-      "curve": {"type": "Curve", "description": "Timing curve, smooth by default."},
-      "easing": {"type": "Curve", "description": "Alias for curve; supply only one spelling."}
+      "curve": {"type": "Curve", "description": "Timing curve, smooth by default."}
     },
     "AnimationOptions": {
       "duration": {"type": "number", "description": "Seconds; omitted keeps the operation's default."},
       "curve": {"type": "Curve", "description": "Timing curve, smooth by default."},
-      "easing": {"type": "Curve", "description": "Alias for curve; supply only one spelling."},
       "lag": {"type": "number", "description": "Each later target starts duration * lag seconds after the previous one."}
     },
     "RevealOptions": {
       "duration": {"type": "number", "description": "Seconds; omitted keeps the operation's default."},
       "curve": {"type": "Curve", "description": "Timing curve, smooth by default."},
-      "easing": {"type": "Curve", "description": "Alias for curve; supply only one spelling."},
       "lag": {"type": "number", "description": "Each later target starts duration * lag seconds after the previous one."},
       "direction": {"type": "CreateDirection", "description": "Drawing order, forward by default."}
     },
     "MorphOptions": {
       "duration": {"type": "number", "description": "Seconds; omitted keeps the operation's default."},
       "curve": {"type": "Curve", "description": "Timing curve, smooth by default."},
-      "easing": {"type": "Curve", "description": "Alias for curve; supply only one spelling."},
       "lag": {"type": "number", "description": "Delay of each later pair in seconds."},
       "pairs": {"type": "number[][]", "description": "Explicit one-based source and target contour indices; each piece pairs once, and remaining pieces pair automatically. The same indices apply to each object pair in an array call. Surfaces take no pairs."},
       "copy": {"type": "boolean", "description": "Morph a copy of each source made at the cursor and leave the source in place; the copy is removed when the morph ends."}
@@ -852,7 +833,6 @@
     "MatchOptions": {
       "duration": {"type": "number", "description": "Seconds; omitted keeps the operation's default."},
       "curve": {"type": "Curve", "description": "Timing curve, smooth by default."},
-      "easing": {"type": "Curve", "description": "Alias for curve; supply only one spelling."},
       "lag": {"type": "number", "description": "Delay of each later pair in seconds."},
       "path": {"type": "Object", "description": "Snapshot outline guide, at most 2048 samples: add its arc-length detour from its endpoint chord to each paired piece while preserving individual endpoints and spacing. No live connectors or nonzero arc."},
       "arc": {"type": "number", "description": "Central angle of the arc matched parts travel."},
@@ -866,7 +846,6 @@
     "EditOptions": {
       "duration": {"type": "number", "description": "Seconds; omitted keeps the operation's default."},
       "curve": {"type": "Curve", "description": "Timing curve, smooth by default."},
-      "easing": {"type": "Curve", "description": "Alias for curve; supply only one spelling."},
       "lag": {"type": "number", "description": "Delay of each later pair in seconds."},
       "id": {"type": "string", "description": "Id of the new block; by default the block's id with the first free .2, .3, and so on."},
       "arc": {"type": "number", "description": "Central angle of the arc matched parts travel."},
@@ -875,7 +854,6 @@
     "ArrangeOptions": {
       "duration": {"type": "number", "description": "Seconds; omitted keeps the operation's default."},
       "curve": {"type": "Curve", "description": "Timing curve, smooth by default."},
-      "easing": {"type": "Curve", "description": "Alias for curve; supply only one spelling."},
       "direction": {"type": "Vec2|Vec3", "description": "Direction of the row."},
       "gap": {"type": "number", "description": "Space between neighbors in world units."},
       "center": {"type": "Vec2|Vec3", "description": "Point the row centers on in the parent."}
@@ -883,7 +861,6 @@
     "WarpOptions": {
       "duration": {"type": "number", "description": "Seconds; omitted keeps the operation's default."},
       "curve": {"type": "Curve", "description": "Timing curve, smooth by default."},
-      "easing": {"type": "Curve", "description": "Alias for curve; supply only one spelling."},
       "step": {"type": "number", "description": "Longest straight piece, in the parent space of each target, that the warp maps without cutting it first; 0.05 by default."}
     }
   },
@@ -953,6 +930,9 @@
     "RiemannConfig": ["radius"],
     "CodeConfig": ["stroke", "fill", "gradient", "width", "radius", "dash", "dash_offset"],
     "SpansConfig": ["stroke", "gradient", "width", "radius", "dash", "dash_offset"],
-    "TexConfig": ["stroke", "gradient", "width", "radius", "dash", "dash_offset"]
+    "TexConfig": ["stroke", "gradient", "width", "radius", "dash", "dash_offset"],
+    "GroupConfig": ["color", "radius", "dash", "dash_offset"],
+    "PictureConfig": ["color", "stroke", "fill", "radius", "dash", "dash_offset"],
+    "CellConfig": ["stroke", "fill", "width", "radius", "dash", "dash_offset"]
   }
 }

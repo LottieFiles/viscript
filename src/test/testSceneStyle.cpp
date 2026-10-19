@@ -80,10 +80,9 @@ void sceneThemes(Renderer* renderer)
     auto proWhite = Theme::preset(ThemePreset::ProWhite);
     auto proBlack = Theme::preset(ThemePreset::ProBlack);
     auto adaptiveVscode = Theme::preset(ThemePreset::AdaptiveVscode);
-    auto legacyPro = Theme::preset(ThemePreset::Pro);
     CHECK(Theme::ColorLimit == 10u);
     Theme implicit;
-    const Theme presets[] = {implicit, proWhite, proBlack, adaptiveVscode, legacyPro};
+    const Theme presets[] = {implicit, proWhite, proBlack, adaptiveVscode};
     for (const auto& preset : presets) {
         CHECK(std::strcmp(preset.code.font, "JetBrainsMono") == 0);
     }
@@ -93,7 +92,7 @@ void sceneThemes(Renderer* renderer)
     CHECK(near(proBlack.objectWidth, 1.25f));
     // Every preset keeps structural boxes square; a custom Theme may round them.
     CHECK(implicit.roundness == 0.0f && proWhite.roundness == 0.0f && proBlack.roundness == 0.0f
-          && adaptiveVscode.roundness == 0.0f && legacyPro.roundness == 0.0f);
+          && adaptiveVscode.roundness == 0.0f);
     CHECK(same(adaptiveVscode.background, proWhite.background));
     CHECK(same(adaptiveVscode.objects[0], proWhite.objects[0]));
     CHECK(same(implicit.background, proWhite.background));
@@ -108,8 +107,6 @@ void sceneThemes(Renderer* renderer)
     CHECK(same(proWhite.color(ThemeColorRole::Result), Color::hex("#8a6500")));
     CHECK(same(proBlack.color(ThemeColorRole::Focus), Color::hex("#6ea8fe")));
     CHECK(same(proBlack.color(ThemeColorRole::Background), proBlack.background));
-    CHECK(same(legacyPro.background, proWhite.background));
-    CHECK(same(legacyPro.objects[0], proWhite.objects[0]));
     CHECK(same(proWhite.axis.x, proWhite.axis.grid));
     CHECK(same(proWhite.axis.y, proWhite.axis.grid));
     CHECK(same(proWhite.axis.z, proWhite.axis.grid));

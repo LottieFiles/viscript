@@ -73,7 +73,7 @@ export interface CameraTarget {
     far?: number;
 }
 
-export type ThemePreset = "pro_white" | "pro_black" | "adaptive_vscode" | "pro";
+export type ThemePreset = "pro_white" | "pro_black" | "adaptive_vscode";
 export interface TextTheme {
     font?: string;
     size?: number;
@@ -1114,12 +1114,11 @@ export type BoundState = Partial<Omit<AnimationProperties, "shift" | "transform"
     {shift?: never; transform?: Mat4; arc?: never}
 );
 
-type CurveChoice = {easing?: AnimCurve; curve?: never} | {easing?: never; curve: AnimCurve};
-interface TimingFields {
+export type TimingOptions = {
     /** Seconds. Omitted values keep the operation's default; restore also accepts zero. */
     duration?: number;
-}
-export type TimingOptions = TimingFields & CurveChoice;
+    curve?: AnimCurve;
+};
 export type AnimationOptions = TimingOptions & {
     /** Each later target starts duration * lag seconds after the previous one. Non-negative. */
     lag?: number;

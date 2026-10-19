@@ -367,7 +367,7 @@ const effectSource = effects.polygon({
 });
 const effectAuxiliary = effects.rectangle({ id: "effect-auxiliary" });
 const fadeShift = [0, 0.5];
-const fadeOptions = { shift: fadeShift, scale: 0.9, duration: 0.6, easing: "ease_out" };
+const fadeOptions = { shift: fadeShift, scale: 0.9, duration: 0.6, curve: "ease_out" };
 effects.create(effectSource, 0.5, "linear", 0, "clockwise");
 effects.uncreate(effectSource, 0.4, "smooth", 0.1, "reverse");
 effects.fillReveal(effectSource, 0.3, "ease_out", 0.05);
@@ -378,7 +378,7 @@ effects.fadeOut(effectSource);
 effects.growFromCenter(effectSource, 0.45, "ease_out");
 effects.growFromEdge(effectSource, "bottom", 0.4, "ease_out");
 effects.shrinkToCenter(effectSource, 0.35, "ease_in");
-effects.indicate(effectSource, { color: "#4cc9f0", scale: 1.25, duration: 0.7, easing: "smooth" });
+effects.indicate(effectSource, { color: "#4cc9f0", scale: 1.25, duration: 0.7, curve: "smooth" });
 effects.indicate(effectAuxiliary);
 const effectTarget = effects.polygon({
     id: "effect-target",
@@ -522,22 +522,22 @@ assert.match(effectsLua, /scene:draw_border_then_fill\(objects\[1\],0\.6,"ease_i
 assert.match(effectsLua, /scene:write\(objects\[1\],0\.7,"gentle",0\.05,"forward"\)/);
 assert.match(
     effectsLua,
-    /scene:fade_in\(objects\[1\],\{\["duration"\]=0\.6,\["easing"\]="ease_out",\["scale"\]=0\.9,\["shift"\]=\{0,0\.5\}\}\)/,
+    /scene:fade_in\(objects\[1\],\{\["curve"\]="ease_out",\["duration"\]=0\.6,\["scale"\]=0\.9,\["shift"\]=\{0,0\.5\}\}\)/,
 );
 assert.match(
     effectsLua,
-    /scene:fade_out\(objects\[1\],\{\["duration"\]=1,\["easing"\]="smooth",\["scale"\]=1,\["shift"\]=\{0,0,0\}\}\)/,
+    /scene:fade_out\(objects\[1\],\{\["curve"\]="smooth",\["duration"\]=1,\["scale"\]=1,\["shift"\]=\{0,0,0\}\}\)/,
 );
 assert.match(effectsLua, /scene:grow_from_center\(objects\[1\],0\.45,"ease_out"\)/);
 assert.match(effectsLua, /scene:grow_from_edge\(objects\[1\],"bottom",0\.4,"ease_out"\)/);
 assert.match(effectsLua, /scene:shrink_to_center\(objects\[1\],0\.35,"ease_in"\)/);
 assert.match(
     effectsLua,
-    /scene:indicate\(objects\[1\],\{\["color"\]="#4cc9f0",\["duration"\]=0\.7,\["easing"\]="smooth",\["scale"\]=1\.25\}\)/,
+    /scene:indicate\(objects\[1\],\{\["color"\]="#4cc9f0",\["curve"\]="smooth",\["duration"\]=0\.7,\["scale"\]=1\.25\}\)/,
 );
 assert.match(
     effectsLua,
-    /scene:indicate\(objects\[2\],\{\["color"\]="focus",\["duration"\]=1,\["easing"\]="smooth",\["scale"\]=1\.2\}\)/,
+    /scene:indicate\(objects\[2\],\{\["color"\]="focus",\["curve"\]="smooth",\["duration"\]=1,\["scale"\]=1\.2\}\)/,
 );
 assert.match(effectsLua, /scene:morph\(objects\[1\],objects\[3\],0\.8,"ease_in_out"\)/);
 assert.match(effectsLua, /scene:morph\(objects\[3\],objects\[4\],0\.9,"ease_out"\)/);
@@ -575,8 +575,8 @@ assert.throws(() => invalidEffects.indicate(invalidEffectSource, { scale: 1 }), 
 assert.throws(() => invalidEffects.indicate(invalidEffectSource, { scale: Number.NaN }), /greater than 1/);
 assert.throws(() => invalidEffects.indicate(invalidEffectSource, { flash: true }), /Unknown Indicate option/);
 assert.throws(
-    () => invalidEffects.fadeIn(invalidEffectSource, { easing: "smooth", curve: "bounce" }),
-    /either easing or curve/,
+    () => invalidEffects.fadeIn(invalidEffectSource, { easing: "smooth" }),
+    /Unknown FadeIn option: easing/,
 );
 assert.throws(() => vis.animCurve.preset("warp"), /Unknown animation curve preset/);
 assert.throws(() => vis.animCurve.preset("back", 2.1), /between 0 and 2/);
@@ -681,7 +681,7 @@ assert.match(
 );
 assert.match(
     emphasisLua,
-    /scene:wiggle\(objects\[1\],\{\["angle"\]=0\.0628318531,\["duration"\]=2,\["easing"\]="smooth",\["scale"\]=1\.1,\["swings"\]=6\}\)/,
+    /scene:wiggle\(objects\[1\],\{\["angle"\]=0\.0628318531,\["curve"\]="smooth",\["duration"\]=2,\["scale"\]=1\.1,\["swings"\]=6\}\)/,
 );
 assert.match(
     emphasisLua,
@@ -689,11 +689,11 @@ assert.match(
 );
 assert.match(
     emphasisLua,
-    /scene:passing_flash\(objects\[1\],\{\["color"\]="focus",\["duration"\]=1,\["easing"\]="smooth",\["width"\]=4,\["window"\]=0\.5\}\)/,
+    /scene:passing_flash\(objects\[1\],\{\["color"\]="focus",\["curve"\]="smooth",\["duration"\]=1,\["width"\]=4,\["window"\]=0\.5\}\)/,
 );
 assert.match(
     emphasisLua,
-    /scene:flash\(objects\[1\],\{\["color"\]="focus",\["duration"\]=1,\["easing"\]="smooth",\["lines"\]=8,\["padding"\]=0\.1,\["size"\]=0\.2,\["width"\]=3\}\)/,
+    /scene:flash\(objects\[1\],\{\["color"\]="focus",\["curve"\]="smooth",\["duration"\]=1,\["lines"\]=8,\["padding"\]=0\.1,\["size"\]=0\.2,\["width"\]=3\}\)/,
 );
 assert.match(
     emphasisLua,
@@ -701,7 +701,7 @@ assert.match(
 );
 assert.match(
     emphasisLua,
-    /scene:ripple\(objects\[1\],\{\["color"\]="focus",\["duration"\]=1,\["easing"\]="snappy",\["padding"\]=0,\["size"\]=0\.6,\["width"\]=3\}\)/,
+    /scene:ripple\(objects\[1\],\{\["color"\]="focus",\["curve"\]="snappy",\["duration"\]=1,\["padding"\]=0,\["size"\]=0\.6,\["width"\]=3\}\)/,
 );
 
 // Named timing compiles to the same timeline as positional calls and leaves shared options intact.
@@ -768,7 +768,7 @@ const timingValidation = vis.scene();
 const timingTarget = timingValidation.rectangle({});
 const timingBefore = compileScene(timingValidation);
 for (const options of [{duration: 0}, {duration: -1}, {duration: Infinity}, {curve: "unknown"},
-    {curve: "linear", easing: "smooth"}, {lag: 0.25}, {seconds: 1}]) {
+    {easing: "smooth"}, {lag: 0.25}, {seconds: 1}]) {
     assert.throws(() => timingValidation.shift(timingTarget, [0, 1], options));
 }
 assert.throws(() => timingValidation.create(timingTarget, {lag: -0.1}), /Lag/);
@@ -1330,8 +1330,8 @@ assert.throws(() => vis.scene().sceneTransition([duplicateTransitionStage, dupli
 assert.throws(() => vis.scene().sceneTransition([vis.scene(), vis.scene()], { duration: 0 }), /positive/);
 assert.throws(() => vis.scene().sceneTransition([vis.scene(), vis.scene()], { hold: -1 }), /non-negative/);
 assert.throws(
-    () => vis.scene().sceneTransition([vis.scene(), vis.scene()], { easing: "smooth", curve: "linear" }),
-    /either/,
+    () => vis.scene().sceneTransition([vis.scene(), vis.scene()], { easing: "smooth" }),
+    /Unknown scene transition option: easing/,
 );
 const invalidTransitionRoot = vis.scene();
 const invalidTransitionFirst = vis.scene();
@@ -2356,7 +2356,7 @@ assert.match(framingLua, /scene:focus\(nil,\{\}\)/);
 assert.throws(() => framing.focus([]), /Focus targets must be a handle or a non-empty array of handles/);
 assert.throws(() => framing.focus(vis.scene().circle({ radius: 1 })), /handles from the same scene/);
 assert.throws(() => framing.focus([near, "far"]), /handles from the same scene/);
-assert.throws(() => framing.focus(near, { easing: "linear", curve: "smooth" }), /either easing or curve/);
+assert.throws(() => framing.focus(near, { easing: "linear" }), /Unknown Focus option: easing/);
 assert.throws(() => framing.focus(near, null), /Focus options must be a plain object/);
 for (const padding of [-0.1, Infinity, "1"]) {
     assert.throws(() => framing.focus(near, { padding }), /Focus padding must be a non-negative number/);
@@ -2520,7 +2520,7 @@ for (const duration of [0, -1, Number.NaN]) {
 assert.throws(() => lens.fade(0.5, 1, "wobble"), /Unknown animation curve preset: wobble/);
 assert.throws(() => lens.orbit(0), /non-zero/);
 assert.throws(() => lens.focus([]), /Focus targets must be a handle or a non-empty array of handles/);
-assert.throws(() => lens.focus(speck, { easing: "linear", curve: "smooth" }), /either easing or curve/);
+assert.throws(() => lens.focus(speck, { easing: "linear" }), /Unknown Focus option: easing/);
 assert.throws(() => lens.look({ target: stranger }), /handles from the same scene/);
 assert.equal(compileScene(magnified), magnifiedLua);
 const crowded = vis.scene();
@@ -2750,7 +2750,7 @@ assert.throws(() => coded.highlight(listing, []), /non-empty array of handles/);
 assert.throws(() => coded.highlight(listing, 1, { spin: 1 }), /Unknown Highlight option: spin/);
 assert.throws(() => coded.highlight(listing, { dim: 2 }), /dim must be an opacity from 0 to 1/);
 assert.throws(() => coded.highlight(listing, { duration: 0 }), /positive number of seconds/);
-assert.throws(() => coded.highlight(listing, { easing: "linear", curve: "smooth" }), /easing or curve, not both/);
+assert.throws(() => coded.highlight(listing, { easing: "linear" }), /Unknown Highlight option: easing/);
 assert.throws(() => coded.code("x"), /plain object/);
 assert.throws(() => coded.code({ language: "lua" }), /text string/);
 assert.throws(() => coded.code({ text: "x", language: "rust" }), /Code language must be plain, lua/);
@@ -2861,7 +2861,7 @@ const sumsLua = compileScene(sums);
 assert.match(sumsLua, /scene:highlight\(objects\[1\],\{objects\[3\]\[1\]\[2\],objects\[3\]\[3\]\[1\],objects\[3\]\[3\]\[3\],objects\[3\]\[5\]\[3\]\}\)/);
 assert.match(
     sumsLua,
-    /scene:indicate\(\{objects\[3\]\[1\]\[2\],objects\[3\]\[3\]\[1\],objects\[3\]\[3\]\[3\],objects\[3\]\[5\]\[3\]\},\{\["color"\]="focus",\["duration"\]=0\.5,\["easing"\]="smooth",\["scale"\]=1\.2\}\)/,
+    /scene:indicate\(\{objects\[3\]\[1\]\[2\],objects\[3\]\[3\]\[1\],objects\[3\]\[3\]\[3\],objects\[3\]\[5\]\[3\]\},\{\["color"\]="focus",\["curve"\]="smooth",\["duration"\]=0\.5,\["scale"\]=1\.2\}\)/,
 );
 assert.match(sumsLua, /objects\[8\] = scene:rectangle \{\["around"\]=\{objects\[3\]\[2\]\[4\],objects\[3\]\[2\]\[5\],objects\[3\]\[2\]\[6\]\},\["id"\]="box",\["padding"\]=0\.1\}/);
 assert.match(
