@@ -84,6 +84,8 @@ for (const [name, factory] of Object.entries(api.factories)) {
 }
 assert.equal(api.factories.contour.returns, "Group");
 assert.equal(api.configs.ContourConfig.levels.required, true);
+// scene:number writes 0 without a value.
+assert.equal(api.configs.NumberConfig.value.required, undefined);
 assert.equal(api.globals.spring_response.returns, "number");
 assert.deepEqual(api.globals.spring_response.parameters.map((parameter) => parameter.type), ["number", "SpringResponseConfig"]);
 for (const name of ["mass", "stiffness", "damping", "displacement"]) {
