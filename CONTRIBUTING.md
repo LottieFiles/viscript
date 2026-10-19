@@ -11,8 +11,9 @@ meson test -C build --print-errorlogs
 For the VS Code extension, run `npm ci` and `npm test` in `tools/vscode`.
 
 `meson test` also runs `api-sync`, which holds the editor's API schema,
-`tools/vscode/api/vis-api.json`, to the Lua binding. After changing the binding, update the
-schema and run `npm run generate:api` in `tools/vscode` to regenerate `vis.d.lua`.
+`tools/vscode/api/vis-api.json`, to the Lua binding and checks the LuaLS definitions made from
+it. After changing the binding, update the schema. The definitions, `api/vis.d.lua`, are not
+tracked: `npm run compile` in `tools/vscode` writes them, and so does packaging the extension.
 
 ## Comments and guides
 

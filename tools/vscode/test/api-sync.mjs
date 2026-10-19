@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import {fileURLToPath} from "node:url";
+import {luaMeta} from "../scripts/generate-lua-meta.mjs";
 
 const extensionRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const repositoryRoot = path.resolve(extensionRoot, "..", "..");
@@ -204,7 +205,8 @@ for (const [name, fields] of Object.entries(api.configBaseExcept)) {
     }
 }
 
-const meta = fs.readFileSync(path.join(extensionRoot, "api", "vis.d.lua"), "utf8");
+// The LuaLS definitions npm run compile writes as api/vis.d.lua.
+const meta = luaMeta(api);
 for (const name of sceneMethods) assert.match(meta, new RegExp(`function Scene:${name}\\(`));
 assert.match(meta, /---@class vis\.Tracker\n/);
 assert.match(meta, /function Tracker:get\(\)/);
