@@ -112,7 +112,6 @@ try {
     const down = event("keydown", {
         key: "ArrowRight",
         button: 1,
-        repeat: false,
         time: 0.6,
     });
     assert.equal(down.handled, true);
@@ -124,14 +123,14 @@ try {
     assert(Math.abs(keyFirstPeriod.x - keyInitial.x - 25) < 0.1);
     assert(Math.abs(keyHeld.x - keyInitial.x - 50) < 0.1);
 
-    const repeat = event("keydown", {
+    // A second keydown of a held key, as a browser's auto-repeat sends, changes nothing.
+    const again = event("keydown", {
         key: "ArrowRight",
         button: 1,
-        repeat: true,
         time: 0.9,
     });
-    assert.equal(repeat.handled, true);
-    assert.equal(repeat.redraw, false);
+    assert.equal(again.handled, true);
+    assert.equal(again.redraw, false);
     const keyAfterRepeat = center(runtime.bounds("key-mover", 0.96));
     assert(Math.abs(keyAfterRepeat.x - keyInitial.x - 75) < 0.1);
 
@@ -190,9 +189,9 @@ module._vis_input = (engine, ...values) => {
 const bare = await createVis({module});
 try {
     bare.input({type: "keydown", key: "A", time: 0.5});
-    assert.deepEqual(forwarded, [5, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 8, 0, 0.5]);
-    bare.input({type: "wheel", x: 3, wheelY: -2, modifiers: 1, repeat: true, time: 1});
-    assert.deepEqual(forwarded, [4, 3, 0, 0, 0, 0, -2, -1, 0, 1, 0, 0, 1, 1]);
+    assert.deepEqual(forwarded, [5, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 8, 0.5]);
+    bare.input({type: "wheel", x: 3, wheelY: -2, modifiers: 1, time: 1});
+    assert.deepEqual(forwarded, [4, 3, 0, 0, 0, 0, -2, -1, 0, 1, 0, 0, 1]);
     assert.throws(() => bare.input({type: "pointermove"}), /time must be finite/);
 } finally {
     bare.destroy();

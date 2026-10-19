@@ -697,8 +697,7 @@ extern "C" VIS_KEEPALIVE uint32_t vis_input(VisEngine handle, uint32_t type,
                                                   float x, float y, float dx, float dy,
                                                   float wheelX, float wheelY, int32_t button,
                                                   uint32_t buttons, uint32_t modifiers,
-                                                  uint32_t pointer, uint32_t key,
-                                                  uint8_t repeat, float time)
+                                                  uint32_t pointer, uint32_t key, float time)
 {
     auto engine = _engine(handle);
 #if defined(VIS_UI)
@@ -719,8 +718,6 @@ extern "C" VIS_KEEPALIVE uint32_t vis_input(VisEngine handle, uint32_t type,
 #endif
     constexpr uint32_t Failed = 32u;
     uint32_t flags = 0u;
-    // Input tells a held key from a new press by its own key state.
-    (void) repeat;
 #if !defined(VIS_INPUT)
     (void) buttons;
     (void) modifiers;

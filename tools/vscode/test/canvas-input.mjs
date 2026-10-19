@@ -425,14 +425,12 @@ const handledKey = keyTarget.emit("keydown", {key: "ArrowLeft"});
 assert.equal(handledKey.defaultPrevented, true);
 assert.equal(inputs.at(-1).button, INPUT_KEY_ACTION.ArrowLeft);
 assert.equal(inputs.at(-1).key, "ArrowLeft");
-assert.equal(inputs.at(-1).repeat, false);
 const cameraCount = camera.length;
 
-const handledLetter = keyTarget.emit("keydown", {key: "w", repeat: true});
+const handledLetter = keyTarget.emit("keydown", {key: "w"});
 assert.equal(handledLetter.defaultPrevented, true);
 assert.equal(inputs.at(-1).key, "W");
 assert.equal(inputs.at(-1).button, -1);
-assert.equal(inputs.at(-1).repeat, true);
 const handledTab = keyTarget.emit("keydown", {key: "Tab"});
 assert.equal(handledTab.defaultPrevented, true);
 assert.equal(inputs.at(-1).key, "Tab");

@@ -169,8 +169,6 @@ export interface VisInputEvent {
     readonly pointerId?: number;
     /** A key name as inputKeyName gives it, required for keydown and keyup: an arrow, Space, Enter, Escape, Shift, Tab, A-Z, 0-9, Plus or Minus. */
     readonly key?: string;
-    /** True for an auto-repeated keydown event; retained Input state ignores repeats. */
-    readonly repeat?: boolean;
     readonly time: number;
 }
 

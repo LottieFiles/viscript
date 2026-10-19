@@ -181,13 +181,13 @@ export function createCanvasInputRouter(options) {
         const value = Number(getTime?.());
         return Number.isFinite(value) && value >= 0 ? value : 0;
     };
-    const dispatchKey = (type, key, button, modifiers, repeat, allowBusy = false) =>
-        runtimeInput({type, button, modifiers, key, repeat, time: eventTime()}, allowBusy);
+    const dispatchKey = (type, key, button, modifiers, allowBusy = false) =>
+        runtimeInput({type, button, modifiers, key, time: eventTime()}, allowBusy);
     const releaseHeldKeys = () => {
         const entries = [...heldKeys];
         heldKeys.clear();
         for (const [key, button] of entries) {
-            dispatchKey("keyup", key, button, 0, false, true);
+            dispatchKey("keyup", key, button, 0, true);
         }
         const runtime = getRuntime?.();
         if (!runtime || typeof runtime.releaseInput !== "function") return;
@@ -414,13 +414,7 @@ export function createCanvasInputRouter(options) {
         const key = keyName?.(event.key, event.code);
         if (key !== undefined) {
             const button = keyAction ?? -1;
-            const result = dispatchKey(
-                "keydown",
-                key,
-                button,
-                inputModifiers(event),
-                Boolean(event.repeat),
-            );
+            const result = dispatchKey("keydown", key, button, inputModifiers(event));
             if (result.handled) {
                 heldKeys.set(key, button);
                 event.preventDefault();
@@ -457,7 +451,6 @@ export function createCanvasInputRouter(options) {
             key,
             heldKeys.get(key) ?? inputKeyAction(event.key) ?? -1,
             inputModifiers(event),
-            false,
             true,
         );
         heldKeys.delete(key);

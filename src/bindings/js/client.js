@@ -230,14 +230,11 @@ export async function createVis(...args) {
         }
     }
 
-    // The bundled WASM predates vis_render's pixel ratio and takes it in vis_render_scaled; drop
-    // the fallback when the bundles are rebuilt.
-    const renderPixels = module._vis_render_scaled ?? module._vis_render;
     // Renders a frame and returns a view of its pixels, which the next render, a resize or WASM
     // memory growth leaves stale: render hands out a copy, draw puts the view on a canvas.
     const renderFrame = (time, pixelRatio) => {
         assertScene();
-        check(renderPixels(engine, time, pixelRatio), "Render");
+        check(module._vis_render(engine, time, pixelRatio), "Render");
         return new Uint8ClampedArray(module.HEAPU8.buffer, module._vis_pixels(engine), module._vis_pixels_size(engine));
     };
     const render = (time) => renderFrame(time, 1).slice();
@@ -432,7 +429,7 @@ export async function createVis(...args) {
         if (type === undefined) throw new TypeError(`Unknown input type '${event.type}'`);
         const {
             x = 0, y = 0, dx = 0, dy = 0, wheelX = 0, wheelY = 0,
-            button = -1, buttons = 0, modifiers = 0, pointerId = 0, repeat, time,
+            button = -1, buttons = 0, modifiers = 0, pointerId = 0, time,
         } = event;
         if (![x, y, dx, dy, wheelX, wheelY, time].every(Number.isFinite) || time < 0) {
             throw new TypeError("Input coordinates, deltas, wheel values, and time must be finite and time must be non-negative");
@@ -448,7 +445,7 @@ export async function createVis(...args) {
             throw new TypeError("Input key is required for keydown and keyup events");
         }
         const flags = module._vis_input(engine, type, x, y, dx, dy, wheelX, wheelY, button, buttons, modifiers,
-            pointerId, key, repeat ? 1 : 0, time) >>> 0;
+            pointerId, key, time) >>> 0;
         let sample;
         if (flags & 16) {
             const getters = [

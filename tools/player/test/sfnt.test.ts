@@ -164,7 +164,9 @@ test("an Apple-format kern table, which the engine rejects, is left out", async 
 });
 
 test("a Unicode map labeled where the engine does not look is relabeled", async () => {
-    // Only the format 4 map, labeled Unicode 1.1 as in some Apple fonts.
+    // Only the format 4 map, labeled Unicode 1.1 as in some Apple fonts. The text is Cyrillic, which
+    // the engine's own fonts lack, so what it cannot find in the font draws nothing.
+    const text = "Проба Жж";
     const [face] = await readFaces(memoryFile(STD));
     const table = face!.tables.find((entry) => entry.tag === "cmap")!;
     const cmap = new DataView(STD.buffer, STD.byteOffset + table.offset, table.length);
@@ -182,12 +184,12 @@ test("a Unicode map labeled where the engine does not look is relabeled", async 
     header.setUint32(8, 12);
     relabeled.set(map, 12);
     const apple = await withTables(STD, {cmap: relabeled});
-    const [unfixed, blank] = await Promise.all([render(apple), render(STD, " ")]);
+    const [unfixed, blank] = await Promise.all([render(apple, text), render(STD, " ")]);
     assert.ok(unfixed.equals(blank), "the engine finds no glyphs");
     const [appleFace] = await readFaces(memoryFile(apple));
     assert.equal((await readCharset(memoryFile(apple), appleFace!))(0x41), true);
     const fixed = await extractFace(memoryFile(apple), appleFace!);
-    assert.ok((await render(fixed)).equals(await render(STD)));
+    assert.ok((await render(fixed, text)).equals(await render(STD, text)));
 });
 
 test("the library finds faces by family, full or PostScript name, the regular face first", async () => {
