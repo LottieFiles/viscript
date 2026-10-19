@@ -681,7 +681,6 @@ struct Laid
 {
     char* joined = nullptr;
     uint32_t* starts = nullptr;
-    uint32_t count = 0;
     bool split = false;
     char* font = nullptr;
     Options options;
@@ -730,18 +729,13 @@ void key(const char* source, uint32_t begin, uint32_t end, char* output) noexcep
             if (word) blank = true;
             continue;
         }
-        auto letter = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
-        if (blank && letter) output[written++] = ' ';
+        if (blank && _letter(c)) output[written++] = ' ';
         blank = false;
         word = false;
         output[written++] = c;
         if (c != '\\' || i + 1u >= end) continue;
-        auto next = source[i + 1u];
-        if ((next >= 'a' && next <= 'z') || (next >= 'A' && next <= 'Z')) {
-            while (i + 1u < end && ((source[i + 1u] >= 'a' && source[i + 1u] <= 'z')
-                                    || (source[i + 1u] >= 'A' && source[i + 1u] <= 'Z'))) {
-                output[written++] = source[++i];
-            }
+        if (_letter(source[i + 1u])) {
+            while (i + 1u < end && _letter(source[i + 1u])) output[written++] = source[++i];
             word = true;
         } else {
             // A control symbol, such as \, or the control space, keeps its character.
@@ -775,7 +769,6 @@ bool prepare(Scene* scene, const char* const* sources, uint32_t count, bool spli
     auto laid = new (std::nothrow) Laid;
     if (!laid) return _fail(error, errorSize, "out of memory");
     output.laid = laid;
-    laid->count = count;
     laid->split = split;
     laid->options = options;
     laid->options.font = nullptr;
@@ -864,7 +857,7 @@ bool draw(Built& output, const Vec3& origin, bool detached, char* error, uint32_
         return _fail(error, errorSize, "the point must be finite");
     }
     auto& items = laid->laid;
-    auto count = laid->count;
+    auto count = output.sourceCount;
     auto split = laid->split;
     std::unique_ptr<uint32_t[]> order(new (std::nothrow) uint32_t[items.count ? 2u * items.count : 1u]);
 

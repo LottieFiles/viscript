@@ -3,6 +3,7 @@
 #define _VIS_TEX_PRIVATE_H_
 
 #include <cstdint>
+#include <cstring>
 
 namespace vis::tex::detail
 {
@@ -19,6 +20,18 @@ static inline float _max(float a, float b)
 static inline float _min(float a, float b)
 {
     return a < b ? a : b;
+}
+
+// Whether c is an ASCII letter, as the letters of a control word are.
+static inline bool _letter(uint32_t c)
+{
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+}
+
+// Whether the length bytes at text spell name.
+static inline bool _named(const char* text, uint32_t length, const char* name)
+{
+    return std::strlen(name) == length && std::memcmp(text, name, length) == 0;
 }
 
 // The classes of math atoms, which decide the space between neighbors, as The TeXbook gives
@@ -192,8 +205,8 @@ struct Parse
     ~Parse();
 };
 
-// Parses source, size bytes of TeX math. On failure writes why, with the 1-based character
-// where it happened, to error and returns false.
+// Parses source, size bytes of TeX math; a missing source or one past SourceLimit fails. On
+// failure writes why, with the 1-based character where it happened, to error and returns false.
 bool parse(const char* source, uint32_t size, Parse& output, char* error, uint32_t errorSize) noexcept;
 
 // The UTF-8 a character takes in variant: the letters and digits of the Mathematical

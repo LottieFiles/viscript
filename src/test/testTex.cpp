@@ -18,7 +18,7 @@ static bool _parse(const char* source, Parse& parse)
 
 static bool _text(const Node& node, const char* text)
 {
-    return node.length == std::strlen(text) && std::memcmp(node.text, text, node.length) == 0;
+    return _named(node.text, node.length, text);
 }
 
 // The nodes of the list from first, in order; returns how many there are.
@@ -167,6 +167,16 @@ static void _errors()
     char deep[200] = {};
     for (auto i = 0u; i < 70u; i++) deep[i] = '{';
     _error(deep, "the formula nests too deeply");
+    // The parser names a missing formula itself, rather than taking it for a long one.
+    Parse missing;
+    char error[64] = {};
+    CHECK(!tex::detail::parse(nullptr, 0u, missing, error, sizeof(error)));
+    CHECK(!std::strcmp(error, "the formula is missing"));
+    CHECK(tex::check(nullptr, error, sizeof(error)) == Result::InvalidArguments);
+    CHECK(!std::strcmp(error, "the formula is missing"));
+    static char large[SourceLimit + 2u];
+    std::memset(large, 'x', SourceLimit + 1u);
+    _error(large, "a formula holds at most 16384 bytes");
     CHECK(tex::check("\\frac{\\alpha}{2} \\le \\sqrt{x^2 + 1}") == Result::Success);
 }
 
@@ -242,6 +252,20 @@ struct FakeMetrics : Metrics
     }
 };
 
+// The fake font with a '+' that reaches without end above and below, so it has no middle.
+struct EndlessMetrics : FakeMetrics
+{
+    bool glyph(const char* text, uint32_t length, Variant variant, Glyph& output) noexcept override
+    {
+        if (!FakeMetrics::glyph(text, length, variant, output)) return false;
+        if (length == 1u && text[0] == '+') {
+            output.top = INFINITY;
+            output.bottom = -INFINITY;
+        }
+        return true;
+    }
+};
+
 static bool _set(const char* source, bool display, Layout& layout)
 {
     Parse parse;
@@ -259,7 +283,7 @@ static const Item* _item(const Layout& layout, const char* text, ItemKind kind =
     for (auto i = 0u; i < layout.count; i++) {
         auto& item = layout.items[i];
         if (item.kind != kind) continue;
-        if (text && (item.length != std::strlen(text) || std::memcmp(item.text, text, item.length) != 0)) continue;
+        if (text && !_named(item.text, item.length, text)) continue;
         if (nth-- == 0u) return &item;
     }
     static const Item none = {};
@@ -371,6 +395,13 @@ static void _radicals()
     CHECK(near(bar->y, 0.481f) && near(bar->x, sign->x + sign->width) && near(bar->width, 0.5f));
     CHECK(near(sign->y + sign->height, bar->y + bar->height) && sign->y < 0.0f);
     CHECK(near(_item(layout, "x")->x, bar->x));
+    // A radicand lower than the x-height, or none, takes the sign of one that high.
+    auto height = sign->height;
+    CHECK(_set("\\sqrt{}", false, layout));
+    CHECK(near(_item(layout, nullptr, ItemKind::Radical)->height, height) && near(layout.height, 0.561f));
+    CHECK(_set("\\sqrt{-}", false, layout));
+    CHECK(near(_item(layout, nullptr, ItemKind::Radical)->height, height));
+    CHECK(near(_item(layout, nullptr, ItemKind::Rule)->y, 0.481f));
     CHECK(_set("\\sqrt{x}", true, layout));
     CHECK(near(_item(layout, nullptr, ItemKind::Rule)->y, 0.431f + 0.04f + 0.10775f));
     // An index stands small over the sign's left arm, before the radicand in the source.
@@ -501,6 +532,12 @@ static void _fallbacks()
     char error[256] = {};
     CHECK(!tex::detail::layout(parse, false, metrics, layout, error, sizeof(error)));
     CHECK(std::strstr(error, "the font cannot set '☃'") != nullptr);
+    // A '+' without a middle leaves the axis at its lowest, not NaN.
+    CHECK(_parse("\\frac{a}{b}", parse));
+    EndlessMetrics endless;
+    CHECK(tex::detail::layout(parse, false, endless, layout, error, sizeof(error)));
+    auto bar = _item(layout, nullptr, ItemKind::Rule);
+    CHECK(near(bar->y + bar->height * 0.5f, 0.15f) && std::isfinite(layout.height));
 }
 
 int main()

@@ -1,3 +1,6 @@
+// Sets a parsed formula the way TeX sets math (The TeXbook, Appendix G): atoms spaced by
+// their classes, scripts, fractions and roots by the rules there, with TeX's font parameters
+// scaled to the x-height of the font and the axis and rule thickness the font itself shows.
 #include <cmath>
 #include <cstdarg>
 #include <cstdio>
@@ -7,10 +10,6 @@
 
 #include "visTex.h"
 #include "../common/visGrow.h"
-
-// Sets a parsed formula the way TeX sets math (The TeXbook, Appendix G): atoms spaced by
-// their classes, scripts, fractions and roots by the rules there, with TeX's font parameters
-// scaled to the x-height of the font and the axis and rule thickness the font itself shows.
 
 namespace vis::tex::detail
 {
@@ -42,9 +41,10 @@ static constexpr float NullDelimiter = 0.12f;
 static constexpr float ScriptSpace = 0.05f;
 static constexpr uint32_t NoSlot = UINT32_MAX;
 
+// value kept from low to high; low when it is NaN.
 static float _clamp(float value, float low, float high)
 {
-    return value < low ? low : value > high ? high : value;
+    return value > low ? _min(value, high) : low;
 }
 
 struct Style
@@ -123,8 +123,7 @@ static Class _class(const Node& node)
 
 static bool _prime(const Node& node)
 {
-    return node.kind == Kind::Glyph && node.sup == None && node.sub == None && node.length == 3u
-        && std::memcmp(node.text, "′", 3u) == 0;
+    return node.kind == Kind::Glyph && node.sup == None && node.sub == None && _named(node.text, node.length, "′");
 }
 
 // An item keyed by the TeX of node, which shows the node's text if it has one.
@@ -684,7 +683,9 @@ struct Setter
         if (failed) return empty();
         auto rule = this->rule(size);
         auto clearance = rule + (style.level == Level::Display ? font.xheight * size : rule) * 0.25f;
-        auto top = body.height + clearance;
+        // TeX's smallest sign is the font's own surd: a radicand lower than the x-height, or
+        // none, takes the sign of one that high.
+        auto top = _max(body.height, font.xheight * size) + clearance;
         auto bottom = -body.depth - 0.1f * size;
         auto height = top + rule - bottom;
         auto signWidth = size * _clamp(0.62f + 0.1f * (height / size - 1.0f), 0.62f, 0.95f);
@@ -962,8 +963,7 @@ bool layout(const Parse& parse, bool display, Metrics& metrics, Layout& output, 
 {
     if (error && errorSize) error[0] = '\0';
     delete[] output.items;
-    output.items = nullptr;
-    output.count = output.capacity = 0u;
+    output.count = 0u;
     output.width = output.height = output.depth = 0.0f;
     output.capacity = parse.count * 2u + 16u;
     output.items = new (std::nothrow) Item[output.capacity];

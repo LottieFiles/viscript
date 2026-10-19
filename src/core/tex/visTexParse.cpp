@@ -358,7 +358,7 @@ static constexpr Named ENVIRONMENTS[] = {
 // The relations \not turns into their negations.
 struct Negation
 {
-    const char* relation;
+    const char* name;
     const char* text;
 };
 
@@ -385,7 +385,7 @@ template<typename T, size_t N>
 static const T* _find(const T (&table)[N], const char* name, uint32_t length)
 {
     for (auto& entry : table) {
-        if (std::strlen(entry.name) == length && std::memcmp(entry.name, name, length) == 0) return &entry;
+        if (_named(name, length, entry.name)) return &entry;
     }
     return nullptr;
 }
@@ -581,18 +581,24 @@ struct Parser
         }
     }
 
-    static bool letter(char c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'); }
-
     // The name of the command at pos, a backslash, without moving: its letters, or the one
     // character after the backslash.
     uint32_t name(uint32_t at, const char*& name) const
     {
         name = source + at + 1u;
         if (at + 1u >= size) return 0u;
-        if (!letter(source[at + 1u])) return 1u;
+        if (!_letter(source[at + 1u])) return 1u;
         auto end = at + 1u;
-        while (end < size && letter(source[end])) end++;
+        while (end < size && _letter(source[end])) end++;
         return end - at - 1u;
+    }
+
+    // The bytes of the token at pos: a command with its backslash, one byte, or none at the end.
+    uint32_t token() const
+    {
+        const char* word;
+        if (pos >= size) return 0u;
+        return source[pos] == '\\' ? name(pos, word) + 1u : 1u;
     }
 
     bool command(const char* word)
@@ -600,7 +606,7 @@ struct Parser
         if (pos >= size || source[pos] != '\\') return false;
         const char* text;
         auto length = name(pos, text);
-        return std::strlen(word) == length && std::memcmp(text, word, length) == 0;
+        return _named(text, length, word);
     }
 
     // Appends node, and the nodes linked after it, to the list from first to last.
@@ -662,17 +668,16 @@ struct Parser
                     ended = Ended::Row;
                     break;
                 }
-                if (length == 5u && std::memcmp(word, "right", 5u) == 0) {
+                if (_named(word, length, "right")) {
                     if (stop != Stop::Right) return fail("'\\right' at %u has no '\\left'", character(pos));
                     break;
                 }
-                if (length == 3u && std::memcmp(word, "end", 3u) == 0) {
+                if (_named(word, length, "end")) {
                     if (stop != Stop::Cell) return fail("'\\end' at %u has no '\\begin'", character(pos));
                     ended = Ended::Environment;
                     break;
                 }
-                if ((length == 6u && std::memcmp(word, "limits", 6u) == 0)
-                    || (length == 8u && std::memcmp(word, "nolimits", 8u) == 0)) {
+                if (_named(word, length, "limits") || _named(word, length, "nolimits")) {
                     if (last == None || at(last).cls != Class::Op) {
                         return fail("'\\%.*s' at %u does not follow an operator", static_cast<int>(length), word,
                                     character(pos));
@@ -754,7 +759,7 @@ struct Parser
     {
         node.cls = Class::Ord;
         node.variant = Variant::Upright;
-        if ((codepoint >= 'a' && codepoint <= 'z') || (codepoint >= 'A' && codepoint <= 'Z')) {
+        if (_letter(codepoint)) {
             node.variant = variant;
             return;
         }
@@ -774,7 +779,7 @@ struct Parser
         }
         // A symbol typed as itself takes the class its command gives it.
         for (auto& symbol : SYMBOLS) {
-            if (node.length == std::strlen(symbol.text) && std::memcmp(node.text, symbol.text, node.length) == 0) {
+            if (_named(node.text, node.length, symbol.text)) {
                 node.cls = symbol.cls;
                 node.variant = symbol.variant == Variant::Italic ? variant : symbol.variant;
                 return;
@@ -886,11 +891,7 @@ struct Parser
             fail("'\\%s' takes a delimiter at %u", command, character(begin));
             return Delim::None;
         }
-        uint32_t length = 1u;
-        if (source[pos] == '\\') {
-            const char* word;
-            length = name(pos, word) + 1u;
-        }
+        auto length = token();
         auto found = _find(DELIMITERS, source + pos, length);
         if (!found) {
             fail("'\\%s' takes a delimiter at %u, such as ( or \\{", command, character(begin));
@@ -976,9 +977,7 @@ struct Parser
             at(node).style = style->value;
             return node;
         }
-        auto is = [word, length](const char* name) {
-            return std::strlen(name) == length && std::memcmp(word, name, length) == 0;
-        };
+        auto is = [word, length](const char* name) { return _named(word, length, name); };
         if (is("frac") || is("dfrac") || is("tfrac") || is("binom") || is("dbinom") || is("tbinom")) {
             char label[8] = {};
             std::memcpy(label, word, length);
@@ -1056,30 +1055,22 @@ struct Parser
         }
         if (is("not")) {
             blank();
-            auto start = pos;
-            uint32_t relation = 1u;
-            if (pos < size && source[pos] == '\\') {
-                const char* next;
-                relation = name(pos, next) + 1u;
+            auto relation = token();
+            auto negation = _find(NEGATIONS, source + pos, relation);
+            if (!negation) {
+                return fail("'\\not' at %u negates only =, <, >, \\in, \\equiv, \\sim, \\approx, \\subset, \\supset, "
+                            "\\le and \\ge", character(begin));
             }
-            for (auto& negation : NEGATIONS) {
-                if (std::strlen(negation.relation) == relation
-                    && std::memcmp(source + start, negation.relation, relation) == 0) {
-                    pos = start + relation;
-                    auto node = add(Kind::Glyph, begin);
-                    if (failed) return None;
-                    at(node).text = negation.text;
-                    at(node).length = static_cast<uint32_t>(std::strlen(negation.text));
-                    at(node).cls = Class::Rel;
-                    return node;
-                }
-            }
-            return fail("'\\not' at %u negates only =, <, >, \\in, \\equiv, \\sim, \\approx, \\subset, \\supset, "
-                        "\\le and \\ge", character(begin));
+            pos += relation;
+            auto node = add(Kind::Glyph, begin);
+            if (failed) return None;
+            at(node).text = negation->text;
+            at(node).length = static_cast<uint32_t>(std::strlen(negation->text));
+            at(node).cls = Class::Rel;
+            return node;
         }
         if (is("begin")) return environment(begin);
-        if (is("end")) return fail("'\\end' at %u has no '\\begin'", character(begin));
-        if (is("right")) return fail("'\\right' at %u has no '\\left'", character(begin));
+        // list() and argument() stop at \end and \right; an argument may still be \\.
         if (is("\\")) return fail("'\\\\' outside an environment at %u", character(begin));
         if (is("limits") || is("nolimits")) {
             return fail("'\\%.*s' at %u does not follow an operator", static_cast<int>(length), word, character(begin));
@@ -1113,19 +1104,16 @@ struct Parser
     bool environmentName(uint32_t begin, const char*& word, uint32_t& length)
     {
         blank();
-        if (pos >= size || source[pos] != '{') {
-            fail("'\\begin' and '\\end' take the name of an environment in braces at %u", character(begin));
-            return false;
-        }
-        auto start = ++pos;
-        while (pos < size && (letter(source[pos]) || source[pos] == '*')) pos++;
-        if (pos >= size || source[pos] != '}') {
+        auto start = pos + 1u;
+        auto end = start;
+        while (end < size && (_letter(source[end]) || source[end] == '*')) end++;
+        if (pos >= size || source[pos] != '{' || end >= size || source[end] != '}') {
             fail("'\\begin' and '\\end' take the name of an environment in braces at %u", character(begin));
             return false;
         }
         word = source + start;
-        length = pos - start;
-        pos++;
+        length = end - start;
+        pos = end + 1u;
         return true;
     }
 
@@ -1197,20 +1185,16 @@ bool parse(const char* source, uint32_t size, Parse& output, char* error, uint32
     output.strings = nullptr;
     output.count = output.stringCount = 0u;
     output.first = None;
-    if (!source || size > SourceLimit) {
-        if (error && errorSize) std::snprintf(error, errorSize, "a formula holds at most %u bytes", SourceLimit);
-        return false;
-    }
+    Parser parser(source, size, output, error, errorSize);
+    if (!source) parser.fail("the formula is missing");
+    else if (size > SourceLimit) parser.fail("a formula holds at most %u bytes", SourceLimit);
+    if (parser.failed) return false;
     output.capacity = 2u * size + 64u;
     output.stringCapacity = size + 64u;
     output.nodes = new (std::nothrow) Node[output.capacity];
     output.strings = new (std::nothrow) char[output.stringCapacity];
-    if (!output.nodes || !output.strings) {
-        if (error && errorSize) std::snprintf(error, errorSize, "out of memory");
-        return false;
-    }
-    Parser parser(source, size, output, error, errorSize);
-    output.first = parser.list(Stop::End);
+    if (!output.nodes || !output.strings) parser.fail("out of memory");
+    else output.first = parser.list(Stop::End);
     return !parser.failed;
 }
 
