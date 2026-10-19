@@ -28,6 +28,7 @@
 #include "../common/visHash.h"
 #include "../common/visConstants.h"
 #include "../common/visGrow.h"
+#include "../common/visMix.h"
 #include "../common/visString.h"
 #include "visSceneValidation.h"
 #include "visWarp.h"
@@ -492,6 +493,13 @@ uint64_t fingerprint(const Object* object) noexcept
     return hash;
 }
 
+// Records entry's object as the scene now authors it: a later call that finds the object changed
+// since refuses to animate it (see _unplayable()).
+static void _commit(ObjectEntry& entry)
+{
+    entry.fingerprint = fingerprint(entry.object);
+}
+
 // ---------- Interpolation and matrices ----------
 
 static bool _equal(const Mat4& first, const Mat4& second)
@@ -527,9 +535,7 @@ static Color _lerp(const Color& from, const Color& to, float progress)
 static Mat4 _lerp(const Mat4& from, const Mat4& to, float progress)
 {
     Mat4 result;
-    for (auto i = 0; i < 16; i++) {
-        result.e[i] = static_cast<float>(static_cast<double>(from.e[i]) + (static_cast<double>(to.e[i]) - from.e[i]) * progress);
-    }
+    for (auto i = 0; i < 16; i++) result.e[i] = _mix(from.e[i], to.e[i], progress);
     return result;
 }
 
@@ -984,10 +990,10 @@ static bool _lerp(const Camera& from, const Camera& to, float progress, Camera& 
             return false;
         }
     }
-    camera.fov = static_cast<float>(static_cast<double>(from.fov) + (static_cast<double>(to.fov) - from.fov) * progress);
-    camera.orthoHeight = static_cast<float>(static_cast<double>(from.orthoHeight) + (static_cast<double>(to.orthoHeight) - from.orthoHeight) * progress);
-    camera.near = static_cast<float>(static_cast<double>(from.near) + (static_cast<double>(to.near) - from.near) * progress);
-    camera.far = static_cast<float>(static_cast<double>(from.far) + (static_cast<double>(to.far) - from.far) * progress);
+    camera.fov = _mix(from.fov, to.fov, progress);
+    camera.orthoHeight = _mix(from.orthoHeight, to.orthoHeight, progress);
+    camera.near = _mix(from.near, to.near, progress);
+    camera.far = _mix(from.far, to.far, progress);
     return true;
 }
 
@@ -1053,13 +1059,10 @@ static bool _layer(const CameraClip& clip, float progress, Camera& camera)
     // The field of view and the clip planes ease from the current camera's to the look's, as a
     // plain look eases them from its start: between two valid lenses they stay valid however the
     // moves combine. The planes move together so that near stays in front of far.
-    auto toward = [share](float value, float goal) {
-        return static_cast<float>(static_cast<double>(value) + (static_cast<double>(goal) - value) * share);
-    };
-    if (clip.from.fov != clip.to.fov) camera.fov = toward(current.fov, clip.to.fov);
+    if (clip.from.fov != clip.to.fov) camera.fov = _mix(current.fov, clip.to.fov, progress);
     if (clip.from.near != clip.to.near || clip.from.far != clip.to.far) {
-        camera.near = toward(current.near, clip.to.near);
-        camera.far = toward(current.far, clip.to.far);
+        camera.near = _mix(current.near, clip.to.near, progress);
+        camera.far = _mix(current.far, clip.to.far, progress);
     }
     return _narrow(target, camera.target)
            && _narrow({target.x + reach.x, target.y + reach.y, target.z + reach.z}, camera.eye);
@@ -1435,7 +1438,7 @@ static void _inherit(ObjectEntry& entry, Clip* clips, const Style& source, bool 
             }
         }
     }
-    entry.fingerprint = fingerprint(entry.object);
+    _commit(entry);
 }
 
 // Whether the points of two shapes can travel from one to the other: as many of them, in the same
@@ -1454,38 +1457,35 @@ static VisualState _lerp(const VisualState& from, const VisualState& to, float p
     state.stroke = _lerp(from.stroke, to.stroke, bounded);
     state.fill = _lerp(from.fill, to.fill, bounded);
     state.gradientEnd = _lerp(from.gradientEnd, to.gradientEnd, bounded);
-    state.width = static_cast<float>(static_cast<double>(from.width) + (static_cast<double>(to.width) - from.width) * bounded);
-    state.radius = static_cast<float>(static_cast<double>(from.radius) + (static_cast<double>(to.radius) - from.radius) * bounded);
-    state.dashOffset = static_cast<float>(static_cast<double>(from.dashOffset) + (static_cast<double>(to.dashOffset) - from.dashOffset) * bounded);
-    state.markerTail = static_cast<float>(static_cast<double>(from.markerTail) + (static_cast<double>(to.markerTail) - from.markerTail) * bounded);
-    state.markerTip = static_cast<float>(static_cast<double>(from.markerTip) + (static_cast<double>(to.markerTip) - from.markerTip) * bounded);
-    state.opacity = static_cast<float>(static_cast<double>(from.opacity) + (static_cast<double>(to.opacity) - from.opacity) * bounded);
-    state.progress = static_cast<float>(static_cast<double>(from.progress) + (static_cast<double>(to.progress) - from.progress) * bounded);
-    state.start = static_cast<float>(static_cast<double>(from.start) + (static_cast<double>(to.start) - from.start) * bounded);
-    state.fillProgress = static_cast<float>(static_cast<double>(from.fillProgress) + (static_cast<double>(to.fillProgress) - from.fillProgress) * bounded);
-    state.pixelScale = static_cast<float>(static_cast<double>(from.pixelScale) + (static_cast<double>(to.pixelScale) - from.pixelScale) * progress);
+    state.width = _mix(from.width, to.width, bounded);
+    state.radius = _mix(from.radius, to.radius, bounded);
+    state.dashOffset = _mix(from.dashOffset, to.dashOffset, bounded);
+    state.markerTail = _mix(from.markerTail, to.markerTail, bounded);
+    state.markerTip = _mix(from.markerTip, to.markerTip, bounded);
+    state.opacity = _mix(from.opacity, to.opacity, bounded);
+    state.progress = _mix(from.progress, to.progress, bounded);
+    state.start = _mix(from.start, to.start, bounded);
+    state.fillProgress = _mix(from.fillProgress, to.fillProgress, bounded);
+    state.pixelScale = _mix(from.pixelScale, to.pixelScale, progress);
     if (state.pixelScale < 0.0f) state.pixelScale = 0.0f;
     state.gradient = mix(from.gradient, to.gradient, bounded);
     // Sizes follow the curve past its ends, so a back or elastic curve overshoots them.
     auto extent = [progress](float a, float b) {
-        auto value = static_cast<float>(static_cast<double>(a) + (static_cast<double>(b) - a) * progress);
+        auto value = _mix(a, b, progress);
         return value < 0.0f ? 0.0f : value;
     };
     state.size = {extent(from.size.x, to.size.x), extent(from.size.y, to.size.y)};
-    state.arcStart = static_cast<float>(static_cast<double>(from.arcStart) + (static_cast<double>(to.arcStart) - from.arcStart) * progress);
-    state.arcAngle = static_cast<float>(static_cast<double>(from.arcAngle) + (static_cast<double>(to.arcAngle) - from.arcAngle) * progress);
+    state.arcStart = _mix(from.arcStart, to.arcStart, progress);
+    state.arcAngle = _mix(from.arcAngle, to.arcAngle, progress);
     state.corner = extent(from.corner, to.corner);
     state.trimDistance = {extent(from.trimDistance.x, to.trimDistance.x), extent(from.trimDistance.y, to.trimDistance.y)};
-    auto number = [bounded](float a, float b) {
-        return static_cast<float>(static_cast<double>(a) + (static_cast<double>(b) - a) * bounded);
-    };
-    state.blur = number(from.blur, to.blur);
+    state.blur = _mix(from.blur, to.blur, bounded);
     state.shadow.color = _lerp(from.shadow.color, to.shadow.color, bounded);
-    state.shadow.offset = {number(from.shadow.offset.x, to.shadow.offset.x),
-                           number(from.shadow.offset.y, to.shadow.offset.y)};
-    state.shadow.blur = number(from.shadow.blur, to.shadow.blur);
+    state.shadow.offset = {_mix(from.shadow.offset.x, to.shadow.offset.x, bounded),
+                           _mix(from.shadow.offset.y, to.shadow.offset.y, bounded)};
+    state.shadow.blur = _mix(from.shadow.blur, to.shadow.blur, bounded);
     // A count follows the curve past its ends, as sizes do, and may turn negative.
-    state.value = static_cast<float>(static_cast<double>(from.value) + (static_cast<double>(to.value) - from.value) * progress);
+    state.value = _mix(from.value, to.value, progress);
     // A text change never passes either string.
     state.text = to.text;
     state.textFrom = from.text;
@@ -2458,17 +2458,27 @@ bool Scene::Impl::growClips(uint32_t count) noexcept
     return grow(clips, clipCnt, clipCap, count, 16u);
 }
 
-void Scene::Impl::link(uint32_t index) noexcept
+Clip& Scene::Impl::append(Object* object, uint32_t channels, float begin, float end, const AnimCurve& curve,
+                          bool prepared) noexcept
 {
+    auto index = clipCnt++;
     auto& clip = clips[index];
+    if (!prepared) clip = Clip{};
+    clip.object = object;
+    clip.channels = channels;
+    clip.begin = begin;
+    clip.end = end;
+    clip.curve = curve;
     clip.next = NO_CLIP;
-    auto item = entry(clip.object);
-    if (!item) return;
+    auto item = entry(object);
+    if (!item) return clip;
     if (item->lastClip == NO_CLIP) item->firstClip = index;
     else clips[item->lastClip].next = index;
     item->lastClip = index;
     item->clipCount++;
     work += item->family;
+    _channelEnd(*item, channels, end);
+    return clip;
 }
 
 // The latest time a camera move runs until, or 0 without one.
@@ -3770,7 +3780,7 @@ Result Scene::attach(Object* object, Object* parent) noexcept
         auto& entry = pImpl->objects[pImpl->objectCnt++];
         entry.object = item;
         entry.base = _state(item);
-        entry.fingerprint = fingerprint(item);
+        _commit(entry);
         entry.born = pImpl->cursor;
     }
     // The tree lists each object before the objects below it, so going back through it adds
@@ -4670,7 +4680,7 @@ Result Scene::update(Object* object) noexcept
             if (heir.properties & TARGET_FILL) heir.object->style.fill = object->style.fill;
             if (heir.properties & TARGET_WIDTH) heir.object->style.width = object->style.width;
             _rebase(*heir.entry, _state(heir.object));
-            heir.entry->fingerprint = fingerprint(heir.object);
+            _commit(*heir.entry);
         }
         delete[] heirs;
         if (passed & TARGET_STROKE) object->objStrokeAuthored = true;
@@ -4678,7 +4688,7 @@ Result Scene::update(Object* object) noexcept
         if (passed & TARGET_WIDTH) object->objWidthAuthored = true;
     }
     _rebase(*entry, _state(object));
-    entry->fingerprint = fingerprint(object);
+    _commit(*entry);
     return Result::Success;
 }
 
@@ -5590,26 +5600,21 @@ Result Scene::matchTransform(Object* source, Object* target, float duration,
             continue;
         }
         auto index = outgoing ? i : i - sourceCount;
-        auto& clip = impl.clips[impl.clipCnt++];
-        clip = Clip{};
-        clip.object = piece.object;
-        impl.link(impl.clipCnt - 1u);
-        clip.from = piece.from;
-        clip.to = piece.to;
-        clip.begin = static_cast<float>(static_cast<double>(time)
+        auto begin = static_cast<float>(static_cast<double>(time)
                      + static_cast<double>(duration) * options.lag * index);
-        clip.end = static_cast<float>(static_cast<double>(time)
+        auto end = static_cast<float>(static_cast<double>(time)
                    + static_cast<double>(duration) * (1.0 + static_cast<double>(options.lag) * index));
         // An unpaired piece fades in its share of the time: out at the start, in at the end.
         if (piece.partner == UINT32_MAX && options.fade < 1.0f) {
             auto share = static_cast<float>(static_cast<double>(duration) * options.fade);
-            if (outgoing) clip.end = clip.begin + share;
-            else clip.begin = clip.end - share;
+            if (outgoing) end = begin + share;
+            else begin = end - share;
         }
-        piece.contactBegin = clip.begin;
-        piece.contactEnd = clip.end;
-        clip.curve = curve;
-        clip.channels = piece.channels;
+        piece.contactBegin = begin;
+        piece.contactEnd = end;
+        auto& clip = impl.append(piece.object, piece.channels, begin, end, curve);
+        clip.from = piece.from;
+        clip.to = piece.to;
         if ((piece.channels & CHANNEL_MODEL) && path) {
             clip.motion = ClipMotion::MatchPath;
             clip.path = path;
@@ -5621,10 +5626,9 @@ Result Scene::matchTransform(Object* source, Object* target, float duration,
             clip.motion = ClipMotion::Arc;
             clip.arc = options.arc;
         }
-        _channelEnd(*piece.entry, clip.channels, clip.end);
         if (outgoing) {
             Impl::store(piece.object, piece.to);
-            piece.entry->fingerprint = fingerprint(piece.object);
+            _commit(*piece.entry);
         } else {
             // The piece starts in its pair's place and look, or unseen.
             _rebase(*piece.entry, piece.from);
@@ -6269,7 +6273,7 @@ Result Scene::arrange(Object* const* items, uint32_t count, const Vec3& directio
             grown[growing++] = {item, item->model};
             item->model = Mat4::translate(offset) * item->model;
             _rebase(*entry, _state(item));
-            entry->fingerprint = fingerprint(item);
+            _commit(*entry);
             animations[moving++] = Animation::growFromCenter(item);
         } else if (offset.length() > 1.0e-6f) {
             animations[moving++] = Animation::transform(item, Mat4::translate(offset) * item->model);
@@ -6281,7 +6285,7 @@ Result Scene::arrange(Object* const* items, uint32_t count, const Vec3& directio
             auto entry = impl.entry(grown[i].object);
             grown[i].object->model = grown[i].model;
             _rebase(*entry, _state(grown[i].object));
-            entry->fingerprint = fingerprint(grown[i].object);
+            _commit(*entry);
         }
     }
     release();
@@ -6817,19 +6821,13 @@ static void _inheritClips(Impl& impl, const Inheritance& inheritance, float dura
         auto from = _state(heir.object);
         auto to = from;
         values(heir.target, heir.properties, to);
-        auto& clip = impl.clips[impl.clipCnt++];
-        clip = Clip{};
-        clip.object = heir.object;
-        impl.link(impl.clipCnt - 1u);
+        auto& clip = impl.append(heir.object, _channels(heir.properties, heir.object->type()),
+                                 _begin(impl.cursor, duration, lag, heir.target),
+                                 _end(impl.cursor, duration, lag, heir.target), curve);
         clip.from = from;
         clip.to = to;
-        clip.begin = _begin(impl.cursor, duration, lag, heir.target);
-        clip.end = _end(impl.cursor, duration, lag, heir.target);
-        clip.curve = curve;
-        clip.channels = _channels(heir.properties, heir.object->type());
-        _channelEnd(*heir.entry, clip.channels, clip.end);
         impl.store(heir.object, to);
-        heir.entry->fingerprint = fingerprint(heir.object);
+        _commit(*heir.entry);
     }
 }
 
@@ -7340,23 +7338,17 @@ Result Scene::play(const Animation* animations, uint32_t count, float duration,
             case AnimationKind::MoveAlong: to.model = pImpl->clips[pImpl->clipCnt].to.model; break;
         }
 
-        auto& clip = pImpl->clips[pImpl->clipCnt++];
-        clip.object = animation.target;
-        pImpl->link(pImpl->clipCnt - 1u);
+        // The clip keeps the motion prepare() gave it.
+        auto& clip = pImpl->append(animation.target, _channels(animation), begin, end, curve, true);
         clip.from = from;
         clip.to = to;
-        clip.begin = begin;
-        clip.end = end;
-        clip.curve = curve;
         clip.kind = animation.kind;
         clip.progressReveal = animation.kind == AnimationKind::Create
                               || animation.kind == AnimationKind::Uncreate
                               || animation.kind == AnimationKind::Write
                               || animation.kind == AnimationKind::DrawBorderThenFill;
         clip.related = animation.related;
-        clip.channels = _channels(animation);
         if (layered) _layered(clip, animation, authored);
-        _channelEnd(*entry, clip.channels, end);
         if (animation.kind == AnimationKind::Indicate || animation.kind == AnimationKind::Morph) continue;
         if (animation.kind == AnimationKind::FadeOut || animation.kind == AnimationKind::Shrink) {
             auto authored = from;
@@ -7365,7 +7357,7 @@ Result Scene::play(const Animation* animations, uint32_t count, float duration,
         } else {
             Impl::store(animation.target, to);
         }
-        entry->fingerprint = fingerprint(animation.target);
+        _commit(*entry);
         // The object now sets the color itself; below a group, shapes added later inherit it.
         if (animation.kind == AnimationKind::Stroke) animation.target->objStrokeAuthored = true;
         if (animation.kind == AnimationKind::Fill) animation.target->objFillAuthored = true;
@@ -7383,7 +7375,7 @@ Result Scene::play(const Animation* animations, uint32_t count, float duration,
         VisualState state;
         if (pImpl->sample(*entry, _channelEnd(*entry, CHANNEL_MODEL), state)) {
             animation.target->model = state.model;
-            entry->fingerprint = fingerprint(animation.target);
+            _commit(*entry);
         }
     }
     pImpl->advance(nextCursor);
@@ -7582,25 +7574,18 @@ Result Scene::play(const AnimationTarget* targets, uint32_t count, float duratio
         auto layered = (target.properties & TARGET_MODEL) && begin < _channelEnd(*entry, CHANNEL_MODEL);
         if (layered && _shifts(from.model, to.model, change)) to.model = change * from.model;
 
-        auto& clip = pImpl->clips[pImpl->clipCnt++];
-        clip = Clip{};
+        auto& clip = pImpl->append(target.target, _channels(target.properties, target.target->type()), begin,
+                                   _end(pImpl->cursor, duration, lag, i), curve);
         if ((target.properties & TARGET_MODEL) && target.targetArc != 0.0f) {
             clip.motion = ClipMotion::Arc;
             clip.arc = target.targetArc;
         }
-        clip.object = target.target;
-        pImpl->link(pImpl->clipCnt - 1u);
         clip.from = from;
         clip.to = to;
         if (layered) _layered(clip, target.target, from.model, target.targetModel);
-        clip.begin = begin;
-        clip.end = _end(pImpl->cursor, duration, lag, i);
-        clip.curve = curve;
-        clip.channels = _channels(target.properties, target.target->type());
-        _channelEnd(*entry, clip.channels, clip.end);
         Impl::store(target.target, to);
         if (target.properties & TARGET_GEOMETRY) entry->geometry = to.geometry;
-        entry->fingerprint = fingerprint(target.target);
+        _commit(*entry);
         // The object now sets these itself; below a group, shapes added later inherit them.
         if (target.properties & TARGET_STROKE) target.target->objStrokeAuthored = true;
         if (target.properties & TARGET_FILL) target.target->objFillAuthored = true;
@@ -7644,7 +7629,7 @@ static void _carry(Impl& impl, Object* object, int64_t moved)
         child->layer = static_cast<int32_t>(child->layer + moved);
         if (auto entry = impl.entry(child)) {
             entry->base.layer = child->layer;
-            entry->fingerprint = fingerprint(child);
+            _commit(*entry);
         }
         _carry(impl, child, moved);
     }
@@ -7784,24 +7769,17 @@ Result Scene::update(const AnimationTarget& target) noexcept
             impl.dropGeometries(previousGeometryCount, previousGeometryPoints);
             return impl.fail(Result::OutOfMemory, SCENE_MEMORY);
         }
-        auto& clip = impl.clips[impl.clipCnt++];
-        clip = Clip{};
-        clip.object = object;
-        impl.link(impl.clipCnt - 1u);
+        auto& clip = impl.append(object, channels, time, time, AnimCurve::preset(AnimCurvePreset::Smooth));
         clip.from = _state(object);
         if (shaped) _reshaped(clip.from, entry->geometry);
         clip.to = Impl::targeted(target, clip.from, kept, shaped);
         if (shifts) clip.to.model = change * clip.from.model;
-        clip.begin = time;
-        clip.end = time;
-        clip.channels = channels;
-        _channelEnd(*entry, channels, time);
         auto state = clip.to;
         auto authored = clip.from.model;
         if (layered) _layered(clip, object, authored, target.targetModel);
         Impl::store(object, state);
         if (shaped) entry->geometry = shaped;
-        entry->fingerprint = fingerprint(object);
+        _commit(*entry);
         _inheritClips(impl, inheritance, 0.0f, 0.0f, clip.curve, [&target](uint32_t, uint32_t properties, VisualState& to) {
             if (properties & TARGET_STROKE) to.stroke = target.targetStroke;
             if (properties & TARGET_FILL) to.fill = target.targetFill;
@@ -8146,10 +8124,7 @@ Result Scene::restore(Object* const* targets, uint32_t count, float duration, co
 
     for (auto k = 0u; k < planned; k++) {
         auto& item = plan[k];
-        auto& clip = impl.clips[impl.clipCnt++];
-        clip = Clip{};
-        clip.object = item.object;
-        impl.link(impl.clipCnt - 1u);
+        auto& clip = impl.append(item.object, item.channels, item.begin, item.end, curve);
         clip.from = item.from;
         clip.to = item.to;
         if (item.channels & CHANNEL_TEXT) {
@@ -8158,10 +8133,6 @@ Result Scene::restore(Object* const* targets, uint32_t count, float duration, co
             clip.to.textProgress = 1.0f;
             clip.to.textChange = TextChange::Sweep;
         }
-        clip.begin = item.begin;
-        clip.end = item.end;
-        clip.curve = curve;
-        clip.channels = item.channels;
         // The saved values become the object's latest authored state.
         auto authored = _state(item.object);
         _apply(authored, clip.to, item.channels);
@@ -8173,7 +8144,6 @@ Result Scene::restore(Object* const* targets, uint32_t count, float duration, co
             clip.from.model = Mat4::identity();
             clip.to.model = item.change;
         }
-        _channelEnd(*item.entry, item.channels, item.end);
         if (item.channels & (CHANNEL_BLUR | CHANNEL_SHADOW)) item.object->objEffects = true;
     }
     // The objects set again the styles they set themselves when saved, which decide what the
@@ -8188,7 +8158,7 @@ Result Scene::restore(Object* const* targets, uint32_t count, float duration, co
             record.object->objStrokeAuthored = record.strokeAuthored;
             record.object->objFillAuthored = record.fillAuthored;
             record.object->objWidthAuthored = record.widthAuthored;
-            entry->fingerprint = fingerprint(record.object);
+            _commit(*entry);
         }
         save.target = nullptr;
     }
@@ -8357,22 +8327,14 @@ Result Scene::warp(Object* const* targets, uint32_t count, PointMap map, void* d
     for (auto i = 0u; i < used; i++) {
         auto& item = items[i];
         auto entry = impl.entry(item.object);
-        auto& clip = impl.clips[impl.clipCnt++];
-        clip = Clip{};
-        clip.object = item.object;
+        auto& clip = impl.append(item.object, item.channels, begin, end, curve);
         clip.from = _state(item.object);
         clip.from.warp = item.object->objWarp;
         clip.from.warpProgress = 1.0f;
         _reshaped(clip.from, entry->geometry);
         clip.to = clip.from;
         clip.to.warp = item.shape;
-        clip.begin = begin;
-        clip.end = end;
-        clip.curve = curve;
         clip.kind = AnimationKind::Transform;
-        clip.channels = item.channels;
-        impl.link(impl.clipCnt - 1u);
-        _channelEnd(*entry, item.channels, end);
         item.object->objWarp = item.shape;
         impl.warps[impl.warpCnt++] = item.shape;
         impl.warpPoints += item.shape->count;

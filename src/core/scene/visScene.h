@@ -466,7 +466,7 @@ struct Clip
     bool layered = false;
     bool follows = false;
     Vec3 anchor;
-    // The index of the next clip of the same object in storage order, or NO_CLIP, which link()
+    // The index of the next clip of the same object in storage order, or NO_CLIP, which append()
     // sets.
     uint32_t next = NO_CLIP;
 };
@@ -698,7 +698,7 @@ struct Scene::Impl
     uint32_t clipCnt = 0;
     uint32_t clipCap = 0;
     // The clips that placing every object once reads: the clip count of each entry times its
-    // family. link() and attach() keep it, and Scene::sampleWork() adds the nested scenes.
+    // family. append() and attach() keep it, and Scene::sampleWork() adds the nested scenes.
     uint64_t work = 0;
     uint32_t cameraCnt = 0;
     uint32_t cameraCap = 0;
@@ -743,9 +743,12 @@ struct Scene::Impl
     ~Impl();
     bool assign(const Theme& theme) noexcept;
     bool growClips(uint32_t count) noexcept;
-    // Adds the clip at index, the last one stored, to the list of the object it names. Every
-    // clip is linked once its object is set, before anything samples that object.
-    void link(uint32_t index) noexcept;
+    // Stores the next clip, which growClips() made room for, as a clip of object on channels from
+    // begin to end, and adds it to the list of the object's clips, whose channels then end at end
+    // or later. The clip starts empty unless prepare() has filled it. Every clip is appended
+    // before anything samples its object.
+    Clip& append(Object* object, uint32_t channels, float begin, float end, const AnimCurve& curve,
+                 bool prepared = false) noexcept;
     // The camera timeline of the scene, or of view index - 1 for an index from 1.
     CameraTrack track(uint32_t index) noexcept;
     // Add a look or an orbit to track after the checks of Scene::look() and Scene::orbit() that

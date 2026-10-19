@@ -5,6 +5,7 @@
 #include <cmath>
 
 #include "vis.h"
+#include "../common/visMix.h"
 
 namespace vis
 {
@@ -22,12 +23,6 @@ static inline Color _opacity(Color color, float opacity)
     auto alpha = static_cast<float>(color.a) * _clamp(opacity);
     color.a = static_cast<uint8_t>(alpha + 0.5f);
     return color;
-}
-
-static inline float _mix(float from, float to, float progress)
-{
-    return static_cast<float>(static_cast<double>(from)
-           + (static_cast<double>(to) - from) * progress);
 }
 
 static inline uint8_t _mix(uint8_t from, uint8_t to, float progress)
