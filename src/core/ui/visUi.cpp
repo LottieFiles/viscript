@@ -6,6 +6,7 @@
 #include "vis_ui.h"
 #include "../common/visControl.h"
 #include "../common/visFinite.h"
+#include "../common/visGrow.h"
 #include "../common/visRetarget.h"
 
 namespace vis::ui
@@ -440,34 +441,6 @@ struct Panel::Impl
         delete[] bindings;
     }
 
-    bool growControls() noexcept
-    {
-        if (controlCount < controlCapacity) return true;
-        auto capacity = controlCapacity ? controlCapacity * 2u : 8u;
-        if (capacity < controlCapacity) return false;
-        auto grown = new (std::nothrow) UIObject*[capacity];
-        if (!grown) return false;
-        for (auto i = 0u; i < controlCount; i++) grown[i] = controls[i];
-        delete[] controls;
-        controls = grown;
-        controlCapacity = capacity;
-        return true;
-    }
-
-    bool growBindings() noexcept
-    {
-        if (bindingCount < bindingCapacity) return true;
-        auto capacity = bindingCapacity ? bindingCapacity * 2u : 8u;
-        if (capacity < bindingCapacity) return false;
-        auto grown = new (std::nothrow) Binding[capacity];
-        if (!grown) return false;
-        for (auto i = 0u; i < bindingCount; i++) grown[i] = bindings[i];
-        delete[] bindings;
-        bindings = grown;
-        bindingCapacity = capacity;
-        return true;
-    }
-
     // Whether object can take a transform: the scene's own, nested with no sample marker or
     // swatch.
     bool bindable(const Object* object) const noexcept
@@ -486,7 +459,7 @@ struct Panel::Impl
     Result add(const Binding& binding) noexcept
     {
         if (bindingCount >= BindingLimit) return Result::InsufficientCondition;
-        if (!growBindings()) return Result::OutOfMemory;
+        if (!grow(bindings, bindingCount, bindingCapacity, 1u, 8u)) return Result::OutOfMemory;
         bindings[bindingCount++] = binding;
         return Result::Success;
     }
@@ -572,7 +545,9 @@ Result Panel::add(UIObject* control) noexcept
         }
     }
     if (pImpl->controlCount >= ControlLimit) return Result::InsufficientCondition;
-    if (!pImpl->growControls()) return Result::OutOfMemory;
+    if (!grow(pImpl->controls, pImpl->controlCount, pImpl->controlCapacity, 1u, 8u)) {
+        return Result::OutOfMemory;
+    }
     auto result = Group::add(control);
     if (result != Result::Success) return result;
     control->uiPanel = this;

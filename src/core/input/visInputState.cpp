@@ -7,6 +7,7 @@
 #include "vis_input.h"
 #include "visInputEvent.h"
 #include "../common/visFinite.h"
+#include "../common/visGrow.h"
 
 namespace vis::input
 {
@@ -203,21 +204,6 @@ struct ActionMap::Impl
         delete[] bindings;
     }
 
-    bool grow() noexcept
-    {
-        if (bindingCount < bindingCapacity) return true;
-        auto capacity = bindingCapacity ? bindingCapacity * 2u : 8u;
-        if (capacity > BindingLimit) capacity = BindingLimit;
-        if (capacity <= bindingCapacity) return false;
-        auto grown = new (std::nothrow) Binding[capacity];
-        if (!grown) return false;
-        for (auto i = 0u; i < bindingCount; i++) grown[i] = bindings[i];
-        delete[] bindings;
-        bindings = grown;
-        bindingCapacity = capacity;
-        return true;
-    }
-
     Binding* find(const char* action, Source source, Key key, uint32_t pointer,
                   uint8_t button) noexcept
     {
@@ -249,7 +235,9 @@ struct ActionMap::Impl
             return Result::Success;
         }
         if (bindingCount == BindingLimit) return Result::InsufficientCondition;
-        if (!grow()) return Result::OutOfMemory;
+        if (!grow(bindings, bindingCount, bindingCapacity, 1u, 8u, BindingLimit)) {
+            return Result::OutOfMemory;
+        }
         binding = bindings + bindingCount++;
         std::memcpy(binding->action, action, length + 1u);
         binding->source = source;

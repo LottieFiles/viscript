@@ -385,31 +385,8 @@ struct IR::Impl
     }
 };
 
-struct ConstraintReport::Impl
+struct ConstraintReport::Impl : IssueList<ConstraintIssue>
 {
-    ConstraintIssue* issues = nullptr;
-    uint32_t count = 0u;
-    uint32_t capacity = 0u;
-
-    ~Impl()
-    {
-        delete[] issues;
-    }
-
-    bool add(const ConstraintIssue& issue) noexcept
-    {
-        if (count == capacity) {
-            auto next = capacity ? capacity * 2u : 8u;
-            auto grown = new (std::nothrow) ConstraintIssue[next];
-            if (!grown) return false;
-            for (auto i = 0u; i < count; i++) grown[i] = issues[i];
-            delete[] issues;
-            issues = grown;
-            capacity = next;
-        }
-        issues[count++] = issue;
-        return true;
-    }
 };
 
 namespace receipt_detail

@@ -18,6 +18,7 @@
 #include "vis.h"
 #include "vis_capi.h"
 #include "visLuaHost.h"
+#include "../../core/common/visGrow.h"
 #if defined(VIS_AUDIO)
 #include "vis_audio.h"
 
@@ -223,20 +224,11 @@ struct JsonBuffer
         delete[] data;
     }
 
+    // Makes room for additional bytes and the terminator after them.
     bool reserve(uint32_t additional)
     {
         if (additional > UINT32_MAX - size - 1u) return false;
-        auto required = size + additional + 1u;
-        if (required <= capacity) return true;
-        auto next = capacity ? capacity * 2u : 4096u;
-        if (next < capacity || next < required) next = required;
-        auto grown = new (std::nothrow) uint8_t[next];
-        if (!grown) return false;
-        if (size) std::memcpy(grown, data, size);
-        delete[] data;
-        data = grown;
-        capacity = next;
-        return true;
+        return vis::grow(data, size, capacity, additional + 1u, 4096u);
     }
 
     bool append(const char* value)

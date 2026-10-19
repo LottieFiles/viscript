@@ -5,37 +5,14 @@
 #include <limits>
 #include <new>
 
+#include "visDiagram.h"
 #include "visDiagramGeometry.h"
 
 namespace vis::diagram
 {
 
-struct PhysicalConstraintReport::Impl
+struct PhysicalConstraintReport::Impl : detail::IssueList<PhysicalConstraintIssue>
 {
-    PhysicalConstraintIssue* issues = nullptr;
-    uint32_t count = 0u;
-    uint32_t capacity = 0u;
-
-    ~Impl()
-    {
-        delete[] issues;
-    }
-
-    bool add(const PhysicalConstraintIssue& issue) noexcept
-    {
-        if (count == capacity) {
-            auto next = capacity ? capacity * 2u : 8u;
-            if (next < capacity) return false;
-            auto grown = new (std::nothrow) PhysicalConstraintIssue[next];
-            if (!grown) return false;
-            for (auto i = 0u; i < count; i++) grown[i] = issues[i];
-            delete[] issues;
-            issues = grown;
-            capacity = next;
-        }
-        issues[count++] = issue;
-        return true;
-    }
 };
 
 namespace

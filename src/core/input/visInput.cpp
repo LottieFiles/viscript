@@ -7,6 +7,7 @@
 #include "visInputEvent.h"
 #include "../common/visControl.h"
 #include "../common/visFinite.h"
+#include "../common/visGrow.h"
 #include "../common/visRetarget.h"
 
 namespace vis::input
@@ -93,62 +94,6 @@ struct Controller::Impl
         delete inputState;
     }
 
-    bool growStates() noexcept
-    {
-        if (stateCount < stateCapacity) return true;
-        auto capacity = stateCapacity ? stateCapacity * 2u : 8u;
-        if (capacity < stateCapacity) return false;
-        auto grown = new (std::nothrow) State[capacity];
-        if (!grown) return false;
-        for (auto i = 0u; i < stateCount; i++) grown[i] = states[i];
-        delete[] states;
-        states = grown;
-        stateCapacity = capacity;
-        return true;
-    }
-
-    bool growPointers() noexcept
-    {
-        if (pointerCount < pointerCapacity) return true;
-        auto capacity = pointerCapacity ? pointerCapacity * 2u : 4u;
-        if (capacity < pointerCapacity) return false;
-        auto grown = new (std::nothrow) PointerBinding[capacity];
-        if (!grown) return false;
-        for (auto i = 0u; i < pointerCount; i++) grown[i] = pointers[i];
-        delete[] pointers;
-        pointers = grown;
-        pointerCapacity = capacity;
-        return true;
-    }
-
-    bool growKeys() noexcept
-    {
-        if (keyCount < keyCapacity) return true;
-        auto capacity = keyCapacity ? keyCapacity * 2u : 8u;
-        if (capacity < keyCapacity) return false;
-        auto grown = new (std::nothrow) KeyBinding[capacity];
-        if (!grown) return false;
-        for (auto i = 0u; i < keyCount; i++) grown[i] = keys[i];
-        delete[] keys;
-        keys = grown;
-        keyCapacity = capacity;
-        return true;
-    }
-
-    bool growTriggers() noexcept
-    {
-        if (triggerCount < triggerCapacity) return true;
-        auto capacity = triggerCapacity ? triggerCapacity * 2u : 8u;
-        if (capacity < triggerCapacity) return false;
-        auto grown = new (std::nothrow) KeyTriggerBinding[capacity];
-        if (!grown) return false;
-        for (auto i = 0u; i < triggerCount; i++) grown[i] = triggers[i];
-        delete[] triggers;
-        triggers = grown;
-        triggerCapacity = capacity;
-        return true;
-    }
-
     uint32_t find(const Object* object) const noexcept
     {
         for (auto i = 0u; i < stateCount; i++) {
@@ -180,7 +125,7 @@ struct Controller::Impl
     {
         auto index = find(target);
         if (index != UINT32_MAX) return index;
-        if (!growStates()) return UINT32_MAX;
+        if (!grow(states, stateCount, stateCapacity, 1u, 8u)) return UINT32_MAX;
         states[stateCount].object = target;
         states[stateCount].origin = origin;
         return stateCount++;
@@ -340,7 +285,9 @@ Result Controller::pointerFollow(const PointerFollow& binding) noexcept
     for (auto i = 0u; i < pImpl->keyCount; i++) {
         if (pImpl->keys[i].config.target == binding.target) return Result::InsufficientCondition;
     }
-    if (!pImpl->growPointers()) return Result::OutOfMemory;
+    if (!grow(pImpl->pointers, pImpl->pointerCount, pImpl->pointerCapacity, 1u, 4u)) {
+        return Result::OutOfMemory;
+    }
     auto state = pImpl->track(binding.target, binding.targetOrigin);
     if (state == UINT32_MAX) return Result::OutOfMemory;
     pImpl->pointers[pImpl->pointerCount++] = {binding, state};
@@ -360,7 +307,7 @@ Result Controller::keyMove(const KeyMove& binding) noexcept
             return Result::InsufficientCondition;
         }
     }
-    if (!pImpl->growKeys()) return Result::OutOfMemory;
+    if (!grow(pImpl->keys, pImpl->keyCount, pImpl->keyCapacity, 1u, 8u)) return Result::OutOfMemory;
     auto state = pImpl->track(binding.target, {});
     if (state == UINT32_MAX) return Result::OutOfMemory;
     pImpl->keys[pImpl->keyCount++] = {binding, state};
@@ -377,7 +324,9 @@ Result Controller::keyTrigger(const KeyTriggerBinding& binding) noexcept
     if (pImpl->pointerCount + pImpl->keyCount + pImpl->triggerCount >= BindingLimit) {
         return Result::InsufficientCondition;
     }
-    if (!pImpl->growTriggers()) return Result::OutOfMemory;
+    if (!grow(pImpl->triggers, pImpl->triggerCount, pImpl->triggerCapacity, 1u, 8u)) {
+        return Result::OutOfMemory;
+    }
     pImpl->triggers[pImpl->triggerCount++] = binding;
     return Result::Success;
 }

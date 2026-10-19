@@ -3,6 +3,7 @@
 #define _VIS_DIAGRAM_PRIVATE_H_
 
 #include "vis_diagram.h"
+#include "../common/visGrow.h"
 
 namespace vis::diagram::detail
 {
@@ -32,6 +33,28 @@ struct ZoneLayout
 {
     Vec2 center;
     Vec2 size;
+};
+
+// The issues a report holds in the order its checks found them: the Impl of ConstraintReport
+// and of PhysicalConstraintReport.
+template<typename Issue>
+struct IssueList
+{
+    Issue* issues = nullptr;
+    uint32_t count = 0u;
+    uint32_t capacity = 0u;
+
+    ~IssueList()
+    {
+        delete[] issues;
+    }
+
+    bool add(const Issue& issue) noexcept
+    {
+        if (!grow(issues, count, capacity, 1u, 8u)) return false;
+        issues[count++] = issue;
+        return true;
+    }
 };
 
 static inline bool _dashed(const EdgeRecord& edge) noexcept
