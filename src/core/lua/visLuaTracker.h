@@ -21,7 +21,7 @@ static constexpr const char* STATE_KEYS[] = {
 // track wait until a scene call that adds or reads clips, or the end of the script, so a
 // later track of other trackers that overlaps it on a binding can merge with it.
 static constexpr const char* TRACKER_PRELUDE = R"lua(
-local methods, ease, settle, fps, unknown, where, pend, timing, KEYS = ...
+local methods, ease, settle, fps, unknown, where, pend, sampling, timing, KEYS = ...
 local type, error, ipairs, select, unpack, pcall = type, error, ipairs, select, table.unpack, pcall
 local tonumber = tonumber
 local sort = table.sort
@@ -71,8 +71,10 @@ local function component(v)
     return not v or tonumber(v) ~= nil
 end
 
+-- The state the bound function gives for args. It runs as a sampling callback of the scene, which
+-- it cannot author.
 local function evaluate(binding, args, level)
-    local state = binding.fn(unpack(args, 1, #binding.trackers))
+    local state = sampling(binding.scene, binding.fn, unpack(args, 1, #binding.trackers))
     if type(state) ~= "table" then error("a bound function must return a state table", level + 1) end
     local key = unknown(state)
     if key then error("a bound state cannot set '" .. key .. "'", level + 1) end
@@ -259,6 +261,8 @@ function methods.tracker(scene, value)
 end
 
 function methods.bind(scene, object, source, fn)
+    -- A scene that can no longer be authored fails at the author's call, before fn runs.
+    call(2, fps, scene)
     if type(fn) ~= "function" then error("bind requires a function", 2) end
     local list = trackers[source] and {source} or source
     if type(list) ~= "table" or #list == 0 then error("bind requires a tracker or an array of trackers", 2) end
@@ -266,7 +270,7 @@ function methods.bind(scene, object, source, fn)
         if record(tracker, 2).scene ~= scene then error("tracker belongs to another scene", 2) end
     end
     if bound[object] then error("an object can follow only one binding", 2) end
-    local binding = {object = object, trackers = list, fn = fn, shift = {0, 0, 0}, windows = {}}
+    local binding = {scene = scene, object = object, trackers = list, fn = fn, shift = {0, 0, 0}, windows = {}}
     local state = sample(binding, 2)
     local first = descriptor(binding, state)
     settle(scene, first)

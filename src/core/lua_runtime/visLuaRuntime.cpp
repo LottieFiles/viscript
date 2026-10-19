@@ -812,15 +812,9 @@ static int _newRuntime(lua_State* lua)
     _options(lua, 2, "runtime config", options);
     Config config;
     config.fixedStep = _fieldNumber(lua, 2, "fixed_step", config.fixedStep);
-    lua_getfield(lua, 2, "max_steps");
-    if (!lua_isnil(lua, -1)) {
-        auto steps = luaL_checkinteger(lua, -1);
-        if (steps < 1 || steps > 64) {
-            return luaL_error(lua, "max_steps must be between 1 and 64");
-        }
-        config.maxSteps = static_cast<uint32_t>(steps);
-    }
-    lua_pop(lua, 1);
+    auto steps = _fieldInteger(lua, 2, "max_steps", config.maxSteps);
+    if (steps < 1 || steps > 64) return luaL_error(lua, "max_steps must be between 1 and 64");
+    config.maxSteps = static_cast<uint32_t>(steps);
     if (!std::isfinite(config.fixedStep) || config.fixedStep <= 0.0f
         || config.fixedStep > 1.0f) {
         return luaL_error(lua, "fixed_step must be finite and between 0 and 1 second");

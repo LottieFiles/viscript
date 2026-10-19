@@ -86,7 +86,8 @@ return scene
     struct InvalidCall {const char* source; const char* error;};
     static constexpr InvalidCall batches[] = {
         {"states:transition({})", "transition targets must contain"},
-        {"states:transition({{object=a, state='idle'}, 1})", "table expected"},
+        {"states:transition({{object=a, state='idle'}, 1})", "transition target must be a table, got number"},
+        {"states:transition({{object=a, state=true}})", "transition target state must be a string, got boolean"},
         {"states:transition({{object=a, state='idle', extra=true}})", "extra"},
         {"states:transition({{object=a, state='idle'}, {object=a, state='idle'}})", "transition failed"},
         {"states:transition({{object=a, state='idle'}, {object=b, state='missing'}})", "transition failed"},

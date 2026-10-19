@@ -99,6 +99,7 @@ void _streamLines();
 void _shapeMorphs();
 void _contourPaths();
 void _regions();
+void _samplingCallbacks();
 void _arranging();
 void _advecting();
 void _emphasizing(Renderer* renderer);

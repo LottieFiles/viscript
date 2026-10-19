@@ -1281,3 +1281,46 @@ return s
                  "s:difference{of={a, b}, points={}}; return s",
                  "unknown option 'points'");
 }
+
+void _samplingCallbacks()
+{
+    // Every function the binding samples runs as a sampling callback, which cannot author its
+    // scene: a call that would names the line of the callback, also when a bind inside one
+    // samples a function of its own.
+    static constexpr auto prefix = "local s=vis.scene{fps=4}; local c=s:circle{radius=0.5}; local armed=false\n"
+                                   "local function author(x) if armed then s:circle{} end return x end\n";
+    auto fails = [](const char* body, const char* expected = "diagnostic.lua:2: scene authoring is unavailable "
+                                                              "inside a sampling callback") {
+        char script[1024];
+        std::snprintf(script, sizeof(script), "%sarmed=true\n%s\nreturn s", prefix, body);
+        _scriptError(script, expected);
+    };
+    fails("s:plot{fn=author, x_range={0,1,0.5}}");
+    fails("local p=s:plot{points={{0,0},{1,1}}}; s:play({target=p, fn=author, x_range={0,1,0.5}}, 1)");
+    fails("s:area{fn=author, x_range={0,1,0.5}}");
+    fails("s:area{fn=function() return 1 end, base=author, x_range={0,1,0.5}}");
+    fails("s:riemann{fn=author, x_range={0,1,0.5}}");
+    fails("s:vector_field{fn=function(x, y) return author(x), y end, x_range={0,1,1}, y_range={0,1,1}}");
+    fails("s:stream_lines{fn=function(x, y) return author(x), y end, seeds={{0,0}}, time=1, dt=0.5}");
+    fails("s:advect(c, function(x, y) return author(x), y end, {duration=0.5})");
+    fails("s:surface{points={{0,0,0},{1,0,0},{0,1,0},{1,1,0}}, size={2,2},\n"
+          "colors=function(x) return author('#fff') end}");
+    fails("s:bind(c, s:tracker(0), function(v) return {opacity=author(1)} end)");
+    fails("s:plot{x_range={0,1,1}, fn=function(x)\n"
+          "s:bind(c, s:tracker(0), function() return {opacity=1} end) return x end}",
+          "diagnostic.lua:5: scene authoring is unavailable inside a sampling callback");
+    // A function the binding samples again later: the colors of two surfaces where they morph,
+    // a bound function where a track moves its tracker and where tracks that wait play.
+    auto later = [](const char* setup, const char* body) {
+        char script[1024];
+        std::snprintf(script, sizeof(script), "%s%s\narmed=true\n%s\nreturn s", prefix, setup, body);
+        _scriptError(script, "diagnostic.lua:2: scene authoring is unavailable inside a sampling callback");
+    };
+    later("local p={{0,0,0},{1,0,0},{0,1,0},{1,1,0}}; local function f() return author('#fff') end\n"
+          "local a=s:surface{points=p, size={2,2}, colors=f}; local b=s:surface{points=p, size={2,2}, colors=f}",
+          "s:morph(a, b)");
+    later("local t=s:tracker(0); s:bind(c, t, function(v) return {opacity=author(1)} end)", "s:track(t, 1, 1)");
+    later("local x, z=s:tracker(0), s:tracker(0)\n"
+          "s:bind(c, {x, z}, function(a, b) return {opacity=author(1)} end)\n"
+          "s:parallel(function() s:track(x, 1, 1) end, function() s:track(z, 1, 1) end)", "");
+}

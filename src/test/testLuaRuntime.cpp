@@ -186,6 +186,20 @@ return scene
     delete scene;
 }
 
+// A config field of the wrong type or out of range stops the script, naming the field.
+static void configFields()
+{
+    auto fails = [](const char* field, const char* expected) {
+        char source[256];
+        std::snprintf(source, sizeof(source),
+                      "local scene = vis.scene {}\nvis.runtime(scene, {%s, update = function() end})\nreturn scene",
+                      field);
+        _scriptError(source, "runtime-config.lua", expected);
+    };
+    fails("max_steps = 1.5", "runtime-config.lua:2: max_steps must be an integer");
+    fails("max_steps = 65", "runtime-config.lua:2: max_steps must be between 1 and 64");
+}
+
 static void groupFill()
 {
     Config config;
@@ -433,6 +447,7 @@ int main()
     objectLimit();
     soundEvents();
     soundAsset();
+    configFields();
     groupFill();
     callbackFailure();
     optionalRuntime();

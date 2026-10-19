@@ -32,7 +32,7 @@ static void _fieldAsset(lua_State* lua, int index,
     lua_getfield(lua, index, "asset");
     if (lua_isnil(lua, -1)) luaL_error(lua, "audio cue requires asset");
     size_t size = 0u;
-    auto value = luaL_checklstring(lua, -1, &size);
+    auto value = _checkString(lua, -1, "audio asset", &size);
     if (!size || size > Soundscape::AssetNameLimit || std::memchr(value, '\0', size)) {
         luaL_error(lua, "audio asset must be 1 to %d bytes without zero bytes",
                    static_cast<int>(Soundscape::AssetNameLimit));

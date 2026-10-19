@@ -369,6 +369,7 @@ int detail::luaOpenApi(lua_State* lua, const LuaApi& api)
     lua_pushcfunction(lua, api.trackerUnknown);
     lua_pushcfunction(lua, api.trackerWhere);
     lua_pushcfunction(lua, api.trackerPending);
+    lua_pushcfunction(lua, api.trackerSample);
     lua_pushcfunction(lua, _trackTiming);
     // The state keys but shift, which the prelude gives as a change.
     lua_createtable(lua, static_cast<int>(sizeof(STATE_KEYS) / sizeof(*STATE_KEYS)) - 1, 0);
@@ -378,7 +379,7 @@ int detail::luaOpenApi(lua_State* lua, const LuaApi& api)
         lua_pushstring(lua, key);
         lua_rawseti(lua, -2, ++keys);
     }
-    lua_call(lua, 9, 1);
+    lua_call(lua, 10, 1);
     lua_setfield(lua, LUA_REGISTRYINDEX, TRACKER_FLUSH);
     // Last, so the tracker prelude above reads globals without the guard.
     lua_pushglobaltable(lua);

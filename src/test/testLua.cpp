@@ -551,6 +551,7 @@ int main()
         _shapeMorphs();
         _contourPaths();
         _regions();
+        _samplingCallbacks();
         _arranging();
         _advecting();
         _textChanges();

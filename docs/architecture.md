@@ -78,7 +78,10 @@ and [Layout audit](layout-audit.md).
 
 Riemann sums, vector fields, stream lines, and contours are constructed while the
 scene is authored. Function callbacks produce retained rectangles, vectors, or plot
-pieces. Trackers bake changing values and geometry into frame-cadence clips.
+pieces. Trackers bake changing values and geometry into frame-cadence clips. A
+function the binding samples, from a plot `fn` to surface colors or a bound function,
+cannot author the scene while it runs: such a call fails with "scene authoring is
+unavailable inside a sampling callback".
 
 Cell and Voxel fields retain color snapshots on a coordinate/time lattice. Rendering
 interpolates those snapshots. SurfaceMesh stores a rectangular 3D lattice and lowers

@@ -166,7 +166,7 @@ struct LuaScene
     Lua::AssetResolver resolver = nullptr;
     void* resolverData = nullptr;
     bool owner = true;
-    bool sampleActive = false;
+    bool sampleActive = false;  // while _sampleCall runs a function the scene samples
     bool cameraMoved = false;  // homeCamera and homeView hold the camera before the first move
     Camera homeCamera;
     CameraView homeView = CameraView::TwoD;
@@ -315,6 +315,18 @@ static void _authoring(lua_State* lua, const LuaScene* box, const char* what)
     if (!detail::luaAuthoring(lua)) luaL_error(lua, "%s authoring is unavailable after loading", what);
     if (!box->owner) luaL_error(lua, "scene already belongs to a viewport");
     if (box->sampleActive) luaL_error(lua, "scene authoring is unavailable inside a sampling callback");
+}
+
+// Calls the function below the arguments as a sampling callback of box, which cannot author the
+// scene while it runs, and returns the status of the call, as lua_pcall does; the flag then goes
+// back to what it was.
+static int _sampleCall(lua_State* lua, LuaScene* box, int arguments, int results)
+{
+    auto active = box->sampleActive;
+    box->sampleActive = true;
+    auto status = lua_pcall(lua, arguments, results, 0);
+    box->sampleActive = active;
+    return status;
 }
 
 // The scene at index for a call that only moves or reads the authoring time, or that a track
@@ -3555,6 +3567,7 @@ struct LuaPlotSample
 struct LuaPlotCut
 {
     lua_State* lua = nullptr;
+    LuaScene* scene = nullptr;
     Vec3* points = nullptr;
     uint32_t* ends = nullptr;
     uint32_t capacity = 0;
@@ -3789,7 +3802,7 @@ static LuaPlotSample _plotSample(LuaPlotCut& cut, double x)
     auto lua = cut.lua;
     lua_pushvalue(lua, cut.fn);
     lua_pushnumber(lua, x);
-    lua_call(lua, 1, 1);
+    if (_sampleCall(lua, cut.scene, 1, 1) != LUA_OK) lua_error(lua);
     auto number = 0;
     auto y = lua_tonumberx(lua, -1, &number);
     if (!number && !lua_isnil(lua, -1)) {
@@ -4144,6 +4157,7 @@ static int _plot(lua_State* lua)
     if (!points && !function) return luaL_error(lua, "plot requires points or fn with x_range");
     LuaPlotCut cut;
     cut.lua = lua;
+    cut.scene = space.scene;
     cut.fn = 4;
     _plotBand(lua, 2, cut);
     _plotDiscontinuities(lua, 2, cut);
@@ -4197,12 +4211,13 @@ static uint32_t _steps(lua_State* lua, const Range& range, uint32_t limit, const
     return steps;
 }
 
-// Calls the function at index with x and returns its result, which must be a finite number.
-static float _call(lua_State* lua, int index, float x, const char* name)
+// Calls the function at index with x, as a sampling callback of box, and returns its result,
+// which must be a finite number.
+static float _call(lua_State* lua, LuaScene* box, int index, float x, const char* name)
 {
     lua_pushvalue(lua, index);
     lua_pushnumber(lua, x);
-    lua_call(lua, 1, 1);
+    if (_sampleCall(lua, box, 1, 1) != LUA_OK) lua_error(lua);
     auto y = _number(lua, -1, name);
     lua_pop(lua, 1);
     return y;
@@ -4214,6 +4229,7 @@ static float _call(lua_State* lua, int index, float x, const char* name)
 struct LuaFunction
 {
     lua_State* lua = nullptr;
+    LuaScene* scene = nullptr;
     int index = 0;
     const char* name = nullptr;
     bool raised = false;
@@ -4226,7 +4242,7 @@ static bool _sampleFunction(float x, float& value, void* data) noexcept
     auto lua = function->lua;
     lua_pushvalue(lua, function->index);
     lua_pushnumber(lua, x);
-    if (lua_pcall(lua, 1, 1, 0) != LUA_OK) {
+    if (_sampleCall(lua, function->scene, 1, 1) != LUA_OK) {
         function->raised = true;
         return false;
     }
@@ -4271,12 +4287,12 @@ static int _area(lua_State* lua)
     auto points = static_cast<Vec3*>(lua_newuserdatauv(lua, sizeof(Vec3) * count, 0));
     for (auto i = 0u; i <= steps; i++) {
         auto x = range.stepAt(i);
-        new (points + i) Vec3{x, _call(lua, fn, x, "area fn result"), 0.0f};
+        new (points + i) Vec3{x, _call(lua, space.scene, fn, x, "area fn result"), 0.0f};
     }
     for (auto i = steps + 1u; i < count; i++) {
         auto back = i - steps - 1u;
         auto x = range.stepAt(curved ? steps - back : (back ? 0u : steps));
-        new (points + i) Vec3{x, curved ? _call(lua, base, x, "area base result") : level, 0.0f};
+        new (points + i) Vec3{x, curved ? _call(lua, space.scene, base, x, "area base result") : level, 0.0f};
     }
     auto owner = _owner(lua, space.scene);
     return _add(lua, space, owner, Polygon::gen(points, count), 2, "area");
@@ -4382,7 +4398,7 @@ static int _riemann(lua_State* lua)
 
     auto owner = _owner(lua, space.scene);
     auto handle = lua_gettop(lua);
-    LuaFunction function{lua, fn, "riemann fn result"};
+    LuaFunction function{lua, space.scene, fn, "riemann fn result"};
     Group* group = nullptr;
     Result status;
     if (heights) {
@@ -4512,10 +4528,7 @@ static bool _contourSample(double x, double y, double& value, void* data) noexce
     lua_pushvalue(lua, context->fn);
     lua_pushnumber(lua, x);
     lua_pushnumber(lua, y);
-    context->scene->sampleActive = true;
-    auto result = lua_pcall(lua, 2, 1, 0);
-    context->scene->sampleActive = false;
-    if (result != LUA_OK) {
+    if (_sampleCall(lua, context->scene, 2, 1) != LUA_OK) {
         context->raised = true;
         return false;
     }
@@ -4708,14 +4721,15 @@ struct LuaFieldVector
     double y = 0.0;
 };
 
-// Calls the field function at index with x and y and reads the vector it gives, two numbers or a
-// list {x, y}; returns whether both are finite.
-static bool _fieldCall(lua_State* lua, int index, double x, double y, const char* name, LuaFieldVector& output)
+// Calls the field function at index with x and y, as a sampling callback of box, and reads the
+// vector it gives, two numbers or a list {x, y}; returns whether both are finite.
+static bool _fieldCall(lua_State* lua, LuaScene* box, int index, double x, double y, const char* name,
+                       LuaFieldVector& output)
 {
     lua_pushvalue(lua, index);
     lua_pushnumber(lua, x);
     lua_pushnumber(lua, y);
-    lua_call(lua, 2, 2);
+    if (_sampleCall(lua, box, 2, 2) != LUA_OK) lua_error(lua);
     auto listed = lua_istable(lua, -2);
     if (listed) {
         lua_rawgeti(lua, -2, 1);
@@ -4733,14 +4747,14 @@ static bool _fieldCall(lua_State* lua, int index, double x, double y, const char
 
 // One step of the classic Runge-Kutta method along the field function at fn from x, y by h,
 // giving the field where the step starts at start; false where the field is not finite.
-static bool _rungeKutta(lua_State* lua, int fn, double& x, double& y, double h, const char* name,
+static bool _rungeKutta(lua_State* lua, LuaScene* box, int fn, double& x, double& y, double h, const char* name,
                         LuaFieldVector& start)
 {
     LuaFieldVector k2, k3, k4;
-    if (!_fieldCall(lua, fn, x, y, name, start)) return false;
-    if (!_fieldCall(lua, fn, x + 0.5 * h * start.x, y + 0.5 * h * start.y, name, k2)) return false;
-    if (!_fieldCall(lua, fn, x + 0.5 * h * k2.x, y + 0.5 * h * k2.y, name, k3)) return false;
-    if (!_fieldCall(lua, fn, x + h * k3.x, y + h * k3.y, name, k4)) return false;
+    if (!_fieldCall(lua, box, fn, x, y, name, start)) return false;
+    if (!_fieldCall(lua, box, fn, x + 0.5 * h * start.x, y + 0.5 * h * start.y, name, k2)) return false;
+    if (!_fieldCall(lua, box, fn, x + 0.5 * h * k2.x, y + 0.5 * h * k2.y, name, k3)) return false;
+    if (!_fieldCall(lua, box, fn, x + h * k3.x, y + h * k3.y, name, k4)) return false;
     auto nextX = x + h / 6.0 * (start.x + 2.0 * k2.x + 2.0 * k3.x + k4.x);
     auto nextY = y + h / 6.0 * (start.y + 2.0 * k2.y + 2.0 * k3.y + k4.y);
     if (!(std::fabs(nextX) <= FLT_MAX) || !(std::fabs(nextY) <= FLT_MAX)) return false;
@@ -4754,6 +4768,7 @@ static bool _rungeKutta(lua_State* lua, int fn, double& x, double& y, double h, 
 struct LuaField
 {
     lua_State* lua = nullptr;
+    LuaScene* scene = nullptr;
     int index = 0;
     const char* name = nullptr;
     bool finite = true;
@@ -4770,7 +4785,7 @@ static bool _sampleField(double x, double y, double& u, double& v, void* data) n
     lua_pushvalue(lua, field->index);
     lua_pushnumber(lua, x);
     lua_pushnumber(lua, y);
-    if (lua_pcall(lua, 2, 2, 0) != LUA_OK) {
+    if (_sampleCall(lua, field->scene, 2, 2) != LUA_OK) {
         field->raised = true;
         return false;
     }
@@ -4886,7 +4901,7 @@ static int _vectorField(lua_State* lua)
 
     auto owner = _owner(lua, space.scene);
     auto handle = lua_gettop(lua);
-    LuaField field{lua, fn, "vector_field fn"};
+    LuaField field{lua, space.scene, fn, "vector_field fn"};
     Group* group = nullptr;
     Result status;
     if (vectors) {
@@ -4985,7 +5000,7 @@ static int _streamLines(lua_State* lua)
     auto owner = _owner(lua, space.scene);
     auto handle = lua_gettop(lua);
     // A vector that is not finite ends a line rather than the call.
-    LuaField field{lua, fn, "stream_lines fn", false};
+    LuaField field{lua, space.scene, fn, "stream_lines fn", false};
     Group* group = nullptr;
     Result status;
     luaL_checkstack(lua, 4, nullptr);
@@ -5260,18 +5275,19 @@ static SurfaceColormap _colormapTable(lua_State* lua, int index, const Vec3* poi
     return colormap;
 }
 
-// The color the color function of a surface at index gives the point.
-static Color _callColors(lua_State* lua, int index, const Theme& theme, const Vec3& point)
+// The color the color function of a surface at index gives the point, called as a sampling
+// callback of box.
+static Color _callColors(lua_State* lua, LuaScene* box, int index, const Vec3& point)
 {
     lua_pushvalue(lua, index);
     lua_pushnumber(lua, point.x);
     lua_pushnumber(lua, point.y);
     lua_pushnumber(lua, point.z);
-    lua_call(lua, 3, 1);
+    if (_sampleCall(lua, box, 3, 1) != LUA_OK) lua_error(lua);
     size_t size = 0;
     auto value = lua_type(lua, -1) == LUA_TSTRING ? lua_tolstring(lua, -1, &size) : nullptr;
     Color color;
-    if (!value || !_colorName(value, size, &theme, color)) {
+    if (!value || !_colorName(value, size, &box->scene->theme(), color)) {
         luaL_error(lua, "surface colors must return a hex color or Theme color role; at (%f, %f, %f) it did not",
                    static_cast<lua_Number>(point.x), static_cast<lua_Number>(point.y),
                    static_cast<lua_Number>(point.z));
@@ -5308,8 +5324,8 @@ static void _keepColors(lua_State* lua, int index, const SurfaceMesh* surface)
 // a point that returns its color; or a list of one color per point. The last two leave a
 // userdata holding a color for each point on the stack and return it; a colormap returns nullptr
 // and goes to colormap.
-static Color* _surfaceColors(lua_State* lua, int index, const Theme& theme, const Vec3* points,
-                             uint32_t count, SurfaceColormap& colormap)
+static Color* _surfaceColors(lua_State* lua, LuaScene* box, int index, const Vec3* points, uint32_t count,
+                             SurfaceColormap& colormap)
 {
     index = lua_absindex(lua, index);
     if (lua_type(lua, index) == LUA_TSTRING) {
@@ -5334,11 +5350,11 @@ static Color* _surfaceColors(lua_State* lua, int index, const Theme& theme, cons
     for (auto i = 0u; i < count; i++) {
         auto& point = points[i];
         if (function) {
-            colors[i] = _callColors(lua, index, theme, point);
+            colors[i] = _callColors(lua, box, index, point);
             continue;
         }
         lua_rawgeti(lua, index, i + 1u);
-        colors[i] = _color(lua, -1, "surface colors", &theme);
+        colors[i] = _color(lua, -1, "surface colors", &box->scene->theme());
         lua_pop(lua, 1);
     }
     return colors;
@@ -5434,7 +5450,7 @@ static int _surface(lua_State* lua)
     lua_getfield(lua, 2, "colors");
     auto rule = lua_gettop(lua);
     if (!lua_isnil(lua, -1)) {
-        colors = _surfaceColors(lua, -1, space.scene->scene->theme(), points, count, colormap);
+        colors = _surfaceColors(lua, space.scene, -1, points, count, colormap);
     }
 
     auto owner = _owner(lua, space.scene);
@@ -5746,6 +5762,7 @@ static Result _sampleFrames(const SampleTime& time, uint64_t volume,
 struct LuaSample
 {
     lua_State* lua = nullptr;
+    LuaScene* scene = nullptr;
     int callback = 0;
     const char* name = nullptr;
     bool failed = false;
@@ -5761,7 +5778,7 @@ static bool _sample(float x, float y, float z, float time, Color& color,
     lua_pushnumber(lua, y);
     if (spatial) lua_pushnumber(lua, z);
     lua_pushnumber(lua, time);
-    if (lua_pcall(lua, spatial ? 4 : 3, 1, 0) != LUA_OK) {
+    if (_sampleCall(lua, context->scene, spatial ? 4 : 3, 1) != LUA_OK) {
         context->failed = true;
         return false;
     }
@@ -5839,15 +5856,13 @@ static int _sampleGen(lua_State* lua, bool spatial)
     LuaCharge charge{512u + counts[2] * uint64_t{512} + volume * frames * sizeof(Color), counts[2] + 1u};
     _fit(lua, scene, charge);
 
-    auto context = LuaSample{lua, lua_absindex(lua, 2), name, false};
+    auto context = LuaSample{lua, scene, lua_absindex(lua, 2), name};
     Group* field = nullptr;
-    scene->sampleActive = true;
     if (spatial) {
         status = space->voxel(_sampleVoxel, field, &context, mode, padding, time);
     } else {
         status = space->cell(_sampleCell, field, &context, mode, padding, time);
     }
-    scene->sampleActive = false;
     if (context.failed) {
         auto message = lua_tostring(lua, -1);
         return luaL_error(lua, "%s", message ? message : "sampling callback failed");
@@ -6471,7 +6486,7 @@ static int _playOne(lua_State* lua, int index, Make make)
 
 // A contour child keeps its grid and level, but no callback. Each state traces a new fn or
 // values at authoring time and hands ordinary plot geometry to the timeline.
-static bool _recontour(lua_State* lua, int index, const Plot* plot, const LuaPlotRecord& kept,
+static bool _recontour(lua_State* lua, LuaScene* box, int index, const Plot* plot, const LuaPlotRecord& kept,
                        AnimationTarget& target, size_t* strings, uint32_t* grown, int anchor)
 {
     auto top = lua_gettop(lua);
@@ -6512,9 +6527,6 @@ static bool _recontour(lua_State* lua, int index, const Plot* plot, const LuaPlo
         }
     }
     auto count = columns * rows;
-    lua_getfield(lua, index, "target");
-    auto box = _handle(lua, -1)->scene;
-    lua_pop(lua, 1);
     auto available = _room(box).points;
     auto charged = grown ? *grown : 0u;
     if (charged > available || count > available - charged) {
@@ -6594,8 +6606,8 @@ static bool _recontour(lua_State* lua, int index, const Plot* plot, const LuaPlo
 // Resamples a Plot descriptor with updated or retained ranges/discontinuities.
 // Stores points/pieces in anchor userdata until core copies them; bytes charge strings,
 // including expanded plot storage charged to grown. Returns whether fn/points was supplied.
-static bool _replot(lua_State* lua, int index, const Plot* plot, AnimationTarget& target, size_t* strings,
-                    uint32_t* grown, int anchor)
+static bool _replot(lua_State* lua, LuaScene* box, int index, const Plot* plot, AnimationTarget& target,
+                    size_t* strings, uint32_t* grown, int anchor)
 {
     auto top = lua_gettop(lua);
     lua_getfield(lua, index, "points");
@@ -6616,7 +6628,7 @@ static bool _replot(lua_State* lua, int index, const Plot* plot, AnimationTarget
     }
     auto kept = static_cast<const LuaPlotRecord*>(lua_touserdata(lua, -1));
     if (kept && kept->contour) {
-        auto redrawn = _recontour(lua, index, plot, *kept, target, strings, grown, anchor);
+        auto redrawn = _recontour(lua, box, index, plot, *kept, target, strings, grown, anchor);
         lua_settop(lua, top);
         return redrawn;
     }
@@ -6632,6 +6644,7 @@ static bool _replot(lua_State* lua, int index, const Plot* plot, AnimationTarget
     if (function && !lua_isfunction(lua, top + 2) && !lua_istable(lua, top + 2)) luaL_error(lua, "fn must be a function");
     LuaPlotCut cut;
     cut.lua = lua;
+    cut.scene = box;
     cut.fn = top + 2;
     if (banded) {
         _plotBand(lua, index, cut);
@@ -6714,8 +6727,8 @@ static bool _replot(lua_State* lua, int index, const Plot* plot, AnimationTarget
 // Reads factory-named geometry fields; omitted keys retain the latest authored geometry.
 // Plot permits changed counts or fn resampling. Anchor userdata retains points until core
 // copies them and charges their bytes to strings. Returns whether any field was supplied.
-static bool _geometry(lua_State* lua, int index, Object* object, AnimationTarget& target, size_t* strings,
-                      uint32_t* grown, int anchor)
+static bool _geometry(lua_State* lua, LuaScene* box, int index, Object* object, AnimationTarget& target,
+                      size_t* strings, uint32_t* grown, int anchor)
 {
     static constexpr const char* LINE[] = {"from", "to"};
     static constexpr const char* VECTOR[] = {"value", "origin"};
@@ -6762,7 +6775,7 @@ static bool _geometry(lua_State* lua, int index, Object* object, AnimationTarget
         if (key[0] == 'c') luaL_error(lua, "%s needs a curve", key);
         luaL_error(lua, "%s needs a line, arrow, curve or angle; move other objects with shift", key);
     }
-    if (type == Type::Plot) return _replot(lua, index, static_cast<Plot*>(object), target, strings, grown, anchor);
+    if (type == Type::Plot) return _replot(lua, box, index, static_cast<Plot*>(object), target, strings, grown, anchor);
     if (type == Type::Vector && _has(lua, index, "value")) given = true;
     if (!given) return false;
     if (type == Type::Path && static_cast<Path*>(object)->contours() > 1u) {
@@ -6964,7 +6977,7 @@ static AnimationTarget _animationTarget(lua_State* lua, LuaScene* box, int index
         changed = true;
     }
     lua_pop(lua, 1);
-    if (_geometry(lua, index, object, target, strings, grown, anchor)) changed = true;
+    if (_geometry(lua, box, index, object, target, strings, grown, anchor)) changed = true;
     if (object->type() != Type::Vector && _has(lua, index, "value")) {
         if (object->type() != Type::Text || !static_cast<Text*>(object)->counting()) {
             luaL_error(lua, "value needs a number from scene:number, or a vector's value");
@@ -7441,7 +7454,7 @@ static int _advect(lua_State* lua)
             // A target the field stops being finite at stays where it is from then on.
             for (auto sub = 0u; sub < LUA_ADVECT_SUBSTEPS && moving[i]; sub++) {
                 LuaFieldVector start;
-                moving[i] = _rungeKutta(lua, 3, x, y, h, "advect fn", start);
+                moving[i] = _rungeKutta(lua, box, 3, x, y, h, "advect fn", start);
             }
             if (!moving[i]) continue;
             auto by = Vec3{static_cast<float>(x - points[i].x), static_cast<float>(y - points[i].y), 0.0f};
@@ -7611,6 +7624,7 @@ static void _warpSamples(lua_State* lua, int index, LuaWarpSamples& samples)
 struct LuaWarp
 {
     lua_State* lua = nullptr;
+    LuaScene* scene = nullptr;
     int callback = 0;
     const LuaWarpSamples* samples = nullptr;
     uint32_t points = 0;
@@ -7641,7 +7655,7 @@ static bool _warpPoint(const Vec3& point, Vec3& image, void* data) noexcept
     lua_pushnumber(lua, point.x);
     lua_pushnumber(lua, point.y);
     lua_pushnumber(lua, point.z);
-    if (lua_pcall(lua, 3, 3, 0) != LUA_OK) {
+    if (_sampleCall(lua, context->scene, 3, 3) != LUA_OK) {
         context->failure = LuaWarpFailure::Raised;
         return false;
     }
@@ -7701,13 +7715,12 @@ static int _warp(lua_State* lua)
     auto room = _room(box);
     LuaWarp context;
     context.lua = lua;
+    context.scene = box;
     context.callback = 3;
     context.samples = sampled ? &samples : nullptr;
     context.budget = static_cast<uint32_t>(std::min<uint64_t>(room.points, room.native / perPoint));
     auto clips = scene->clipCount();
-    box->sampleActive = true;
     auto result = scene->warp(targets, count, _warpPoint, &context, duration, curve, step);
-    box->sampleActive = false;
     switch (context.failure) {
         case LuaWarpFailure::Raised: {
             auto message = lua_tostring(lua, -1);
@@ -7944,7 +7957,7 @@ static constexpr uint32_t MORPH_COLOR_STEPS = 8;
 // points between the two at MORPH_COLOR_STEPS + 1 even steps of its progress, so the colors
 // follow the shape rather than fade from one end's to the other's. A side whose function is the
 // other's shares its colors. The colors stay on the stack until the morph is played.
-static void _morphColors(lua_State* lua, const Theme& theme, Animation& animation)
+static void _morphColors(lua_State* lua, LuaScene* box, Animation& animation)
 {
     auto source = animation.target;
     auto target = animation.related;
@@ -7977,7 +7990,7 @@ static void _morphColors(lua_State* lua, const Theme& theme, Animation& animatio
             for (auto i = 0u; i < count; i++) {
                 auto& a = from->points()[i];
                 auto& b = to->points()[i];
-                colors[step * count + i] = _callColors(lua, function, theme, a + (b - a) * progress);
+                colors[step * count + i] = _callColors(lua, box, function, a + (b - a) * progress);
             }
         }
         sides[side] = colors;
@@ -8048,7 +8061,7 @@ static int _morph(lua_State* lua)
         auto source = _object(lua, box->scene, 2);
         auto target = _object(lua, box->scene, 3);
         auto animation = Animation::morph(source, target);
-        _morphColors(lua, box->scene->theme(), animation);
+        _morphColors(lua, box, animation);
         animation.copy = copy;
         animation.pairs = pairs;
         animation.pairCount = pairCount;
@@ -8076,7 +8089,7 @@ static int _morph(lua_State* lua)
         animation.pairs = pairs;
         animation.pairCount = pairCount;
         if (copy && !_treeCharge(source, copies)) return luaL_error(lua, "the copy is too deep or large");
-        _morphColors(lua, box->scene->theme(), animation);
+        _morphColors(lua, box, animation);
         new (animations + i) Animation(animation);
     }
     return _play(lua, box, animations, static_cast<uint32_t>(size), duration, curve, lag, copies);
@@ -9535,6 +9548,15 @@ static int _trackerWhere(lua_State* lua)
     return 1;
 }
 
+// Calls the bound function at 2 with the values after it, as a sampling callback of the scene at
+// 1, and returns the state it gives.
+static int _trackerSample(lua_State* lua)
+{
+    auto box = static_cast<LuaScene*>(luaL_checkudata(lua, 1, SCENE_METATABLE));
+    if (_sampleCall(lua, box, lua_gettop(lua) - 2, 1) != LUA_OK) return lua_error(lua);
+    return 1;
+}
+
 // Tells the scene calls that tracks wait to play, so the next one flushes them first.
 static int _trackerPending(lua_State* lua)
 {
@@ -10194,7 +10216,7 @@ static int _open(lua_State* lua)
     static const detail::LuaApi api = {
         FACTORY_METHODS, SCENE_METHODS, OBJECT_METHODS, GROUP_METHODS, SPACE_METHODS, VIEW_METHODS,
         _sceneGc, _objectGc, _sceneGen, _springResponse,
-        _trackerEase, _trackerSettle, _trackerFps, _trackerUnknown, _trackerWhere, _trackerPending,
+        _trackerEase, _trackerSettle, _trackerFps, _trackerUnknown, _trackerWhere, _trackerPending, _trackerSample,
     };
     return detail::luaOpenApi(lua, api);
 }

@@ -50,6 +50,7 @@ struct LuaApi
     lua_CFunction trackerUnknown;
     lua_CFunction trackerWhere;
     lua_CFunction trackerPending;
+    lua_CFunction trackerSample;
 };
 
 int luaOpenApi(lua_State* lua, const LuaApi& api);

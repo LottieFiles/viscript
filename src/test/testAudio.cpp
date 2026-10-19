@@ -504,7 +504,8 @@ return scene
     _scriptError(invalid, "invalid-audio.lua", "audio bus");
 }
 
-// An asset name out of range stops the script with the limit, at the line of the cue.
+// An asset name out of range, or not a string, stops the script with the reason, at the line of
+// the cue.
 static void luaAsset()
 {
     static constexpr const char* source = R"(
@@ -514,6 +515,12 @@ return scene
 )";
     _scriptError(source, "audio-asset.lua",
                  "audio-asset.lua:3: audio asset must be 1 to 255 bytes without zero bytes");
+    static constexpr const char* typed = R"(
+local scene = vis.scene {}
+vis.audio.cue(scene, {asset = true})
+return scene
+)";
+    _scriptError(typed, "audio-asset.lua", "audio-asset.lua:3: audio asset must be a string, got boolean");
 }
 
 #if defined(VIS_LUA_RUNTIME)

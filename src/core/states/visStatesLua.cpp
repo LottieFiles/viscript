@@ -35,7 +35,7 @@ static Controller* _controller(lua_State* lua)
 static const char* _text(lua_State* lua, int index, const char* name)
 {
     size_t size = 0u;
-    auto value = luaL_checklstring(lua, index, &size);
+    auto value = _checkString(lua, index, name, &size);
     if (!size || std::strlen(value) != size) {
         luaL_error(lua, "%s must be non-empty text without zero bytes", name);
     }
@@ -115,7 +115,7 @@ static int _transition(lua_State* lua)
     Target targets[Controller::ObjectLimit];
     for (auto i = 0u; i < count; i++) {
         lua_rawgeti(lua, 2, i + 1u);
-        luaL_checktype(lua, -1, LUA_TTABLE);
+        _checkTable(lua, -1, "transition target");
         static const char* const options[] = {"object", "state", nullptr};
         _options(lua, -1, "transition target", options);
         lua_getfield(lua, -1, "object");
