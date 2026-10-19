@@ -351,8 +351,8 @@ static int _slider(lua_State* lua)
         auto list = lua_absindex(lua, -1);
         auto count = lua_rawlen(lua, list);
         if (!count || count > Panel::BindingLimit) {
-            return luaL_error(lua, "slider bindings must contain between 1 and %u items",
-                              Panel::BindingLimit);
+            return luaL_error(lua, "slider bindings must contain between 1 and %d items",
+                              static_cast<int>(Panel::BindingLimit));
         }
         bindingCount = static_cast<uint32_t>(count);
         static const char* const bindingOptions[] = {
@@ -433,8 +433,8 @@ static int _sampleArea(lua_State* lua)
     luaL_checktype(lua, -1, LUA_TTABLE);
     auto targetCount = lua_rawlen(lua, -1);
     if (!targetCount || targetCount > SampleArea::TargetLimit) {
-        return luaL_error(lua, "sample_area targets must contain between 1 and %u objects",
-                          SampleArea::TargetLimit);
+        return luaL_error(lua, "sample_area targets must contain between 1 and %d objects",
+                          static_cast<int>(SampleArea::TargetLimit));
     }
     const Object* targets[SampleArea::TargetLimit];
     for (auto i = 0u; i < targetCount; i++) {

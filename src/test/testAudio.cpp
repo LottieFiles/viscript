@@ -470,6 +470,25 @@ return scene
     CHECK(std::strstr(error, "audio bus") != nullptr);
 }
 
+// An asset name out of range stops the script with the limit, at the line of the cue.
+static void luaAsset()
+{
+    static constexpr const char* source = R"(
+local scene = vis.scene {}
+vis.audio.cue(scene, {asset = ""})
+return scene
+)";
+    Scene* scene = nullptr;
+    Soundscape* soundscape = nullptr;
+    char error[512] = {};
+    auto result = audio::Lua::load(source, static_cast<uint32_t>(std::strlen(source)),
+                                   "audio-asset.lua", &scene, &soundscape,
+                                   error, sizeof(error));
+    CHECK(result == Result::ScriptError && !scene && !soundscape);
+    CHECK(std::strstr(error, "audio-asset.lua:3: audio asset must be 1 to 255 bytes "
+                             "without zero bytes") != nullptr);
+}
+
 #if defined(VIS_LUA_RUNTIME)
 static void retainedLua()
 {
@@ -509,6 +528,7 @@ int main()
     player();
     mixing();
     lua();
+    luaAsset();
 #if defined(VIS_LUA_RUNTIME)
     retainedLua();
 #endif

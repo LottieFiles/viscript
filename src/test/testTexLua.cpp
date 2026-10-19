@@ -200,6 +200,15 @@ return scene
            "tex-part-taken.lua", "tex-part-taken.lua:3: duplicate id 'taken'");
 }
 
+// More parts than the bytes a formula holds stop the script with the limit before any part is
+// read.
+static void _partLimit()
+{
+    _error("local scene = vis.scene {}\nlocal parts = {}\nfor i = 1, 16385 do parts[i] = 'x' end\n"
+           "scene:tex {tex = parts}\nreturn scene",
+           "tex-part-limit.lua", "tex-part-limit.lua:4: tex: a formula holds at most 16384 bytes");
+}
+
 // The bounds of a piece when the scene shows time, in pixels.
 static Vec2 _center(Renderer* renderer, const Scene* scene, const char* id, float time)
 {
@@ -797,6 +806,7 @@ int main()
         _parts();
         _shapes();
         _errors();
+        _partLimit();
         _matching(renderer);
         _choosing(renderer);
         _framing(renderer);

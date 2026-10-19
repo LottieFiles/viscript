@@ -717,8 +717,8 @@ static int _sound(lua_State* lua)
     if (!assetSize || assetSize > SoundEvent::AssetNameLimit
         || std::strlen(asset) != assetSize) {
         return luaL_error(
-            lua, "sound asset must contain 1 to %u bytes without zero bytes",
-            SoundEvent::AssetNameLimit);
+            lua, "sound asset must contain 1 to %d bytes without zero bytes",
+            static_cast<int>(SoundEvent::AssetNameLimit));
     }
 
     SoundEvent event;

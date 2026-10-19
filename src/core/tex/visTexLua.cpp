@@ -307,7 +307,9 @@ static LuaFormula* _prepare(lua_State* lua, int box, int list, const Options& op
     auto count = split ? lua_rawlen(lua, list) : 1u;
     if (!count) luaL_error(lua, "tex needs at least one part");
     // The parts read with a blank between each, which alone would pass the limit.
-    if (count > detail::SourceLimit) luaL_error(lua, "tex: a formula holds at most %u bytes", detail::SourceLimit);
+    if (count > detail::SourceLimit) {
+        luaL_error(lua, "tex: a formula holds at most %d bytes", static_cast<int>(detail::SourceLimit));
+    }
     if (split) {
         lua_pushnil(lua);
         while (lua_next(lua, list)) {

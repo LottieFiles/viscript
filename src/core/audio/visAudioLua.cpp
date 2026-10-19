@@ -34,8 +34,8 @@ static void _fieldAsset(lua_State* lua, int index,
     size_t size = 0u;
     auto value = luaL_checklstring(lua, -1, &size);
     if (!size || size > Soundscape::AssetNameLimit || std::memchr(value, '\0', size)) {
-        luaL_error(lua, "audio asset must be 1 to %u bytes without zero bytes",
-                   Soundscape::AssetNameLimit);
+        luaL_error(lua, "audio asset must be 1 to %d bytes without zero bytes",
+                   static_cast<int>(Soundscape::AssetNameLimit));
     }
     std::memcpy(asset, value, size);
     asset[size] = '\0';

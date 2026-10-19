@@ -1097,12 +1097,48 @@ return scene
     CHECK(std::strstr(error, "InvalidArguments") != nullptr);
 }
 
+// A list of slider bindings or sample targets out of range stops the script with its limit,
+// at the line of the call.
+static void luaLimits()
+{
+    static constexpr const char sliderSource[] = R"(
+local scene = vis.scene { width = 32, height = 32 }
+local visual = scene:line { from = { -1, 0 }, to = { 1, 0 } }
+local panel = vis.ui.panel(scene)
+panel:slider { visual = visual, region = { 0, 0, 20, 10 }, bindings = {} }
+return scene
+    )";
+    Scene* scene = nullptr;
+    Panel* panel = nullptr;
+    char error[512] = {};
+    auto result = vis::ui::Lua::load(sliderSource, sizeof(sliderSource) - 1u,
+                                     "ui-slider-bindings.lua", &scene, &panel, error,
+                                     sizeof(error));
+    CHECK(result == Result::ScriptError && !scene && !panel);
+    CHECK(std::strstr(error, "ui-slider-bindings.lua:5: slider bindings must contain "
+                             "between 1 and 256 items") != nullptr);
+
+    static constexpr const char sampleSource[] = R"(
+local scene = vis.scene { width = 32, height = 32 }
+local panel = vis.ui.panel(scene)
+panel:sample_area { region = { 0, 0, 20, 10 }, targets = {} }
+return scene
+    )";
+    result = vis::ui::Lua::load(sampleSource, sizeof(sampleSource) - 1u,
+                                "ui-sample-targets.lua", &scene, &panel, error,
+                                sizeof(error));
+    CHECK(result == Result::ScriptError && !scene && !panel);
+    CHECK(std::strstr(error, "ui-sample-targets.lua:4: sample_area targets must contain "
+                             "between 1 and 64 objects") != nullptr);
+}
+
 int main()
 {
     pointerPosition();
     controls();
     limits();
     luaBindings();
+    luaLimits();
     auto renderer = Renderer::gen();
     CHECK(renderer != nullptr);
     if (renderer) {

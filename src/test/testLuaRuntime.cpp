@@ -200,6 +200,31 @@ return scene
     delete scene;
 }
 
+// A sound asset name out of range stops the step with the limit, at the line of the call.
+static void soundAsset()
+{
+    static constexpr char source[] = R"lua(
+local scene = vis.scene {width = 64, height = 36}
+vis.runtime(scene, {
+    fixed_step = 0.1,
+    update = function(ctx, dt, time, tick)
+        ctx:sound("")
+    end,
+})
+return scene
+)lua";
+    Scene* scene = nullptr;
+    char error[1024] = {};
+    detail::LuaHostContext context;
+    auto result = load(source, scene, context, error, sizeof(error));
+    CHECK(result == Result::Success && scene);
+    auto runtime = context.runtime.runtime;
+    CHECK(runtime && runtime->advance(0.1f) == Result::ScriptError);
+    CHECK(runtime && std::strstr(runtime->error(),
+                                 "runtime.lua:6: sound asset must contain 1 to 255 bytes"));
+    delete scene;
+}
+
 static void groupFill()
 {
     Config config;
@@ -476,6 +501,7 @@ int main()
     fixedStep();
     objectLimit();
     soundEvents();
+    soundAsset();
     groupFill();
     callbackFailure();
     optionalRuntime();
