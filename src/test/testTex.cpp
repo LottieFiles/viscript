@@ -487,6 +487,23 @@ static void _accents()
     CHECK(_near(_item(layout, nullptr, ItemKind::Accent)->width, 1.56f));
 }
 
+// Empty groups set as TeX sets them: a fraction keeps its null delimiters and the shifts of its
+// parts, a root its sign and an accent its mark, while a bar over nothing draws nothing.
+static void _empties()
+{
+    Layout layout;
+    CHECK(_set("\\frac{}{}", false, layout));
+    CHECK(layout.count == 0u && _near(layout.width, 0.24f));
+    CHECK(_near(layout.height, 0.394f) && _near(layout.depth, 0.345f));
+    CHECK(_set("\\sqrt{}", false, layout));
+    CHECK(layout.count == 1u && layout.items[0].kind == ItemKind::Radical);
+    CHECK(_near(layout.width, layout.items[0].width));
+    CHECK(_set("\\overline{} \\underline{}", false, layout));
+    CHECK(layout.count == 0u && _near(layout.height, 0.2f) && _near(layout.depth, 0.2f));
+    CHECK(_set("\\hat{}", false, layout));
+    CHECK(layout.count == 1u && layout.items[0].kind == ItemKind::Accent);
+}
+
 static void _fallbacks()
 {
     Layout layout;
@@ -516,6 +533,7 @@ int main()
     _spacing();
     _arrays();
     _accents();
+    _empties();
     _fallbacks();
     if (failures) std::fprintf(stderr, "%d tex checks failed\n", failures);
     return failures ? 1 : 0;

@@ -169,6 +169,25 @@ static void _baseline(Scene* scene)
     delete boxed;
 }
 
+// Empty groups are TeX like any other, alone or together: an empty fraction draws no bar, while
+// an empty root keeps its sign and an empty accent its mark.
+static void _empties(Scene* scene)
+{
+    const char* sources[] = {"\\frac{}{}", "{}", "\\sqrt{}", "\\hat{}", "\\overline{}",
+                             "x + {} + \\frac{}{} + \\sqrt{} + \\hat{}"};
+    const uint32_t pieces[] = {0u, 0u, 1u, 1u, 0u, 7u};
+    for (auto i = 0u; i < 6u; i++) {
+        char error[256] = {};
+        auto formula = tex::Formula::gen(scene, sources[i], {}, error, sizeof(error));
+        CHECK(formula && formula->pieces() == pieces[i]);
+        if (!formula) std::fprintf(stderr, "%s: %s\n", sources[i], error);
+        delete formula;
+    }
+    auto root = tex::Formula::gen(scene, "\\sqrt{}");
+    CHECK(root && std::strcmp(root->key(0), "\\sqrt") == 0 && root->piece(0)->type() == Type::Path);
+    delete root;
+}
+
 static void _errors(Scene* scene)
 {
     char error[256] = {};
@@ -190,6 +209,7 @@ int main()
         _parts(scene);
         _pieces(scene);
         _baseline(scene);
+        _empties(scene);
         _errors(scene);
         _inked(renderer);
     }

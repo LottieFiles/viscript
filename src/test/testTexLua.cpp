@@ -200,6 +200,25 @@ return scene
            "tex-part-taken.lua", "tex-part-taken.lua:3: duplicate id 'taken'");
 }
 
+// Empty groups set through the binding as through the core, alone, together, as parts and
+// inline: an empty fraction draws no bar and an empty root keeps its sign.
+static void _empties()
+{
+    static constexpr char source[] = R"lua(
+local scene = vis.scene {}
+local sources = {"\\frac{}{}", "{}", "\\sqrt{}", "\\hat{}", "x + {} + \\frac{}{} + \\sqrt{} + \\hat{}"}
+for i, tex in ipairs(sources) do scene:tex {tex = tex, id = "empty" .. i, point = {0, i}} end
+if #scene:find("empty1"):children() ~= 0 or #scene:find("empty3"):children() ~= 1 then
+    error("an empty fraction draws no bar and an empty root its sign")
+end
+scene:tex {tex = {"\\frac{}{}", "\\sqrt{}"}, point = {0, -1}}
+scene:spans {"a ", {tex = "\\frac{}{} + \\sqrt{}"}, " b", point = {0, -2}}
+return scene
+)lua";
+    auto scene = _load(source, "tex-empty.lua");
+    delete scene;
+}
+
 // More parts than the bytes a formula holds stop the script with the limit before any part is
 // read.
 static void _partLimit()
@@ -806,6 +825,7 @@ int main()
         _parts();
         _shapes();
         _errors();
+        _empties();
         _partLimit();
         _matching(renderer);
         _choosing(renderer);

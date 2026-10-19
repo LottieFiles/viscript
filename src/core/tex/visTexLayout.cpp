@@ -976,10 +976,12 @@ bool layout(const Parse& parse, bool display, Metrics& metrics, Layout& output, 
     setter.measureFont();
     auto box = setter.list(parse.first, Style{display ? Level::Display : Level::Text, false});
     if (setter.failed) return false;
-    // Drop the slots left empty, as for \left. and \right.
+    // Drop the slots left empty, as for \left. and \right., and the rules without width, as the
+    // bar of \frac{}{}, which cover nothing; the boxes keep their room.
     auto count = 0u;
     for (auto i = 0u; i < output.count; i++) {
         if (output.items[i].kind == ItemKind::Text && !output.items[i].text) continue;
+        if (output.items[i].kind == ItemKind::Rule && !(output.items[i].width > 0.0f)) continue;
         output.items[count++] = output.items[i];
     }
     output.count = count;
