@@ -1,31 +1,14 @@
-#include <cmath>
-#include <cstdio>
 #include <cstring>
 
 #include "vis.h"
 #include "vis_lua_runtime.h"
 #include "visLuaHost.h"
+#include "testCheck.h"
 #if defined(VIS_INPUT)
 #include "vis_input.h"
 #endif
 
 using namespace vis;
-
-static int failures = 0;
-
-static void check(bool condition, const char* expression, int line)
-{
-    if (condition) return;
-    std::fprintf(stderr, "%s:%d: CHECK(%s) failed\n", __FILE__, line, expression);
-    failures++;
-}
-
-#define CHECK(condition) check((condition), #condition, __LINE__)
-
-static bool near(double first, double second, double epsilon = 1.0e-5)
-{
-    return std::fabs(first - second) <= epsilon;
-}
 
 static Result load(const char* source, Scene*& scene,
                    detail::LuaHostContext& context, char* error,
@@ -511,5 +494,5 @@ int main()
     inputActions();
 #endif
     flatScale();
-    return failures ? 1 : 0;
+    return report();
 }

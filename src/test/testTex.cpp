@@ -1,23 +1,12 @@
-#include <cmath>
 #include <cstdio>
 #include <cstring>
 
 #include "vis_tex.h"
 #include "visTex.h"
+#include "testCheck.h"
 
 using namespace vis;
 using namespace vis::tex::detail;
-
-static int failures = 0;
-
-static void check(bool condition, const char* expression, int line)
-{
-    if (condition) return;
-    std::fprintf(stderr, "%s:%d: CHECK(%s) failed\n", __FILE__, line, expression);
-    failures++;
-}
-
-#define CHECK(condition) check((condition), #condition, __LINE__)
 
 static bool _parse(const char* source, Parse& parse)
 {
@@ -253,11 +242,6 @@ struct FakeMetrics : Metrics
     }
 };
 
-static bool _near(float a, float b)
-{
-    return std::fabs(a - b) < 1e-4f;
-}
-
 static bool _set(const char* source, bool display, Layout& layout)
 {
     Parse parse;
@@ -290,23 +274,23 @@ static void _fractions()
     // The bar stands on the axis, the parts at TeX's baselines for text style, a size down.
     CHECK(_set("\\frac{a}{b}", false, layout));
     auto bar = _item(layout, nullptr, ItemKind::Rule);
-    CHECK(_near(bar->y + bar->height * 0.5f, 0.25f) && _near(bar->height, 0.04f));
-    CHECK(_near(bar->x, 0.12f) && _near(bar->width, 0.35f) && _near(layout.width, 0.59f));
-    CHECK(_near(_item(layout, "a")->y, 0.394f) && _near(_item(layout, "a")->scale, 0.7f));
-    CHECK(_near(_item(layout, "b")->y, -0.345f) && _near(_item(layout, "b")->x, 0.12f));
+    CHECK(near(bar->y + bar->height * 0.5f, 0.25f) && near(bar->height, 0.04f));
+    CHECK(near(bar->x, 0.12f) && near(bar->width, 0.35f) && near(layout.width, 0.59f));
+    CHECK(near(_item(layout, "a")->y, 0.394f) && near(_item(layout, "a")->scale, 0.7f));
+    CHECK(near(_item(layout, "b")->y, -0.345f) && near(_item(layout, "b")->x, 0.12f));
     // Items keep the order of the source: \frac, then its numerator and denominator.
     CHECK(layout.count == 3u && layout.items[0].kind == ItemKind::Rule && layout.items[0].begin == 0u);
     CHECK(layout.items[0].end == 5u && layout.items[1].begin == 6u);
     // In display style the parts stay their size and move out.
     CHECK(_set("\\frac{a}{b}", true, layout));
-    CHECK(_near(_item(layout, "a")->y, 0.677f) && _near(_item(layout, "a")->scale, 1.0f));
-    CHECK(_near(_item(layout, "b")->y, -0.686f));
+    CHECK(near(_item(layout, "a")->y, 0.677f) && near(_item(layout, "a")->scale, 1.0f));
+    CHECK(near(_item(layout, "b")->y, -0.686f));
     // A numerator that reaches down keeps its clearance from the bar.
     CHECK(_set("\\frac{g}{x}", false, layout));
-    CHECK(_near(_item(layout, "g")->y, 0.27f + 0.04f + 0.14f));
+    CHECK(near(_item(layout, "g")->y, 0.27f + 0.04f + 0.14f));
     // \tfrac sets text style inside a display.
     CHECK(_set("\\tfrac{a}{b}", true, layout));
-    CHECK(_near(_item(layout, "a")->scale, 0.7f));
+    CHECK(near(_item(layout, "a")->scale, 0.7f));
     // A binomial has no bar and takes parentheses.
     CHECK(_set("\\binom{n}{k}", false, layout));
     CHECK(_item(layout, nullptr, ItemKind::Delimiter)->shape == static_cast<uint8_t>(Delim::LeftParen));
@@ -318,33 +302,33 @@ static void _scripts()
 {
     Layout layout;
     CHECK(_set("x^2", false, layout));
-    CHECK(_near(_item(layout, "2")->y, 0.363f) && _near(_item(layout, "2")->x, 0.5f));
-    CHECK(_near(_item(layout, "2")->scale, 0.7f) && _near(layout.width, 0.5f + 0.35f + 0.05f));
+    CHECK(near(_item(layout, "2")->y, 0.363f) && near(_item(layout, "2")->x, 0.5f));
+    CHECK(near(_item(layout, "2")->scale, 0.7f) && near(layout.width, 0.5f + 0.35f + 0.05f));
     CHECK(_set("x_i", false, layout));
-    CHECK(_near(_item(layout, "i")->y, -0.15f) && _near(_item(layout, "i")->x, 0.5f));
+    CHECK(near(_item(layout, "i")->y, -0.15f) && near(_item(layout, "i")->x, 0.5f));
     // Both scripts keep 4 rule thicknesses apart.
     CHECK(_set("x_i^2", false, layout));
-    CHECK(_near(_item(layout, "2")->y, 0.363f) && _near(_item(layout, "i")->y, -0.287f));
+    CHECK(near(_item(layout, "2")->y, 0.363f) && near(_item(layout, "i")->y, -0.287f));
     CHECK(layout.items[1].begin == 2u && layout.items[2].begin == 4u);
     CHECK(_set("x^2_i", false, layout));
-    CHECK(_near(_item(layout, "i")->y, -0.287f) && layout.items[1].begin == 2u);
+    CHECK(near(_item(layout, "i")->y, -0.287f) && layout.items[1].begin == 2u);
     // A superscript clears what a glyph's outline reaches past its advance; a subscript
     // tucks under it.
     CHECK(_set("f^2", false, layout));
-    CHECK(_near(_item(layout, "2")->x, 0.6f));
+    CHECK(near(_item(layout, "2")->x, 0.6f));
     CHECK(_set("f_1^2", false, layout));
-    CHECK(_near(_item(layout, "1")->x, 0.5f) && _near(_item(layout, "2")->x, 0.6f));
+    CHECK(near(_item(layout, "1")->x, 0.5f) && near(_item(layout, "2")->x, 0.6f));
     // Primes stand at the size of the nucleus, on its baseline.
     CHECK(_set("f'", false, layout));
-    CHECK(_near(_item(layout, "′")->scale, 1.0f) && _near(_item(layout, "′")->y, 0.0f));
-    CHECK(_near(_item(layout, "′")->x, 0.6f));
+    CHECK(near(_item(layout, "′")->scale, 1.0f) && near(_item(layout, "′")->y, 0.0f));
+    CHECK(near(_item(layout, "′")->x, 0.6f));
     CHECK(_set("f'^2", false, layout));
-    CHECK(_near(_item(layout, "2")->x, 0.9f) && _near(_item(layout, "2")->y, 0.363f));
+    CHECK(near(_item(layout, "2")->x, 0.9f) && near(_item(layout, "2")->y, 0.363f));
     // A superscript in display style rises higher; a cramped one less.
     CHECK(_set("x^2", true, layout));
-    CHECK(_near(_item(layout, "2")->y, 0.413f));
+    CHECK(near(_item(layout, "2")->y, 0.413f));
     CHECK(_set("\\sqrt{x^2}", false, layout));
-    CHECK(_near(_item(layout, "2")->y, 0.289f));
+    CHECK(near(_item(layout, "2")->y, 0.289f));
 }
 
 static void _operators()
@@ -353,15 +337,15 @@ static void _operators()
     // In display style a sum grows, centers on the axis and takes limits above and below.
     CHECK(_set("\\sum_{i=1}^{n}", true, layout));
     auto sum = _item(layout, "∑");
-    CHECK(_near(sum->scale, 1.35f) && _near(sum->y, -0.0875f));
-    CHECK(_near(_item(layout, "n")->y, 1.125f) && _near(_item(layout, "n")->x, 0.5f));
-    CHECK(_near(_item(layout, "i")->y, -1.081f) && _near(_item(layout, "i")->x, 0.15f));
+    CHECK(near(sum->scale, 1.35f) && near(sum->y, -0.0875f));
+    CHECK(near(_item(layout, "n")->y, 1.125f) && near(_item(layout, "n")->x, 0.5f));
+    CHECK(near(_item(layout, "i")->y, -1.081f) && near(_item(layout, "i")->x, 0.15f));
     // The relation in a limit takes no thick spaces in script style.
-    CHECK(_near(_item(layout, "=")->x - _item(layout, "i")->x, 0.35f));
+    CHECK(near(_item(layout, "=")->x - _item(layout, "i")->x, 0.35f));
     // In text style the limits stand beside it as scripts.
     CHECK(_set("\\sum_{i=1}^{n}", false, layout));
-    CHECK(_near(_item(layout, "∑")->scale, 1.0f) && _near(_item(layout, "∑")->y, 0.0f));
-    CHECK(_near(_item(layout, "n")->x, 1.0f) && _item(layout, "i")->y < 0.0f);
+    CHECK(near(_item(layout, "∑")->scale, 1.0f) && near(_item(layout, "∑")->y, 0.0f));
+    CHECK(near(_item(layout, "n")->x, 1.0f) && _item(layout, "i")->y < 0.0f);
     // \limits puts them above and below even so.
     CHECK(_set("\\sum\\limits_{i}", false, layout));
     CHECK(_item(layout, "i")->y < -0.5f);
@@ -384,15 +368,15 @@ static void _radicals()
     CHECK(_set("\\sqrt{x}", false, layout));
     auto sign = _item(layout, nullptr, ItemKind::Radical);
     auto bar = _item(layout, nullptr, ItemKind::Rule);
-    CHECK(_near(bar->y, 0.481f) && _near(bar->x, sign->x + sign->width) && _near(bar->width, 0.5f));
-    CHECK(_near(sign->y + sign->height, bar->y + bar->height) && sign->y < 0.0f);
-    CHECK(_near(_item(layout, "x")->x, bar->x));
+    CHECK(near(bar->y, 0.481f) && near(bar->x, sign->x + sign->width) && near(bar->width, 0.5f));
+    CHECK(near(sign->y + sign->height, bar->y + bar->height) && sign->y < 0.0f);
+    CHECK(near(_item(layout, "x")->x, bar->x));
     CHECK(_set("\\sqrt{x}", true, layout));
-    CHECK(_near(_item(layout, nullptr, ItemKind::Rule)->y, 0.431f + 0.04f + 0.10775f));
+    CHECK(near(_item(layout, nullptr, ItemKind::Rule)->y, 0.431f + 0.04f + 0.10775f));
     // An index stands small over the sign's left arm, before the radicand in the source.
     CHECK(_set("\\sqrt[3]{x}", false, layout));
     auto index = _item(layout, "3");
-    CHECK(_near(index->scale, 0.5f) && index->y > 0.2f && index->x > 0.0f);
+    CHECK(near(index->scale, 0.5f) && index->y > 0.2f && index->x > 0.0f);
     CHECK(layout.items[0].kind == ItemKind::Radical && layout.items[1].kind == ItemKind::Rule);
     CHECK(layout.items[2].text && layout.items[2].text[0] == '3');
 }
@@ -409,40 +393,40 @@ static void _fences()
     auto left = _item(layout, nullptr, ItemKind::Delimiter);
     auto right = _item(layout, nullptr, ItemKind::Delimiter, 1);
     CHECK(left->shape == static_cast<uint8_t>(Delim::LeftBracket) && right->shape == static_cast<uint8_t>(Delim::RightBracket));
-    CHECK(_near(left->y + left->height * 0.5f, 0.25f) && left->height > 1.0f && _near(right->height, left->height));
+    CHECK(near(left->y + left->height * 0.5f, 0.25f) && left->height > 1.0f && near(right->height, left->height));
     CHECK(right->begin == 19u && right->end == 26u);
     CHECK(_item(layout, "2")->x >= right->x + right->width);
     // A null delimiter draws nothing and takes its space.
     CHECK(_set("\\left. x \\right|", false, layout));
-    CHECK(layout.count == 2u && _near(_item(layout, "x")->x, 0.12f));
+    CHECK(layout.count == 2u && near(_item(layout, "x")->x, 0.12f));
     // \big sets a fixed size; a bare \langle the normal one.
     CHECK(_set("\\Big( \\langle", false, layout));
-    CHECK(_near(_item(layout, nullptr, ItemKind::Delimiter)->height, 1.8f));
-    CHECK(_near(_item(layout, nullptr, ItemKind::Delimiter, 1)->height, 1.0f));
+    CHECK(near(_item(layout, nullptr, ItemKind::Delimiter)->height, 1.8f));
+    CHECK(near(_item(layout, nullptr, ItemKind::Delimiter, 1)->height, 1.0f));
 }
 
 static void _spacing()
 {
     Layout layout;
     CHECK(_set("a+b", false, layout));
-    CHECK(_near(_item(layout, "+")->x, 0.5f + 4.0f / 18.0f));
-    CHECK(_near(_item(layout, "b")->x, 1.0f + 8.0f / 18.0f));
+    CHECK(near(_item(layout, "+")->x, 0.5f + 4.0f / 18.0f));
+    CHECK(near(_item(layout, "b")->x, 1.0f + 8.0f / 18.0f));
     CHECK(_set("a=b", false, layout));
-    CHECK(_near(_item(layout, "=")->x, 0.5f + 5.0f / 18.0f));
+    CHECK(near(_item(layout, "=")->x, 0.5f + 5.0f / 18.0f));
     // A binary operator with nothing to join is ordinary.
     CHECK(_set("-a", false, layout));
-    CHECK(_near(_item(layout, "a")->x, 0.5f));
+    CHECK(near(_item(layout, "a")->x, 0.5f));
     CHECK(_set("a+=b", false, layout));
-    CHECK(_near(_item(layout, "+")->x, 0.5f) && _near(_item(layout, "=")->x, 1.0f + 5.0f / 18.0f));
+    CHECK(near(_item(layout, "+")->x, 0.5f) && near(_item(layout, "=")->x, 1.0f + 5.0f / 18.0f));
     // Scripts take no medium or thick spaces.
     CHECK(_set("x^{a+b}", false, layout));
-    CHECK(_near(_item(layout, "+")->x - _item(layout, "a")->x, 0.35f));
+    CHECK(near(_item(layout, "+")->x - _item(layout, "a")->x, 0.35f));
     CHECK(_set("a,b \\sin x", false, layout));
-    CHECK(_near(_item(layout, "b")->x, 1.0f + 3.0f / 18.0f));
-    CHECK(_near(_item(layout, "x")->x - _item(layout, "sin")->x, 1.5f + 3.0f / 18.0f));
+    CHECK(near(_item(layout, "b")->x, 1.0f + 3.0f / 18.0f));
+    CHECK(near(_item(layout, "x")->x - _item(layout, "sin")->x, 1.5f + 3.0f / 18.0f));
     // Spaces add to the spacing of the classes.
     CHECK(_set("a\\quad b \\, c", false, layout));
-    CHECK(_near(_item(layout, "b")->x, 1.5f) && _near(_item(layout, "c")->x, 2.0f + 3.0f / 18.0f));
+    CHECK(near(_item(layout, "b")->x, 1.5f) && near(_item(layout, "c")->x, 2.0f + 3.0f / 18.0f));
 }
 
 static void _arrays()
@@ -451,24 +435,24 @@ static void _arrays()
     // Rows stand on struts, centered on the axis; columns 1em apart.
     CHECK(_set("\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}", false, layout));
     auto left = _item(layout, nullptr, ItemKind::Delimiter);
-    CHECK(_near(_item(layout, "a")->y, 0.61f) && _near(_item(layout, "c")->y, -0.59f));
-    CHECK(_near(_item(layout, "b")->y, 0.61f) && _near(_item(layout, "b")->x - _item(layout, "a")->x, 1.5f));
-    CHECK(_near(left->y + left->height * 0.5f, 0.25f) && _near(left->height, 2.1624f));
+    CHECK(near(_item(layout, "a")->y, 0.61f) && near(_item(layout, "c")->y, -0.59f));
+    CHECK(near(_item(layout, "b")->y, 0.61f) && near(_item(layout, "b")->x - _item(layout, "a")->x, 1.5f));
+    CHECK(near(left->y + left->height * 0.5f, 0.25f) && near(left->height, 2.1624f));
     CHECK(left->begin == 0u && left->end == 15u && layout.items[0].kind == ItemKind::Delimiter);
     auto right = _item(layout, nullptr, ItemKind::Delimiter, 1);
     CHECK(right->begin == 31u && right->end == 44u && layout.items[layout.count - 1u].kind == ItemKind::Delimiter);
     // Cells center in their columns; a bare matrix has no delimiters.
     CHECK(_set("\\begin{matrix} aa \\\\ b \\end{matrix}", false, layout));
-    CHECK(_near(_item(layout, "b")->x, 0.25f) && layout.count == 3u);
+    CHECK(near(_item(layout, "b")->x, 0.25f) && layout.count == 3u);
     // Cases: a brace on the left, cells flush left, a quad between the columns.
     CHECK(_set("\\begin{cases} 1 & x \\\\ 0 & yy \\end{cases}", false, layout));
     CHECK(_item(layout, nullptr, ItemKind::Delimiter)->shape == static_cast<uint8_t>(Delim::LeftBrace));
     CHECK(layout.items[layout.count - 1u].kind == ItemKind::Text);
-    CHECK(_near(_item(layout, "y")->x, _item(layout, "x")->x) && _near(_item(layout, "x")->x - _item(layout, "1")->x, 1.5f));
+    CHECK(near(_item(layout, "y")->x, _item(layout, "x")->x) && near(_item(layout, "x")->x - _item(layout, "1")->x, 1.5f));
     // Aligned: right then left columns, the relation spaced as after an Ord.
     CHECK(_set("\\begin{aligned} a &= b \\\\ cc &= d \\end{aligned}", false, layout));
-    CHECK(_near(_item(layout, "a")->x, 0.5f) && _near(_item(layout, "=")->x, 1.0f + 5.0f / 18.0f));
-    CHECK(_near(_item(layout, "=", ItemKind::Text, 1)->x, 1.0f + 5.0f / 18.0f));
+    CHECK(near(_item(layout, "a")->x, 0.5f) && near(_item(layout, "=")->x, 1.0f + 5.0f / 18.0f));
+    CHECK(near(_item(layout, "=", ItemKind::Text, 1)->x, 1.0f + 5.0f / 18.0f));
 }
 
 static void _accents()
@@ -476,15 +460,15 @@ static void _accents()
     Layout layout;
     CHECK(_set("\\hat{x}", false, layout));
     auto hat = _item(layout, nullptr, ItemKind::Accent);
-    CHECK(hat->shape == static_cast<uint8_t>(Accent::Hat) && _near(hat->y, 0.511f));
-    CHECK(_near(hat->x + hat->width * 0.5f, 0.25f) && layout.items[0].kind == ItemKind::Accent);
+    CHECK(hat->shape == static_cast<uint8_t>(Accent::Hat) && near(hat->y, 0.511f));
+    CHECK(near(hat->x + hat->width * 0.5f, 0.25f) && layout.items[0].kind == ItemKind::Accent);
     CHECK(_set("\\hat{A}", false, layout));
-    CHECK(_near(_item(layout, nullptr, ItemKind::Accent)->y, 0.78f));
+    CHECK(near(_item(layout, nullptr, ItemKind::Accent)->y, 0.78f));
     CHECK(_set("\\overline{x} \\underline{y}", false, layout));
-    CHECK(_near(_item(layout, nullptr, ItemKind::Rule)->y, 0.431f + 0.12f));
-    CHECK(_near(_item(layout, nullptr, ItemKind::Rule, 1)->y, -(0.2f + 0.16f)));
+    CHECK(near(_item(layout, nullptr, ItemKind::Rule)->y, 0.431f + 0.12f));
+    CHECK(near(_item(layout, nullptr, ItemKind::Rule, 1)->y, -(0.2f + 0.16f)));
     CHECK(_set("\\widehat{xyz}", false, layout));
-    CHECK(_near(_item(layout, nullptr, ItemKind::Accent)->width, 1.56f));
+    CHECK(near(_item(layout, nullptr, ItemKind::Accent)->width, 1.56f));
 }
 
 // Empty groups set as TeX sets them: a fraction keeps its null delimiters and the shifts of its
@@ -493,13 +477,13 @@ static void _empties()
 {
     Layout layout;
     CHECK(_set("\\frac{}{}", false, layout));
-    CHECK(layout.count == 0u && _near(layout.width, 0.24f));
-    CHECK(_near(layout.height, 0.394f) && _near(layout.depth, 0.345f));
+    CHECK(layout.count == 0u && near(layout.width, 0.24f));
+    CHECK(near(layout.height, 0.394f) && near(layout.depth, 0.345f));
     CHECK(_set("\\sqrt{}", false, layout));
     CHECK(layout.count == 1u && layout.items[0].kind == ItemKind::Radical);
-    CHECK(_near(layout.width, layout.items[0].width));
+    CHECK(near(layout.width, layout.items[0].width));
     CHECK(_set("\\overline{} \\underline{}", false, layout));
-    CHECK(layout.count == 0u && _near(layout.height, 0.2f) && _near(layout.depth, 0.2f));
+    CHECK(layout.count == 0u && near(layout.height, 0.2f) && near(layout.depth, 0.2f));
     CHECK(_set("\\hat{}", false, layout));
     CHECK(layout.count == 1u && layout.items[0].kind == ItemKind::Accent);
 }
@@ -509,7 +493,7 @@ static void _fallbacks()
     Layout layout;
     // A glyph the font lacks keeps room for itself.
     CHECK(_set("\\mathbb{R}", false, layout));
-    CHECK(layout.count == 1u && _near(layout.width, 0.5f));
+    CHECK(layout.count == 1u && near(layout.width, 0.5f));
     // A glyph that cannot be measured fails the formula, naming it.
     Parse parse;
     CHECK(_parse("a + ☃", parse));
@@ -535,6 +519,5 @@ int main()
     _accents();
     _empties();
     _fallbacks();
-    if (failures) std::fprintf(stderr, "%d tex checks failed\n", failures);
-    return failures ? 1 : 0;
+    return report();
 }
