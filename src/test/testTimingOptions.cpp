@@ -56,7 +56,6 @@ static void _native(Renderer* renderer)
     delete second;
 }
 
-#ifdef VIS_EXPECT_LUA
 static void _lua(Renderer* renderer)
 {
     static constexpr auto prefix =
@@ -130,7 +129,6 @@ static void _lua(Renderer* renderer)
         delete scene;
     }
 }
-#endif
 
 int main()
 {
@@ -138,9 +136,7 @@ int main()
     CHECK(renderer);
     if (renderer) {
         _native(renderer);
-#ifdef VIS_EXPECT_LUA
         _lua(renderer);
-#endif
     }
     delete renderer;
     return failures ? 1 : 0;

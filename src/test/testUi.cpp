@@ -963,7 +963,6 @@ return scene
     char error[512] = {};
     auto result = vis::ui::Lua::load(source, sizeof(source) - 1u, "ui-test.lua",
                                         &scene, &panel, error, sizeof(error));
-    if (result == Result::NonSupport) return;
     CHECK(result == Result::Success);
     CHECK(scene && panel && panel->scene() == scene && panel->count() == 5u);
     if (scene && panel) {

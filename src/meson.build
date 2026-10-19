@@ -4,7 +4,7 @@ subdir('core')
 if host_machine.system() != 'emscripten'
     pkg = import('pkgconfig')
     private_requires = ['thorvg-1']
-    if lua_enabled and not lua_fallback
+    if not lua_fallback
         private_requires += lua_pc
     endif
     pkg.generate(
@@ -33,7 +33,7 @@ endif
 if cli_enabled
     subdir('cli')
 endif
-if lua_enabled and host_machine.system() == 'emscripten'
+if host_machine.system() == 'emscripten'
     subdir('bindings/js')
     subdir('bindings/wasm')
 endif

@@ -15,9 +15,7 @@ extern "C" {
 #include "../lua/visLuaExtension.h"
 #include "../lua/visLuaValues.h"
 #include "visLuaRuntimeExtension.h"
-#if defined(VIS_INPUT)
 #include "vis_input.h"
-#endif
 
 namespace vis::lua_runtime
 {
@@ -97,7 +95,6 @@ struct Runtime::Impl
     int handle = LUA_NOREF;
     Config config;
     char error[1024] = {};
-#if defined(VIS_INPUT)
     struct PointerClaim
     {
         uint32_t pointer = 0u;
@@ -109,15 +106,12 @@ struct Runtime::Impl
     PointerClaim pointerClaims[input::ActionMap::BindingLimit];
     uint64_t keyClaims = 0u;
     uint32_t pointerClaimCount = 0u;
-#endif
     bool running = false;
     bool failed = false;
 
     ~Impl()
     {
-#if defined(VIS_INPUT)
         delete actions;
-#endif
     }
 
     Entry* find(Entry* entries, uint32_t count, uint32_t object) noexcept
@@ -188,7 +182,6 @@ struct RuntimeAccess
         return runtime && runtime->pImpl && runtime->pImpl->running;
     }
 
-#if defined(VIS_INPUT)
     static Result key(Runtime* runtime, const char* action, input::Key key,
                       const Vec2& value) noexcept
     {
@@ -270,7 +263,6 @@ struct RuntimeAccess
         state.released = 0u;
         return result;
     }
-#endif
 };
 
 }  // namespace detail
@@ -463,29 +455,18 @@ Result Runtime::advance(float elapsed) noexcept
 
 Result Runtime::input(const input::State* state) noexcept
 {
-#if defined(VIS_INPUT)
     if (!pImpl) return Result::InvalidArguments;
     pImpl->input = state;
     return Result::Success;
-#else
-    (void) state;
-    return Result::NonSupport;
-#endif
 }
 
 bool Runtime::claimsKey(uint32_t key) const noexcept
 {
-#if defined(VIS_INPUT)
     return pImpl && key < 64u && (pImpl->keyClaims & (uint64_t{1u} << key));
-#else
-    (void) key;
-    return false;
-#endif
 }
 
 uint32_t Runtime::claimsPointer(uint32_t pointer) const noexcept
 {
-#if defined(VIS_INPUT)
     if (!pImpl) return 0u;
     for (auto i = 0u; i < pImpl->pointerClaimCount; i++) {
         if (pImpl->pointerClaims[i].pointer == pointer) {
@@ -493,10 +474,6 @@ uint32_t Runtime::claimsPointer(uint32_t pointer) const noexcept
         }
     }
     return 0u;
-#else
-    (void) pointer;
-    return 0u;
-#endif
 }
 
 float Runtime::fixedStep() const noexcept
@@ -611,7 +588,6 @@ static Runtime* _running(lua_State* lua)
     return runtime;
 }
 
-#if defined(VIS_INPUT)
 static Vec2 _vec2(lua_State* lua, int index, const char* name)
 {
     luaL_checktype(lua, index, LUA_TTABLE);
@@ -627,7 +603,6 @@ static Vec2 _vec2(lua_State* lua, int index, const char* name)
     lua_pop(lua, 1);
     return {x, y};
 }
-#endif
 
 static Vec3 _vec3(lua_State* lua, int index, const char* name)
 {
@@ -783,7 +758,6 @@ static int _sound(lua_State* lua)
     return 1;
 }
 
-#if defined(VIS_INPUT)
 static input::Key _key(lua_State* lua, int index)
 {
     auto name = luaL_checkstring(lua, index);
@@ -954,7 +928,6 @@ static int _pointerState(lua_State* lua)
     lua_setfield(lua, -2, "active");
     return 1;
 }
-#endif
 
 static int _runtimeGc(lua_State* lua)
 {
@@ -1027,13 +1000,11 @@ static int _open(lua_State* lua, void* data)
         {"update", _update},
         {"clear", _clear},
         {"sound", _sound},
-#if defined(VIS_INPUT)
         {"bind_key", _bindKey},
         {"bind_pointer", _bindPointer},
         {"action", _action},
         {"key", _keyState},
         {"pointer", _pointerState},
-#endif
         {nullptr, nullptr},
     };
     luaL_newmetatable(lua, RuntimeMetatable);

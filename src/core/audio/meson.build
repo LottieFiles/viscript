@@ -4,14 +4,7 @@ miniaudio_include = miniaudio_project.get_variable('miniaudio_include')
 miniaudio_args = miniaudio_project.get_variable('miniaudio_args')
 miniaudio_system_deps = miniaudio_project.get_variable('miniaudio_system_deps')
 miniaudio_license = miniaudio_project.get_variable('miniaudio_license')
-vis_audio_sources = files('visAudio.cpp', 'visAudioPlayer.cpp')
-vis_audio_dependencies = [vis_dep]
-if lua_enabled
-    vis_audio_sources += files('visAudioLua.cpp')
-    vis_audio_dependencies += lua_dep
-else
-    vis_audio_sources += files('visAudioLuaStub.cpp')
-endif
+vis_audio_sources = files('visAudio.cpp', 'visAudioPlayer.cpp', 'visAudioLua.cpp')
 vis_audio_lib = static_library(
     'vis-audio',
     vis_audio_sources,
@@ -19,7 +12,7 @@ vis_audio_lib = static_library(
         include_directories('../../inc', '../lua'),
         miniaudio_include,
     ],
-    dependencies: vis_audio_dependencies,
+    dependencies: [vis_dep, lua_dep],
     cpp_args: miniaudio_args,
     link_whole: miniaudio_lib,
     install: true,

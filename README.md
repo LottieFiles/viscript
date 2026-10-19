@@ -104,7 +104,6 @@ meson test -C build --print-errorlogs
 |---|---|---|
 | `gl` | `false` | The experimental OpenGL renderer module, `vis-gl` with `vis_gl.h`, for native hosts; never in WASM builds. |
 | `modules` | none | Optional modules: `diagram`, `tex`, `interactive`, `audio`, or `all`. |
-| `savers` | `all` | GIF and video exporters. PNG is built into the core. |
 | `tools` | `all` | The CLI and the audit command. |
 | `bundled_thorvg` | `false` | Build the pinned ThorVG subproject instead of using the system one. |
 

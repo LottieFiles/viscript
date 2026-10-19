@@ -14,13 +14,8 @@ project(
 )
 
 cpp = meson.get_compiler('cpp')
-lua_option = get_option('lua')
 modules = get_option('modules')
 all_modules = modules.contains('all')
-savers = get_option('savers')
-all_savers = savers.contains('all')
-gif_saver_enabled = all_savers or savers.contains('gif')
-video_saver_enabled = all_savers or savers.contains('video')
 tools = get_option('tools')
 all_tools = tools.contains('all')
 cli_requested = all_tools or tools.contains('cli') or tools.contains('audit')
@@ -127,36 +122,24 @@ if tvg_fallback
     tvg_dep = subproject('thorvg', default_options: tvg_options).get_variable('thorvg_dep')
 endif
 
-
-# Compile definitions shared by the core library and tests.
-vis_args = (gif_saver_enabled ? ['-DVIS_SAVER_GIF'] : []) + (video_saver_enabled ? ['-DVIS_SAVER_VIDEO'] : [])
-
 lua_fallback = false
 lua_pc = ''
 lua_link_whole = []
 lua_dep = dependency('', required: false)
-if not lua_option.disabled()
-    foreach name : ['lua-5.4', 'lua54']
-        if not lua_dep.found()
-            lua_dep = dependency(name, required: false, allow_fallback: false)
-            lua_pc = lua_dep.found() ? name : ''
-        endif
-    endforeach
+foreach name : ['lua-5.4', 'lua54']
     if not lua_dep.found()
-        lua_project = subproject('lua', required: lua_option)
-        if lua_project.found()
-            lua_fallback = true
-            lua_dep = lua_project.get_variable('lua_dep')
-            lua_link_whole += lua_project.get_variable('lua_lib')
-        endif
+        lua_dep = dependency(name, required: false, allow_fallback: false)
+        lua_pc = lua_dep.found() ? name : ''
     endif
+endforeach
+if not lua_dep.found()
+    lua_project = subproject('lua')
+    lua_fallback = true
+    lua_dep = lua_project.get_variable('lua_dep')
+    lua_link_whole += lua_project.get_variable('lua_lib')
 endif
-lua_enabled = lua_dep.found()
-cli_enabled = lua_enabled and cli_requested and host_machine.system() != 'emscripten'
+cli_enabled = cli_requested and host_machine.system() != 'emscripten'
 audit_enabled = cli_enabled and audit_requested
-if lua_runtime_enabled and not lua_enabled
-    error('Experimental retained Lua runtime requires Lua support')
-endif
 
 subdir('src')
 
@@ -172,7 +155,7 @@ if cli_enabled
     )
 endif
 
-if lua_enabled and host_machine.system() == 'emscripten'
+if host_machine.system() == 'emscripten'
     vis_wasm = executable(
         'vis-wasm',
         wasm_sources,
@@ -199,12 +182,11 @@ endif
 summary(
     {
         'ThorVG': tvg_dep.version(),
+        'Lua': lua_dep.version(),
         'Module selector': modules,
-        'Saver selector': savers,
         'Tool selector': tools,
         'CLI': cli_enabled,
         'Layout audit': audit_enabled,
-        'Lua': lua_enabled,
         'Experimental Interactive (UI, input, states, runtime)': interactive_enabled,
         'Experimental Audio': audio_enabled,
         'Experimental Diagram': diagram_enabled,

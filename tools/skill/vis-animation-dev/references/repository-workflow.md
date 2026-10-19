@@ -28,7 +28,7 @@ meson compile -C build-wasm
 
 Inspect each build directory's configured options before using it. Native and WASM builds verify different host paths.
 
-For a new checkout, inspect `meson_options.txt` and the README before selecting options. Keep bundled ThorVG, Lua, the `gl` renderer module, test, and example choices explicit when they affect the result. The core renders on the CPU; the GL module is experimental and opt-in (`-Dgl=true`), and WASM builds never include it.
+For a new checkout, inspect `meson_options.txt` and the README before selecting options. Keep bundled ThorVG, the `gl` renderer module, test, and example choices explicit when they affect the result. The core renders on the CPU; the GL module is experimental and opt-in (`-Dgl=true`), and WASM builds never include it.
 
 Validate renderer work with a fresh build, and with `-Dgl=true` when the GL module is affected; its parity tests run on macOS. Distributed browser rendering uses the CPU WASM bundle; read renderer API comments for backend/target selection and readback contracts.
 

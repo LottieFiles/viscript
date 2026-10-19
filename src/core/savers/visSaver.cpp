@@ -393,6 +393,35 @@ Result Saver::png(const Surface& surface, const char* path) noexcept
     return ok ? Result::Success : Result::IoError;
 }
 
+Result saver::timeline(const Scene* scene, uint32_t& fps, uint32_t& frames) noexcept
+{
+    if (!scene) return Result::InvalidArguments;
+    auto& config = scene->config();
+    if (!fps) fps = config.fps;
+    if (!fps || !config.width || !config.height) return Result::InvalidArguments;
+    auto total = scene->duration();
+    if (!std::isfinite(total) || total < 0.0f) return Result::InvalidArguments;
+    auto samples = static_cast<double>(total) * fps;
+    if (!std::isfinite(samples)) return Result::InvalidArguments;
+    auto adjacent = std::nextafter(total, std::numeric_limits<float>::infinity());
+    if (std::isfinite(adjacent)) {
+        auto tolerance = (static_cast<double>(adjacent) - total) * fps;
+        auto integer = std::round(samples);
+        if (std::fabs(samples - integer) <= tolerance) samples = integer;
+    }
+    auto frameValue = std::ceil(samples);
+    if (!std::isfinite(frameValue) || frameValue > UINT32_MAX) return Result::InvalidArguments;
+    frames = frameValue < 1.0 ? 1u : static_cast<uint32_t>(frameValue);
+    return Result::Success;
+}
+
+static bool _ends(const char* value, const char* suffix)
+{
+    auto valueSize = std::strlen(value);
+    auto suffixSize = std::strlen(suffix);
+    return valueSize >= suffixSize && std::strcmp(value + valueSize - suffixSize, suffix) == 0;
+}
+
 #if !defined(__EMSCRIPTEN__) && !defined(_WIN32)
 static char* _quote(const char* path)
 {
@@ -473,56 +502,21 @@ struct SigpipeGuard
     }
 };
 #endif
-#endif
 
-bool saver::ends(const char* value, const char* suffix) noexcept
-{
-    if (!value || !suffix) return false;
-    auto valueSize = std::strlen(value);
-    auto suffixSize = std::strlen(suffix);
-    return valueSize >= suffixSize && std::strcmp(value + valueSize - suffixSize, suffix) == 0;
-}
+// ffmpeg output options: a GIF with a palette generated from its frames, and an H.264 MP4,
+// silent or with an AAC soundtrack.
+static constexpr auto GIF_OPTIONS = "-filter_complex '[0:v]split[a][b];[a]palettegen[p];[b][p]paletteuse' -f gif";
+static constexpr auto MP4_OPTIONS = "-an -c:v libx264 -pix_fmt yuv420p -f mp4";
+static constexpr auto MP4_SOUNDTRACK_OPTIONS = "-c:v libx264 -pix_fmt yuv420p -c:a aac -b:a 192k -f mp4";
 
-Result saver::timeline(const Scene* scene, uint32_t& fps, uint32_t& frames) noexcept
+// Pipes the frames to ffmpeg with the output options, which must encode the soundtrack's audio
+// when there is one.
+static Result _frames(const Scene* scene, Renderer& renderer, const char* path, uint32_t fps,
+                      const char* options, bool evenDimensions, const char* soundtrack = nullptr)
 {
-    if (!scene) return Result::InvalidArguments;
-    auto& config = scene->config();
-    if (!fps) fps = config.fps;
-    if (!fps || !config.width || !config.height) return Result::InvalidArguments;
-    auto total = scene->duration();
-    if (!std::isfinite(total) || total < 0.0f) return Result::InvalidArguments;
-    auto samples = static_cast<double>(total) * fps;
-    if (!std::isfinite(samples)) return Result::InvalidArguments;
-    auto adjacent = std::nextafter(total, std::numeric_limits<float>::infinity());
-    if (std::isfinite(adjacent)) {
-        auto tolerance = (static_cast<double>(adjacent) - total) * fps;
-        auto integer = std::round(samples);
-        if (std::fabs(samples - integer) <= tolerance) samples = integer;
-    }
-    auto frameValue = std::ceil(samples);
-    if (!std::isfinite(frameValue) || frameValue > UINT32_MAX) return Result::InvalidArguments;
-    frames = frameValue < 1.0 ? 1u : static_cast<uint32_t>(frameValue);
-    return Result::Success;
-}
-
-Result saver::frames(const Scene* scene, Renderer* renderer, const char* path, uint32_t fps,
-                     const char* options, bool evenDimensions, const char* soundtrack) noexcept
-{
-#if defined(__EMSCRIPTEN__) || defined(_WIN32)
-    static_cast<void>(scene);
-    static_cast<void>(renderer);
-    static_cast<void>(path);
-    static_cast<void>(fps);
-    static_cast<void>(options);
-    static_cast<void>(evenDimensions);
-    static_cast<void>(soundtrack);
-    return Result::NonSupport;
-#else
-    if (!scene || !renderer || !path || !path[0] || !options || !options[0]) return Result::InvalidArguments;
-    if (soundtrack && !soundtrack[0]) return Result::InvalidArguments;
     auto& config = scene->config();
     uint32_t frameCount;
-    auto result = timeline(scene, fps, frameCount);
+    auto result = saver::timeline(scene, fps, frameCount);
     if (result != Result::Success) return result;
     if (evenDimensions && ((config.width & 1u) || (config.height & 1u))) return Result::InvalidArguments;
     // The soundtrack is the second input, read for as long as the video lasts.
@@ -616,7 +610,7 @@ Result saver::frames(const Scene* scene, Renderer* renderer, const char* path, u
     result = Result::Success;
     for (auto frame = 0u; frame < frameCount; frame++) {
         auto time = static_cast<float>(frame) / static_cast<float>(fps);
-        result = renderer->render(scene, time, surface);
+        result = renderer.render(scene, time, surface);
         if (result != Result::Success) break;
         if (!bytes) {
             bytes = _rgba(surface, false, byteSize);
@@ -651,22 +645,22 @@ Result saver::frames(const Scene* scene, Renderer* renderer, const char* path, u
     if (result != Result::Success) unlink(temporary);
     delete[] temporary;
     return result;
-#endif
 }
+#endif
 
 Result Saver::save(const Scene* scene, Renderer& renderer, const char* path, uint32_t fps) noexcept
 {
     if (!scene || !path || !path[0]) return Result::InvalidArguments;
-    auto gif = saver::ends(path, ".gif");
-    auto mp4 = saver::ends(path, ".mp4");
+    auto gif = _ends(path, ".gif");
+    auto mp4 = _ends(path, ".mp4");
     if (!gif && !mp4) return Result::InvalidArguments;
 #if defined(__EMSCRIPTEN__) || defined(_WIN32)
     static_cast<void>(renderer);
     static_cast<void>(fps);
     return Result::NonSupport;
 #else
-    if (gif) return saver::gif(scene, &renderer, path, fps);
-    return saver::video(scene, &renderer, path, fps);
+    if (gif) return _frames(scene, renderer, path, fps, GIF_OPTIONS, false);
+    return _frames(scene, renderer, path, fps, MP4_OPTIONS, true);
 #endif
 }
 
@@ -674,7 +668,7 @@ Result Saver::save(const Scene* scene, Renderer& renderer, const char* path, uin
                    const char* soundtrack) noexcept
 {
     if (!soundtrack) return save(scene, renderer, path, fps);
-    if (!scene || !path || !soundtrack[0] || !saver::ends(path, ".mp4")) {
+    if (!scene || !path || !soundtrack[0] || !_ends(path, ".mp4")) {
         return Result::InvalidArguments;
     }
 #if defined(__EMSCRIPTEN__) || defined(_WIN32)
@@ -682,7 +676,7 @@ Result Saver::save(const Scene* scene, Renderer& renderer, const char* path, uin
     static_cast<void>(fps);
     return Result::NonSupport;
 #else
-    return saver::video(scene, &renderer, path, fps, soundtrack);
+    return _frames(scene, renderer, path, fps, MP4_SOUNDTRACK_OPTIONS, true, soundtrack);
 #endif
 }
 

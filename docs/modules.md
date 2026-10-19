@@ -41,19 +41,21 @@ meson setup build-full -Dmodules=all -Dgl=true
 ```
 
 `modules` defaults to none. Each selected module adds its library, installed header,
-pkg-config entry, Lua hook, tests, and dependencies. The retained Lua runtime uses
-Lua; the other modules expose C++ APIs independently of their Lua hooks.
+pkg-config entry, Lua hook, tests, and dependencies. Lua 5.4 is required: Meson uses the
+system `lua-5.4` or `lua54` package, or else builds the bundled subproject into
+`libviscript`. Every module library includes its Lua factories beside its C++ API.
 `scripts/wasm-bundle.sh` packages every module.
 
-Select exporters and native tools independently:
+Select native tools independently:
 
 ```sh
-meson setup build-publisher -Dmodules=diagram,tex -Dsavers=gif,video -Dtools=cli,audit
-meson setup build-library -Dmodules='' -Dsavers='' -Dtools=''
+meson setup build-publisher -Dmodules=diagram,tex -Dtools=cli,audit
+meson setup build-library -Dmodules='' -Dtools=''
 ```
 
-PNG snapshots are part of core. `gif` and `video` add timeline encoders; video uses
-FFmpeg. `tools=cli,audit` builds the executable and its audit subcommand.
+The core saves PNG snapshots itself, and GIF and MP4 timelines through FFmpeg, which must
+be on `PATH`; GIF and MP4 saving is unsupported on Windows and in WebAssembly.
+`tools=cli,audit` builds the executable and its audit subcommand.
 
 ## Adding a module
 
@@ -63,8 +65,9 @@ FFmpeg. `tools=cli,audit` builds the executable and its audit subcommand.
    directory in `src/core/meson.build`.
 3. Define its library and dependency in the directory's `meson.build`, linking
    `vis_dep`.
-4. Register its Lua hook in hosts that link the library. A module part for `spans`
-   uses `luaSetSpanPart`; its key also belongs in the core's `MODULE_PARTS` table.
+4. Register its Lua hook in `src/core/lua/visLuaHost.h`, through which the CLI and WASM
+   hosts load scenes. A module part for `spans` uses `luaSetSpanPart`; its key also
+   belongs in the core's `MODULE_PARTS` table.
 5. Link the module into CLI or WASM hosts and expose capability detection.
 6. Run core, selected-module, and full builds to verify the boundary.
 

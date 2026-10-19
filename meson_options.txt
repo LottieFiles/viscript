@@ -12,13 +12,6 @@ option(
     description: 'Build selected optional viscript native modules; interactive builds the UI, input, states and retained Lua runtime modules together',
 )
 option(
-    'savers',
-    type: 'array',
-    choices: ['', 'gif', 'video', 'all'],
-    value: ['all'],
-    description: 'Build selected viscript animation savers; PNG remains in core',
-)
-option(
     'tools',
     type: 'array',
     choices: ['', 'cli', 'audit', 'all'],
@@ -30,12 +23,6 @@ option(
     type: 'boolean',
     value: false,
     description: 'Build the pinned ThorVG subproject',
-)
-option(
-    'lua',
-    type: 'feature',
-    value: 'enabled',
-    description: 'Build the Lua scene binding and CLI',
 )
 option('tests', type: 'boolean', value: true, description: 'Build tests')
 option(

@@ -531,7 +531,6 @@ static void camera()
 
 static void luaBinding()
 {
-#if defined(VIS_EXPECT_LUA)
     static constexpr char source[] = R"lua(
 local scene = vis.scene {
     width = 200, height = 100,
@@ -567,16 +566,6 @@ return scene
         CHECK(controller->input(key(InputKind::KeyDown, Key::ArrowRight, 0.0f)).handled);
     }
     delete scene;
-#else
-    Scene* scene = nullptr;
-    Controller* controller = nullptr;
-    char error[64] = {};
-    auto result = input::Lua::load("return nil", 10u, "input.lua", &scene, &controller,
-                                  error, sizeof(error));
-    CHECK(result == Result::NonSupport);
-    CHECK(!scene && !controller);
-    CHECK(std::strstr(error, "disabled") != nullptr);
-#endif
 }
 
 #if defined(VIS_UI)

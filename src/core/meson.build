@@ -25,7 +25,6 @@ vis_lib = static_library(
     include_directories: vis_inc,
     dependencies: vis_dependencies,
     link_whole: lua_link_whole,
-    cpp_args: vis_args,
     install: true,
 )
 
@@ -69,7 +68,7 @@ if lua_runtime_enabled
     vis_module_pkgs += {
         'lib': vis_lua_runtime_lib, 'name': 'vis-lua-runtime',
         'description': 'Experimental retained Lua fixed-step runtime for viscript',
-        'requires': input_enabled ? ['viscript', 'vis-input'] : ['viscript'],
+        'requires': ['viscript', 'vis-input'],
     }
 endif
 if audio_enabled

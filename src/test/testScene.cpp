@@ -1200,7 +1200,7 @@ static void boundaries(Renderer* renderer)
     auto odd = Scene::gen(oddConfig);
     CHECK(odd != nullptr);
     if (odd) {
-#ifdef VIS_SAVER_VIDEO
+#if !defined(_WIN32) && !defined(__EMSCRIPTEN__)
         CHECK(Saver::save(odd, *renderer, "invalid.mp4") == Result::InvalidArguments);
 #else
         CHECK(Saver::save(odd, *renderer, "invalid.mp4") == Result::NonSupport);
@@ -1210,8 +1210,7 @@ static void boundaries(Renderer* renderer)
     }
 }
 
-#if !defined(_WIN32) && !defined(__EMSCRIPTEN__) && defined(VIS_SAVER_GIF) \
-    && defined(VIS_SAVER_VIDEO)
+#if !defined(_WIN32) && !defined(__EMSCRIPTEN__)
 // Whether the file at path, which holds one ffmpeg argument per line, contains argument.
 static bool _argument(const char* path, const char* argument)
 {
@@ -2199,8 +2198,7 @@ int main()
         cameraLayers(renderer);
         runtimeModifiers(renderer);
         boundaries(renderer);
-#if !defined(_WIN32) && !defined(__EMSCRIPTEN__) && defined(VIS_SAVER_GIF) \
-    && defined(VIS_SAVER_VIDEO)
+#if !defined(_WIN32) && !defined(__EMSCRIPTEN__)
         videoCadence(renderer);
 #endif
     }

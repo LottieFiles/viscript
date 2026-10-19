@@ -18,7 +18,6 @@
 #include "vis.h"
 #include "vis_capi.h"
 #include "visLuaHost.h"
-#include "visSaver.h"
 #if defined(VIS_AUDIO)
 #include "vis_audio.h"
 

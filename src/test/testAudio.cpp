@@ -5,7 +5,7 @@
 
 #include "vis.h"
 #include "vis_audio.h"
-#if defined(VIS_EXPECT_LUA_RUNTIME)
+#if defined(VIS_LUA_RUNTIME)
 #include "vis_lua_runtime.h"
 #include "visLuaHost.h"
 #endif
@@ -457,7 +457,6 @@ return scene
     auto result = audio::Lua::load(source, static_cast<uint32_t>(std::strlen(source)),
                                    "audio.lua", &scene, &soundscape,
                                    error, sizeof(error));
-#if defined(VIS_EXPECT_LUA)
     CHECK(result == Result::Success);
     CHECK(scene && soundscape && soundscape->scene() == scene);
     if (soundscape) {
@@ -483,12 +482,9 @@ return scene
                               error, sizeof(error));
     CHECK(result == Result::ScriptError && !scene && !soundscape);
     CHECK(std::strstr(error, "audio bus") != nullptr);
-#else
-    CHECK(result == Result::NonSupport && !scene && !soundscape);
-#endif
 }
 
-#if defined(VIS_EXPECT_LUA_RUNTIME)
+#if defined(VIS_LUA_RUNTIME)
 static void retainedLua()
 {
     static constexpr const char* source = R"(
@@ -527,7 +523,7 @@ int main()
     player();
     mixing();
     lua();
-#if defined(VIS_EXPECT_LUA_RUNTIME)
+#if defined(VIS_LUA_RUNTIME)
     retainedLua();
 #endif
     if (failures) std::fprintf(stderr, "%d audio test(s) failed\n", failures);

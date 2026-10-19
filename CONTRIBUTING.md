@@ -27,8 +27,7 @@ list their sections at the top; each section is marked `// ---------- name -----
 
 Files are `vis` and what they hold, in CamelCase: `visScene.cpp`, `visLuaValues.h`. A module
 under `src/core/<module>/` has `visX.cpp` for the engine side, `visXLua.cpp` for its Lua
-binding, `visXLuaExtension.h` for what the binding shares with the core loader, and
-`visXLuaStub.cpp` for a build that leaves the binding out.
+binding, and `visXLuaExtension.h` for what the binding shares with the core loader.
 
 Functions and structs that one file uses are `static` and start with an underscore
 (`_options`, `_fieldNumber`); helpers shared through a private header are `static inline`.

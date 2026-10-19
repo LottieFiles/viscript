@@ -2,7 +2,6 @@ native = host_machine.system() != 'emscripten'
 lua_inc = include_directories('../core/lua')
 font_arg = '-DVIS_TEST_FONT="' + (meson.project_source_root() / 'src/examples/assets/Pretendard.ttf') + '"'
 mono_font_arg = '-DVIS_TEST_MONO_FONT="' + (meson.project_source_root() / 'src/examples/assets/JetBrainsMono.ttf') + '"'
-expect_lua = lua_enabled ? ['-DVIS_EXPECT_LUA'] : []
 scene_test_sources = files(
     'testScene.cpp',
     'testSceneAnimations.cpp',
@@ -81,14 +80,14 @@ endif
 cpp_tests += [
     {
         'name': 'sw-scene', 'exe': 'testScene', 'src': scene_test_sources,
-        'when': native, 'args': vis_args + [font_arg],
+        'when': native, 'args': [font_arg],
     },
     {'name': 'composite', 'exe': 'testComposite', 'when': native},
-    {'name': 'timing-options', 'exe': 'testTimingOptions', 'when': native, 'args': expect_lua},
+    {'name': 'timing-options', 'exe': 'testTimingOptions', 'when': native},
     {'name': 'ui', 'exe': 'testUi', 'when': ui_enabled, 'deps': ui_deps},
     {
         'name': 'input', 'exe': 'testInput', 'when': input_enabled,
-        'deps': input_deps + ui_deps, 'args': expect_lua + ui_args,
+        'deps': input_deps + ui_deps, 'args': ui_args,
     },
 ]
 if states_enabled
@@ -102,7 +101,7 @@ if audio_enabled
     cpp_tests += {
         'name': 'audio', 'exe': 'testAudio', 'when': true,
         'deps': [vis_audio_dep] + runtime_deps,
-        'args': expect_lua + (lua_runtime_enabled ? ['-DVIS_AUDIO', '-DVIS_LUA_RUNTIME', '-DVIS_EXPECT_LUA_RUNTIME'] : []),
+        'args': lua_runtime_enabled ? ['-DVIS_AUDIO', '-DVIS_LUA_RUNTIME'] : [],
         'inc': lua_runtime_enabled ? [lua_inc] : [],
     }
 endif
@@ -119,49 +118,47 @@ if gl_deps.length() > 0
 endif
 
 # Lua binding tests.
-if lua_enabled
-    if states_enabled
-        cpp_tests += {
-            'name': 'states-lua', 'exe': 'testStatesLua', 'when': true,
-            'deps': [vis_states_dep] + runtime_deps, 'args': ['-DVIS_STATES'] + runtime_args,
-            'inc': [lua_inc],
-        }
-    endif
-    if diagram_enabled
-        cpp_tests += [
-            {
-                'name': 'diagram-lua', 'exe': 'testDiagramLua', 'src': 'testAuthoringModules.cpp',
-                'when': true, 'deps': [vis_diagram_dep], 'args': ['-DVIS_DIAGRAM'], 'inc': [lua_inc],
-            },
-            {
-                'name': 'authoring-modules', 'exe': 'testAuthoringModules', 'when': true,
-                'deps': [vis_diagram_dep] + ui_deps + input_deps,
-                'args': ['-DVIS_DIAGRAM'] + ui_args + input_args, 'inc': [lua_inc],
-            },
-        ]
-    endif
-    if tex_enabled
-        cpp_tests += {
-            'name': 'tex-lua', 'exe': 'testTexLua', 'when': native,
-            'deps': [vis_tex_dep], 'args': [font_arg, '-DVIS_TEX'], 'inc': [lua_inc],
-        }
-    endif
+if states_enabled
+    cpp_tests += {
+        'name': 'states-lua', 'exe': 'testStatesLua', 'when': true,
+        'deps': [vis_states_dep] + runtime_deps, 'args': ['-DVIS_STATES'] + runtime_args,
+        'inc': [lua_inc],
+    }
+endif
+if diagram_enabled
     cpp_tests += [
         {
-            'name': 'lua-extension', 'exe': 'testLuaExtension', 'when': true, 'inc': [lua_inc],
-            'args': native ? [font_arg] : [],
+            'name': 'diagram-lua', 'exe': 'testDiagramLua', 'src': 'testAuthoringModules.cpp',
+            'when': true, 'deps': [vis_diagram_dep], 'args': ['-DVIS_DIAGRAM'], 'inc': [lua_inc],
         },
         {
-            'name': 'lua-scene', 'exe': 'testLua', 'src': lua_test_sources,
-            'when': native, 'args': [font_arg],
-        },
-        {'name': 'c-api', 'exe': 'testCapi', 'when': native},
-        {
-            'name': 'retained', 'exe': 'testRetained', 'when': native,
-            'args': [font_arg, '-DVIS_TEST_EXAMPLES="' + (meson.project_source_root() / 'src/examples/lua') + '"'],
+            'name': 'authoring-modules', 'exe': 'testAuthoringModules', 'when': true,
+            'deps': [vis_diagram_dep] + ui_deps + input_deps,
+            'args': ['-DVIS_DIAGRAM'] + ui_args + input_args, 'inc': [lua_inc],
         },
     ]
 endif
+if tex_enabled
+    cpp_tests += {
+        'name': 'tex-lua', 'exe': 'testTexLua', 'when': native,
+        'deps': [vis_tex_dep], 'args': [font_arg, '-DVIS_TEX'], 'inc': [lua_inc],
+    }
+endif
+cpp_tests += [
+    {
+        'name': 'lua-extension', 'exe': 'testLuaExtension', 'when': true, 'inc': [lua_inc],
+        'args': native ? [font_arg] : [],
+    },
+    {
+        'name': 'lua-scene', 'exe': 'testLua', 'src': lua_test_sources,
+        'when': native, 'args': [font_arg],
+    },
+    {'name': 'c-api', 'exe': 'testCapi', 'when': native},
+    {
+        'name': 'retained', 'exe': 'testRetained', 'when': native,
+        'args': [font_arg, '-DVIS_TEST_EXAMPLES="' + (meson.project_source_root() / 'src/examples/lua') + '"'],
+    },
+]
 
 foreach t : cpp_tests
     if t['when']

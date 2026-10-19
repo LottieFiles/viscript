@@ -1,18 +1,11 @@
-vis_states_sources = files('visStates.cpp')
-vis_states_dependencies = []
-if lua_enabled
-    vis_states_sources += files('visStatesLua.cpp')
-    vis_states_dependencies += lua_dep
-else
-    vis_states_sources += files('visStatesLuaStub.cpp')
-endif
+vis_states_sources = files('visStates.cpp', 'visStatesLua.cpp')
 vis_states_lib = static_library(
     'vis-states',
     vis_states_sources,
     include_directories: include_directories(
         '../../inc', '../common', '../lua',
     ),
-    dependencies: vis_states_dependencies,
+    dependencies: lua_dep,
     install: true,
 )
 vis_states_dep = declare_dependency(

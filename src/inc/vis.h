@@ -2557,7 +2557,6 @@ private:
 
 struct Saver
 {
-    // Compiled-out savers retain their declarations and return NonSupport.
     // Built-in savers sample scene time; interaction clocks must be advanced by the host.
     static Result png(const Surface& surface, const char* path) noexcept;
     // Saves every frame of the timeline as a GIF or an MP4, by the path's extension, at fps

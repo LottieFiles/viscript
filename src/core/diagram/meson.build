@@ -3,19 +3,13 @@ vis_diagram_sources = files(
     'visDiagramRoute.cpp',
     'visDiagramLayout.cpp',
     'visDiagramAudit.cpp',
+    'visDiagramLua.cpp',
 )
-vis_diagram_dependencies = []
-if lua_enabled
-    vis_diagram_sources += files('visDiagramLua.cpp')
-    vis_diagram_dependencies += lua_dep
-else
-    vis_diagram_sources += files('visDiagramLuaStub.cpp')
-endif
 vis_diagram_lib = static_library(
     'vis-diagram',
     vis_diagram_sources,
     include_directories: include_directories('../../inc', '../lua'),
-    dependencies: vis_diagram_dependencies,
+    dependencies: lua_dep,
     install: true,
 )
 vis_diagram_dep = declare_dependency(
