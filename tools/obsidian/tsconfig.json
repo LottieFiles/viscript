@@ -17,5 +17,5 @@
       "vis-wasm-bundle": ["../../src/bindings/js/client.d.ts"]
     }
   },
-  "include": ["src"]
+  "include": ["src", "test"]
 }

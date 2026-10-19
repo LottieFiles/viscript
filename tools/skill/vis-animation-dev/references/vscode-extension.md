@@ -57,6 +57,6 @@ npx vsce ls
 npm run package
 ```
 
-`npm test` compiles the host/Webview, verifies API metadata, exercises manifest and viewer utilities, export codecs, and runtime seeking. Add focused cases for the behavior changed. Inspect responsive modes, range boundaries, series navigation, keyboard focus, source links, and reload recovery in an Extension Development Host when UI behavior changes.
+`npm test` compiles the host/Webview, verifies API metadata, exercises manifest and viewer utilities, export planning, and runtime seeking. Add focused cases for the behavior changed. Inspect responsive modes, range boundaries, series navigation, keyboard focus, source links, and reload recovery in an Extension Development Host when UI behavior changes.
 
 Package inspection should include compiled providers, schema, media, runtime, fonts, and license notices. Remove stale `out/` files after deleting TypeScript sources before packaging.

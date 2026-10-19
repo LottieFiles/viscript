@@ -1,38 +1,15 @@
 import assert from "node:assert/strict";
 import {
-    normalizeSourceContexts,
     reconcileInspectorOpenState,
     resetSourceContextView,
     resolveActiveSourceIndex,
     sourceContextExpansionCount,
-    sourceContextKeys,
     sourceContextRowIsFocused,
     sourceContextRows,
 } from "../media/source-inspector.mjs";
 
-const contexts = normalizeSourceContexts([
-    {
-        id: "dispatch-reference",
-        label: "Dispatch",
-        path: "src/renderer/tvggRaster.cpp",
-        language: "cpp",
-        startLine: 184,
-        endLine: 186,
-        focusStartLine: 185,
-        focusEndLine: 185,
-        totalLineCount: 420,
-        hasMoreAbove: true,
-        hasMoreBelow: true,
-        expanded: true,
-        lines: ["if (ready) {", "    dispatch();", "}"],
-        truncated: true,
-        unavailable: false,
-    },
-    {label: "Fallback", path: "src/fallback.cpp", startLine: 40, lines: ["fallback();"]},
-]);
-
-assert.equal(contexts.length, 2);
-assert.deepEqual(contexts[0], {
+// Source contexts as the extension sends them.
+const dispatch = {
     kind: "source",
     id: "dispatch-reference",
     label: "Dispatch",
@@ -51,20 +28,40 @@ assert.deepEqual(contexts[0], {
     lines: ["if (ready) {", "    dispatch();", "}"],
     truncated: true,
     unavailable: false,
-    oldPath: "",
-    diffRows: undefined,
-});
-assert.deepEqual(sourceContextRows(contexts[0]), [
+};
+const fallback = {
+    kind: "source",
+    id: "fallback-reference",
+    label: "Fallback",
+    path: "src/fallback.cpp",
+    language: "cpp",
+    startLine: 40,
+    endLine: 40,
+    focusStartLine: 40,
+    focusEndLine: 40,
+    totalLineCount: 80,
+    hasMoreAbove: true,
+    hasMoreBelow: true,
+    baseStartLine: 40,
+    baseEndLine: 40,
+    expanded: false,
+    lines: ["fallback();"],
+    truncated: false,
+    unavailable: false,
+};
+const contexts = [dispatch, fallback];
+
+assert.deepEqual(sourceContextRows(dispatch), [
     {lineNumber: 184, text: "if (ready) {"},
     {lineNumber: 185, text: "    dispatch();"},
     {lineNumber: 186, text: "}"},
 ]);
-assert.equal(sourceContextRowIsFocused(contexts[0], 184), false);
-assert.equal(sourceContextRowIsFocused(contexts[0], 185), true);
-assert.equal(sourceContextRowIsFocused(contexts[0], 186), false);
-assert.equal(sourceContextRowIsFocused({...contexts[0], expanded: false}, 185), false);
+assert.equal(sourceContextRowIsFocused(dispatch, 184), false);
+assert.equal(sourceContextRowIsFocused(dispatch, 185), true);
+assert.equal(sourceContextRowIsFocused(dispatch, 186), false);
+assert.equal(sourceContextRowIsFocused({...dispatch, expanded: false}, 185), false);
 
-const diffContext = normalizeSourceContexts([{
+const diffContext = {
     kind: "diff",
     id: "verified-diff",
     label: "Dispatch change",
@@ -75,25 +72,30 @@ const diffContext = normalizeSourceContexts([{
     endLine: 21,
     focusStartLine: 20,
     focusEndLine: 21,
+    totalLineCount: 21,
+    hasMoreAbove: true,
+    hasMoreBelow: false,
+    baseStartLine: 20,
+    baseEndLine: 21,
+    expanded: false,
     lines: ["oldCall();", "newCall();", "return value;"],
+    truncated: false,
+    unavailable: false,
     diffRows: [
         {kind: "removed", oldLineNumber: 20, text: "oldCall();"},
         {kind: "inserted", newLineNumber: 20, text: "newCall();"},
         {kind: "context", oldLineNumber: 21, newLineNumber: 21, text: "return value;"},
     ],
-    unavailable: false,
-}])[0];
-assert.equal(diffContext.kind, "diff");
-assert.equal(diffContext.oldPath, "src/old.cpp");
+};
 assert.deepEqual(sourceContextRows(diffContext), [
-    {kind: "removed", oldLineNumber: 20, newLineNumber: undefined, lineNumber: 20, text: "oldCall();"},
-    {kind: "inserted", oldLineNumber: undefined, newLineNumber: 20, lineNumber: 20, text: "newCall();"},
+    {kind: "removed", oldLineNumber: 20, lineNumber: 20, text: "oldCall();"},
+    {kind: "inserted", newLineNumber: 20, lineNumber: 20, text: "newCall();"},
     {kind: "context", oldLineNumber: 21, newLineNumber: 21, lineNumber: 21, text: "return value;"},
 ]);
 assert.equal(sourceContextRowIsFocused({...diffContext, expanded: true}, 20), false);
 assert.deepEqual(resetSourceContextView(diffContext), diffContext);
-assert.deepEqual(resetSourceContextView(contexts[0]), {
-    ...contexts[0],
+assert.deepEqual(resetSourceContextView(dispatch), {
+    ...dispatch,
     startLine: 185,
     endLine: 185,
     hasMoreAbove: true,
@@ -102,84 +104,58 @@ assert.deepEqual(resetSourceContextView(contexts[0]), {
     lines: ["    dispatch();"],
     truncated: false,
 });
-assert.equal(sourceContextExpansionCount(contexts[0], "above"), 5);
-assert.equal(sourceContextExpansionCount(contexts[0], "below"), 5);
-assert.equal(sourceContextExpansionCount(contexts[0], "above", 10), 10);
-assert.equal(sourceContextExpansionCount(contexts[0], "below", 20), 20);
-assert.equal(sourceContextExpansionCount({...contexts[0], startLine: 6}, "above"), 5);
-assert.equal(sourceContextExpansionCount({...contexts[0], endLine: 418}, "below"), 2);
-assert.equal(sourceContextExpansionCount(contexts[0], "sideways"), 0);
-assert.equal(sourceContextExpansionCount(contexts[0], "above", 0), 0);
-assert.equal(contexts[1].endLine, 40);
-assert.equal(contexts[1].baseStartLine, 40);
-assert.equal(contexts[1].baseEndLine, 40);
-assert.equal(contexts[1].expanded, false);
-assert.equal(contexts[1].truncated, false);
-assert.equal(contexts[1].unavailable, false);
-const unavailable = normalizeSourceContexts([{
-    label: "Missing",
-    startLine: 99,
-    endLine: 101,
-    lines: [],
-    unavailable: true,
-}])[0];
-assert.equal(unavailable.unavailable, true);
+assert.equal(sourceContextExpansionCount(dispatch, "above"), 5);
+assert.equal(sourceContextExpansionCount(dispatch, "below"), 5);
+assert.equal(sourceContextExpansionCount(dispatch, "above", 10), 10);
+assert.equal(sourceContextExpansionCount(dispatch, "below", 20), 20);
+assert.equal(sourceContextExpansionCount({...dispatch, startLine: 6}, "above"), 5);
+assert.equal(sourceContextExpansionCount({...dispatch, endLine: 418}, "below"), 2);
+assert.equal(sourceContextExpansionCount(dispatch, "sideways"), 0);
+assert.equal(sourceContextExpansionCount(dispatch, "above", 0), 0);
+const unavailable = {...dispatch, id: "missing", lines: [], unavailable: true};
 assert.equal(resetSourceContextView(unavailable).hasMoreAbove, false);
 assert.equal(resetSourceContextView(unavailable).hasMoreBelow, false);
 assert.equal(resolveActiveSourceIndex(contexts, 1), 1);
 assert.equal(resolveActiveSourceIndex(contexts, 9), 0);
 assert.equal(resolveActiveSourceIndex([], 0), -1);
 
-const contextKeys = sourceContextKeys(contexts);
-assert.equal(new Set(contextKeys).size, contexts.length);
-assert.equal(new Set(sourceContextKeys([contexts[0], contexts[0]])).size, 2);
-const samePresentationDifferentReferences = [
-    {...contexts[0], id: "dispatch-range-a"},
-    {...contexts[0], id: "dispatch-range-b"},
-];
-const referenceKeys = sourceContextKeys(samePresentationDifferentReferences);
-assert.deepEqual(
-    sourceContextKeys([...samePresentationDifferentReferences].reverse()),
-    [...referenceKeys].reverse(),
-);
 assert.deepEqual(reconcileInspectorOpenState(contexts, undefined, 1, false), {
     notesOpen: true,
-    sourceKeys: [contextKeys[1]],
+    sourceKeys: [fallback.id],
 });
 assert.deepEqual(reconcileInspectorOpenState(contexts, {notesOpen: false, sourceKeys: []}, 0, false), {
     notesOpen: true,
-    sourceKeys: [contextKeys[0]],
+    sourceKeys: [dispatch.id],
 });
 assert.deepEqual(reconcileInspectorOpenState([], undefined, -1, false), {
     notesOpen: true,
     sourceKeys: [],
 });
 
-const multiOpen = {notesOpen: true, sourceKeys: contextKeys};
+const multiOpen = {notesOpen: true, sourceKeys: [dispatch.id, fallback.id]};
 assert.deepEqual(reconcileInspectorOpenState(contexts, multiOpen, 0, true), multiOpen);
 assert.deepEqual(
-    reconcileInspectorOpenState([contexts[1], contexts[0]], multiOpen, 0, true),
-    {notesOpen: true, sourceKeys: [contextKeys[1], contextKeys[0]]},
+    reconcileInspectorOpenState([fallback, dispatch], multiOpen, 0, true),
+    {notesOpen: true, sourceKeys: [fallback.id, dispatch.id]},
 );
 assert.deepEqual(
-    reconcileInspectorOpenState([contexts[1]], multiOpen, 0, true),
-    {notesOpen: true, sourceKeys: [contextKeys[1]]},
+    reconcileInspectorOpenState([fallback], multiOpen, 0, true),
+    {notesOpen: true, sourceKeys: [fallback.id]},
 );
-const shiftedContext = {...contexts[0], startLine: 190, endLine: 192};
+const shiftedContext = {...dispatch, startLine: 190, endLine: 192};
 assert.deepEqual(
     reconcileInspectorOpenState([shiftedContext], multiOpen, 0, true),
-    {notesOpen: true, sourceKeys: [contextKeys[0]]},
+    {notesOpen: true, sourceKeys: [dispatch.id]},
+);
+assert.deepEqual(
+    reconcileInspectorOpenState([{...dispatch, id: "range-a"}, {...dispatch, id: "range-b"}],
+        {notesOpen: true, sourceKeys: ["range-b"]}, 0, true),
+    {notesOpen: true, sourceKeys: ["range-b"]},
+    "open state follows the reference, not the presentation",
 );
 assert.deepEqual(
     reconcileInspectorOpenState(contexts, {notesOpen: false, sourceKeys: []}, 0, true),
     {notesOpen: false, sourceKeys: []},
 );
-assert.deepEqual(normalizeSourceContexts(null), []);
-assert.deepEqual(normalizeSourceContexts([...contexts, {label: "invalid", lines: "not an array"}]), []);
-assert.deepEqual(normalizeSourceContexts([{
-    kind: "diff",
-    lines: ["bad"],
-    diffRows: [{kind: "inserted", text: "bad"}],
-}]), []);
 
 console.log("source inspector passed");

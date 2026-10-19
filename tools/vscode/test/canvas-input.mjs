@@ -134,33 +134,12 @@ assert.equal(inputKeyName("F12"), undefined);
 assert.equal(isHostKeyTarget({closest: () => ({tagName: "BUTTON"})}), true);
 assert.equal(isHostKeyTarget({closest: () => null}), false);
 assert.equal(isHostKeyTarget(null), false);
-const sampleSnapshot = inputResult({
+assert.deepEqual(inputResult({handled: 1, redraw: true, release: true, sample: {}}), {
     handled: true,
     redraw: true,
     capture: false,
     release: true,
-    sample: {
-        position: {x: 60, y: 50},
-        value: {x: 0.3, y: 0.5},
-        rgba: [205, 0, 50, 255],
-        object: {handle: 42, id: "gradient", type: "rectangle"},
-    },
 });
-assert.deepEqual(sampleSnapshot, {
-    handled: true,
-    redraw: true,
-    capture: false,
-    release: true,
-    sample: {
-        position: {x: 60, y: 50},
-        value: {x: 0.3, y: 0.5},
-        rgba: [205, 0, 50, 255],
-        object: {handle: 42, id: "gradient", type: "rectangle"},
-    },
-});
-assert(Object.isFrozen(sampleSnapshot.sample));
-assert(Object.isFrozen(sampleSnapshot.sample.rgba));
-assert.equal(inputResult({sample: {...sampleSnapshot.sample, rgba: [256, 0, 0, 255]}}).sample, undefined);
 assert.equal(inputResult({error: "unknown"}).error, "unknown");
 
 const canvas = new CanvasStub();
@@ -301,16 +280,17 @@ assert.equal(scheduled.size, 1, "UI redraws must coalesce into one animation fra
 scheduled.flush();
 assert.equal(redraws, 2);
 
+const sample = {position: {x: 60, y: 50}, value: {x: 0.3, y: 0.5}, rgba: [205, 0, 50, 255]};
 inputResponse = (event) => ({
     handled: true,
     capture: event.type === "pointerdown",
     release: event.type === "pointerup",
-    sample: event.type === "pointerup" ? sampleSnapshot.sample : undefined,
+    sample: event.type === "pointerup" ? sample : undefined,
 });
 canvas.emit("pointerdown", {clientX: 300, clientY: 150, button: 0, buttons: 1, pointerId: 76});
 canvas.emit("pointerup", {clientX: 340, clientY: 170, button: 0, buttons: 0, pointerId: 76});
 assert.equal(samples.length, 1, "a completed SampleArea result must reach the host callback");
-assert.deepEqual(samples[0], sampleSnapshot.sample);
+assert.equal(samples[0], sample);
 
 inputResponse = (event) => ({
     handled: true,
@@ -398,6 +378,19 @@ canvas.emit("pointerdown", {clientX: 200, clientY: 100, button: 1, buttons: 4, p
 canvas.emit("pointermove", {clientX: 225, clientY: 110, button: -1, buttons: 4, pointerId: 9});
 canvas.emit("pointerup", {clientX: 225, clientY: 110, button: 1, buttons: 0, pointerId: 9});
 assert.deepEqual(previewPans, [["start", 0, 0], ["move", 25, 10], ["end", 0, 0]]);
+fit = false;
+canvas.emit("pointerdown", {clientX: 200, clientY: 100, button: 1, buttons: 4, pointerId: 10});
+canvas.emit("pointermove", {clientX: 225, clientY: 110, button: -1, buttons: 4, pointerId: 10});
+canvas.emit("pointerup", {clientX: 225, clientY: 110, button: 1, buttons: 0, pointerId: 10});
+fit = true;
+assert.equal(previewPans.length, 3, "the middle button pans the preview only while it fits the window");
+runtime.cameraMode = "fixed";
+const cameraCountBeforeFixed = camera.length;
+canvas.emit("pointerdown", {clientX: 200, clientY: 100, button: 0, buttons: 1, pointerId: 11});
+canvas.emit("pointermove", {clientX: 240, clientY: 120, button: -1, buttons: 1, pointerId: 11});
+canvas.emit("pointerup", {clientX: 240, clientY: 120, button: 0, buttons: 0, pointerId: 11});
+runtime.cameraMode = "interactive";
+assert.equal(camera.length, cameraCountBeforeFixed, "a fixed camera ignores drags");
 
 const context = canvas.emit("contextmenu", {clientX: 120, clientY: 70, button: 2});
 assert.equal(context.defaultPrevented, true);

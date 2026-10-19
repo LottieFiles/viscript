@@ -60,44 +60,6 @@ const center = (box) => ({
     y: box.y + box.height / 2,
 });
 
-const pixelAt = (pixels, width, point) => {
-    const x = Math.max(0, Math.min(width - 1, Math.floor(point.x)));
-    const height = pixels.length / (width * 4);
-    const y = Math.max(0, Math.min(height - 1, Math.floor(point.y)));
-    const offset = (y * width + x) * 4;
-    return pixels.slice(offset, offset + 4);
-};
-
-const redPixelCount = (pixels, width, box) => {
-    const height = pixels.length / (width * 4);
-    const left = Math.max(0, Math.floor(box.x));
-    const right = Math.min(width - 1, Math.ceil(box.x + box.width));
-    const top = Math.max(0, Math.floor(box.y));
-    const bottom = Math.min(height - 1, Math.ceil(box.y + box.height));
-    let count = 0;
-    for (let y = top; y <= bottom; y += 1) {
-        for (let x = left; x <= right; x += 1) {
-            const offset = (y * width + x) * 4;
-            const red = pixels[offset];
-            if (red > pixels[offset + 1] * 1.25
-                && red > pixels[offset + 2] * 1.25) count += 1;
-        }
-    }
-    return count;
-};
-
-const visibleCenters = (runtime, prefix, count) => {
-    const result = [];
-    for (let index = 1; index <= count; ++index) {
-        try {
-            result.push(center(runtime.bounds(`${prefix}${index}`, 0)));
-        } catch {
-            // Inactive retained pool entries intentionally have no painted bounds.
-        }
-    }
-    return result;
-};
-
 const runtime = await createVis(source, "runtime-retained-lua.lua", {wasmBinary});
 const event = (type, fields = {}) => runtime.input({
     type,

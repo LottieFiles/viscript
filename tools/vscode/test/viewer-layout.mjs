@@ -48,6 +48,9 @@ assert.equal(manualStageHeight(Number.NaN, 900, 38), 260);
 assert.equal(normalStageMaxHeight(900, 38, 7, 1_600, 960, 540), 855);
 assert.equal(normalStageMaxHeight(900, 38, 7, 1_200, 960, 540), 675);
 assert.equal(normalStageMaxHeight(900, 38, 7, 1_000, 960, 540), 562);
+// A wide Scene keeps the stage short, a portrait one takes the whole height.
+assert.equal(normalStageMaxHeight(900, 38, 7, 1_600, 3_840, 720), 300);
+assert.equal(normalStageMaxHeight(900, 38, 7, 1_600, 450, 800), 855);
 
 assert.deepEqual(
     floatingMenuPlacement(800, 600, {top: 500, right: 790, bottom: 528}),

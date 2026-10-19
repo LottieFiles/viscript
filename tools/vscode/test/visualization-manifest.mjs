@@ -5,8 +5,6 @@ import {
     matchingVisualizationUsage,
     normalizeWorkspacePath,
     parseVisualizationManifest,
-    uniqueVisualizationLocation,
-    visualizationSeriesEntries,
     visualizationSeriesGroups,
 } from "../out/visualizationManifest.js";
 
@@ -203,8 +201,6 @@ const sharedRelatedSource = parseVisualizationManifest({
 });
 const sharedLocations = matchingVisualizationLocations(sharedRelatedSource.entries, "src/shared.cpp");
 assert.equal(sharedLocations.length, 2);
-assert.equal(uniqueVisualizationLocation(sharedLocations), undefined);
-assert.equal(uniqueVisualizationLocation([sharedLocations[1]]), sharedLocations[1]);
 
 const series = parseVisualizationManifest({
     version: 2,
@@ -229,8 +225,6 @@ const series = parseVisualizationManifest({
         },
     ],
 });
-assert.deepEqual(visualizationSeriesEntries(series.entries, series.entries[0]), series.entries.slice(0, 2));
-assert.deepEqual(visualizationSeriesEntries(series.entries, series.entries[2]), [series.entries[2]]);
 assert.deepEqual(
     visualizationSeriesGroups(series.entries).map((group) => ({
         label: group.label,

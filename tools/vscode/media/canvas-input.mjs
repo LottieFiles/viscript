@@ -103,27 +103,6 @@ export function inputResult(value) {
         capture: Boolean(value.capture),
         release: Boolean(value.release),
     };
-    const sample = value.sample;
-    const position = sample?.position;
-    const normalized = sample?.value;
-    const rgba = sample?.rgba;
-    const object = sample?.object;
-    if (position && normalized && Array.isArray(rgba) && object
-        && Number.isFinite(position.x) && Number.isFinite(position.y)
-        && Number.isFinite(normalized.x) && normalized.x >= 0 && normalized.x <= 1
-        && Number.isFinite(normalized.y) && normalized.y >= 0 && normalized.y <= 1
-        && rgba.length === 4
-        && rgba.every((channel) => Number.isInteger(channel) && channel >= 0 && channel <= 255)
-        && Number.isInteger(object.handle) && object.handle >= 0 && object.handle <= 0xffffffff
-        && (object.id === null || typeof object.id === "string")
-        && typeof object.type === "string") {
-        result.sample = Object.freeze({
-            position: Object.freeze({x: position.x, y: position.y}),
-            value: Object.freeze({x: normalized.x, y: normalized.y}),
-            rgba: Object.freeze([...rgba]),
-            object: Object.freeze({handle: object.handle, id: object.id, type: object.type}),
-        });
-    }
     if (typeof value.error === "string" && value.error) result.error = value.error;
     return result;
 }
@@ -202,18 +181,19 @@ export function createCanvasInputRouter(options) {
         if (!runtime || (!allowBusy && isBusy?.()) || typeof runtime.input !== "function") {
             return EMPTY_RESULT;
         }
-        let result;
+        let value;
         try {
-            result = inputResult(runtime.input(event));
+            value = runtime.input(event);
         } catch (error) {
             reportInputError(error);
             return EMPTY_RESULT;
         }
+        const result = inputResult(value);
         if (result.redraw) scheduleRedraw();
         if (result.error) reportInputError(new Error(result.error));
-        if (result.sample && typeof onSample === "function") {
+        if (typeof onSample === "function" && value?.sample) {
             try {
-                onSample(result.sample);
+                onSample(value.sample);
             } catch (error) {
                 reportInputError(error);
             }

@@ -3,7 +3,6 @@
 // zoom, the series menu, the source inspector, performance stats, runtime audio and export.
 import {frameElapsed, normalizeTime} from "./time.mjs";
 import {
-    advancePlaybackTime,
     clampPlaybackRange,
     playbackBounds,
     setPlaybackEnd,
@@ -30,7 +29,9 @@ import {
 } from "./viewport.mjs";
 import {saveGif, saveMp4} from "./savers.js";
 import {adaptiveVscodeThemeKey, readAdaptiveVscodeTheme} from "./adaptive-theme.mjs";
-import {autoAdvanceSeriesTarget, seriesStepTarget} from "./series-step.mjs";
+import {advanceSeriesPlayback, seriesStepTarget} from "./series-step.mjs";
+import {SOURCE_CONTEXT_LINE_COUNTS, previewPreferences} from "./preferences.mjs";
+import {createRuntimeAudio, loadSceneAsset} from "./runtime-audio.mjs";
 import {createCanvasInputRouter, isHostKeyTarget} from "./canvas-input.mjs";
 import {advanceRetainedRuntime, sceneCanPlay} from "./retained-runtime.mjs";
 import {createFontCache, loadWithFonts} from "./scene-fonts.mjs";
@@ -40,19 +41,16 @@ import {
 } from "./horizontal-wheel.mjs";
 import {highlightSourceLines, shikiTheme} from "./shiki/syntax-highlighter.js";
 import {
-    normalizeSourceContexts,
     reconcileInspectorOpenState,
     resetSourceContextView,
     resolveActiveSourceIndex,
     sourceContextExpansionCount,
-    sourceContextKeys,
     sourceContextRowIsFocused,
     sourceContextRows,
 } from "./source-inspector.mjs";
 
 const vscode = acquireVsCodeApi();
 const config = window.visPreviewConfig;
-const persistedPreviewState = vscode.getState();
 
 function requiredElement(selector) {
     const element = document.querySelector(selector);
@@ -83,7 +81,6 @@ const timeline = document.querySelector(".timeline");
 const timeOutput = document.querySelector("#time");
 const speedValue = document.querySelector("#speed-value");
 const speedButtons = [...document.querySelectorAll("[data-speed]")];
-const camera = document.querySelector("#camera");
 const cameraMode = document.querySelector("#camera-mode");
 const cameraButtons = [...document.querySelectorAll("[data-camera]")];
 const statValue = document.querySelector("#stat-value");
@@ -122,11 +119,6 @@ const transport = document.querySelector(".transport");
 
 const BOOTSTRAP = `return vis.scene { width = 16, height = 16, loop = false }`;
 const PLAYER_MENU_WIDTH = 174;
-const SOURCE_CONTEXT_LINE_COUNTS = new Set([5, 10, 20]);
-
-function normalizedSourceContextLineCount(value) {
-    return SOURCE_CONTEXT_LINE_COUNTS.has(value) ? value : 5;
-}
 
 let createVis;
 let runtime;
@@ -139,16 +131,7 @@ let loadGeneration = 0;
 let playing = false;
 let looping = false;
 let playbackSpeed = 1;
-let autoPlayNext = typeof persistedPreviewState?.autoPlayNext === "boolean"
-    ? persistedPreviewState.autoPlayNext
-    : config.autoPlayNext === true;
-let forceCompactLayout = typeof persistedPreviewState?.forceCompactLayout === "boolean"
-    ? persistedPreviewState.forceCompactLayout
-    : config.forceCompactLayout === true;
-let sourceContextLineCount = normalizedSourceContextLineCount(
-    persistedPreviewState?.sourceContextLineCount ?? config.sourceContextLineCount,
-);
-let showStats = persistedPreviewState?.showStats === true;
+let {autoPlayNext, forceCompactLayout, sourceContextLineCount, showStats} = previewPreferences(vscode.getState(), config);
 let measuredFps = "—";
 let currentTime = 0;
 let previousFrame = performance.now();
@@ -158,7 +141,6 @@ let measureStarted = performance.now();
 let busy = false;
 let exportController;
 let sceneId;
-let sceneVersion;
 let playbackRange = null;
 let sceneWidth = canvas.width;
 let sceneHeight = canvas.height;
@@ -177,16 +159,20 @@ let viewerLayout = "compact";
 let currentScenePayload;
 let activeHostThemeKey;
 let themeRefreshFrame = 0;
-let audioStarted = false;
 let currentSeries;
 let playerMenuAnchor;
 let currentSourceContexts = [];
-let currentSourceKeys = [];
 let activeSourceIndex = -1;
 let notesOpen = true;
 let openSourceKeys = new Set();
 const sourceHighlightGenerations = new WeakMap();
 let pendingSourceExpansionAnchor;
+const runtimeAudio = createRuntimeAudio({
+    runtime: () => runtime,
+    time: sceneTime,
+    rate: () => playbackSpeed,
+    playing: () => playing,
+});
 
 function setStatus(label, state) {
     status.dataset.state = state;
@@ -237,7 +223,7 @@ async function loadScene(scene, {themeRefresh = false} = {}) {
     }
     const generation = ++loadGeneration;
     const wasPlaying = playing;
-    const wasAudioStarted = audioStarted;
+    const wasAudioStarted = runtimeAudio.started;
     exportController?.abort(new DOMException("Scene changed", "AbortError"));
     setStatus("COMPILING LUA", "loading");
 
@@ -248,14 +234,7 @@ async function loadScene(scene, {themeRefresh = false} = {}) {
         const hostTheme = readAdaptiveVscodeTheme();
         const hostThemeKey = adaptiveVscodeThemeKey(hostTheme);
         candidate.hostTheme(hostTheme);
-        for (const asset of scene.assets) {
-            const bytes = decodeBase64(asset.base64);
-            if (asset.mime.startsWith("audio/")) {
-                candidate.audio?.load(asset.name, bytes);
-            } else {
-                candidate.asset(asset.name, bytes, asset.mime);
-            }
-        }
+        for (const asset of scene.assets) loadSceneAsset(candidate, asset, decodeBase64(asset.base64));
         const load = (engine) => engine.load(scene.source, scene.fileName);
         const fonts = await loadWithFonts(candidate, load, sceneFonts, {
             expected: documentFonts.get(scene.documentUri),
@@ -272,7 +251,7 @@ async function loadScene(scene, {themeRefresh = false} = {}) {
         runtime = candidate;
         candidate = undefined;
         previous?.destroy();
-        audioStarted = false;
+        runtimeAudio.reset();
         activeHostThemeKey = runtime.adaptiveTheme ? hostThemeKey : undefined;
         const [width, height] = runtime.size();
         sceneWidth = width;
@@ -288,13 +267,12 @@ async function loadScene(scene, {themeRefresh = false} = {}) {
         playbackRange = sameScene ? clampPlaybackRange(playbackRange, runtime.duration) : null;
         const previousTime = currentTime;
         sceneId = scene.sceneId;
-        sceneVersion = scene.version;
         currentTime = sameScene ? normalizeTime(previousTime, runtime.duration) : playbackBounds(playbackRange, runtime.duration).start;
         scrub.max = String(runtime.duration);
         scrub.value = String(currentTime);
         looping = runtime.loop;
         playing = themeRefresh ? wasPlaying && sceneCanPlay(runtime) : sceneCanPlay(runtime);
-        if (wasAudioStarted) startRuntimeAudio();
+        if (wasAudioStarted) runtimeAudio.start();
         previousFrame = performance.now();
         empty.hidden = true;
         errorCard.hidden = true;
@@ -426,19 +404,20 @@ function syncSeriesPanelHost() {
     hostSeriesPanelInPopup();
 }
 
-function syncSourceInspector(value, requestedIndex, {preserveSelection = false} = {}) {
+function syncSourceInspector(contexts, requestedIndex, {preserveSelection = false} = {}) {
     if (!preserveSelection) pendingSourceExpansionAnchor = undefined;
     const scrollTop = preserveSelection ? inspectorContent.scrollTop : 0;
     const sourceScrollPositions = preserveSelection
-        ? new Map(currentSourceKeys.map((sourceKey, index) => {
+        ? new Map(currentSourceContexts.map((context, index) => {
             const excerpt = codeContent.querySelector(`.reference-item[data-index="${index}"] .reference-code`);
-            return [sourceKey, {
+            return [context.id, {
                 left: excerpt?.scrollLeft ?? 0,
                 top: excerpt?.scrollTop ?? 0,
             }];
         }))
         : new Map();
-    currentSourceContexts = normalizeSourceContexts(value);
+    // Collapsing a context replaces it here, so the Scene payload a theme refresh reloads stays as sent.
+    currentSourceContexts = [...contexts];
     activeSourceIndex = resolveActiveSourceIndex(
         currentSourceContexts,
         preserveSelection ? activeSourceIndex : requestedIndex,
@@ -449,10 +428,8 @@ function syncSourceInspector(value, requestedIndex, {preserveSelection = false} 
         activeSourceIndex,
         preserveSelection,
     );
-    currentSourceKeys = sourceContextKeys(currentSourceContexts);
     notesOpen = openState.notesOpen;
     openSourceKeys = new Set(openState.sourceKeys);
-    notesItem.classList.toggle("last-item", currentSourceContexts.length === 0);
     notesItem.open = notesOpen;
     renderSourceAccordion(sourceScrollPositions);
     inspectorContent.scrollTop = scrollTop;
@@ -462,7 +439,7 @@ function syncSourceInspector(value, requestedIndex, {preserveSelection = false} 
 function renderSourceAccordion(sourceScrollPositions = new Map()) {
     codeContent.replaceChildren();
     currentSourceContexts.forEach((context, index) => {
-        const sourceKey = currentSourceKeys[index];
+        const sourceKey = context.id;
         const item = document.createElement("details");
         item.className = "reference-item source-reference-item";
         item.dataset.index = String(index);
@@ -763,7 +740,7 @@ function syncSeriesStepControls() {
 
 function showError(message, label, title = "RENDER INTERRUPTED") {
     playing = false;
-    syncRuntimeAudio(false);
+    runtimeAudio.sync(false);
     errorTitle.textContent = title;
     errorMessage.textContent = message;
     errorCard.hidden = false;
@@ -934,7 +911,6 @@ function applyManualStageHeight() {
     );
     document.documentElement.style.setProperty("--manual-stage-height", `${height}px`);
     player.dataset.stageSizing = "manual";
-    stageResizer.dataset.manual = "true";
     stageResizer.setAttribute("aria-valuenow", String(height));
 }
 
@@ -957,7 +933,6 @@ function resetCanvasView() {
     manualStageHeightValue = null;
     manualWidePlayerWidthValue = null;
     delete player.dataset.stageSizing;
-    delete stageResizer.dataset.manual;
     stageResizer.removeAttribute("aria-valuenow");
     wideResizer.removeAttribute("aria-valuenow");
     document.documentElement.style.removeProperty("--manual-stage-height");
@@ -1186,26 +1161,23 @@ function frame(now) {
         const scaledElapsed = elapsed * playbackSpeed;
         try {
             const runtimeStep = advanceRetainedRuntime(runtime, scaledElapsed);
-            playRuntimeSounds(runtimeStep);
+            runtimeAudio.play(runtimeStep);
             if (runtime.duration > 0) {
-                const autoAdvanceTarget = autoAdvanceSeriesTarget(currentSeries, autoPlayNext);
-                const next = advancePlaybackTime(
+                const next = advanceSeriesPlayback(
+                    {series: currentSeries, autoPlayNext, looping},
                     currentTime,
                     scaledElapsed,
                     runtime.duration,
                     playbackRange,
-                    looping && !autoAdvanceTarget,
                 );
                 currentTime = next.time;
                 if (next.ended) {
                     playing = false;
                     syncControls();
-                    if (autoAdvanceTarget) {
-                        openSeriesItem(autoAdvanceTarget.groupIndex, autoAdvanceTarget.itemIndex);
-                    }
+                    if (next.open) openSeriesItem(next.open.groupIndex, next.open.itemIndex);
                 }
             }
-            syncRuntimeAudio(false);
+            runtimeAudio.sync(false);
             draw();
         } catch (error) {
             showError(describeError(error), "RUNTIME ERROR");
@@ -1214,49 +1186,9 @@ function frame(now) {
     animationFrame = requestAnimationFrame(frame);
 }
 
-function runtimeAudioTime() {
+// Retained Lua runs on its own clock, other scenes on the transport's.
+function sceneTime() {
     return runtime?.retainedLua ? runtime.runtimeTime : currentTime;
-}
-
-function syncRuntimeAudio(seek) {
-    if (!audioStarted || !runtime?.audio) return;
-    try {
-        runtime.audio.transport({
-            time: runtimeAudioTime(),
-            rate: playbackSpeed,
-            playing,
-            seek,
-        });
-    } catch {
-        audioStarted = false;
-    }
-}
-
-function startRuntimeAudio() {
-    if (audioStarted || !runtime?.audio) return;
-    try {
-        runtime.audio.start();
-        audioStarted = true;
-        syncRuntimeAudio(true);
-    } catch {
-        audioStarted = false;
-    }
-}
-
-function playRuntimeSounds(step) {
-    if (!audioStarted || !runtime?.audio || !step?.sounds?.length) return;
-    for (const sound of step.sounds) {
-        try {
-            runtime.audio.play(sound.asset, {
-                bus: sound.bus,
-                gain: sound.gain,
-                rate: sound.rate,
-                loop: sound.loop,
-            });
-        } catch {
-            // A saturated optional voice pool may drop sound, never simulation.
-        }
-    }
 }
 
 function syncControls() {
@@ -1279,10 +1211,8 @@ function syncControls() {
 function syncCamera() {
     if (!runtime) return;
     const interactive = runtime.cameraMode === "interactive";
-    camera.dataset.mode = runtime.cameraMode;
     canvas.dataset.cameraMode = runtime.cameraMode;
     cameraMode.textContent = `${runtime.cameraMode === "interactive" ? "" : "FIXED · "}${runtime.cameraView.toUpperCase()}`;
-    cameraMode.dataset.mode = runtime.cameraMode;
     for (const button of cameraButtons) {
         const action = button.dataset.camera;
         button.setAttribute("aria-current", String(action !== "reset" && action === `view${runtime.cameraView}`));
@@ -1313,12 +1243,12 @@ notesItem.addEventListener("toggle", () => {
 
 playButton.addEventListener("click", () => {
     if (!runtime) return;
-    startRuntimeAudio();
+    runtimeAudio.start();
     const {start, end} = playbackBounds(playbackRange, runtime.duration);
     if (!playing && (currentTime < start || currentTime >= end)) currentTime = start;
     playing = !playing;
     previousFrame = performance.now();
-    syncRuntimeAudio(true);
+    runtimeAudio.sync(true);
     draw();
     syncControls();
 });
@@ -1326,7 +1256,7 @@ playButton.addEventListener("click", () => {
 restartButton.addEventListener("click", () => {
     currentTime = playbackBounds(playbackRange, runtime?.duration ?? 0).start;
     previousFrame = performance.now();
-    syncRuntimeAudio(true);
+    runtimeAudio.sync(true);
     draw();
 });
 
@@ -1348,7 +1278,7 @@ seriesNextButton.addEventListener("click", () => {
 scrub.addEventListener("input", () => {
     currentTime = normalizedTime(Number(scrub.value));
     previousFrame = performance.now();
-    syncRuntimeAudio(true);
+    runtimeAudio.sync(true);
     draw();
 });
 
@@ -1400,7 +1330,7 @@ async function exportMedia(format, fps = 30) {
     const controller = new AbortController();
     busy = true;
     playing = false;
-    syncRuntimeAudio(false);
+    runtimeAudio.sync(false);
     exportController = controller;
     syncControls();
     try {
@@ -1441,7 +1371,7 @@ async function exportMedia(format, fps = 30) {
         if (exportController === controller) {
             busy = false;
             if (runtime === exportingRuntime) playing = resume;
-            if (runtime === exportingRuntime) syncRuntimeAudio(true);
+            if (runtime === exportingRuntime) runtimeAudio.sync(true);
             previousFrame = performance.now();
             syncControls();
             if (runtime === exportingRuntime) draw();
@@ -1453,7 +1383,7 @@ async function exportMedia(format, fps = 30) {
 for (const button of speedButtons) {
     button.addEventListener("click", () => {
         playbackSpeed = Number(button.dataset.speed);
-        syncRuntimeAudio(true);
+        runtimeAudio.sync(true);
         speedValue.textContent = button.textContent;
         for (const candidate of speedButtons) {
             candidate.setAttribute("aria-current", String(candidate === button));
@@ -1696,7 +1626,7 @@ const canvasInputRouter = createCanvasInputRouter({
     keyTarget: window,
     getRuntime: () => runtime,
     getSceneSize: () => [sceneWidth, sceneHeight],
-    getTime: () => runtime?.retainedLua ? runtime.runtimeTime : currentTime,
+    getTime: sceneTime,
     isBusy: () => busy,
     isFit: () => previewFits,
     camera: (action, x, y) => moveCamera(action, x, y, false),
@@ -1731,12 +1661,6 @@ const canvasInputRouter = createCanvasInputRouter({
         syncCamera();
         if (!playing) draw();
     },
-    onSample: (sample) => vscode.postMessage({
-        type: "sample",
-        sceneId,
-        version: sceneVersion,
-        sample,
-    }),
     ignoreKey: (event) => isHostKeyTarget(event.target),
     inputError: (error) => showError(describeError(error), "INPUT ERROR"),
 });
@@ -1747,12 +1671,12 @@ const disposeHorizontalWheel = [
 ];
 
 document.addEventListener("pointerdown", (event) => {
-    startRuntimeAudio();
+    runtimeAudio.start();
     if (playerMenu.open && !playerMenu.contains(event.target)) playerMenu.open = false;
     if (seriesMenu.open && !seriesMenu.contains(event.target)) seriesMenu.open = false;
 });
 
-window.addEventListener("keydown", startRuntimeAudio, {capture: true});
+window.addEventListener("keydown", () => runtimeAudio.start(), {capture: true});
 
 window.addEventListener("message", (event) => {
     if (event.data?.type === "scene") void loadScene(event.data);

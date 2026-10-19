@@ -80,22 +80,7 @@ export function readAdaptiveVscodeTheme(body = document.body) {
     return resolveAdaptiveVscodeTheme({dark, read: (name) => style.getPropertyValue(name)});
 }
 
+// Equal for equal themes: resolveAdaptiveVscodeTheme gives every theme the same key order.
 export function adaptiveVscodeThemeKey(theme) {
-    return [
-        theme.dark,
-        theme.background,
-        theme.foreground,
-        theme.muted,
-        theme.accent,
-        theme.secondary,
-        theme.success,
-        theme.warning,
-        theme.danger,
-        theme.info,
-        theme.surface,
-        theme.line,
-        theme.result,
-        theme.focus,
-        ...theme.objects,
-    ].join("\u0000");
+    return JSON.stringify(theme);
 }

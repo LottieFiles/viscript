@@ -81,22 +81,6 @@ export function matchingVisualizationLocations(
     return matches;
 }
 
-export function uniqueVisualizationLocation(
-    locations: readonly VisualizationLocation[],
-): VisualizationLocation | undefined {
-    let unique: VisualizationLocation | undefined;
-    let uniqueKey: string | undefined;
-    for (const location of locations) {
-        const entry = location.entry;
-        const key = `${entry.source}\0${entry.symbol}\0${entry.line ?? ""}\0${entry.animation}`;
-        if (key === uniqueKey) continue;
-        if (unique) return undefined;
-        unique = location;
-        uniqueKey = key;
-    }
-    return unique;
-}
-
 export function matchingVisualizationUsage(
     entries: VisualizationEntry[],
     word: string,
@@ -111,13 +95,6 @@ export function matchingVisualizationUsage(
     if (matched.length === 1) return matched[0];
     if (matched.length > 1) return undefined;
     return candidates.length === 1 ? candidates[0] : undefined;
-}
-
-export function visualizationSeriesEntries(
-    entries: VisualizationEntry[],
-    current: VisualizationEntry,
-): VisualizationEntry[] {
-    return entries.filter((entry) => entry.series === current.series);
 }
 
 export function visualizationSeriesGroups(entries: VisualizationEntry[]): VisualizationSeriesGroup[] {

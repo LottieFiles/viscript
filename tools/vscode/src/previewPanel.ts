@@ -23,7 +23,6 @@ type ScenePayload = {
     fileName: string;
     displayName: string;
     source: string;
-    version: number;
     assets: AssetPayload[];
     assetErrors: string[];
     relatedSources: string[];
@@ -109,13 +108,6 @@ export type PreviewContextResolver = (
 
 export type PreviewExportFormat = "png" | "gif" | "mp4";
 
-export type PreviewSample = Readonly<{
-    position: Readonly<{x: number; y: number}>;
-    value: Readonly<{x: number; y: number}>;
-    rgba: readonly [number, number, number, number];
-    object: Readonly<{handle: number; id: string | null; type: string}>;
-}>;
-
 type SourceOpenOptions = {
     current?: () => boolean;
     preservePreview?: boolean;
@@ -139,48 +131,11 @@ function sourceContextLineCount(value: unknown): SourceContextLineCount {
     return isSourceContextLineCount(value) ? value : DEFAULT_SOURCE_CONTEXT_LINE_COUNT;
 }
 
-function previewSample(value: unknown): PreviewSample | undefined {
-    if (!value || typeof value !== "object") return undefined;
-    const sample = value as Record<string, unknown>;
-    const position = sample.position as Record<string, unknown> | undefined;
-    const normalized = sample.value as Record<string, unknown> | undefined;
-    const rgba = sample.rgba;
-    const object = sample.object as Record<string, unknown> | undefined;
-    if (!position || !normalized || !Array.isArray(rgba) || !object
-        || !Number.isFinite(position.x) || !Number.isFinite(position.y)
-        || !Number.isFinite(normalized.x) || (normalized.x as number) < 0
-        || (normalized.x as number) > 1
-        || !Number.isFinite(normalized.y) || (normalized.y as number) < 0
-        || (normalized.y as number) > 1
-        || rgba.length !== 4
-        || !rgba.every((channel) => Number.isInteger(channel) && channel >= 0 && channel <= 255)
-        || !Number.isInteger(object.handle) || (object.handle as number) < 0
-        || (object.handle as number) > 0xffffffff
-        || (object.id !== null && typeof object.id !== "string")
-        || typeof object.type !== "string") {
-        return undefined;
-    }
-    return {
-        position: {x: position.x as number, y: position.y as number},
-        value: {x: normalized.x as number, y: normalized.y as number},
-        rgba: rgba as [number, number, number, number],
-        object: {
-            handle: object.handle as number,
-            id: object.id as string | null,
-            type: object.type,
-        },
-    };
-}
-
 export class PreviewPanel implements vscode.Disposable {
     static current: PreviewPanel | undefined;
 
     static follows(uri: vscode.Uri): boolean {
         return PreviewPanel.current?.document?.uri.toString() === uri.toString();
-    }
-
-    static currentSample(): PreviewSample | undefined {
-        return PreviewPanel.current?.lastSample;
     }
 
     private readonly disposables: vscode.Disposable[] = [];
@@ -201,7 +156,6 @@ export class PreviewPanel implements vscode.Disposable {
     private sourceColumn: vscode.ViewColumn | undefined;
     private previewContext: PreviewContext | undefined;
     private seriesCatalog: PreviewSeries | undefined;
-    private lastSample: PreviewSample | undefined;
 
     private constructor(
         private readonly panel: vscode.WebviewPanel,
@@ -391,10 +345,7 @@ export class PreviewPanel implements vscode.Disposable {
         if (this.document && changed) {
             this.diagnostics.delete(this.document.uri);
         }
-        if (changed) {
-            this.sceneId += 1;
-            this.lastSample = undefined;
-        }
+        if (changed) this.sceneId += 1;
         this.document = document;
         const sourceColumn = previewContext?.sourceColumn
             ?? vscode.window.visibleTextEditors.find((editor) => editor.document === document)?.viewColumn
@@ -497,7 +448,6 @@ export class PreviewPanel implements vscode.Disposable {
         this.sourceContextUpdateTimer = undefined;
         this.sourceContextUpdateGeneration += 1;
         const version = ++this.version;
-        this.lastSample = undefined;
         const source = document.getText();
         const {assets, errors} = await this.readAssets(document.uri, source);
         const sourceContexts = await this.readSourceContexts();
@@ -509,7 +459,6 @@ export class PreviewPanel implements vscode.Disposable {
             fileName: path.basename(document.fileName),
             displayName: this.previewContext?.title ?? path.basename(document.fileName),
             source,
-            version,
             assets,
             assetErrors: errors,
             relatedSources: this.previewContext?.relatedSources.map((item) => item.label) ?? [],
@@ -817,13 +766,6 @@ export class PreviewPanel implements vscode.Disposable {
             await this.resetSourceContext(message.index as number, message.id);
             return;
         }
-        if (message.type === "sample"
-            && message.sceneId === this.sceneId
-            && message.version === this.version) {
-            const sample = previewSample(message.sample);
-            if (sample) this.lastSample = sample;
-            return;
-        }
         if (message.type === "refresh") {
             this.refresh();
             return;
@@ -1030,7 +972,7 @@ export class PreviewPanel implements vscode.Disposable {
     <meta http-equiv="Content-Security-Policy" content="${csp}">
     <link rel="stylesheet" href="${styleUri}">
     <style nonce="${nonce}">
-        @font-face { font-family: "Pretendard"; src: url("${fontUri}") format("truetype"); font-display: swap; }
+        @font-face { font-family: "JetBrains Mono"; src: url("${codeFontUri}") format("truetype"); font-display: swap; }
         @font-face { font-family: "IBM Plex Sans KR"; src: url("${headingFontUri}") format("truetype"); font-display: swap; }
         @font-face { font-family: "Source Serif 4"; src: url("${serifHeadingFontUri}") format("truetype"); font-display: swap; }
     </style>
@@ -1148,7 +1090,7 @@ export class PreviewPanel implements vscode.Disposable {
                             </details>
                             <details class="menu-submenu" data-positioned="false">
                                 <summary><span>Camera</span><output id="camera-mode">FIXED · 2D</output></summary>
-                                <div class="submenu-panel menu-actions" id="camera" role="group" aria-label="Interactive camera controls">
+                                <div class="submenu-panel menu-actions" role="group" aria-label="Interactive camera controls">
                                     <button type="button" data-camera="view2d" aria-current="true" disabled>2D</button>
                                     <button type="button" data-camera="view3d" disabled>3D</button>
                                     <button type="button" data-camera="reset" disabled>RESET</button>
