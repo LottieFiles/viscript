@@ -191,6 +191,19 @@ const RIPPLE_OPTIONS = Object.freeze({
     duration: 1,
     curve: "snappy",
 });
+// What the options of the effects above must be past their timing and scale: a test, the rule an
+// error states, and the error's type when it is not a RangeError. An effect checks those of its
+// options that are here, in the order of its defaults.
+const EFFECT_CHECKS = Object.freeze({
+    angle: [Number.isFinite, "must be a finite number of radians"],
+    swings: [(swings) => Number.isFinite(swings) && swings > 0, "must be a finite positive number"],
+    shape: [(shape) => shape === "rectangle" || shape === "ellipse", 'must be "rectangle" or "ellipse"', TypeError],
+    width: [(width) => Number.isFinite(width) && width > 0, "must be a finite positive number of pixels"],
+    padding: [(padding) => Number.isFinite(padding) && padding >= 0, "must be a finite number of zero or more"],
+    window: [(window) => Number.isFinite(window) && window > 0 && window <= 1, "must be greater than 0 and at most 1"],
+    size: [(size) => Number.isFinite(size) && size > 0, "must be a finite positive number of world units"],
+    lines: [(lines) => Number.isInteger(lines) && lines >= 1 && lines <= 64, "must be a whole number from 1 to 64"],
+});
 
 const SCENE_OWNERS = new WeakMap();
 const SCENE_SNAPSHOTS = new WeakMap();
@@ -619,13 +632,13 @@ function _plotStored(pieces, samples) {
     return `{points=${_plotLine(pieces)},samples=${column}}`;
 }
 
-// A point of a plot as Lua reads it; one with a coordinate that is not finite breaks the line.
 // Whether a point of a plot has a coordinate that is not finite, where Lua plot breaks the line.
 function _plotUndefined(point) {
     const values = Array.isArray(point) ? point : point && typeof point === "object" ? [point.x, point.y, point.z] : [];
     return values.some((n) => typeof n === "number" && !Number.isFinite(n));
 }
 
+// A point of a plot as Lua reads it; one with a coordinate that is not finite breaks the line.
 function _plotPoint(point) {
     return _plotUndefined(point) ? PLOT_BREAK : _lua(point);
 }
@@ -970,29 +983,20 @@ function _timingArguments(args, index, values, fields = [], fallback = 1) {
     return _timing(args[index], fields, fallback);
 }
 
-function _effectOptions(value, defaults, name, minimumScale) {
+// The options of an effect over its defaults, checked: the timing, a scale past minimumScale and
+// what EFFECT_CHECKS holds.
+function _effectOptions(value, defaults, name, minimumScale = 0) {
     _timing(value, Object.keys(defaults), defaults.duration, name);
     const options = { ...defaults, ...value };
     if (Object.hasOwn(defaults, "scale") && (!Number.isFinite(options.scale) || options.scale <= minimumScale)) {
         const comparison = minimumScale === 1 ? "greater than 1" : "positive";
         throw new RangeError(`${name} scale must be a finite ${comparison} number`);
     }
+    for (const key of Object.keys(defaults)) {
+        const [test, rule, type = RangeError] = EFFECT_CHECKS[key] ?? [];
+        if (test && !test(options[key])) throw new type(`${name} ${key} ${rule}`);
+    }
     return options;
-}
-
-function _emphasisValues(values, name) {
-    if (!Number.isFinite(values.width) || values.width <= 0) {
-        throw new RangeError(`${name} width must be a finite positive number of pixels`);
-    }
-    if (Object.hasOwn(values, "padding") && (!Number.isFinite(values.padding) || values.padding < 0)) {
-        throw new RangeError(`${name} padding must be a finite number of zero or more`);
-    }
-    if (Object.hasOwn(values, "window") && (!Number.isFinite(values.window) || values.window <= 0 || values.window > 1)) {
-        throw new RangeError(`${name} window must be greater than 0 and at most 1`);
-    }
-    if (Object.hasOwn(values, "size") && (!Number.isFinite(values.size) || values.size <= 0)) {
-        throw new RangeError(`${name} size must be a finite positive number of world units`);
-    }
 }
 
 function _snapshot(scene) {
@@ -1058,36 +1062,23 @@ class Handle {
 
     moveTo(point) {
         this.owner._assertQuiet();
-        const value = _lua(point);
-        SCENE_STATES.get(this.owner).lines.push(() => `${this.name}:move_to(${value})`);
-        return this;
+        return this.owner._callOn(this, "move_to", _lua(point));
     }
 
     nextTo(target, direction, gap = 0.25) {
         this.owner._assertQuiet();
-        const targetName = this.owner._handle(target);
-        const directionValue = _lua(direction);
-        const gapValue = _lua(gap);
-        SCENE_STATES.get(this.owner).lines.push(
-            () => `${this.name}:next_to(${targetName},${directionValue},${gapValue})`,
-        );
-        return this;
+        return this.owner._callOn(this, "next_to", this.owner._handle(target), _lua(direction), _lua(gap));
     }
 
     alignTo(target, direction) {
         this.owner._assertQuiet();
-        const targetName = this.owner._handle(target);
-        const directionValue = _lua(direction);
-        SCENE_STATES.get(this.owner).lines.push(() => `${this.name}:align_to(${targetName},${directionValue})`);
-        return this;
+        return this.owner._callOn(this, "align_to", this.owner._handle(target), _lua(direction));
     }
 
     mask(target, mode = "alpha") {
         this.owner._assertQuiet();
         const targetName = target === null ? "nil" : this.owner._handle(target);
-        const modeValue = _lua(_maskMode(mode));
-        SCENE_STATES.get(this.owner).lines.push(() => `${this.name}:mask(${targetName},${modeValue})`);
-        return this;
+        return this.owner._callOn(this, "mask", targetName, _lua(_maskMode(mode)));
     }
 
     // The handles created below this one, in order.
@@ -1132,19 +1123,16 @@ export class ViewHandle {
     }
 
     look(camera, duration = 1, curve = "smooth") {
-        this.owner._look(this.name, camera, _timingArguments(arguments, 1, {duration, curve}));
-        return this;
+        return this.owner._look(this, camera, _timingArguments(arguments, 1, {duration, curve}));
     }
 
     orbit(radians, options = {}) {
-        this.owner._orbit(this.name, radians, options);
-        return this;
+        return this.owner._orbit(this, radians, options);
     }
 
     // Frames the targets in the view's rectangle, or returns to the camera the view opened with.
     focus(target = null, options = {}) {
-        this.owner._focus(this.name, target, options);
-        return this;
+        return this.owner._focus(this, target, options);
     }
 
     // Fades the whole view; the fades of a view follow one another.
@@ -1158,30 +1146,19 @@ export class ViewHandle {
             throw new RangeError("View fade duration must be a positive number");
         }
         _curveValue(curve);
-        const values = [opacity, duration, curve].map(_lua).join(",");
-        SCENE_STATES.get(this.owner).lines.push(() => `${this.name}:fade(${values})`);
-        return this;
+        return this.owner._callOn(this, "fade", _lua(opacity), _lua(duration), _lua(curve));
     }
 }
 
 class GroupHandle extends Handle {
     arrange(direction = [1, 0, 0], gap = 0.25) {
         this.owner._assertQuiet();
-        const directionValue = _lua(direction);
-        const gapValue = _lua(gap);
-        SCENE_STATES.get(this.owner).lines.push(() => `${this.name}:arrange(${directionValue},${gapValue})`);
-        return this;
+        return this.owner._callOn(this, "arrange", _lua(direction), _lua(gap));
     }
 
     arrangeGrid(columns, columnGap = 0.25, rowGap = 0.25) {
         this.owner._assertQuiet();
-        const columnsValue = _lua(columns);
-        const columnGapValue = _lua(columnGap);
-        const rowGapValue = _lua(rowGap);
-        SCENE_STATES.get(this.owner).lines.push(
-            () => `${this.name}:arrange_grid(${columnsValue},${columnGapValue},${rowGapValue})`,
-        );
-        return this;
+        return this.owner._callOn(this, "arrange_grid", _lua(columns), _lua(columnGap), _lua(rowGap));
     }
 
     // The rows of a group are the groups directly below it, in order, such as the lines of a
@@ -1256,11 +1233,7 @@ class TexHandle extends GroupHandle {
         this.owner._assertQuiet();
         if (typeof tex !== "string") throw new TypeError("Tex part requires the TeX of what it finds as a string");
         _ordinal(nth, "Tex part");
-        const state = SCENE_STATES.get(this.owner);
-        const name = `objects[${++state.handles}]`;
-        const value = _lua(tex);
-        state.lines.push(() => `${name} = ${this.name}:part(${value},${nth})`);
-        return new TexHandle(this.owner, name, "tex");
+        return new TexHandle(this.owner, this.owner._make(`part(${_lua(tex)},${nth})`, this), "tex");
     }
 }
 
@@ -1320,13 +1293,12 @@ function _sampleField(handle, callback, options, spatial) {
             }
         }
     });
-    const state = SCENE_STATES.get(handle.owner);
-    const object = `objects[${++state.handles}]`;
+    const object = handle.owner._slot();
     const settings = `{mode=${_string(mode)},padding=${_lua(padding)},duration=${_lua(duration)},fps=${fps}}`;
     const values = _lua(colors);
     const parameters = spatial ? "x,y,z,time" : "x,y,time";
     // The replay's colors and counter stay inside a block, where the callback still sees them.
-    state.lines.push(() =>
+    SCENE_STATES.get(handle.owner).lines.push(() =>
         `do local colors=${values};local index=0;${object}=${handle.name}:${name}(function(${parameters}) index=index+1;return colors[index] end,${settings}) end`,
     );
     return handle.owner._track(new GroupHandle(handle.owner, object, "group"), handle);
@@ -1872,6 +1844,11 @@ function _makeHandle(owner, name, method, options) {
     return new Handle(owner, name, method);
 }
 
+// The id of a child that a composite names after its own id, or none when id is not a string.
+function _childId(id, name) {
+    return typeof id === "string" ? `${id}/${name}` : undefined;
+}
+
 // A number that bound objects follow: scene.tracker makes one and scene.track moves it.
 class Tracker {
     get() {
@@ -2135,6 +2112,47 @@ export class SceneBuilder {
         if (timing !== "instant") SCENE_TRACKERS.get(this).clock = { anchor: {}, time: 0 };
     }
 
+    // Adds the Lua call receiver:method(args...), where the args are Lua already and receiver is
+    // a handle or a view, or null for the scene; returns the receiver, or the scene.
+    _callOn(receiver, method, ...args) {
+        const call = `${method}(${args.join(",")})`;
+        SCENE_STATES.get(this).lines.push((scene) => `${receiver ? receiver.name : scene}:${call}`);
+        return receiver ?? this;
+    }
+
+    // Adds the Lua call scene:method(args...), where the args are Lua already; returns the scene.
+    _call(method, ...args) {
+        return this._callOn(null, method, ...args);
+    }
+
+    // A new slot in the scene's objects table, which holds its handles and lists of them.
+    _slot() {
+        return `objects[${++SCENE_STATES.get(this).handles}]`;
+    }
+
+    // Adds the Lua that puts what parent:call returns, or scene:call without a parent, in a new
+    // slot, and returns the slot.
+    _make(call, parent) {
+        const name = this._slot();
+        SCENE_STATES.get(this).lines.push((scene) => `${name} = ${parent ? parent.name : scene}:${call}`);
+        return name;
+    }
+
+    // Adds the Lua that keeps the children of the object in slot name in a new slot, and returns
+    // that slot.
+    _children(name) {
+        const children = this._slot();
+        SCENE_STATES.get(this).lines.push(() => `${children} = ${name}:children()`);
+        return children;
+    }
+
+    // Makes a composite as _make does and keeps its children; returns its group, recorded below
+    // parent with id, and the slot of its children.
+    _composite(call, parent, id) {
+        const name = this._make(call, parent);
+        return [this._track(new GroupHandle(this, name, "group"), parent, id), this._children(name)];
+    }
+
     _object(method, options, parent = null) {
         this._assertQuiet();
         if (["text", "label", "number"].includes(method) && options?.reserve !== undefined
@@ -2150,11 +2168,8 @@ export class SceneBuilder {
             throw new TypeError("Space axis_width must be zero or more pixels");
         }
         if (method === "surface") options = _surfaceOptions(this, options);
-        const state = SCENE_STATES.get(this);
-        const name = `objects[${++state.handles}]`;
         const value = method === "plot" ? this._plotOptions(options) : this._options(options);
-        state.lines.push((scene) => `${name} = ${parent ? parent.name : scene}:${method} ${value}`);
-        const handle = _makeHandle(this, name, method, options);
+        const handle = _makeHandle(this, this._make(`${method} ${value}`, parent), method, options);
         if (["polygon", "route"].includes(method) && Array.isArray(options?.points)) {
             POINT_COUNTS.set(handle, options.points.length);
         }
@@ -2203,9 +2218,8 @@ export class SceneBuilder {
             });
             return `[${_string(key)}]={${entries.join(",")}}`;
         });
+        const list = this._make(`labels {${fields.join(",")}}`, space);
         const state = SCENE_STATES.get(this);
-        const list = `objects[${++state.handles}]`;
-        state.lines.push(() => `${list} = ${space.name}:labels {${fields.join(",")}}`);
         const id = [...state.ids].find(([, handle]) => handle === space)?.[0];
         const numbers = { x: 0, y: 0, z: 0 };
         return labels.map(({ axis, label }, index) => {
@@ -2278,6 +2292,18 @@ export class SceneBuilder {
         return handle;
     }
 
+    // Records the rows of a composite group, children[r] in Lua, and their entries, entries[r][c],
+    // whose types types[r] lists; with an id, they are named <id>/<r> and <id>/<r>/<c>.
+    _trackRows(group, children, entries, types, id) {
+        types.forEach((row, r) => {
+            const rowId = _childId(id, r + 1);
+            const handle = this._track(new GroupHandle(this, `${children}[${r + 1}]`, "group"), group, rowId);
+            row.forEach((type, c) => {
+                this._track(new Handle(this, `${entries}[${r + 1}][${c + 1}]`, type), handle, _childId(rowId, c + 1));
+            });
+        });
+    }
+
     // A row of texts set side by side on shared baselines; its children are the texts, and the
     // formulas the tex module sets inline for parts that hold tex.
     _spans(parts, options, parent = null) {
@@ -2296,16 +2322,10 @@ export class SceneBuilder {
         });
         const styled = _styleOptions(options);
         const fields = Object.keys(styled).sort().map((key) => this._field(key, styled[key]));
-        const value = `{${[...items, ...fields].join(",")}}`;
-        const state = SCENE_STATES.get(this);
-        const name = `objects[${++state.handles}]`;
-        const texts = `objects[${++state.handles}]`;
-        state.lines.push((scene) => `${name} = ${parent ? parent.name : scene}:spans ${value}`);
-        state.lines.push(() => `${texts} = ${name}:children()`);
-        const row = this._track(new GroupHandle(this, name, "group"), parent, options.id);
+        const [row, texts] = this._composite(`spans {${[...items, ...fields].join(",")}}`, parent, options.id);
         // A child without an id of its own is named after the row and its place in it.
         _spanTexts(parts, options.split ?? "none").forEach(({ id, tex }, index) => {
-            const named = id ?? (typeof options.id === "string" ? `${options.id}/${index + 1}` : undefined);
+            const named = id ?? _childId(options.id, index + 1);
             const child = `${texts}[${index + 1}]`;
             if (tex === undefined) {
                 this._track(new Handle(this, child, "text"), row, named);
@@ -2328,10 +2348,7 @@ export class SceneBuilder {
         this._assertQuiet();
         _plainOptions(options, "Tex");
         _texSource(options.tex, "Tex");
-        const value = this._texTable(options);
-        const state = SCENE_STATES.get(this);
-        const name = `objects[${++state.handles}]`;
-        state.lines.push((scene) => `${name} = ${parent ? parent.name : scene}:tex ${value}`);
+        const name = this._make(`tex ${this._texTable(options)}`, parent);
         const formula = this._track(new TexHandle(this, name, "tex"), parent, options.id);
         if (Array.isArray(options.tex)) this._texParts(formula, options.tex, options.id);
         return formula;
@@ -2353,13 +2370,10 @@ export class SceneBuilder {
     // Names the groups of a formula set from parts as the tex module names them: after a part's
     // own id, or after the formula's id and the part's place.
     _texParts(formula, tex, id) {
-        const state = SCENE_STATES.get(this);
-        const groups = `objects[${++state.handles}]`;
-        state.lines.push(() => `${groups} = ${formula.name}:children()`);
+        const groups = this._children(formula.name);
         tex.forEach((part, index) => {
             const own = typeof part === "string" ? undefined : part.id;
-            const named = own ?? (typeof id === "string" ? `${id}/${index + 1}` : undefined);
-            this._track(new TexHandle(this, `${groups}[${index + 1}]`, "tex"), formula, named);
+            this._track(new TexHandle(this, `${groups}[${index + 1}]`, "tex"), formula, own ?? _childId(id, index + 1));
         });
     }
 
@@ -2378,15 +2392,13 @@ export class SceneBuilder {
         const fields = Object.keys(styled).sort().map((key) =>
             key === "label" && label instanceof Handle ? `["label"]=${this._handle(label)}` : this._field(key, styled[key]));
         const value = `{${fields.join(",")}}`;
-        const state = SCENE_STATES.get(this);
-        const name = `objects[${++state.handles}]`;
-        const text = typeof label === "string" ? `objects[${++state.handles}]` : null;
+        const name = this._slot();
+        const text = typeof label === "string" ? this._slot() : null;
         const targets = text ? `${name},${text}` : name;
-        state.lines.push((scene) => `${targets} = ${parent ? parent.name : scene}:brace ${value}`);
+        SCENE_STATES.get(this).lines.push((scene) => `${targets} = ${parent ? parent.name : scene}:brace ${value}`);
         const brace = this._track(new Handle(this, name, "brace"), parent, options.id);
         if (!text) return [brace, label];
-        const id = typeof options.id === "string" ? `${options.id}/label` : undefined;
-        return [brace, this._track(new Handle(this, text, "text"), parent, id)];
+        return [brace, this._track(new Handle(this, text, "text"), parent, _childId(options.id, "label"))];
     }
 
     // Source code set line by line in colored tokens; its children are the lines, and theirs
@@ -2409,33 +2421,21 @@ export class SceneBuilder {
             if (options.leading !== undefined) throw new TypeError("Code takes pitch or leading, not both");
         }
         const value = this._options(options);
-        return this._codeBlock((scene) => `${parent ? parent.name : scene}:code ${value}`, parent, options.id,
-            options.text, language);
+        return this._codeBlock(this._make(`code ${value}`, parent), parent, options.id, options.text, language);
     }
 
-    // Names the block that the Lua expression make(scene) adds below parent, its lines and
-    // their tokens, as the native factory splits text, and keeps the text for search and edit.
-    _codeBlock(make, parent, blockId, text, language) {
-        const counts = _codeTokenCounts(text, language);
-        const state = SCENE_STATES.get(this);
-        const name = `objects[${++state.handles}]`;
-        const lines = `objects[${++state.handles}]`;
-        const tokens = `objects[${++state.handles}]`;
-        state.lines.push((scene) => `${name} = ${make(scene)}`);
-        state.lines.push(() => `${lines} = ${name}:children()`);
-        state.lines.push(() => `${tokens} = {} for i, line in ipairs(${lines}) do ${tokens}[i] = line:children() end`);
+    // Names the block in slot name, which Lua made below parent, its lines and their tokens, as
+    // the native factory splits text, and keeps the text for search and edit.
+    _codeBlock(name, parent, blockId, text, language) {
+        const lines = this._children(name);
+        const tokens = this._slot();
+        SCENE_STATES.get(this).lines.push(
+            () => `${tokens} = {} for i, line in ipairs(${lines}) do ${tokens}[i] = line:children() end`);
         const block = this._track(new GroupHandle(this, name, "group"), parent, blockId);
+        CODE_BLOCKS.set(block, {text, language, id: typeof blockId === "string" ? blockId : null, parent});
         // The block names its lines <id>/<line> and their tokens <id>/<line>/<token>.
-        const id = typeof blockId === "string" ? blockId : null;
-        CODE_BLOCKS.set(block, {text, language, id, parent});
-        counts.forEach((count, row) => {
-            const lineId = id === null ? undefined : `${id}/${row + 1}`;
-            const line = this._track(new GroupHandle(this, `${lines}[${row + 1}]`, "group"), block, lineId);
-            for (let index = 0; index < count; index++) {
-                const tokenId = id === null ? undefined : `${lineId}/${index + 1}`;
-                this._track(new Handle(this, `${tokens}[${row + 1}][${index + 1}]`, "text"), line, tokenId);
-            }
-        });
+        const types = _codeTokenCounts(text, language).map((count) => Array(count).fill("text"));
+        this._trackRows(block, lines, tokens, types, blockId);
         return block;
     }
 
@@ -2488,16 +2488,10 @@ export class SceneBuilder {
             }
         }
         const value = this._options({ ...style, x_range: range, values: heights });
-        const state = SCENE_STATES.get(this);
-        const name = `objects[${++state.handles}]`;
-        const bars = `objects[${++state.handles}]`;
-        state.lines.push((scene) => `${name} = ${parent ? parent.name : scene}:riemann ${value}`);
-        state.lines.push(() => `${bars} = ${name}:children()`);
-        const sum = this._track(new GroupHandle(this, name, "group"), parent, style.id);
+        const [sum, bars] = this._composite(`riemann ${value}`, parent, style.id);
         // The sum names its rectangles <id>/<n>, counting from the left.
         for (let i = 0; i < steps; i++) {
-            const id = typeof style.id === "string" ? `${style.id}/${i + 1}` : undefined;
-            this._track(new Handle(this, `${bars}[${i + 1}]`, "rectangle"), sum, id);
+            this._track(new Handle(this, `${bars}[${i + 1}]`, "rectangle"), sum, _childId(style.id, i + 1));
         }
         return sum;
     }
@@ -2567,17 +2561,12 @@ export class SceneBuilder {
             throw new TypeError("Contour colors must hold one color per level or name a colormap");
         }
         const { samples, xRange: gridX, yRange: gridY } = this._contourSamples(fn, values, xRange, yRange, levels.length);
-        const state = SCENE_STATES.get(this);
         const value = this._options({ ...style, levels, x_range: xRange, y_range: yRange, values: samples });
-        const name = `objects[${++state.handles}]`;
-        const children = `objects[${++state.handles}]`;
-        state.lines.push((scene) => `${name} = ${parent ? parent.name : scene}:contour ${value}`);
-        state.lines.push(() => `${children} = ${name}:children()`);
-        const group = this._track(new GroupHandle(this, name, "group"), parent, style.id);
-        levels.forEach((_, i) => {
-            const id = typeof style.id === "string" ? `${style.id}/${i + 1}` : undefined;
-            const child = this._track(new Handle(this, `${children}[${i + 1}]`, "plot"), group, id);
-            PLOT_CUTS.set(child, { contour: true, xRange: gridX, yRange: gridY, level: levels[i] });
+        const [group, children] = this._composite(`contour ${value}`, parent, style.id);
+        levels.forEach((level, i) => {
+            const child = new Handle(this, `${children}[${i + 1}]`, "plot");
+            this._track(child, group, _childId(style.id, i + 1));
+            PLOT_CUTS.set(child, { contour: true, xRange: gridX, yRange: gridY, level });
         });
         return group;
     }
@@ -2614,12 +2603,7 @@ export class SceneBuilder {
             throw new TypeError(`Vector field values must hold one [x, y] for each of the ${count} samples of x_range and y_range`);
         }
         const value = this._options({ ...style, x_range: xRange, y_range: yRange, values: vectors });
-        const state = SCENE_STATES.get(this);
-        const name = `objects[${++state.handles}]`;
-        const arrows = `objects[${++state.handles}]`;
-        state.lines.push((scene) => `${name} = ${parent ? parent.name : scene}:vector_field ${value}`);
-        state.lines.push(() => `${arrows} = ${name}:children()`);
-        const field = this._track(new GroupHandle(this, name, "group"), parent, style.id);
+        const [field, arrows] = this._composite(`vector_field ${value}`, parent, style.id);
         // The field names its arrows <id>/<column>/<row>; it leaves out the arrows the scene
         // does, where the field vanishes or an arrow would be too short to see.
         const magnitudes = vectors.map(([x, y]) => Math.hypot(Math.fround(x), Math.fround(y)));
@@ -2632,8 +2616,8 @@ export class SceneBuilder {
             if (!(magnitude > 0) || drawn < shortest) return;
             const column = (k % xs.length) + 1;
             const row = Math.floor(k / xs.length) + 1;
-            const id = typeof style.id === "string" ? `${style.id}/${column}/${row}` : undefined;
-            this._track(new Handle(this, `${arrows}[${++child}]`, "vector"), field, id);
+            const arrow = new Handle(this, `${arrows}[${++child}]`, "vector");
+            this._track(arrow, field, _childId(style.id, `${column}/${row}`));
         });
         return field;
     }
@@ -2654,31 +2638,18 @@ export class SceneBuilder {
         }
         const brackets = options.brackets ?? "square";
         if (!MATRIX_BRACKETS.has(brackets)) throw new TypeError("Matrix brackets must be square, round, bar, or none");
-        const value = this._options(options);
-        const state = SCENE_STATES.get(this);
-        const name = `objects[${++state.handles}]`;
-        const children = `objects[${++state.handles}]`;
-        const entries = `objects[${++state.handles}]`;
-        state.lines.push((scene) => `${name} = ${parent ? parent.name : scene}:matrix ${value}`);
-        state.lines.push(() => `${children} = ${name}:children()`);
-        state.lines.push(() => `${entries} = {} for i, row in ipairs(${children}) do ${entries}[i] = row:children() end`);
-        const matrix = this._track(new GroupHandle(this, name, "group"), parent, options.id);
+        const [matrix, children] = this._composite(`matrix ${this._options(options)}`, parent, options.id);
+        const entries = this._slot();
+        SCENE_STATES.get(this).lines.push(
+            () => `${entries} = {} for i, row in ipairs(${children}) do ${entries}[i] = row:children() end`);
         // The matrix names its rows <id>/<r>, its entries <id>/<r>/<c> and its brackets
         // <id>/left and <id>/right.
-        const id = typeof options.id === "string" ? options.id : null;
-        rows.forEach((row, r) => {
-            const rowId = id === null ? undefined : `${id}/${r + 1}`;
-            const group = this._track(new GroupHandle(this, `${children}[${r + 1}]`, "group"), matrix, rowId);
-            row.forEach((entry, c) => {
-                const entryId = id === null ? undefined : `${rowId}/${c + 1}`;
-                const type = typeof entry === "number" ? "number" : "text";
-                this._track(new Handle(this, `${entries}[${r + 1}][${c + 1}]`, type), group, entryId);
-            });
-        });
+        const types = rows.map((row) => row.map((entry) => (typeof entry === "number" ? "number" : "text")));
+        this._trackRows(matrix, children, entries, types, options.id);
         if (brackets !== "none") {
             ["left", "right"].forEach((end, index) => {
-                const bracketId = id === null ? undefined : `${id}/${end}`;
-                this._track(new Handle(this, `${children}[${rows.length + index + 1}]`, "path"), matrix, bracketId);
+                const bracket = new Handle(this, `${children}[${rows.length + index + 1}]`, "path");
+                this._track(bracket, matrix, _childId(options.id, end));
             });
         }
         return matrix;
@@ -2701,26 +2672,13 @@ export class SceneBuilder {
         if (stripes !== undefined && typeof stripes !== "boolean" && typeof stripes !== "string") {
             throw new TypeError("Table stripes must be true or a color");
         }
-        const value = this._options(options);
-        const state = SCENE_STATES.get(this);
-        const name = `objects[${++state.handles}]`;
-        const children = `objects[${++state.handles}]`;
-        const entries = `objects[${++state.handles}]`;
-        state.lines.push((scene) => `${name} = ${parent ? parent.name : scene}:table ${value}`);
-        state.lines.push(() => `${children} = ${name}:children()`);
-        state.lines.push(() => `${entries} = {} for i = 1, ${rows.length} do ${entries}[i] = ${children}[i]:children() end`);
-        const table = this._track(new GroupHandle(this, name, "group"), parent, options.id);
+        const [table, children] = this._composite(`table ${this._options(options)}`, parent, options.id);
+        const entries = this._slot();
+        SCENE_STATES.get(this).lines.push(
+            () => `${entries} = {} for i = 1, ${rows.length} do ${entries}[i] = ${children}[i]:children() end`);
         // The table names its rows <id>/<r> and its entries <id>/<r>/<c>, the header's first.
-        const id = typeof options.id === "string" ? options.id : null;
-        rows.forEach((row, r) => {
-            const rowId = id === null ? undefined : `${id}/${r + 1}`;
-            const group = this._track(new GroupHandle(this, `${children}[${r + 1}]`, "group"), table, rowId);
-            row.forEach((entry, c) => {
-                const entryId = id === null ? undefined : `${rowId}/${c + 1}`;
-                const type = typeof entry === "number" ? "number" : "text";
-                this._track(new Handle(this, `${entries}[${r + 1}][${c + 1}]`, type), group, entryId);
-            });
-        });
+        const types = rows.map((row) => row.map((entry) => (typeof entry === "number" ? "number" : "text")));
+        this._trackRows(table, children, entries, types, options.id);
         // A stripe behind every second row below the header, then the rule under the header,
         // those between rows, those between columns and the four of the frame.
         let child = rows.length;
@@ -2768,8 +2726,8 @@ export class SceneBuilder {
             key === "parent" ? `["parent"]=${this._handle(styled.parent)}` : this._field(key, styled[key]));
         const tags = new Map([...state.ids].map(([id, handle]) => [handle, id]));
         const origin = tags.get(source);
-        const name = `objects[${++state.handles}]`;
-        const copies = `objects[${++state.handles}]`;
+        const name = this._slot();
+        const copies = this._slot();
         const value = fields.length ? `,{${fields.join(",")}}` : "";
         state.lines.push((scene) => `${name},${copies} = ${scene}:clone(${sourceName}${value})`);
         const made = [];
@@ -2842,11 +2800,8 @@ export class SceneBuilder {
         const fields = Object.keys(styled)
             .sort()
             .map((key) => this._field(key, styled[key]));
-        const state = SCENE_STATES.get(this);
-        const name = `objects[${++state.handles}]`;
         const value = `{from=${fromName},to=${toName}${fields.length ? `,${fields.join(",")}` : ""}}`;
-        state.lines.push((scene) => `${name} = ${parent ? parent.name : scene}:connector ${value}`);
-        return this._track(new Handle(this, name, "connector"), parent, options.id);
+        return this._track(new Handle(this, this._make(`connector ${value}`, parent), "connector"), parent, options.id);
     }
 
     viewport(child, bounds) {
@@ -3068,10 +3023,7 @@ export class SceneBuilder {
 
     _animate(method, target, values) {
         this._assertMutable();
-        const targetName = this._target(target);
-        const argumentsList = values.map(_lua).join(",");
-        SCENE_STATES.get(this).lines.push((scene) => `${scene}:${method}(${targetName},${argumentsList})`);
-        return this;
+        return this._call(method, this._target(target), ...values.map(_lua));
     }
 
     fillReveal(target, duration = 1, curve = "smooth", lag = 0) {
@@ -3079,20 +3031,20 @@ export class SceneBuilder {
         return this._animate("fill_reveal", target, [duration, curve, lag]);
     }
 
-    _effect(method, target, options, defaults, name, minimumScale) {
+    // Plays the effect method on the handle target, checking the target, then the options over the
+    // defaults of the effect, which name names in errors, as Lua does.
+    _effect(method, target, options, defaults, name) {
         this._assertMutable();
         const targetName = this._handle(target);
-        const value = _lua(_effectOptions(options, defaults, name, minimumScale));
-        SCENE_STATES.get(this).lines.push((scene) => `${scene}:${method}(${targetName},${value})`);
-        return this;
+        return this._call(method, targetName, _lua(_effectOptions(options, defaults, name)));
     }
 
     fadeIn(target, options = {}) {
-        return this._effect("fade_in", target, options, FADE_OPTIONS, "FadeIn", 0);
+        return this._effect("fade_in", target, options, FADE_OPTIONS, "FadeIn");
     }
 
     fadeOut(target, options = {}) {
-        return this._effect("fade_out", target, options, FADE_OPTIONS, "FadeOut", 0);
+        return this._effect("fade_out", target, options, FADE_OPTIONS, "FadeOut");
     }
 
     growFromEdge(target, edge, duration = 1, curve = "smooth") {
@@ -3107,59 +3059,33 @@ export class SceneBuilder {
     indicate(target, options = {}) {
         this._assertMutable();
         const targetName = this._target(target);
-        const value = _lua(_effectOptions(options, INDICATE_OPTIONS, "Indicate", 1));
-        SCENE_STATES.get(this).lines.push((scene) => `${scene}:indicate(${targetName},${value})`);
-        return this;
+        return this._call("indicate", targetName, _lua(_effectOptions(options, INDICATE_OPTIONS, "Indicate", 1)));
     }
 
     wiggle(target, options = {}) {
-        this._assertMutable();
-        const values = _effectOptions(options, WIGGLE_OPTIONS, "Wiggle", 0);
-        if (!Number.isFinite(values.angle)) throw new RangeError("Wiggle angle must be a finite number of radians");
-        if (!Number.isFinite(values.swings) || values.swings <= 0) {
-            throw new RangeError("Wiggle swings must be a finite positive number");
-        }
-        return this._effect("wiggle", target, options, WIGGLE_OPTIONS, "Wiggle", 0);
+        return this._effect("wiggle", target, options, WIGGLE_OPTIONS, "Wiggle");
     }
 
     circumscribe(target, options = {}) {
-        this._assertMutable();
-        const values = _effectOptions(options, CIRCUMSCRIBE_OPTIONS, "Circumscribe", 0);
-        if (values.shape !== "rectangle" && values.shape !== "ellipse") {
-            throw new TypeError('Circumscribe shape must be "rectangle" or "ellipse"');
-        }
-        _emphasisValues(values, "Circumscribe");
-        return this._effect("circumscribe", target, options, CIRCUMSCRIBE_OPTIONS, "Circumscribe", 0);
+        return this._effect("circumscribe", target, options, CIRCUMSCRIBE_OPTIONS, "Circumscribe");
     }
 
     passingFlash(target, options = {}) {
-        this._assertMutable();
-        _emphasisValues(_effectOptions(options, PASSING_FLASH_OPTIONS, "PassingFlash", 0), "PassingFlash");
-        return this._effect("passing_flash", target, options, PASSING_FLASH_OPTIONS, "PassingFlash", 0);
+        return this._effect("passing_flash", target, options, PASSING_FLASH_OPTIONS, "PassingFlash");
     }
 
     flash(target, options = {}) {
+        if (target instanceof Handle) return this._effect("flash", target, options, FLASH_OPTIONS, "Flash");
         this._assertMutable();
-        const values = _effectOptions(options, FLASH_OPTIONS, "Flash", 0);
-        _emphasisValues(values, "Flash");
-        if (!Number.isInteger(values.lines) || values.lines < 1 || values.lines > 64) {
-            throw new RangeError("Flash lines must be a whole number from 1 to 64");
-        }
-        if (target instanceof Handle) return this._effect("flash", target, options, FLASH_OPTIONS, "Flash", 0);
         // A flash may also burst out of a point in world coordinates.
         if (!Array.isArray(target) || (target.length !== 2 && target.length !== 3) || !target.every(Number.isFinite)) {
             throw new TypeError("Flash takes a handle or a finite point [x, y] or [x, y, z]");
         }
-        const point = _lua(target);
-        const value = _lua(values);
-        SCENE_STATES.get(this).lines.push((scene) => `${scene}:flash(${point},${value})`);
-        return this;
+        return this._call("flash", _lua(target), _lua(_effectOptions(options, FLASH_OPTIONS, "Flash")));
     }
 
     ripple(target, options = {}) {
-        this._assertMutable();
-        _emphasisValues(_effectOptions(options, RIPPLE_OPTIONS, "Ripple", 0), "Ripple");
-        return this._effect("ripple", target, options, RIPPLE_OPTIONS, "Ripple", 0);
+        return this._effect("ripple", target, options, RIPPLE_OPTIONS, "Ripple");
     }
 
     morph(source, target, duration = 1, curve = "smooth", lag) {
@@ -3175,10 +3101,10 @@ export class SceneBuilder {
             throw new TypeError("Morph arrays must be non-empty and equally sized");
         }
         // The lag, or options: with copy, a copy of each source morphs in its place.
-        let lagValue = "";
+        const lagValues = [];
         let copy = false;
         if (lag === null || typeof lag !== "object") {
-            if (lag !== undefined) lagValue = `,${_lua(lag)}`;
+            if (lag !== undefined) lagValues.push(_lua(lag));
         } else {
             if (!_plain(lag)) {
                 throw new TypeError("Morph options must be a number or a plain object");
@@ -3205,7 +3131,7 @@ export class SceneBuilder {
             }
             copy = lag.copy === true;
             const fields = Object.keys(lag).filter((key) => lag[key] !== undefined).sort();
-            lagValue = `,{${fields.map((key) => `[${_string(key)}]=${_lua(lag[key])}`).join(",")}}`;
+            lagValues.push(`{${fields.map((key) => `[${_string(key)}]=${_lua(lag[key])}`).join(",")}}`);
         }
         const sources = sourceArray ? source : [source];
         const targets = targetArray ? target : [target];
@@ -3225,14 +3151,8 @@ export class SceneBuilder {
             sourceNames.add(sourceName);
             targetNames.add(targetName);
         }
-        const sourceName = this._target(source);
-        const targetName = this._target(target);
-        const durationValue = _lua(duration);
-        const curveValue = _lua(curve);
-        SCENE_STATES.get(this).lines.push(
-            (scene) => `${scene}:morph(${sourceName},${targetName},${durationValue},${curveValue}${lagValue})`,
-        );
-        return this;
+        return this._call("morph", this._target(source), this._target(target), _lua(duration), _lua(curve),
+            ...lagValues);
     }
 
     fadeTransform(source, target, duration = 1, curve = "smooth") {
@@ -3243,12 +3163,7 @@ export class SceneBuilder {
         if (sourceName === targetName) {
             throw new TypeError("FadeTransform source and target must be distinct handles");
         }
-        const durationValue = _lua(duration);
-        const curveValue = _lua(curve);
-        SCENE_STATES.get(this).lines.push(
-            (scene) => `${scene}:fade_transform(${sourceName},${targetName},${durationValue},${curveValue})`,
-        );
-        return this;
+        return this._call("fade_transform", sourceName, targetName, _lua(duration), _lua(curve));
     }
 
     // Serializes rotate, scale, and moveAlong options; an `about` handle names its local.
@@ -3303,13 +3218,9 @@ export class SceneBuilder {
         if (options.shapes !== undefined) entries.push(`["shapes"]=${_lua(options.shapes)}`);
         if (options.fade !== undefined) entries.push(`["fade"]=${_lua(options.fade)}`);
         if (options.copy !== undefined) entries.push(`["copy"]=${_lua(options.copy)}`);
-        const value = entries.length ? `,{${entries.join(",")}}` : "";
-        const durationValue = _lua(duration);
-        const curveValue = _lua(curve);
-        SCENE_STATES.get(this).lines.push(
-            (scene) => `${scene}:match_transform(${sourceName},${targetName},${durationValue},${curveValue}${value})`,
-        );
-        return this;
+        const values = [sourceName, targetName, _lua(duration), _lua(curve)];
+        if (entries.length) values.push(`{${entries.join(",")}}`);
+        return this._call("match_transform", ...values);
     }
 
     // Makes the code block that the text of block turns into after edits, one edit or an array
@@ -3363,7 +3274,7 @@ export class SceneBuilder {
             _lua(curve),
         ];
         if (entries.length) values.push(`{${entries.join(",")}}`);
-        return this._codeBlock((scene) => `${scene}:edit(${values.join(",")})`, code.parent, id, held, code.language);
+        return this._codeBlock(this._make(`edit(${values.join(",")})`), code.parent, id, held, code.language);
     }
 
     // Lays items, a group's children or an array of sibling handles in order, one after
@@ -3390,13 +3301,9 @@ export class SceneBuilder {
                 throw new TypeError(`Arrange ${key} must be [x, y] or [x, y, z] of finite numbers`);
             }
         }
-        const value = Object.keys(options).length ? `,${_lua(options)}` : "";
-        const durationValue = _lua(duration);
-        const curveValue = _lua(curve);
-        SCENE_STATES.get(this).lines.push(
-            (scene) => `${scene}:arrange(${itemsValue},${durationValue},${curveValue}${value})`,
-        );
-        return this;
+        const values = [itemsValue, _lua(duration), _lua(curve)];
+        if (Object.keys(options).length) values.push(_lua(options));
+        return this._call("arrange", ...values);
     }
 
     // Brings every object below target that is not a group to full opacity inside the
@@ -3435,8 +3342,7 @@ export class SceneBuilder {
         }
         const values = [targetName, ...picked];
         if (Object.keys(options).length) values.push(_lua(options));
-        SCENE_STATES.get(this).lines.push((scene) => `${scene}:highlight(${values.join(",")})`);
-        return this;
+        return this._call("highlight", ...values);
     }
 
     _motionOptions(options, allowed, name) {
@@ -3472,11 +3378,8 @@ export class SceneBuilder {
         this._assertMutable();
         this._assertTransformable(target);
         if (!Number.isFinite(radians)) throw new TypeError("Rotate angle must be a finite number of radians");
-        const targetName = this._target(target);
-        const angle = _lua(radians);
-        const value = this._motionOptions(options, ROTATE_OPTIONS, "Rotate");
-        SCENE_STATES.get(this).lines.push((scene) => `${scene}:rotate(${targetName},${angle},${value})`);
-        return this;
+        return this._call("rotate", this._target(target), _lua(radians),
+            this._motionOptions(options, ROTATE_OPTIONS, "Rotate"));
     }
 
     scale(target, factor, options = {}) {
@@ -3485,22 +3388,16 @@ export class SceneBuilder {
         if (typeof factor === "number" ? !Number.isFinite(factor) : !factor || typeof factor !== "object") {
             throw new TypeError("Scale factor must be a finite number or a vector");
         }
-        const targetName = this._target(target);
-        const factorValue = _lua(factor);
-        const value = this._motionOptions(options, SCALE_OPTIONS, "Scale");
-        SCENE_STATES.get(this).lines.push((scene) => `${scene}:scale(${targetName},${factorValue},${value})`);
-        return this;
+        return this._call("scale", this._target(target), _lua(factor),
+            this._motionOptions(options, SCALE_OPTIONS, "Scale"));
     }
 
     // Connector paths follow their sampled ends; ordinary paths keep a scheduled copy.
     moveAlong(target, path, options = {}) {
         this._assertMutable();
         this._assertTransformable(target);
-        const targetName = this._target(target);
-        const pathName = this._handle(path);
-        const value = this._motionOptions(options, MOVE_ALONG_OPTIONS, "MoveAlong");
-        SCENE_STATES.get(this).lines.push((scene) => `${scene}:move_along(${targetName},${pathName},${value})`);
-        return this;
+        return this._call("move_along", this._target(target), this._handle(path),
+            this._motionOptions(options, MOVE_ALONG_OPTIONS, "MoveAlong"));
     }
 
     // Sample the plane map in target-parent space and emit its images; z stays unchanged.
@@ -3531,27 +3428,18 @@ export class SceneBuilder {
         if (options.step !== undefined && !(Number.isFinite(options.step) && options.step > 0)) {
             throw new RangeError("Warp step must be a positive length");
         }
-        const timing = `${_lua(duration)},${_lua(curve)}`;
+        const timing = [_lua(duration), _lua(curve)];
         const values = _sampling(this, () => rows.samples.flatMap((y) =>
             columns.samples.map((x) => _sampleVector(fn, x, y, "Warp fn").map(_single))));
-        const state = SCENE_STATES.get(this);
         const samples = `{["values"]=${_lua(values)},["x_range"]=${_lua(columns.range)},["y_range"]=${_lua(rows.range)}}`;
-        const settings = options.step === undefined ? "" : `,{["step"]=${_lua(options.step)}}`;
-        state.lines.push((scene) => `${scene}:warp(${targetName},${samples},${timing}${settings})`);
-        return this;
+        const settings = options.step === undefined ? [] : [`{["step"]=${_lua(options.step)}}`];
+        return this._call("warp", targetName, samples, ...timing, ...settings);
     }
 
     transition(from, to, duration = 1, curve = "smooth") {
         ({duration, curve} = _timingArguments(arguments, 2, {duration, curve}));
         this._assertMutable();
-        const fromName = this._target(from);
-        const toName = this._target(to);
-        const durationValue = _lua(duration);
-        const curveValue = _lua(curve);
-        SCENE_STATES.get(this).lines.push(
-            (scene) => `${scene}:transition(${fromName},${toName},${durationValue},${curveValue})`,
-        );
-        return this;
+        return this._call("transition", this._target(from), this._target(to), _lua(duration), _lua(curve));
     }
 
     play(specification, duration = 1, curve = "smooth", lag = 0) {
@@ -3560,12 +3448,7 @@ export class SceneBuilder {
         const { anchor, time } = timing.clock;
         this._assertMutable();
         const descriptors = this._descriptors(specification, "play");
-        const durationValue = _lua(duration);
-        const curveValue = _lua(curve);
-        const lagValue = _lua(lag);
-        SCENE_STATES.get(this).lines.push(
-            (scene) => `${scene}:play({${descriptors.join(",")}},${durationValue},${curveValue},${lagValue})`,
-        );
+        this._call("play", `{${descriptors.join(",")}}`, _lua(duration), _lua(curve), _lua(lag));
         // A play lasts its duration and the lag of each later target, as the scene counts it.
         if (Number.isFinite(duration) && duration > 0 && Number.isFinite(lag) && lag >= 0) {
             const span = _decimal(duration) * (1 + _decimal(lag) * (descriptors.length - 1));
@@ -3580,17 +3463,13 @@ export class SceneBuilder {
     }
 
     _set(specification) {
-        const descriptors = this._descriptors(specification, "set");
-        SCENE_STATES.get(this).lines.push((scene) => `${scene}:set({${descriptors.join(",")}})`);
-        return this;
+        return this._call("set", `{${this._descriptors(specification, "set").join(",")}}`);
     }
 
     // Records the state each target shows now, with the objects below it, on a stack of its own.
     save(target) {
         this._assertMutable("instant");
-        const targetName = this._target(target);
-        SCENE_STATES.get(this).lines.push((scene) => `${scene}:save(${targetName})`);
-        return this;
+        return this._call("save", this._target(target));
     }
 
     // Brings each target back to the newest state save recorded for it: over duration seconds,
@@ -3603,13 +3482,7 @@ export class SceneBuilder {
             throw new RangeError("Restore duration must be zero or a positive number of seconds");
         }
         if (!(Number.isFinite(lag) && lag >= 0)) throw new RangeError("Restore lag must be zero or positive");
-        const durationValue = _lua(duration);
-        const curveValue = _lua(curve);
-        const lagValue = _lua(lag);
-        SCENE_STATES.get(this).lines.push(
-            (scene) => `${scene}:restore(${targetName},${durationValue},${curveValue},${lagValue})`,
-        );
-        return this;
+        return this._call("restore", targetName, _lua(duration), _lua(curve), _lua(lag));
     }
 
     // A number for objects to follow, starting at value.
@@ -3764,8 +3637,7 @@ export class SceneBuilder {
         }
         const track = {
             order: ++timing.authored, anchor, start, finish: bounds[steps], steps, duration, ease, bounds,
-            moves: moving, affected, states, snapshot, groups: new Map(), slot: 0,
-            declares: false,
+            moves: moving, affected, states, snapshot, groups: new Map(),
         };
         for (const [binding, others] of overlapping) {
             let group = null;
@@ -3982,16 +3854,10 @@ export class SceneBuilder {
         return this._look(null, camera, _timingArguments(arguments, 1, {duration, curve}));
     }
 
-    // The camera calls below move the scene's camera, or with a receiver the view of that name.
+    // The camera calls below move the scene's camera, or with a receiver the camera of that view.
     _look(receiver, camera, {duration, curve}) {
         this._assertMutable();
-        const cameraValue = this._camera(camera);
-        const durationValue = _lua(duration);
-        const curveValue = _lua(curve);
-        SCENE_STATES.get(this).lines.push(
-            (scene) => `${receiver ?? scene}:look(${cameraValue},${durationValue},${curveValue})`,
-        );
-        return this;
+        return this._callOn(receiver, "look", this._camera(camera), _lua(duration), _lua(curve));
     }
 
     // Circles a 3D camera about its target by any angle, about the camera's up by default.
@@ -4004,10 +3870,7 @@ export class SceneBuilder {
         if (!Number.isFinite(radians) || radians === 0) {
             throw new TypeError("Orbit angle must be a finite, non-zero number of radians");
         }
-        const angle = _lua(radians);
-        const value = this._motionOptions(options, ORBIT_OPTIONS, "Orbit");
-        SCENE_STATES.get(this).lines.push((scene) => `${receiver ?? scene}:orbit(${angle},${value})`);
-        return this;
+        return this._callOn(receiver, "orbit", _lua(radians), this._motionOptions(options, ORBIT_OPTIONS, "Orbit"));
     }
 
     // Pans and zooms a 2D camera so the authored bounds of a handle or handles fill the frame,
@@ -4029,24 +3892,19 @@ export class SceneBuilder {
         if (padding !== undefined && !(Number.isFinite(padding) && padding >= 0)) {
             throw new RangeError("Focus padding must be a non-negative number");
         }
-        const value = this._motionOptions(options, FOCUS_OPTIONS, "Focus");
-        SCENE_STATES.get(this).lines.push((scene) => `${receiver ?? scene}:focus(${targetName},${value})`);
-        return this;
+        return this._callOn(receiver, "focus", targetName, this._motionOptions(options, FOCUS_OPTIONS, "Focus"));
     }
 
     wait(duration = 1) {
         this._assertQuiet();
-        const value = _lua(duration);
-        SCENE_STATES.get(this).lines.push((scene) => `${scene}:wait(${value})`);
+        this._call("wait", _lua(duration));
         _advance(this, duration);
         return this;
     }
 
     remove(target) {
         this._assertMutable("instant");
-        const targetName = this._target(target);
-        SCENE_STATES.get(this).lines.push((scene) => `${scene}:remove(${targetName})`);
-        return this;
+        return this._call("remove", this._target(target));
     }
 
     // Authors the callback from an absolute time or marker, then returns to the current time.
@@ -4067,7 +3925,7 @@ export class SceneBuilder {
             ? timing.markers.get(time) ?? { anchor: {}, time: 0 }
             : { anchor: timing.origin, time: Math.fround(time) };
         callback(this);
-        state.lines.push((scene) => `${scene}:seek(${resume})`);
+        this._call("seek", resume);
         timing.clock = back;
         return this;
     }
@@ -4089,7 +3947,7 @@ export class SceneBuilder {
         const begin = timing.clock;
         let reached = null;
         for (const track of list) {
-            state.lines.push((scene) => `${scene}:seek(${start})`);
+            this._call("seek", start);
             timing.clock = begin;
             track(this);
             const clock = timing.clock;
@@ -4102,7 +3960,7 @@ export class SceneBuilder {
             }
             state.lines.push((scene) => `${end}=math.max(${end},${scene}:time())`);
         }
-        state.lines.push((scene) => `${scene}:seek(${end})`);
+        this._call("seek", end);
         timing.clock = reached;
         return this;
     }
@@ -4110,8 +3968,7 @@ export class SceneBuilder {
     mark(name) {
         this._assertQuiet();
         if (typeof name !== "string" || !name) throw new TypeError("Marker names must be non-empty strings");
-        const value = _lua(name);
-        SCENE_STATES.get(this).lines.push((scene) => `${scene}:mark(${value})`);
+        this._call("mark", _lua(name));
         const timing = SCENE_TRACKERS.get(this);
         if (!timing.markers.has(name)) timing.markers.set(name, timing.clock);
         return this;

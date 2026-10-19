@@ -677,6 +677,12 @@ assert.throws(() => emphasis.ripple(wiggled, { size: 0 }), /Ripple size must be 
 assert.throws(() => emphasis.ripple(wiggled, { padding: -1 }), /Ripple padding must be a finite/);
 assert.throws(() => emphasis.ripple(wiggled, { width: Infinity }), /Ripple width must be a finite positive/);
 assert.throws(() => emphasis.ripple(wiggled, { window: 0.5 }), /Unknown Ripple option: window/);
+// An effect checks its target before its options, as Lua does.
+const elsewhere = vis.scene().rectangle({ size: [1, 1] });
+for (const effect of ["fadeIn", "fadeOut", "wiggle", "circumscribe", "passingFlash", "flash", "ripple"]) {
+    assert.throws(() => emphasis[effect](elsewhere, { duration: -1 }), /handles from the same scene/);
+}
+assert.throws(() => emphasis.flash([1], { lines: 0 }), /Flash takes a handle or a finite point/);
 const emphasisLua = compileScene(emphasis);
 assert.match(
     emphasisLua,

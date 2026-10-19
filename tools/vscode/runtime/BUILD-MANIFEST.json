@@ -52,8 +52,8 @@
     },
     {
       "path": "bindings.js",
-      "bytes": 204534,
-      "sha256": "e35aba85e10f34e433570a51aac6c783d3cdecd3e2a5ba21f8d27490b9404dfb"
+      "bytes": 197359,
+      "sha256": "93fcef17704a07cbe66f7d1715106c7be8aac46b180d2622c58963418d3ea571"
     },
     {
       "path": "bindings.d.ts",
