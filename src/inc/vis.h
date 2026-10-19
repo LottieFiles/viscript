@@ -327,19 +327,6 @@ struct AnimCurve
     bool valid() const noexcept;
 };
 
-struct TimingOptions
-{
-    // Seconds; positive.
-    float duration = 1.0f;
-    AnimCurve curve;
-};
-
-struct AnimationOptions : TimingOptions
-{
-    // Each later target starts duration * lag seconds after the previous one; finite and non-negative.
-    float lag = 0.0f;
-};
-
 struct Vec3
 {
     float x = 0.0f;

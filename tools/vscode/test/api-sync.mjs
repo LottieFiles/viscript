@@ -287,14 +287,15 @@ function functionBody(source, functionName) {
     return source.slice(start, end < 0 ? source.length : end);
 }
 
-// The option names the core's _options() and _option() accept in the functions, with the shared
-// styles unless the style flag is false, less the names a `for (auto shape : {...})` loop refuses.
+// The option names the core's _factory(), _options() and _option() accept in the functions, with
+// the shared styles unless the style flag is false, less the names a `for (auto shape : {...})`
+// loop refuses.
 function factoryOptionNames(source, functionNames, shared) {
     const names = new Set();
     const refused = new Set();
     for (const functionName of functionNames) {
         const body = functionBody(source, functionName);
-        const calls = body.matchAll(/_options\(lua,\s*(?:2|index),\s*\{([^}]*)\}(?:,\s*(true|false))?\)|_option\(name,\s*\{([^}]*)\},\s*(true|false)\)/g);
+        const calls = body.matchAll(/(?:_factory\(lua,\s*|_options\(lua,\s*(?:2|index),\s*)\{([^}]*)\}(?:,\s*(true|false))?\)|_option\(name,\s*\{([^}]*)\},\s*(true|false)\)/g);
         for (const match of calls) {
             for (const name of (match[1] ?? match[3]).matchAll(/"([^"]+)"/g)) names.add(name[1]);
             if ((match[2] ?? match[4]) !== "false") for (const name of shared) names.add(name);

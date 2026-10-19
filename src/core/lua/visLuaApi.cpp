@@ -1,8 +1,9 @@
-// The vis.* library functions (merge, keys, format, tostring, the random seed) and luaOpenApi,
-// which registers the scene API, the module methods and the global guard.
+// The vis.* library functions (merge, keys, format, tostring, the random seed), luaMetatable,
+// and luaOpenApi, which registers the scene API, the module methods and the global guard.
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <initializer_list>
 
 extern "C" {
 #include <lualib.h>
@@ -265,6 +266,24 @@ static int _randomSeed(lua_State* lua)
     return 2;
 }
 
+void detail::luaMetatable(lua_State* lua, const char* name, lua_CFunction gc,
+                          std::initializer_list<const luaL_Reg*> tables)
+{
+    luaL_newmetatable(lua, name);
+    if (gc) {
+        lua_pushcfunction(lua, gc);
+        lua_setfield(lua, -2, "__gc");
+    }
+    lua_pushliteral(lua, "protected");
+    lua_setfield(lua, -2, "__metatable");
+    if (tables.size() > 0) {
+        lua_newtable(lua);
+        for (auto table : tables) luaL_setfuncs(lua, table, 0);
+        lua_setfield(lua, -2, "__index");
+    }
+    lua_pop(lua, 1);
+}
+
 int detail::luaOpenApi(lua_State* lua, const LuaApi& api)
 {
     auto registry = [lua](const char* name, const char* mode) {
@@ -312,67 +331,11 @@ int detail::luaOpenApi(lua_State* lua, const LuaApi& api)
     _guard(lua, LUA_STRLIBNAME);
     lua_pop(lua, 1);
 
-    luaL_newmetatable(lua, OBJECT_METATABLE);
-    lua_pushcfunction(lua, api.objectGc);
-    lua_setfield(lua, -2, "__gc");
-    lua_pushliteral(lua, "protected");
-    lua_setfield(lua, -2, "__metatable");
-    lua_newtable(lua);
-    luaL_setfuncs(lua, api.factories, 0);
-    luaL_setfuncs(lua, api.objectMethods, 0);
-    lua_setfield(lua, -2, "__index");
-    lua_pop(lua, 1);
-
-    luaL_newmetatable(lua, SPACE_METATABLE);
-    lua_pushcfunction(lua, api.objectGc);
-    lua_setfield(lua, -2, "__gc");
-    lua_pushliteral(lua, "vis.Space");
-    lua_setfield(lua, -2, "__name");
-    lua_pushliteral(lua, "protected");
-    lua_setfield(lua, -2, "__metatable");
-    lua_newtable(lua);
-    luaL_setfuncs(lua, api.factories, 0);
-    luaL_setfuncs(lua, api.objectMethods, 0);
-    luaL_setfuncs(lua, api.spaceMethods, 0);
-    lua_setfield(lua, -2, "__index");
-    lua_pop(lua, 1);
-
-    luaL_newmetatable(lua, GROUP_METATABLE);
-    lua_pushcfunction(lua, api.objectGc);
-    lua_setfield(lua, -2, "__gc");
-    lua_pushliteral(lua, "vis.Group");
-    lua_setfield(lua, -2, "__name");
-    lua_pushliteral(lua, "protected");
-    lua_setfield(lua, -2, "__metatable");
-    lua_newtable(lua);
-    luaL_setfuncs(lua, api.factories, 0);
-    luaL_setfuncs(lua, api.objectMethods, 0);
-    luaL_setfuncs(lua, api.groupMethods, 0);
-    lua_setfield(lua, -2, "__index");
-    lua_pop(lua, 1);
-
-    luaL_newmetatable(lua, SCENE_METATABLE);
-    lua_pushcfunction(lua, api.sceneGc);
-    lua_setfield(lua, -2, "__gc");
-    lua_pushliteral(lua, "vis.Scene");
-    lua_setfield(lua, -2, "__name");
-    lua_pushliteral(lua, "protected");
-    lua_setfield(lua, -2, "__metatable");
-    lua_newtable(lua);
-    luaL_setfuncs(lua, api.factories, 0);
-    luaL_setfuncs(lua, api.sceneMethods, 0);
-    lua_setfield(lua, -2, "__index");
-    lua_pop(lua, 1);
-
-    luaL_newmetatable(lua, VIEW_METATABLE);
-    lua_pushliteral(lua, "vis.View");
-    lua_setfield(lua, -2, "__name");
-    lua_pushliteral(lua, "protected");
-    lua_setfield(lua, -2, "__metatable");
-    lua_newtable(lua);
-    luaL_setfuncs(lua, api.viewMethods, 0);
-    lua_setfield(lua, -2, "__index");
-    lua_pop(lua, 1);
+    detail::luaMetatable(lua, OBJECT_METATABLE, api.objectGc, {api.factories, api.objectMethods});
+    detail::luaMetatable(lua, SPACE_METATABLE, api.objectGc, {api.factories, api.objectMethods, api.spaceMethods});
+    detail::luaMetatable(lua, GROUP_METATABLE, api.objectGc, {api.factories, api.objectMethods, api.groupMethods});
+    detail::luaMetatable(lua, SCENE_METATABLE, api.sceneGc, {api.factories, api.sceneMethods});
+    detail::luaMetatable(lua, VIEW_METATABLE, nullptr, {api.viewMethods});
 
     for (auto& method : MODULE_METHODS) {
         for (auto handle : {detail::LuaHandle::Scene, detail::LuaHandle::Object}) {
@@ -407,7 +370,15 @@ int detail::luaOpenApi(lua_State* lua, const LuaApi& api)
     lua_pushcfunction(lua, api.trackerWhere);
     lua_pushcfunction(lua, api.trackerPending);
     lua_pushcfunction(lua, _trackTiming);
-    lua_call(lua, 8, 1);
+    // The state keys but shift, which the prelude gives as a change.
+    lua_createtable(lua, static_cast<int>(sizeof(STATE_KEYS) / sizeof(*STATE_KEYS)) - 1, 0);
+    auto keys = 0;
+    for (auto key : STATE_KEYS) {
+        if (std::strcmp(key, "shift") == 0) continue;
+        lua_pushstring(lua, key);
+        lua_rawseti(lua, -2, ++keys);
+    }
+    lua_call(lua, 9, 1);
     lua_setfield(lua, LUA_REGISTRYINDEX, TRACKER_FLUSH);
     // Last, so the tracker prelude above reads globals without the guard.
     lua_pushglobaltable(lua);

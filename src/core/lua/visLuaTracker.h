@@ -4,22 +4,27 @@
 namespace vis
 {
 
+// The keys a state that a bound function returns may set, each a property of a play descriptor.
+// The prelude copies all but shift into the descriptors of the segments it plays, and gives shift
+// as the change since the segment before.
+static constexpr const char* STATE_KEYS[] = {
+    "shift", "transform", "opacity", "stroke", "fill", "progress", "dash_offset", "tail", "tip", "width",
+    "radius", "size", "corner", "trim_distance", "gradient", "blur", "shadow", "value", "points", "from", "to",
+    "origin", "control1", "control2", "fn", "x_range", "y_range", "discontinuities", "center", "vertex",
+    "start", "angle", "level", "values"};
+
 // Value trackers: an animated number that bound objects follow. Construction samples
 // every binding along the eased value and schedules short linear segments, so the
 // timeline stays deterministic and renderers never call back into Lua. The segments of a
 // track wait until a scene call that adds or reads clips, or the end of the script, so a
 // later track of other trackers that overlaps it on a binding can merge with it.
 static constexpr const char* TRACKER_PRELUDE = R"lua(
-local methods, ease, settle, fps, unknown, where, pend, timing = ...
+local methods, ease, settle, fps, unknown, where, pend, timing, KEYS = ...
 local type, error, ipairs, select, unpack, pcall = type, error, ipairs, select, table.unpack, pcall
 local tonumber = tonumber
 local sort = table.sort
 local ceil, min, max, abs = math.ceil, math.min, math.max, math.abs
 local sub, byte, format = string.sub, string.byte, string.format
-local KEYS = {"transform", "opacity", "stroke", "fill", "progress", "dash_offset", "tail", "tip",
-              "width", "radius", "size", "corner", "trim_distance", "gradient", "blur", "shadow", "value",
-              "points", "from", "to", "origin", "control1", "control2", "fn", "x_range", "y_range",
-              "discontinuities", "center", "vertex", "start", "angle", "level", "values"}
 -- Times closer than this are one moment, so windows that share no more do not overlap.
 local EPSILON = 1e-4
 -- Samples that may wait to play; a track that would keep more plays them all at once.

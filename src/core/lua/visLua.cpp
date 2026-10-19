@@ -36,6 +36,7 @@ extern "C" {
 #include "visLuaApi.h"
 #include "visLuaValues.h"
 #include "visLuaStyle.h"
+#include "visLuaTracker.h"
 #include "visScene.h"
 
 namespace vis
@@ -399,6 +400,16 @@ static LuaSpace _space(lua_State* lua)
     return {handle->scene, handle->object};
 }
 
+// Opens a factory: the scene or parent it is called on, after checking that the table of options
+// at 2 holds only fields and, unless style is false, the shared styles.
+static LuaSpace _factory(lua_State* lua, std::initializer_list<const char*> fields, bool style = true)
+{
+    auto space = _space(lua);
+    luaL_checktype(lua, 2, LUA_TTABLE);
+    _options(lua, 2, fields, style);
+    return space;
+}
+
 // The object handle at index 1 of a layout method, while its scene can still be authored.
 static LuaObject* _layoutHandle(lua_State* lua)
 {
@@ -433,6 +444,15 @@ static LuaObject* _objectHandle(lua_State* lua, LuaScene* scene, int sceneIndex,
 static LuaObject* _owner(lua_State* lua, LuaScene* scene)
 {
     return _objectHandle(lua, scene, 1, nullptr, true);
+}
+
+// Hands the object a factory made to its owner handle, which frees it if the script stops before
+// it attaches. The owner comes first, as making it can stop the script too.
+template<typename T>
+static T* _adopt(LuaObject* owner, T* object)
+{
+    owner->object = object;
+    return object;
 }
 
 // Records the handle at index, whose object is now attached, as the handle of that object.
@@ -954,24 +974,19 @@ static Vec2 _trimDistance(lua_State* lua, int index)
 
 static int _line(lua_State* lua)
 {
-    auto space = _space(lua);
-    luaL_checktype(lua, 2, LUA_TTABLE);
-    _options(lua, 2, {"from", "to", "trim_distance"});
+    auto space = _factory(lua, {"from", "to", "trim_distance"});
     auto from = _fieldWorld(lua, 2, "from");
     auto to = _fieldWorld(lua, 2, "to");
     auto owner = _owner(lua, space.scene);
     auto trimDistance = _trimDistance(lua, 2);
-    auto object = Line::gen(from, to);
-    owner->object = object;
+    auto object = _adopt(owner, Line::gen(from, to));
     if (object) object->trimDistance = trimDistance;
     return _add(lua, space, owner, object, 2, "line");
 }
 
 static int _arrow(lua_State* lua)
 {
-    auto space = _space(lua);
-    luaL_checktype(lua, 2, LUA_TTABLE);
-    _options(lua, 2, {"from", "to", "tail", "tip", "trim_distance"});
+    auto space = _factory(lua, {"from", "to", "tail", "tip", "trim_distance"});
     auto from = _fieldWorld(lua, 2, "from");
     auto to = _fieldWorld(lua, 2, "to");
     auto tail = _fieldNumber(lua, 2, "tail", 0.0f);
@@ -979,8 +994,7 @@ static int _arrow(lua_State* lua)
     if (tail < 0.0f || tip < 0.0f) return luaL_error(lua, "tail and tip must be non-negative");
     auto trimDistance = _trimDistance(lua, 2);
     auto owner = _owner(lua, space.scene);
-    auto object = Arrow::gen(from, to);
-    owner->object = object;
+    auto object = _adopt(owner, Arrow::gen(from, to));
     if (object) {
         object->trimDistance = trimDistance;
         object->tail = tail;
@@ -991,9 +1005,7 @@ static int _arrow(lua_State* lua)
 
 static int _point(lua_State* lua)
 {
-    auto space = _space(lua);
-    luaL_checktype(lua, 2, LUA_TTABLE);
-    _options(lua, 2, {"point"});
+    auto space = _factory(lua, {"point"});
     auto point = _fieldWorld(lua, 2, "point");
     auto owner = _owner(lua, space.scene);
     return _add(lua, space, owner, Point::gen(point), 2, "point");
@@ -1039,9 +1051,8 @@ static void _reserveText(lua_State* lua, Scene* scene, Text* text)
 
 static int _textObject(lua_State* lua, bool semanticLabel)
 {
-    auto space = _space(lua);
-    luaL_checktype(lua, 2, LUA_TTABLE);
-    _options(lua, 2, {"text", "point", "size", "align", "font", "orientation", "role", "slant", "measure", "baseline", "reserve", "tabular"});
+    auto space = _factory(lua, {"text", "point", "size", "align", "font", "orientation", "role", "slant", "measure",
+                                "baseline", "reserve", "tabular"});
     size_t size;
     auto value = _fieldString(lua, 2, "text", &size);
     if (size > LUA_TEXT_LIMIT) return luaL_error(lua, "text exceeds the 1 MiB limit");
@@ -1049,8 +1060,7 @@ static int _textObject(lua_State* lua, bool semanticLabel)
     auto measure = _fieldBool(lua, 2, "measure", false);
     auto baseline = _fieldBool(lua, 2, "baseline", false);
     auto owner = _owner(lua, space.scene);
-    auto object = Text::gen(value, point);
-    owner->object = object;
+    auto object = _adopt(owner, Text::gen(value, point));
     _text(lua, 2, object);
     if (object) {
         _measureText(lua, space.scene->scene, object, measure, baseline);
@@ -1086,10 +1096,8 @@ static const char* _fieldText(lua_State* lua, int index, const char* name)
 // value, so it counts through every number on the way.
 static int _numberText(lua_State* lua)
 {
-    auto space = _space(lua);
-    luaL_checktype(lua, 2, LUA_TTABLE);
-    _options(lua, 2, {"value", "decimals", "sign", "separator", "prefix", "suffix", "point", "size", "align",
-                      "font", "orientation", "role", "slant", "measure", "baseline", "reserve", "tabular"});
+    auto space = _factory(lua, {"value", "decimals", "sign", "separator", "prefix", "suffix", "point", "size", "align",
+                                "font", "orientation", "role", "slant", "measure", "baseline", "reserve", "tabular"});
     auto value = _fieldNumber(lua, 2, "value", 0.0f);
     auto decimals = _fieldNumber(lua, 2, "decimals", 0.0f);
     if (decimals < 0.0f || decimals > 6.0f || decimals != std::floor(decimals)) {
@@ -1110,8 +1118,7 @@ static int _numberText(lua_State* lua)
     auto measure = _fieldBool(lua, 2, "measure", false);
     auto baseline = _fieldBool(lua, 2, "baseline", false);
     auto owner = _owner(lua, space.scene);
-    auto object = Text::gen("", point);
-    owner->object = object;
+    auto object = _adopt(owner, Text::gen("", point));
     if (object) {
         // The strings stay on the stack until the text copies them.
         auto prefix = _fieldText(lua, 2, "prefix");
@@ -1195,6 +1202,54 @@ static constexpr const char* SPAN_STYLES[] = {
     "id", "color", "fill", "opacity", "progress", "layer", "isolate", "mask", "blend", "blur", "shadow"};
 static constexpr const char* ROW_STYLES[] = {
     "id", "opacity", "progress", "layer", "isolate", "mask", "blend", "blur", "shadow"};
+
+// Pushes a table of the options at 2 that names lists, as the style a part attaches with, and
+// returns its index.
+template<size_t N>
+static int _pickOptions(lua_State* lua, const char* const (&names)[N])
+{
+    lua_createtable(lua, 0, static_cast<int>(N));
+    auto style = lua_gettop(lua);
+    for (auto name : names) {
+        lua_getfield(lua, 2, name);
+        lua_setfield(lua, style, name);
+    }
+    return style;
+}
+
+// Pushes the id option at 2 and returns it, or nullptr when it is not a string; the stack keeps
+// it while the parts of a group take their names from it.
+static const char* _pushId(lua_State* lua)
+{
+    lua_getfield(lua, 2, "id");
+    return lua_type(lua, -1) == LUA_TSTRING ? lua_tostring(lua, -1) : nullptr;
+}
+
+// Names the style at index after the group whose id is id: id/first, or id/first/second when
+// second is set. Without an id the style stays unnamed.
+static void _childId(lua_State* lua, int index, const char* id, uint32_t first, uint32_t second = 0)
+{
+    if (!id) return;
+    index = lua_absindex(lua, index);
+    if (second) lua_pushfstring(lua, "%s/%d/%d", id, static_cast<int>(first), static_cast<int>(second));
+    else lua_pushfstring(lua, "%s/%d", id, static_cast<int>(first));
+    lua_setfield(lua, index, "id");
+}
+
+// Attaches the typeset group of a spans row, code block, matrix or table, with the row styles of
+// the options at 2 and model, unless null, as its transform. Leaves its handle on the stack.
+static Group* _typeset(lua_State* lua, const LuaSpace& space, const char* name, const Mat4* model = nullptr)
+{
+    auto style = _pickOptions(lua, ROW_STYLES);
+    auto owner = _owner(lua, space.scene);
+    auto group = Group::gen();
+    if (group) {
+        group->typeset = true;
+        if (model) group->model = *model;
+    }
+    _add(lua, space, owner, group, style, name);
+    return group;
+}
 
 // Spans hold only texts, which take a color but no stroke or outline.
 static void _spanOption(lua_State* lua, const char* name)
@@ -1315,8 +1370,7 @@ static Text* _spanText(lua_State* lua, LuaScene* box, int row, int part, const c
 {
     lua_pushlstring(lua, value, length);
     auto owner = _owner(lua, box);
-    auto text = Text::gen(lua_tostring(lua, -2), {});
-    owner->object = text;
+    auto text = _adopt(owner, Text::gen(lua_tostring(lua, -2), {}));
     lua_remove(lua, -2);
     if (!text) luaL_error(lua, "could not create span: out of memory");
     text->orientation = orientation;
@@ -1332,6 +1386,26 @@ static Text* _spanText(lua_State* lua, LuaScene* box, int row, int part, const c
     }
     lua_pop(lua, 1);
     return text;
+}
+
+// A blank in the style of a row, block or grid: the advance of a space and the height of a line,
+// and the role and size the options give its texts.
+struct LuaBlank
+{
+    TextExtent extent;
+    TextRole role = TextRole::Text;
+    float size = 0.0f;
+};
+
+// Measures a blank in the style of the options at 2, in the code role when code is set, as the
+// tokens of a code block take it.
+static LuaBlank _blank(lua_State* lua, LuaScene* box, TextOrientation orientation, bool code = false)
+{
+    auto text = _spanText(lua, box, 2, 0, " ", 1, orientation);
+    if (code) text->role = TextRole::Code;
+    LuaBlank blank{_measured(lua, box->scene, text), text->role, text->size};
+    lua_pop(lua, 1);
+    return blank;
 }
 
 // The style table a span attaches with: the part's style options, and the row's color and
@@ -1362,12 +1436,6 @@ static void _spanStyle(lua_State* lua, int row, int part)
         lua_getfield(lua, row, "layer");
         lua_setfield(lua, style, "layer");
     }
-}
-
-// Measures a span, or stops the script with the reason.
-static void _spanMeasure(lua_State* lua, Scene* scene, LuaSpan& span)
-{
-    span.extent = _measured(lua, scene, span.text);
 }
 
 // Pushes the maker a module gave the parts that hold a key of the part table at index, such as
@@ -1420,12 +1488,50 @@ static void _spanSetting(lua_State* lua, int row, int part, TextOrientation orie
     lua_setfield(lua, -2, "orientation");
 }
 
-// A number a part's maker returned, which must be finite.
-static float _spanNumber(lua_State* lua, int index, const char* key)
+// Reads the box a module's maker measured into extent as one line: the width, ascent, descent,
+// top and bottom above at, then place. Returns whether the width, ascent and descent are finite,
+// neither the width nor the line is negative, and place is a function.
+static bool _makerBox(lua_State* lua, int at, TextExtent& extent)
 {
-    auto value = lua_type(lua, index) == LUA_TNUMBER ? static_cast<float>(lua_tonumber(lua, index)) : NAN;
-    if (!std::isfinite(value)) luaL_error(lua, "the %s part of spans measured no box", key);
-    return value;
+    auto number = [&](int offset) {
+        auto index = at + offset;
+        return lua_type(lua, index) == LUA_TNUMBER ? static_cast<float>(lua_tonumber(lua, index)) : NAN;
+    };
+    extent.width = number(1);
+    extent.ascent = number(2);
+    extent.descent = number(3);
+    extent.top = number(4);
+    extent.bottom = number(5);
+    extent.height = extent.ascent + extent.descent;
+    extent.right = extent.width;
+    extent.lines = 1u;
+    return std::isfinite(extent.width) && std::isfinite(extent.ascent) && std::isfinite(extent.descent)
+           && !(extent.width < 0.0f) && !(extent.height < 0.0f) && lua_isfunction(lua, at + 6);
+}
+
+// Calls place(row, style, x, y, z), on top of the stack, which a module's maker returned to draw
+// its box at at and attach it below the row whose handle is at index; what names the box in the
+// message when it attaches other than one object.
+static void _place(lua_State* lua, Group* row, int index, int style, const Vec3& at, const char* what)
+{
+    auto children = row->childCount();
+    lua_pushvalue(lua, index);
+    lua_pushvalue(lua, style);
+    lua_pushnumber(lua, at.x);
+    lua_pushnumber(lua, at.y);
+    lua_pushnumber(lua, at.z);
+    detail::luaCall(lua, 5, 1);
+    if (row->childCount() != children + 1u) luaL_error(lua, "%s must attach one object below its row", what);
+}
+
+// Sets text with the left end of its baseline at at, in a box as wide as its advance and as tall
+// as its line, so that bounds and layout see the line.
+static void _setOnBaseline(Text* text, const TextExtent& extent, const Vec3& at)
+{
+    auto height = extent.ascent + extent.descent;
+    text->point = at;
+    text->align = {0.0f, height > 0.0f ? extent.ascent / height : 0.0f};
+    text->box = {extent.width, height};
 }
 
 // Whether no line may break between the span at i and the one before it: a box holds on to
@@ -1472,11 +1578,7 @@ static int _spans(lua_State* lua)
     auto orientation = _textOrientation(lua, 2);
 
     // The blank a space leaves, and the line a blank line takes, in the row's own style.
-    lua_createtable(lua, 1, 0);
-    auto blankText = _spanText(lua, space.scene, 2, 0, " ", 1, orientation);
-    auto blank = _measured(lua, scene, blankText);
-    lua_rawseti(lua, -2, 1);
-    lua_pop(lua, 1);
+    auto blank = _blank(lua, space.scene, orientation).extent;
 
     uint32_t capacity = 16;
     auto spans = static_cast<LuaSpan*>(lua_newuserdatauv(lua, sizeof(LuaSpan) * capacity, 0));
@@ -1489,9 +1591,7 @@ static int _spans(lua_State* lua)
     uint32_t breaks = 0;
     uint32_t feeds = 0;
     auto gap = 0.0f;
-    // The row's id, kept on the stack while the texts take their names from it.
-    lua_getfield(lua, 2, "id");
-    auto rowId = lua_type(lua, -1) == LUA_TSTRING ? lua_tostring(lua, -1) : nullptr;
+    auto rowId = _pushId(lua);
     auto next = [&]() -> LuaSpan& {
         if (spanCount == LUA_OBJECT_LIMIT) {
             luaL_error(lua, "spans would make more than %d texts", static_cast<int>(LUA_OBJECT_LIMIT));
@@ -1511,10 +1611,7 @@ static int _spans(lua_State* lua)
         lua_getfield(lua, -1, "id");
         auto named = !lua_isnil(lua, -1);
         lua_pop(lua, 1);
-        if (!named && rowId) {
-            lua_pushfstring(lua, "%s/%d", rowId, static_cast<int>(spanCount + 1));
-            lua_setfield(lua, -2, "id");
-        }
+        if (!named) _childId(lua, -1, rowId, spanCount + 1);
         lua_rawseti(lua, styles, spanCount + 1);
     };
     // Counts the span with its rise and the blanks and line feeds before it.
@@ -1535,7 +1632,7 @@ static int _spans(lua_State* lua)
         span.trail = value[length - 1u] == ' ' || value[length - 1u] == '\t';
         lua_rawseti(lua, handles, spanCount + 1);
         style(part);
-        _spanMeasure(lua, scene, span);
+        span.extent = _measured(lua, scene, span.text);
         tally(span, part);
     };
     // A box a module makes with the maker on top of the stack, which keeps what place needs.
@@ -1549,18 +1646,11 @@ static int _spans(lua_State* lua)
         _spanSetting(lua, 2, part, orientation);
         detail::luaCall(lua, 3, 6);
         auto& extent = span.extent;
-        extent.width = _spanNumber(lua, maker + 1, key);
-        extent.ascent = _spanNumber(lua, maker + 2, key);
-        extent.descent = _spanNumber(lua, maker + 3, key);
-        extent.top = _spanNumber(lua, maker + 4, key);
-        extent.bottom = _spanNumber(lua, maker + 5, key);
-        if (extent.width < 0.0f || extent.ascent + extent.descent < 0.0f || extent.bottom > extent.top
-            || !lua_isfunction(lua, maker + 6)) {
+        // Spans also set lines apart by the ink, so it must lie from top down to bottom.
+        if (!_makerBox(lua, maker, extent) || !std::isfinite(extent.top) || !std::isfinite(extent.bottom)
+            || extent.bottom > extent.top) {
             luaL_error(lua, "the %s part of spans measured no box", key);
         }
-        extent.height = extent.ascent + extent.descent;
-        extent.right = extent.width;
-        extent.lines = 1u;
         lua_rawseti(lua, handles, spanCount + 1);
         lua_settop(lua, maker);
         style(part);
@@ -1705,23 +1795,11 @@ static int _spans(lua_State* lua)
             span.at = {lineLeft + span.x, baseline + span.rise, point.z};
             continue;
         }
-        auto boxHeight = span.extent.ascent + span.extent.descent;
-        span.text->point = {lineLeft + span.x, baseline + span.rise, point.z};
-        span.text->align = {0.0f, boxHeight > 0.0f ? span.extent.ascent / boxHeight : 0.0f};
-        span.text->box = {span.extent.width, boxHeight};
+        _setOnBaseline(span.text, span.extent, {lineLeft + span.x, baseline + span.rise, point.z});
     }
 
     // The group takes the row's id and layer options; its texts and boxes follow it in order.
-    lua_createtable(lua, 0, 4);
-    auto groupStyle = lua_gettop(lua);
-    for (auto name : ROW_STYLES) {
-        lua_getfield(lua, 2, name);
-        lua_setfield(lua, groupStyle, name);
-    }
-    auto owner = _owner(lua, space.scene);
-    auto group = Group::gen();
-    if (group) group->typeset = true;
-    _add(lua, space, owner, group, groupStyle, "spans");
+    auto group = _typeset(lua, space, "spans");
     auto result = lua_gettop(lua);
     LuaSpace inside{space.scene, group};
     for (auto i = 0u; i < spanCount; i++) {
@@ -1734,15 +1812,7 @@ static int _spans(lua_State* lua)
             lua_settop(lua, result);
             continue;
         }
-        // place(row, style, x, y, z) attaches the box below the row.
-        auto children = group->childCount();
-        lua_pushvalue(lua, result);
-        lua_pushvalue(lua, style);
-        lua_pushnumber(lua, span.at.x);
-        lua_pushnumber(lua, span.at.y);
-        lua_pushnumber(lua, span.at.z);
-        detail::luaCall(lua, 5, 1);
-        if (group->childCount() != children + 1u) return luaL_error(lua, "a spans box must attach one object below its row");
+        _place(lua, group, result, style, span.at, "a spans box");
         lua_settop(lua, result);
     }
     return 1;
@@ -1866,11 +1936,7 @@ static void _codeRemember(lua_State* lua, int block)
     lua_createtable(lua, 0, 2);
     lua_getfield(lua, 2, "text");
     lua_setfield(lua, -2, "text");
-    lua_createtable(lua, 0, static_cast<int>(sizeof(CODE_KEPT) / sizeof(CODE_KEPT[0])));
-    for (auto name : CODE_KEPT) {
-        lua_getfield(lua, 2, name);
-        lua_setfield(lua, -2, name);
-    }
+    _pickOptions(lua, CODE_KEPT);
     lua_setfield(lua, -2, "options");
     lua_rawset(lua, -3);
     lua_pop(lua, 2);
@@ -1918,12 +1984,7 @@ static int _codeBlock(lua_State* lua, const Mat4& model)
     auto palette = lua_gettop(lua);
 
     // The advance of a space and the height of a line, in the block's own font.
-    lua_createtable(lua, 1, 0);
-    auto blankText = _spanText(lua, space.scene, 2, 0, " ", 1, orientation);
-    blankText->role = TextRole::Code;
-    auto blank = _measured(lua, scene, blankText);
-    lua_rawseti(lua, -2, 1);
-    lua_pop(lua, 1);
+    auto blank = _blank(lua, space.scene, orientation, true).extent;
 
     // A line feed at the very end closes the last line rather than opening another.
     if (length && source[length - 1u] == '\n') length--;
@@ -1949,9 +2010,7 @@ static int _codeBlock(lua_State* lua, const Mat4& model)
     auto handles = lua_gettop(lua);
     lua_createtable(lua, 0, 0);
     auto styles = lua_gettop(lua);
-    // The block's id, kept on the stack while its lines and tokens take their names from it.
-    lua_getfield(lua, 2, "id");
-    auto blockId = lua_type(lua, -1) == LUA_TSTRING ? lua_tostring(lua, -1) : nullptr;
+    auto blockId = _pushId(lua);
     uint32_t tokenCount = 0;
     CodeState state;
     auto line = source;
@@ -1992,10 +2051,7 @@ static int _codeBlock(lua_State* lua, const Mat4& model)
             // A group's layer orders no drawings below it, so every token takes the block's.
             lua_getfield(lua, 2, "layer");
             lua_setfield(lua, -2, "layer");
-            if (blockId) {
-                lua_pushfstring(lua, "%s/%d/%d", blockId, static_cast<int>(row + 1u), static_cast<int>(i + 1u));
-                lua_setfield(lua, -2, "id");
-            }
+            _childId(lua, -1, blockId, row + 1u, i + 1u);
             lua_rawseti(lua, styles, tokenCount + 1);
             token.extent = _measured(lua, scene, token.text);
             token.line = row;
@@ -2019,35 +2075,17 @@ static int _codeBlock(lua_State* lua, const Mat4& model)
     for (auto i = 0u; i < tokenCount; i++) {
         auto& token = tokens[i];
         auto baseline = (pinned ? point.y : top - blank.ascent) - static_cast<float>(token.line) * pitch;
-        auto boxHeight = token.extent.ascent + token.extent.descent;
-        token.text->point = {left + token.x, baseline, point.z};
-        token.text->align = {0.0f, boxHeight > 0.0f ? token.extent.ascent / boxHeight : 0.0f};
-        token.text->box = {token.extent.width, boxHeight};
+        _setOnBaseline(token.text, token.extent, {left + token.x, baseline, point.z});
     }
 
     // The block takes the id and layer options; its lines follow it in order, blank ones too.
-    lua_createtable(lua, 0, 4);
-    auto blockStyle = lua_gettop(lua);
-    for (auto name : ROW_STYLES) {
-        lua_getfield(lua, 2, name);
-        lua_setfield(lua, blockStyle, name);
-    }
-    auto owner = _owner(lua, space.scene);
-    auto block = Group::gen();
-    if (block) {
-        block->typeset = true;
-        block->model = model;
-    }
-    _add(lua, space, owner, block, blockStyle, "code");
+    auto block = _typeset(lua, space, "code", &model);
     auto result = lua_gettop(lua);
     LuaSpace inside{space.scene, block};
     auto next = 0u;
     for (auto row = 0u; row < lineCount; row++) {
         lua_createtable(lua, 0, 1);
-        if (blockId) {
-            lua_pushfstring(lua, "%s/%d", blockId, static_cast<int>(row + 1u));
-            lua_setfield(lua, -2, "id");
-        }
+        _childId(lua, -1, blockId, row + 1u);
         auto lineStyle = lua_gettop(lua);
         auto lineOwner = _owner(lua, space.scene);
         auto lineGroup = Group::gen();
@@ -2562,6 +2600,20 @@ static int _gridDecimals(lua_State* lua, int index)
     return static_cast<int>(decimals);
 }
 
+// The spacing the field name of the options at 2 sets on both axes, one number for both or
+// {x, y} of zero or more, or fallback without it.
+static Vec2 _fieldSpacing(lua_State* lua, const char* name, Vec2 fallback)
+{
+    lua_getfield(lua, 2, name);
+    if (lua_type(lua, -1) == LUA_TNUMBER) fallback.x = fallback.y = static_cast<float>(lua_tonumber(lua, -1));
+    else if (!lua_isnil(lua, -1)) fallback = _vec2(lua, -1, name);
+    lua_pop(lua, 1);
+    if (!std::isfinite(fallback.x) || !std::isfinite(fallback.y) || fallback.x < 0.0f || fallback.y < 0.0f) {
+        luaL_error(lua, "%s must be a number or {x, y} of zero or more", name);
+    }
+    return fallback;
+}
+
 // The theme's style of a text role.
 static const TextTheme& _roleTheme(const Theme& theme, TextRole role)
 {
@@ -2589,11 +2641,9 @@ enum struct LuaBrackets : uint8_t
 // set as inline math, as a cell of a TeX matrix is; without it, as text.
 static int _matrixGen(lua_State* lua)
 {
-    auto space = _space(lua);
-    luaL_checktype(lua, 2, LUA_TTABLE);
-    _options(lua, 2, {"rows", "point", "align", "brackets", "gap", "justify", "decimals", "size", "font", "role", "reserve", "tabular",
-                      "orientation", "id", "color", "fill", "stroke", "width", "opacity", "progress", "layer",
-                      "isolate", "mask", "blend", "blur", "shadow"}, false);
+    auto space = _factory(lua, {"rows", "point", "align", "brackets", "gap", "justify", "decimals", "size", "font",
+                                "role", "reserve", "tabular", "orientation", "id", "color", "fill", "stroke", "width",
+                                "opacity", "progress", "layer", "isolate", "mask", "blend", "blur", "shadow"}, false);
     auto scene = space.scene->scene;
     lua_getfield(lua, 2, "rows");
     auto list = lua_gettop(lua);
@@ -2611,22 +2661,12 @@ static int _matrixGen(lua_State* lua)
     _justify(lua, 2, "matrix", justify, columns);
 
     // The line a blank takes in the matrix's own style sets the spacing and the brackets.
-    lua_createtable(lua, 1, 0);
-    auto blankText = _spanText(lua, space.scene, 2, 0, " ", 1, orientation);
-    auto blank = _measured(lua, scene, blankText);
-    auto role = blankText->role;
-    auto pixels = blankText->size > 0.0f ? blankText->size : _roleTheme(scene->theme(), role).size;
-    lua_rawseti(lua, -2, 1);
-    lua_pop(lua, 1);
+    auto measured = _blank(lua, space.scene, orientation);
+    auto& blank = measured.extent;
+    auto role = measured.role;
+    auto pixels = measured.size > 0.0f ? measured.size : _roleTheme(scene->theme(), role).size;
     auto line = blank.ascent + blank.descent;
-    auto gap = Vec2{line, 0.5f * line};
-    lua_getfield(lua, 2, "gap");
-    if (lua_type(lua, -1) == LUA_TNUMBER) gap.x = gap.y = static_cast<float>(lua_tonumber(lua, -1));
-    else if (!lua_isnil(lua, -1)) gap = _vec2(lua, -1, "gap");
-    lua_pop(lua, 1);
-    if (!std::isfinite(gap.x) || !std::isfinite(gap.y) || gap.x < 0.0f || gap.y < 0.0f) {
-        return luaL_error(lua, "gap must be a number or {x, y} of zero or more");
-    }
+    auto gap = _fieldSpacing(lua, "gap", {line, 0.5f * line});
 
     auto count = rows * columns;
     auto entries = static_cast<LuaGridEntry*>(lua_newuserdatauv(lua, sizeof(LuaGridEntry) * count, 0));
@@ -2634,9 +2674,7 @@ static int _matrixGen(lua_State* lua)
     auto handles = lua_gettop(lua);
     lua_createtable(lua, static_cast<int>(count), 0);
     auto styles = lua_gettop(lua);
-    // The matrix's id, kept on the stack while its rows and entries take their names from it.
-    lua_getfield(lua, 2, "id");
-    auto matrixId = lua_type(lua, -1) == LUA_TSTRING ? lua_tostring(lua, -1) : nullptr;
+    auto matrixId = _pushId(lua);
     // The maker the tex module gave spans, which sets a string entry as a formula, or nil.
     lua_getfield(lua, LUA_REGISTRYINDEX, SPAN_PART_REGISTRY);
     lua_getfield(lua, -1, "tex");
@@ -2662,22 +2700,7 @@ static int _matrixGen(lua_State* lua)
                 lua_setfield(lua, -2, "tex");
                 _spanSetting(lua, 2, 0, orientation);
                 detail::luaCall(lua, 3, 6);
-                auto& extent = entry.extent;
-                auto number = [&](int at) {
-                    return lua_type(lua, at) == LUA_TNUMBER ? static_cast<float>(lua_tonumber(lua, at)) : NAN;
-                };
-                extent.width = number(top + 1);
-                extent.ascent = number(top + 2);
-                extent.descent = number(top + 3);
-                extent.top = number(top + 4);
-                extent.bottom = number(top + 5);
-                if (!std::isfinite(extent.width) || !std::isfinite(extent.ascent) || !std::isfinite(extent.descent)
-                    || extent.width < 0.0f || extent.ascent + extent.descent < 0.0f || !lua_isfunction(lua, top + 6)) {
-                    luaL_error(lua, "a tex entry of matrix measured no box");
-                }
-                extent.height = extent.ascent + extent.descent;
-                extent.right = extent.width;
-                extent.lines = 1u;
+                if (!_makerBox(lua, top, entry.extent)) luaL_error(lua, "a tex entry of matrix measured no box");
                 entry.box = true;
                 lua_replace(lua, top);
                 lua_settop(lua, top);
@@ -2687,10 +2710,7 @@ static int _matrixGen(lua_State* lua)
             lua_rawseti(lua, handles, i + 1u);
             lua_pop(lua, 1);
             _spanStyle(lua, 2, 0);
-            if (matrixId) {
-                lua_pushfstring(lua, "%s/%d/%d", matrixId, static_cast<int>(r + 1u), static_cast<int>(c + 1u));
-                lua_setfield(lua, -2, "id");
-            }
+            _childId(lua, -1, matrixId, r + 1u, c + 1u);
             lua_rawseti(lua, styles, i + 1u);
             if (entry.text) {
                 entry.text->tabular = _fieldBool(lua, 2, "tabular", false);
@@ -2772,24 +2792,12 @@ static int _matrixGen(lua_State* lua)
     }
 
     // The group takes the id and layer options; its rows follow it in order, then the brackets.
-    lua_createtable(lua, 0, 9);
-    auto groupStyle = lua_gettop(lua);
-    for (auto name : ROW_STYLES) {
-        lua_getfield(lua, 2, name);
-        lua_setfield(lua, groupStyle, name);
-    }
-    auto owner = _owner(lua, space.scene);
-    auto group = Group::gen();
-    if (group) group->typeset = true;
-    _add(lua, space, owner, group, groupStyle, "matrix");
+    auto group = _typeset(lua, space, "matrix");
     auto result = lua_gettop(lua);
     LuaSpace inside{space.scene, group};
     for (auto r = 0u; r < rows; r++) {
         lua_createtable(lua, 0, 1);
-        if (matrixId) {
-            lua_pushfstring(lua, "%s/%d", matrixId, static_cast<int>(r + 1u));
-            lua_setfield(lua, -2, "id");
-        }
+        _childId(lua, -1, matrixId, r + 1u);
         auto rowStyle = lua_gettop(lua);
         auto rowGroup = Group::gen();
         _add(lua, inside, _owner(lua, space.scene), rowGroup, rowStyle, "matrix row");
@@ -2802,16 +2810,7 @@ static int _matrixGen(lua_State* lua)
             lua_rawgeti(lua, handles, i + 1u);
             auto& entry = entries[i];
             if (entry.box) {
-                auto children = rowGroup ? rowGroup->childCount() : 0u;
-                lua_pushvalue(lua, rowTop);
-                lua_pushvalue(lua, style);
-                lua_pushnumber(lua, entry.at.x);
-                lua_pushnumber(lua, entry.at.y);
-                lua_pushnumber(lua, entry.at.z);
-                detail::luaCall(lua, 5, 1);
-                if (!rowGroup || rowGroup->childCount() != children + 1u) {
-                    return luaL_error(lua, "a tex entry of matrix must attach one object below its row");
-                }
+                _place(lua, rowGroup, rowTop, style, entry.at, "a tex entry of matrix");
             } else {
                 _add(lua, members, static_cast<LuaObject*>(lua_touserdata(lua, -1)), entry.text, style, "matrix entry");
             }
@@ -2894,11 +2893,10 @@ enum struct LuaRules : uint8_t
 // entries, then the stripes behind every second row below the header and then the rules.
 static int _tableGen(lua_State* lua)
 {
-    auto space = _space(lua);
-    luaL_checktype(lua, 2, LUA_TTABLE);
-    _options(lua, 2, {"rows", "header", "point", "align", "padding", "justify", "decimals", "stripes", "rules", "size",
-                      "font", "role", "orientation", "id", "color", "fill", "stroke", "width", "opacity", "progress",
-                      "layer", "isolate", "mask", "blend", "blur", "shadow"}, false);
+    auto space = _factory(lua, {"rows", "header", "point", "align", "padding", "justify", "decimals", "stripes",
+                                "rules", "size", "font", "role", "orientation", "id", "color", "fill", "stroke",
+                                "width", "opacity", "progress", "layer", "isolate", "mask", "blend", "blur",
+                                "shadow"}, false);
     auto scene = space.scene->scene;
     auto& theme = scene->theme();
     lua_getfield(lua, 2, "rows");
@@ -2942,20 +2940,9 @@ static int _tableGen(lua_State* lua)
     if (layer < INT32_MIN || layer > INT32_MAX) return luaL_error(lua, "layer is out of range");
 
     // The line a blank takes in the table's own style sets the padding inside the cells.
-    lua_createtable(lua, 1, 0);
-    auto blankText = _spanText(lua, space.scene, 2, 0, " ", 1, orientation);
-    auto blank = _measured(lua, scene, blankText);
-    lua_rawseti(lua, -2, 1);
-    lua_pop(lua, 1);
+    auto blank = _blank(lua, space.scene, orientation).extent;
     auto line = blank.ascent + blank.descent;
-    auto padding = Vec2{0.8f * line, 0.3f * line};
-    lua_getfield(lua, 2, "padding");
-    if (lua_type(lua, -1) == LUA_TNUMBER) padding.x = padding.y = static_cast<float>(lua_tonumber(lua, -1));
-    else if (!lua_isnil(lua, -1)) padding = _vec2(lua, -1, "padding");
-    lua_pop(lua, 1);
-    if (!std::isfinite(padding.x) || !std::isfinite(padding.y) || padding.x < 0.0f || padding.y < 0.0f) {
-        return luaL_error(lua, "padding must be a number or {x, y} of zero or more");
-    }
+    auto padding = _fieldSpacing(lua, "padding", {0.8f * line, 0.3f * line});
 
     auto count = rows * columns;
     auto entries = static_cast<LuaGridEntry*>(lua_newuserdatauv(lua, sizeof(LuaGridEntry) * count, 0));
@@ -2965,9 +2952,7 @@ static int _tableGen(lua_State* lua)
     auto styles = lua_gettop(lua);
     // The header takes the accent color unless the table colors every text.
     auto colored = _has(lua, 2, "color") || _has(lua, 2, "fill");
-    // The table's id, kept on the stack while its rows and entries take their names from it.
-    lua_getfield(lua, 2, "id");
-    auto tableId = lua_type(lua, -1) == LUA_TSTRING ? lua_tostring(lua, -1) : nullptr;
+    auto tableId = _pushId(lua);
     for (auto r = 0u; r < rows; r++) {
         auto heading = headed && r == 0u;
         for (auto c = 0u; c < columns; c++) {
@@ -2984,10 +2969,7 @@ static int _tableGen(lua_State* lua)
                 lua_pushliteral(lua, "accent");
                 lua_setfield(lua, -2, "fill");
             }
-            if (tableId) {
-                lua_pushfstring(lua, "%s/%d/%d", tableId, static_cast<int>(r + 1u), static_cast<int>(c + 1u));
-                lua_setfield(lua, -2, "id");
-            }
+            _childId(lua, -1, tableId, r + 1u, c + 1u);
             lua_rawseti(lua, styles, i + 1u);
             entry.extent = _measured(lua, scene, entry.text);
         }
@@ -3029,24 +3011,12 @@ static int _tableGen(lua_State* lua)
     }
 
     // The group takes the id and layer options; its rows follow it in order.
-    lua_createtable(lua, 0, 9);
-    auto groupStyle = lua_gettop(lua);
-    for (auto name : ROW_STYLES) {
-        lua_getfield(lua, 2, name);
-        lua_setfield(lua, groupStyle, name);
-    }
-    auto owner = _owner(lua, space.scene);
-    auto group = Group::gen();
-    if (group) group->typeset = true;
-    _add(lua, space, owner, group, groupStyle, "table");
+    auto group = _typeset(lua, space, "table");
     auto result = lua_gettop(lua);
     LuaSpace inside{space.scene, group};
     for (auto r = 0u; r < rows; r++) {
         lua_createtable(lua, 0, 1);
-        if (tableId) {
-            lua_pushfstring(lua, "%s/%d", tableId, static_cast<int>(r + 1u));
-            lua_setfield(lua, -2, "id");
-        }
+        _childId(lua, -1, tableId, r + 1u);
         auto rowStyle = lua_gettop(lua);
         auto rowGroup = Group::gen();
         _add(lua, inside, _owner(lua, space.scene), rowGroup, rowStyle, "table row");
@@ -3133,9 +3103,7 @@ static int _tableGen(lua_State* lua)
 
 static int _vector(lua_State* lua)
 {
-    auto space = _space(lua);
-    luaL_checktype(lua, 2, LUA_TTABLE);
-    _options(lua, 2, {"value", "origin", "tail", "tip", "trim_distance"});
+    auto space = _factory(lua, {"value", "origin", "tail", "tip", "trim_distance"});
     auto value = _fieldWorld(lua, 2, "value");
     auto origin = _fieldWorld(lua, 2, "origin", {});
     auto tail = _fieldNumber(lua, 2, "tail", 0.0f);
@@ -3143,8 +3111,7 @@ static int _vector(lua_State* lua)
     if (tail < 0.0f || tip < 0.0f) return luaL_error(lua, "tail and tip must be non-negative");
     auto trimDistance = _trimDistance(lua, 2);
     auto owner = _owner(lua, space.scene);
-    auto object = Vector::gen(value, origin);
-    owner->object = object;
+    auto object = _adopt(owner, Vector::gen(value, origin));
     if (object) {
         object->trimDistance = trimDistance;
         object->tail = tail;
@@ -3155,17 +3122,14 @@ static int _vector(lua_State* lua)
 
 static int _groupGen(lua_State* lua)
 {
-    auto space = _space(lua);
-    luaL_checktype(lua, 2, LUA_TTABLE);
-    _options(lua, 2, {"matrix", "typeset"});
+    auto space = _factory(lua, {"matrix", "typeset"});
     if (_has(lua, 2, "color") || _has(lua, 2, "radius") || _has(lua, 2, "dash")
         || _has(lua, 2, "dash_offset")) {
         return luaL_error(lua, "a group draws nothing itself, so color, radius, dash and dash_offset are unsupported; the stroke, fill and width it sets pass to the shapes below it");
     }
     auto typeset = _fieldBool(lua, 2, "typeset", false);
     auto owner = _owner(lua, space.scene);
-    auto object = Group::gen();
-    owner->object = object;
+    auto object = _adopt(owner, Group::gen());
     if (object) object->typeset = typeset;
     if (object && _has(lua, 2, "matrix")) {
         lua_getfield(lua, 2, "matrix");
@@ -3284,8 +3248,7 @@ static void _spaceLabels(lua_State* lua, LuaScene* scene, Space* space, int inde
                     lua_setfield(lua, style, "id");
                 }
                 auto owner = _owner(lua, scene);
-                auto label = Text::gen(string);
-                owner->object = label;
+                auto label = _adopt(owner, Text::gen(string));
                 if (label) {
                     label->size = size;
                     label->fill(color);
@@ -3324,16 +3287,13 @@ static int _labelsMethod(lua_State* lua)
 
 static int _spaceGen(lua_State* lua)
 {
-    auto space = _space(lua);
-    luaL_checktype(lua, 2, LUA_TTABLE);
-    _options(lua, 2, {"x", "y", "z", "matrix", "axis_x", "axis_y", "axis_z", "numbers", "number_mode", "number_size",
-                      "number_color", "ticks", "tick_length", "labels", "axis_width"});
+    auto space = _factory(lua, {"x", "y", "z", "matrix", "axis_x", "axis_y", "axis_z", "numbers", "number_mode",
+                                "number_size", "number_color", "ticks", "tick_length", "labels", "axis_width"});
     auto x = _fieldRange(lua, 2, "x", {});
     auto y = _fieldRange(lua, 2, "y", {});
     auto z = _fieldRange(lua, 2, "z", {});
     auto owner = _owner(lua, space.scene);
-    auto object = Space::gen(x, y, z);
-    owner->object = object;
+    auto object = _adopt(owner, Space::gen(x, y, z));
     if (object) {
         if (_has(lua, 2, "matrix")) {
             lua_getfield(lua, 2, "matrix");
@@ -3370,9 +3330,7 @@ static int _spaceGen(lua_State* lua)
 
 static int _circle(lua_State* lua)
 {
-    auto space = _space(lua);
-    luaL_checktype(lua, 2, LUA_TTABLE);
-    _options(lua, 2, {"center"});
+    auto space = _factory(lua, {"center"});
     auto center = _fieldWorld(lua, 2, "center", {});
     auto radius = _fieldNumber(lua, 2, "radius", 1.0f);
     auto owner = _owner(lua, space.scene);
@@ -3381,9 +3339,7 @@ static int _circle(lua_State* lua)
 
 static int _arc(lua_State* lua)
 {
-    auto space = _space(lua);
-    luaL_checktype(lua, 2, LUA_TTABLE);
-    _options(lua, 2, {"center", "start", "angle", "sector"});
+    auto space = _factory(lua, {"center", "start", "angle", "sector"});
     auto center = _fieldWorld(lua, 2, "center", {});
     auto radius = _fieldNumber(lua, 2, "radius", 1.0f);
     auto start = _fieldNumber(lua, 2, "start", 0.0f);
@@ -3399,9 +3355,7 @@ static int _arc(lua_State* lua)
 
 static int _angle(lua_State* lua)
 {
-    auto space = _space(lua);
-    luaL_checktype(lua, 2, LUA_TTABLE);
-    _options(lua, 2, {"vertex", "from", "to", "other", "right", "label", "label_distance"});
+    auto space = _factory(lua, {"vertex", "from", "to", "other", "right", "label", "label_distance"});
     auto vertex = _fieldWorld(lua, 2, "vertex", {});
     auto from = _fieldWorld(lua, 2, "from", {1.0f, 0.0f, 0.0f});
     auto to = _fieldWorld(lua, 2, "to", {0.0f, 1.0f, 0.0f});
@@ -3493,9 +3447,7 @@ static Bounds _around(lua_State* lua, const LuaSpace& space, int index, const ch
 
 static int _rectangle(lua_State* lua)
 {
-    auto space = _space(lua);
-    luaL_checktype(lua, 2, LUA_TTABLE);
-    _options(lua, 2, {"center", "size", "corner", "around", "padding"});
+    auto space = _factory(lua, {"center", "size", "corner", "around", "padding"});
     auto center = _fieldWorld(lua, 2, "center", {});
     auto size = _fieldVec2(lua, 2, "size", {1.0f, 1.0f});
     auto corner = _fieldNumber(lua, 2, "corner", 0.0f);
@@ -3504,18 +3456,8 @@ static int _rectangle(lua_State* lua)
         if (_has(lua, 2, "center") || _has(lua, 2, "size")) {
             return luaL_error(lua, "around sets the center and size, so leave out center and size");
         }
-        // The padding grows every side: one number for both axes, or {x, y}.
-        auto padding = Vec2{0.1f, 0.1f};
-        lua_getfield(lua, 2, "padding");
-        if (lua_type(lua, -1) == LUA_TNUMBER) {
-            padding.x = padding.y = static_cast<float>(lua_tonumber(lua, -1));
-        } else if (!lua_isnil(lua, -1)) {
-            padding = _vec2(lua, -1, "padding");
-        }
-        lua_pop(lua, 1);
-        if (!std::isfinite(padding.x) || !std::isfinite(padding.y) || padding.x < 0.0f || padding.y < 0.0f) {
-            return luaL_error(lua, "padding must be a number or {x, y} of zero or more");
-        }
+        // The padding grows every side.
+        auto padding = _fieldSpacing(lua, "padding", {0.1f, 0.1f});
         auto bounds = _around(lua, space, lua_gettop(lua));
         center = bounds.center();
         size = {bounds.max.x - bounds.min.x + 2.0f * padding.x, bounds.max.y - bounds.min.y + 2.0f * padding.y};
@@ -3564,9 +3506,7 @@ static int _boundsOf(lua_State* lua)
 
 static int _polygon(lua_State* lua)
 {
-    auto space = _space(lua);
-    luaL_checktype(lua, 2, LUA_TTABLE);
-    _options(lua, 2, {"points"});
+    auto space = _factory(lua, {"points"});
     lua_getfield(lua, 2, "points");
     if (lua_isnil(lua, -1)) return luaL_error(lua, "missing field 'points'");
     uint32_t count;
@@ -4167,9 +4107,7 @@ static void _plotRemember(lua_State* lua, int index, const LuaPlotCut& cut, cons
 
 static int _plot(lua_State* lua)
 {
-    auto space = _space(lua);
-    luaL_checktype(lua, 2, LUA_TTABLE);
-    _options(lua, 2, {"points", "fn", "x_range", "y_range", "discontinuities", "endpoint_radius"});
+    auto space = _factory(lua, {"points", "fn", "x_range", "y_range", "discontinuities", "endpoint_radius"});
     auto endpointRadius = _fieldNumber(lua, 2, "endpoint_radius", 0.0f);
     if (endpointRadius < 0.0f) return luaL_error(lua, "endpoint_radius must be zero or more");
     lua_settop(lua, 2);
@@ -4294,9 +4232,7 @@ static void _sampled(lua_State* lua, const LuaFunction& function)
 // base, a number or a second function, sampled every step from a to b, as a polygon.
 static int _area(lua_State* lua)
 {
-    auto space = _space(lua);
-    luaL_checktype(lua, 2, LUA_TTABLE);
-    _options(lua, 2, {"fn", "x_range", "base"});
+    auto space = _factory(lua, {"fn", "x_range", "base"});
     lua_getfield(lua, 2, "fn");
     if (!lua_isfunction(lua, -1)) return luaL_error(lua, "area requires fn, a function");
     auto fn = lua_gettop(lua);
@@ -4334,9 +4270,7 @@ static int _area(lua_State* lua)
 // The shapes stay as they are; the path is measured from where they stand as authored.
 static int _region(lua_State* lua, PathOperation operation, const char* name)
 {
-    auto space = _space(lua);
-    luaL_checktype(lua, 2, LUA_TTABLE);
-    _options(lua, 2, {"of"});
+    auto space = _factory(lua, {"of"});
     lua_getfield(lua, 2, "of");
     if (!lua_istable(lua, -1)) return luaL_error(lua, "%s requires of, a list of shapes", name);
     auto count = lua_rawlen(lua, -1);
@@ -4397,11 +4331,9 @@ static constexpr const char* RIEMANN_SHAPE_STYLES[] = {
 // values gives the heights instead, one per step.
 static int _riemann(lua_State* lua)
 {
-    auto space = _space(lua);
-    luaL_checktype(lua, 2, LUA_TTABLE);
-    _options(lua, 2, {"fn", "values", "x_range", "sample", "negative", "id", "color", "stroke", "fill", "gradient",
-                      "width", "dash", "dash_offset", "opacity", "progress", "layer", "isolate", "mask", "blend",
-                      "blur", "shadow"}, false);
+    auto space = _factory(lua, {"fn", "values", "x_range", "sample", "negative", "id", "color", "stroke", "fill",
+                                "gradient", "width", "dash", "dash_offset", "opacity", "progress", "layer", "isolate",
+                                "mask", "blend", "blur", "shadow"}, false);
     lua_getfield(lua, 2, "x_range");
     if (lua_isnil(lua, -1)) return luaL_error(lua, "riemann requires x_range");
     auto range = _range(lua, -1, "x_range");
@@ -4454,33 +4386,19 @@ static int _riemann(lua_State* lua)
     }
 
     // The group takes the id, opacity, and layer options; its rectangles follow it in order.
-    lua_createtable(lua, 0, 9);
-    auto groupStyle = lua_gettop(lua);
-    for (auto name : ROW_STYLES) {
-        lua_getfield(lua, 2, name);
-        lua_setfield(lua, groupStyle, name);
-    }
+    auto groupStyle = _pickOptions(lua, ROW_STYLES);
     _style(lua, space.scene->scene, group, groupStyle);
-    lua_getfield(lua, 2, "id");
-    auto groupId = lua_type(lua, -1) == LUA_TSTRING ? lua_tostring(lua, -1) : nullptr;
+    auto groupId = _pushId(lua);
     auto negative = _has(lua, 2, "negative");
     for (auto i = 0u; i < steps; i++) {
         auto top = lua_gettop(lua);
-        lua_createtable(lua, 0, 9);
-        auto style = lua_gettop(lua);
-        for (auto name : RIEMANN_SHAPE_STYLES) {
-            lua_getfield(lua, 2, name);
-            lua_setfield(lua, style, name);
-        }
+        auto style = _pickOptions(lua, RIEMANN_SHAPE_STYLES);
         auto bar = static_cast<Rectangle*>(group->childAt(i));
         if (negative && bar->center.y < 0.0f) {
             lua_getfield(lua, 2, "negative");
             lua_setfield(lua, style, "fill");
         }
-        if (groupId) {
-            lua_pushfstring(lua, "%s/%d", groupId, static_cast<int>(i + 1u));
-            lua_setfield(lua, style, "id");
-        }
+        _childId(lua, style, groupId, i + 1u);
         _style(lua, space.scene->scene, bar, style);
         lua_settop(lua, top);
     }
@@ -4622,11 +4540,9 @@ static void _contourRemember(lua_State* lua, int index, const Range& xRange, con
 // One plot per level, with all its connected pieces, in the order levels gives.
 static int _contour(lua_State* lua)
 {
-    auto space = _space(lua);
-    luaL_checktype(lua, 2, LUA_TTABLE);
-    _options(lua, 2, {"fn", "values", "levels", "x_range", "y_range", "colors", "id", "color", "stroke",
-                      "width", "dash", "dash_offset", "opacity", "progress", "layer", "isolate", "mask",
-                      "blend", "blur", "shadow", "labels"}, false);
+    auto space = _factory(lua, {"fn", "values", "levels", "x_range", "y_range", "colors", "id", "color", "stroke",
+                                "width", "dash", "dash_offset", "opacity", "progress", "layer", "isolate", "mask",
+                                "blend", "blur", "shadow", "labels"}, false);
     ContourLabelOptions labelOptions;
     lua_getfield(lua, 2, "labels");
     auto labels = !lua_isnil(lua, -1) && !(lua_isboolean(lua, -1) && !lua_toboolean(lua, -1));
@@ -4737,14 +4653,8 @@ static int _contour(lua_State* lua)
     }
     // Grid samples and retained vertices share the point budget; callbacks use the Lua hook.
     _spend(space.scene, {0, 0, count});
-    lua_createtable(lua, 0, 9);
-    auto groupStyle = lua_gettop(lua);
-    for (auto name : ROW_STYLES) {
-        lua_getfield(lua, 2, name);
-        lua_setfield(lua, groupStyle, name);
-    }
-    lua_getfield(lua, 2, "id");
-    auto groupId = lua_type(lua, -1) == LUA_TSTRING ? lua_tostring(lua, -1) : nullptr;
+    auto groupStyle = _pickOptions(lua, ROW_STYLES);
+    auto groupId = _pushId(lua);
     auto groupOwner = _owner(lua, space.scene);
     auto group = Group::gen();
     _add(lua, space, groupOwner, group, groupStyle, "contour");
@@ -4758,10 +4668,7 @@ static int _contour(lua_State* lua)
             lua_getfield(lua, 2, name);
             lua_setfield(lua, style, name);
         }
-        if (groupId) {
-            lua_pushfstring(lua, "%s/%d", groupId, static_cast<int>(i + 1u));
-            lua_setfield(lua, style, "id");
-        }
+        _childId(lua, style, groupId, i + 1u);
         auto owner = _owner(lua, space.scene);
         Plot* plot = nullptr;
         auto result = Plot::contour(xRange, yRange, values, count, levels[i], plot,
@@ -4894,20 +4801,9 @@ static void _styleField(lua_State* lua, LuaScene* scene, Group* group, const cha
 {
     for (auto i = 0u; i < group->childCount(); i++) {
         auto top = lua_gettop(lua);
-        lua_createtable(lua, 0, 7);
-        auto style = lua_gettop(lua);
-        for (auto name : FIELD_SHAPE_STYLES) {
-            lua_getfield(lua, 2, name);
-            lua_setfield(lua, style, name);
-        }
-        if (groupId && columns) {
-            lua_pushfstring(lua, "%s/%d/%d", groupId, static_cast<int>(indices[i] % columns + 1u),
-                            static_cast<int>(indices[i] / columns + 1u));
-            lua_setfield(lua, style, "id");
-        } else if (groupId) {
-            lua_pushfstring(lua, "%s/%d", groupId, static_cast<int>(indices[i] + 1u));
-            lua_setfield(lua, style, "id");
-        }
+        auto style = _pickOptions(lua, FIELD_SHAPE_STYLES);
+        if (columns) _childId(lua, style, groupId, indices[i] % columns + 1u, indices[i] / columns + 1u);
+        else _childId(lua, style, groupId, indices[i] + 1u);
         _style(lua, scene->scene, group->childAt(i), style);
         lua_settop(lua, top);
     }
@@ -4917,11 +4813,9 @@ static void _styleField(lua_State* lua, LuaScene* scene, Group* group, const cha
 // Lengths saturate or scale as configured; colors follow magnitude.
 static int _vectorField(lua_State* lua)
 {
-    auto space = _space(lua);
-    luaL_checktype(lua, 2, LUA_TTABLE);
-    _options(lua, 2, {"fn", "values", "x_range", "y_range", "length", "scale", "anchor", "colors", "magnitude", "tip",
-                      "id", "color", "stroke", "width", "dash", "dash_offset", "opacity", "progress", "layer",
-                      "isolate", "mask", "blend", "blur", "shadow"}, false);
+    auto space = _factory(lua, {"fn", "values", "x_range", "y_range", "length", "scale", "anchor", "colors",
+                                "magnitude", "tip", "id", "color", "stroke", "width", "dash", "dash_offset", "opacity",
+                                "progress", "layer", "isolate", "mask", "blend", "blur", "shadow"}, false);
     auto& theme = space.scene->scene->theme();
     lua_getfield(lua, 2, "x_range");
     if (lua_isnil(lua, -1)) return luaL_error(lua, "vector_field requires x_range");
@@ -5003,15 +4897,9 @@ static int _vectorField(lua_State* lua)
     if (status != Result::Success) return luaL_error(lua, "could not create vector field: %s", _explain(status));
 
     // The group takes the id, opacity, and layer options; its arrows follow it in order.
-    lua_createtable(lua, 0, 9);
-    auto groupStyle = lua_gettop(lua);
-    for (auto name : ROW_STYLES) {
-        lua_getfield(lua, 2, name);
-        lua_setfield(lua, groupStyle, name);
-    }
+    auto groupStyle = _pickOptions(lua, ROW_STYLES);
     _style(lua, space.scene->scene, group, groupStyle);
-    lua_getfield(lua, 2, "id");
-    auto groupId = lua_type(lua, -1) == LUA_TSTRING ? lua_tostring(lua, -1) : nullptr;
+    auto groupId = _pushId(lua);
     _styleField(lua, space.scene, group, groupId, indices, columns);
     lua_pushvalue(lua, handle);
     return _attach(lua, space, owner, group, groupStyle, "vector field");
@@ -5023,11 +4911,9 @@ static constexpr uint32_t LUA_STREAM_STEP_LIMIT = 4096;
 // Each line uses its mean field speed for coloring.
 static int _streamLines(lua_State* lua)
 {
-    auto space = _space(lua);
-    luaL_checktype(lua, 2, LUA_TTABLE);
-    _options(lua, 2, {"fn", "x_range", "y_range", "seeds", "time", "dt", "direction", "colors", "magnitude", "id",
-                      "color", "stroke", "width", "dash", "dash_offset", "opacity", "progress", "layer", "isolate",
-                      "mask", "blend", "blur", "shadow"}, false);
+    auto space = _factory(lua, {"fn", "x_range", "y_range", "seeds", "time", "dt", "direction", "colors", "magnitude",
+                                "id", "color", "stroke", "width", "dash", "dash_offset", "opacity", "progress", "layer",
+                                "isolate", "mask", "blend", "blur", "shadow"}, false);
     auto& theme = space.scene->scene->theme();
     lua_getfield(lua, 2, "fn");
     if (!lua_isfunction(lua, -1)) return luaL_error(lua, "stream_lines requires fn, a function of x and y");
@@ -5118,15 +5004,9 @@ static int _streamLines(lua_State* lua)
     if (status != Result::Success) return luaL_error(lua, "could not create stream lines: %s", _explain(status));
 
     // The group takes the id, opacity, and layer options; its lines follow it in order.
-    lua_createtable(lua, 0, 9);
-    auto groupStyle = lua_gettop(lua);
-    for (auto name : ROW_STYLES) {
-        lua_getfield(lua, 2, name);
-        lua_setfield(lua, groupStyle, name);
-    }
+    auto groupStyle = _pickOptions(lua, ROW_STYLES);
     _style(lua, space.scene->scene, group, groupStyle);
-    lua_getfield(lua, 2, "id");
-    auto groupId = lua_type(lua, -1) == LUA_TSTRING ? lua_tostring(lua, -1) : nullptr;
+    auto groupId = _pushId(lua);
     _styleField(lua, space.scene, group, groupId, indices, 0u);
     lua_pushvalue(lua, handle);
     return _attach(lua, space, owner, group, groupStyle, "stream lines");
@@ -5136,9 +5016,7 @@ static int _streamLines(lua_State* lua)
 
 static int _route(lua_State* lua)
 {
-    auto space = _space(lua);
-    luaL_checktype(lua, 2, LUA_TTABLE);
-    _options(lua, 2, {"points", "tail", "tip"});
+    auto space = _factory(lua, {"points", "tail", "tip"});
     lua_getfield(lua, 2, "points");
     if (lua_isnil(lua, -1)) return luaL_error(lua, "missing field 'points'");
     uint32_t count;
@@ -5150,8 +5028,7 @@ static int _route(lua_State* lua)
         return luaL_error(lua, "tail and tip must be non-negative");
     }
     auto owner = _owner(lua, space.scene);
-    auto object = DirectedRoute::gen(points, count);
-    owner->object = object;
+    auto object = _adopt(owner, DirectedRoute::gen(points, count));
     if (object) {
         object->tail = tail;
         object->tip = tip;
@@ -5171,9 +5048,7 @@ static uint32_t _pathSamples(lua_State* lua, int index, uint32_t fallback)
 
 static int _path(lua_State* lua)
 {
-    auto space = _space(lua);
-    luaL_checktype(lua, 2, LUA_TTABLE);
-    _options(lua, 2, {"commands", "samples"});
+    auto space = _factory(lua, {"commands", "samples"});
     auto samples = _pathSamples(lua, 2, 24u);
     lua_getfield(lua, 2, "commands");
     if (lua_isnil(lua, -1)) return luaL_error(lua, "missing field 'commands'");
@@ -5280,9 +5155,7 @@ static int _path(lua_State* lua)
 
 static int _curveGen(lua_State* lua)
 {
-    auto space = _space(lua);
-    luaL_checktype(lua, 2, LUA_TTABLE);
-    _options(lua, 2, {"from", "control1", "control2", "to", "samples"});
+    auto space = _factory(lua, {"from", "control1", "control2", "to", "samples"});
     auto samples = _pathSamples(lua, 2, 32u);
     auto points = samples + 1u;
     _fit(lua, space.scene, {points * sizeof(Vec3) + 512u, 0, points});
@@ -5478,9 +5351,7 @@ static Color* _surfaceColors(lua_State* lua, int index, const Theme& theme, cons
 
 static int _surface(lua_State* lua)
 {
-    auto space = _space(lua);
-    luaL_checktype(lua, 2, LUA_TTABLE);
-    _options(lua, 2, {"points", "size", "mode", "shading", "light", "colors", "mesh"});
+    auto space = _factory(lua, {"points", "size", "mode", "shading", "light", "colors", "mesh"});
     lua_getfield(lua, 2, "size");
     if (lua_isnil(lua, -1)) return luaL_error(lua, "surface requires size");
     uint32_t columns;
@@ -5572,8 +5443,7 @@ static int _surface(lua_State* lua)
     }
 
     auto owner = _owner(lua, space.scene);
-    auto object = SurfaceMesh::gen(points, columns, rows);
-    owner->object = object;
+    auto object = _adopt(owner, SurfaceMesh::gen(points, columns, rows));
     if (object) {
         object->mode = mode;
         object->shading = shading;
@@ -5627,9 +5497,7 @@ static const char* _assetReason(Result result)
 
 static int _picture(lua_State* lua)
 {
-    auto space = _space(lua);
-    luaL_checktype(lua, 2, LUA_TTABLE);
-    _options(lua, 2, {"asset", "pixels", "size", "center", "filter"});
+    auto space = _factory(lua, {"asset", "pixels", "size", "center", "filter"});
     if (_has(lua, 2, "color") || _has(lua, 2, "stroke") || _has(lua, 2, "fill")
         || _has(lua, 2, "radius") || _has(lua, 2, "dash")
         || _has(lua, 2, "dash_offset")) {
@@ -5693,8 +5561,7 @@ static int _picture(lua_State* lua)
                                                              : _explain(status));
     }
     auto owner = _owner(lua, space.scene);
-    auto object = Picture::gen(asset, center, width);
-    owner->object = object;
+    auto object = _adopt(owner, Picture::gen(asset, center, width));
     delete owned;
     if (object) object->filter = filter;
     return _add(lua, space, owner, object, 2, "picture");
@@ -5705,9 +5572,8 @@ static constexpr LuaName<CellMode> CELL_MODES[] = {{"full", CellMode::Full}, {"p
 
 static int _cell(lua_State* lua)
 {
-    auto space = _space(lua);
-    luaL_checktype(lua, 2, LUA_TTABLE);
-    _options(lua, 2, {"origin", "size", "mode", "padding", "depth", "texture", "source", "destination", "patches"});
+    auto space = _factory(lua, {"origin", "size", "mode", "padding", "depth", "texture", "source", "destination",
+                                "patches"});
     if (_has(lua, 2, "stroke") || _has(lua, 2, "fill") || _has(lua, 2, "width")
         || _has(lua, 2, "radius") || _has(lua, 2, "dash")
         || _has(lua, 2, "dash_offset")) {
@@ -5730,8 +5596,7 @@ static int _cell(lua_State* lua)
     _fieldColor(lua, 2, "color", color, &space.scene->scene->theme());
     // Texture regions and patches can raise through Lua; give the native Cell a GC owner first.
     auto owner = _owner(lua, space.scene);
-    auto object = Cell::gen(origin, columns, rows, color, mode, padding);
-    owner->object = object;
+    auto object = _adopt(owner, Cell::gen(origin, columns, rows, color, mode, padding));
     if (object) object->depth = depth;
     if (object && _has(lua, 2, "texture")) {
         size_t nameSize;
@@ -5815,9 +5680,7 @@ Object* detail::luaObject(lua_State* lua, Scene* scene, int index)
 // Connector attachment uses sampled closed outlines, with bounds as the fallback.
 static int _connector(lua_State* lua)
 {
-    auto space = _space(lua);
-    luaL_checktype(lua, 2, LUA_TTABLE);
-    _options(lua, 2, {"from", "to", "padding", "tail", "tip"});
+    auto space = _factory(lua, {"from", "to", "padding", "tail", "tip"});
     lua_getfield(lua, 2, "from");
     if (lua_isnil(lua, -1)) return luaL_error(lua, "missing field 'from'");
     auto from = _object(lua, space.scene->scene, -1);
@@ -5827,8 +5690,7 @@ static int _connector(lua_State* lua)
     auto to = _object(lua, space.scene->scene, -1);
     lua_pop(lua, 1);
     auto owner = _owner(lua, space.scene);
-    auto object = Connector::gen(from, to);
-    owner->object = object;
+    auto object = _adopt(owner, Connector::gen(from, to));
     if (object) {
         object->padding = _fieldNumber(lua, 2, "padding", object->padding);
         object->tail = _fieldNumber(lua, 2, "tail", object->tail);
@@ -6432,10 +6294,8 @@ static void _inkBox(Text* text, const TextExtent& extent)
 // Returns the brace and optional label at its tip; strings create Text and handles move.
 static int _brace(lua_State* lua)
 {
-    auto space = _space(lua);
-    luaL_checktype(lua, 2, LUA_TTABLE);
-    _options(lua, 2, {"around", "from", "to", "direction", "offset", "depth", "label", "gap", "size", "font", "role",
-                      "orientation"});
+    auto space = _factory(lua, {"around", "from", "to", "direction", "offset", "depth", "label", "gap", "size", "font",
+                                "role", "orientation"});
     lua_settop(lua, 2);
     auto box = space.scene;
     auto scene = box->scene;
@@ -6451,8 +6311,7 @@ static int _brace(lua_State* lua)
     size_t labelSize = 0;
     auto labelText = labelType == LUA_TSTRING ? lua_tolstring(lua, 4, &labelSize) : "";
     if (labelSize > LUA_TEXT_LIMIT) return luaL_error(lua, "text exceeds the 1 MiB limit");
-    auto text = Text::gen(labelText, {});
-    labelOwner->object = text;
+    auto text = _adopt(labelOwner, Text::gen(labelText, {}));
     if (!text) return luaL_error(lua, "could not create brace label: out of memory");
     _text(lua, 2, text);
     auto size = text->size > 0.0f ? text->size : _roleTheme(scene->theme(), text->role).size;
@@ -6971,6 +6830,59 @@ static bool _geometry(lua_State* lua, int index, Object* object, AnimationTarget
     return true;
 }
 
+// The values a number property of a play descriptor may take.
+enum class LuaRange : uint8_t
+{
+    Any,
+    NonNegative,
+    Positive,
+    Unit
+};
+
+// The number properties of a play descriptor that one setter each changes.
+struct LuaNumberProperty
+{
+    const char* name;
+    AnimationTarget& (AnimationTarget::*set)(float) noexcept;
+    LuaRange range;
+};
+
+static constexpr LuaNumberProperty NUMBER_PROPERTIES[] = {
+    {"opacity", &AnimationTarget::opacity, LuaRange::Unit},
+    {"dash_offset", &AnimationTarget::dashOffset, LuaRange::Any},
+    {"tail", &AnimationTarget::tail, LuaRange::NonNegative},
+    {"tip", &AnimationTarget::tip, LuaRange::NonNegative},
+    {"progress", &AnimationTarget::progress, LuaRange::Unit},
+    {"width", &AnimationTarget::strokeWidth, LuaRange::NonNegative},
+    {"start", &AnimationTarget::start, LuaRange::Any},
+    {"angle", &AnimationTarget::angle, LuaRange::Any},
+    {"radius", &AnimationTarget::radius, LuaRange::Positive},
+    {"corner", &AnimationTarget::corner, LuaRange::NonNegative},
+};
+
+// Finds the first key of the table at index that is neither a state key nor one of more. Returns
+// whether there is one, and then leaves the key with its name above it, or its type name for a
+// key that is no string.
+static bool _unknownKey(lua_State* lua, int index, std::initializer_list<const char*> more)
+{
+    index = lua_absindex(lua, index);
+    lua_pushnil(lua);
+    while (lua_next(lua, index)) {
+        lua_pop(lua, 1);
+        auto known = false;
+        if (lua_type(lua, -1) == LUA_TSTRING) {
+            auto name = lua_tostring(lua, -1);
+            for (auto key : STATE_KEYS) known = known || std::strcmp(name, key) == 0;
+            known = known || _option(name, more, false);
+        }
+        if (!known) {
+            lua_pushstring(lua, lua_type(lua, -1) == LUA_TSTRING ? lua_tostring(lua, -1) : luaL_typename(lua, -1));
+            return true;
+        }
+    }
+    return false;
+}
+
 // Parses a play descriptor. A text change adds the bytes of its string to strings; the
 // string stays in the descriptor, which the call's arguments hold until the scene copies it.
 // The points of a geometry change go into the table at anchor (see _geometry), and those a plot
@@ -6980,12 +6892,11 @@ static AnimationTarget _animationTarget(lua_State* lua, LuaScene* box, int index
 {
     luaL_checktype(lua, index, LUA_TTABLE);
     index = lua_absindex(lua, index);
-    _options(lua, index,
-             {"target", "shift", "transform", "arc", "opacity", "stroke", "fill",
-              "dash_offset", "tail", "tip", "progress", "width", "radius", "size", "corner", "trim_distance",
-              "gradient", "blur", "shadow", "value", "text", "retype", "layer", "points", "from",
-              "to", "origin", "control1", "control2", "fn", "x_range", "y_range", "discontinuities", "center", "vertex", "start", "angle", "level", "values"},
-             false);
+    // A descriptor takes the state keys and the five of its own.
+    if (_unknownKey(lua, index, {"target", "arc", "text", "retype", "layer"})) {
+        if (lua_type(lua, -2) != LUA_TSTRING) luaL_error(lua, "option names must be strings");
+        luaL_error(lua, "unknown option '%s'", lua_tostring(lua, -1));
+    }
     lua_getfield(lua, index, "target");
     if (lua_isnil(lua, -1)) luaL_error(lua, "animation descriptor requires a target");
     object = _object(lua, box->scene, -1);
@@ -7013,10 +6924,16 @@ static AnimationTarget _animationTarget(lua_State* lua, LuaScene* box, int index
         if (!shift && !transform) luaL_error(lua, "arc requires shift or transform");
         target.arc(_fieldArc(lua, index));
     }
-    if (_has(lua, index, "opacity")) {
-        auto opacity = _fieldNumber(lua, index, "opacity", 1.0f);
-        if (opacity < 0.0f || opacity > 1.0f) luaL_error(lua, "opacity must be between 0 and 1");
-        target.opacity(opacity);
+    for (auto& property : NUMBER_PROPERTIES) {
+        if (!_has(lua, index, property.name)) continue;
+        auto value = _fieldNumber(lua, index, property.name, 0.0f);
+        auto range = property.range;
+        if (range == LuaRange::NonNegative && value < 0.0f) luaL_error(lua, "%s cannot be negative", property.name);
+        if (range == LuaRange::Positive && value <= 0.0f) luaL_error(lua, "%s must be positive", property.name);
+        if (range == LuaRange::Unit && (value < 0.0f || value > 1.0f)) {
+            luaL_error(lua, "%s must be between 0 and 1", property.name);
+        }
+        (target.*property.set)(value);
         changed = true;
     }
     Color color;
@@ -7026,42 +6943,6 @@ static AnimationTarget _animationTarget(lua_State* lua, LuaScene* box, int index
     }
     if (_fieldColor(lua, index, "fill", color, &box->scene->theme())) {
         target.fill(color);
-        changed = true;
-    }
-    if (_has(lua, index, "dash_offset")) {
-        target.dashOffset(_fieldNumber(lua, index, "dash_offset", 0.0f));
-        changed = true;
-    }
-    if (_has(lua, index, "tail")) {
-        auto tail = _fieldNumber(lua, index, "tail", 0.0f);
-        if (tail < 0.0f) luaL_error(lua, "tail cannot be negative");
-        target.tail(tail);
-        changed = true;
-    }
-    if (_has(lua, index, "tip")) {
-        auto tip = _fieldNumber(lua, index, "tip", 0.0f);
-        if (tip < 0.0f) luaL_error(lua, "tip cannot be negative");
-        target.tip(tip);
-        changed = true;
-    }
-    if (_has(lua, index, "progress")) {
-        auto progress = _fieldNumber(lua, index, "progress", 1.0f);
-        if (progress < 0.0f || progress > 1.0f) luaL_error(lua, "progress must be between 0 and 1");
-        target.progress(progress);
-        changed = true;
-    }
-    if (_has(lua, index, "width")) {
-        auto width = _fieldNumber(lua, index, "width", 0.0f);
-        if (width < 0.0f) luaL_error(lua, "width cannot be negative");
-        target.strokeWidth(width);
-        changed = true;
-    }
-    if (_has(lua, index, "start")) { target.start(_fieldNumber(lua, index, "start", 0.0f)); changed = true; }
-    if (_has(lua, index, "angle")) { target.angle(_fieldNumber(lua, index, "angle", 0.0f)); changed = true; }
-    if (_has(lua, index, "radius")) {
-        auto radius = _fieldNumber(lua, index, "radius", 0.0f);
-        if (radius <= 0.0f) luaL_error(lua, "radius must be positive");
-        target.radius(radius);
         changed = true;
     }
     lua_getfield(lua, index, "size");
@@ -7081,12 +6962,6 @@ static AnimationTarget _animationTarget(lua_State* lua, LuaScene* box, int index
     lua_pop(lua, 1);
     if (_has(lua, index, "trim_distance")) {
         target.trimDistance(_trimDistance(lua, index));
-        changed = true;
-    }
-    if (_has(lua, index, "corner")) {
-        auto corner = _fieldNumber(lua, index, "corner", 0.0f);
-        if (corner < 0.0f) luaL_error(lua, "corner cannot be negative");
-        target.corner(corner);
         changed = true;
     }
     lua_getfield(lua, index, "gradient");
@@ -7375,9 +7250,18 @@ static int _transform(lua_State* lua)
     });
 }
 
-static AnimationOptions _motionOptions(lua_State* lua, int index, std::initializer_list<const char*> fields)
+// The timing a motion call takes from its options: seconds, the curve, and the lag after which
+// each later target starts, as a share of the duration.
+struct LuaMotion
 {
-    AnimationOptions options;
+    float duration = 1.0f;
+    AnimCurve curve;
+    float lag = 0.0f;
+};
+
+static LuaMotion _motionOptions(lua_State* lua, int index, std::initializer_list<const char*> fields)
+{
+    LuaMotion options;
     if (lua_isnoneornil(lua, index)) return options;
     luaL_checktype(lua, index, LUA_TTABLE);
     _options(lua, index, fields, false);
@@ -9744,25 +9628,8 @@ static int _trackerApply(lua_State* lua)
 // Returns the first key a bound state may not set, or nothing.
 static int _trackerUnknown(lua_State* lua)
 {
-    static constexpr const char* keys[] = {"shift", "transform", "opacity", "stroke", "fill",
-                                           "progress", "dash_offset", "tail", "tip", "width",
-                                           "radius", "size", "corner", "trim_distance", "gradient", "blur", "shadow",
-                                           "value", "points", "from", "to", "origin", "control1",
-                                           "control2", "fn", "x_range", "y_range", "discontinuities", "center", "vertex", "start", "angle", "level", "values"};
     luaL_checktype(lua, 1, LUA_TTABLE);
-    lua_pushnil(lua);
-    while (lua_next(lua, 1)) {
-        lua_pop(lua, 1);
-        auto known = false;
-        if (lua_type(lua, -1) == LUA_TSTRING) {
-            for (auto key : keys) known = known || std::strcmp(lua_tostring(lua, -1), key) == 0;
-        }
-        if (!known) {
-            lua_pushstring(lua, lua_type(lua, -1) == LUA_TSTRING ? lua_tostring(lua, -1) : luaL_typename(lua, -1));
-            return 1;
-        }
-    }
-    return 0;
+    return _unknownKey(lua, 1, {}) ? 1 : 0;
 }
 
 // Called from scene:bind; reports failures at the author's bind call (stack level 2).

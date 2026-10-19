@@ -10,6 +10,7 @@
 #include "vis.h"
 
 struct lua_State;
+struct luaL_Reg;
 
 namespace vis::detail
 {
@@ -89,6 +90,11 @@ void luaCall(lua_State* lua, int arguments, int results);
 // script had called it in place of the running function: its errors name the script's line,
 // and a bad argument the name the script called.
 int luaCallWrapped(lua_State* lua, int index);
+// Registers the protected metatable name of one kind of handle: __gc when gc is given, and an
+// __index with the functions of every table in order when tables are given. luaL_newmetatable
+// gives it its __name.
+void luaMetatable(lua_State* lua, const char* name, int (*gc)(lua_State*),
+                  std::initializer_list<const luaL_Reg*> tables = {});
 // Registers the popped spans-part factory for key from an open hook.
 // spans calls maker(handle, part, setting); setting supplies inherited size/font/role
 // and row orientation. Parts remain indivisible on the line.
