@@ -14,10 +14,13 @@
 #include "visMathGlyphs.h"
 
 #include "vis.h"
+#include "visDisplayColor.h"
 #include "visDisplayList.h"
+#include "visRendererBackend.h"
 #include "visTvgRenderer.h"
 #include "visScene.h"
 #include "../../common/visGrow.h"
+#include "../../common/visString.h"
 
 namespace vis
 {
@@ -613,20 +616,6 @@ static bool _visible(const DrawCommand& command)
     return false;
 }
 
-static Color _mix(const Color& from, const Color& to, float progress)
-{
-    auto channel = [progress](uint8_t first, uint8_t second) {
-        auto value = static_cast<float>(first)
-                   + (static_cast<float>(second) - first) * progress;
-        if (value < 0.0f) value = 0.0f;
-        if (value > 255.0f) value = 255.0f;
-        return static_cast<uint8_t>(value + 0.5f);
-    };
-    return {
-        channel(from.r, to.r), channel(from.g, to.g),
-        channel(from.b, to.b), channel(from.a, to.a)};
-}
-
 /************************************************************************/
 /* Retained paint tree                                                  */
 /************************************************************************/
@@ -648,15 +637,6 @@ static bool _sameText(const char* first, const char* second)
 static bool _sameColor(const Color& first, const Color& second)
 {
     return first.r == second.r && first.g == second.g && first.b == second.b && first.a == second.a;
-}
-
-static char* _dup(const char* text)
-{
-    if (!text) return nullptr;
-    auto size = std::strlen(text) + 1u;
-    auto copy = new (std::nothrow) char[size];
-    if (copy) std::memcpy(copy, text, size);
-    return copy;
 }
 
 static uint32_t _hash(const void* first, const void* second, uint32_t extra)
@@ -787,7 +767,7 @@ static bool _storePoints(Slot& slot, const DrawCommand& command)
 static bool _storeText(char*& target, const char* text)
 {
     if (_sameText(target, text)) return true;
-    auto copy = _dup(text);
+    auto copy = _duplicate(text);
     if (text && !copy) return false;
     delete[] target;
     target = copy;

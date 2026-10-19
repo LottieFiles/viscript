@@ -1080,6 +1080,34 @@ static void boundaries(Renderer* renderer)
     }
     delete frozenScene;
 
+    // A render checks each object once, however many objects below it ask, and checks them all
+    // again the next render: an edit between renders to the deepest object, to a group above it or
+    // to an object beside it stops the next one.
+    auto nestedScene = Scene::gen();
+    auto outer = Group::gen();
+    auto inner = Group::gen();
+    auto deepest = Circle::gen({}, 0.25f);
+    auto beside = Circle::gen({0.5f, 0.0f}, 0.25f);
+    auto nestedSpace = _space();
+    CHECK(nestedScene && outer && inner && deepest && beside && nestedSpace);
+    if (nestedScene && outer && inner && deepest && beside && nestedSpace) {
+        CHECK(inner->add(deepest) == Result::Success);
+        CHECK(outer->add(inner) == Result::Success);
+        CHECK(outer->add(beside) == Result::Success);
+        CHECK(nestedSpace->add(outer) == Result::Success);
+        CHECK(nestedScene->add(nestedSpace) == Result::Success);
+        Surface surface;
+        CHECK(renderer->render(nestedScene, 0.0f, surface) == Result::Success);
+        Object* edited[] = {deepest, inner, outer, beside};
+        for (auto object : edited) {
+            object->layer = 1;
+            CHECK(renderer->render(nestedScene, 0.0f, surface) == Result::InvalidArguments);
+            object->layer = 0;
+            CHECK(renderer->render(nestedScene, 0.0f, surface) == Result::Success);
+        }
+    }
+    delete nestedScene;
+
     auto textScene = Scene::gen();
     auto frozenText = Text::gen("before");
     auto textSpace = _space();

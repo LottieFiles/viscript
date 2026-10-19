@@ -1794,12 +1794,22 @@ static Result _labelledPieces(DisplayList& list, const Vec3* local, const Vec2* 
                            pen.style, pen.layer, pen.depth, PathCap::Butt) : Result::Success;
 }
 
+// Whether object, whose entry is entry, is valid and as the scene authored it. With known, where a
+// build keeps whether it found so, it checks each object once however many objects below ask.
+static bool _authored(const Object* object, const ObjectEntry& entry, bool* known)
+{
+    if (known && *known) return true;
+    if (!valid(object) || entry.fingerprint != fingerprint(object)) return false;
+    if (known) *known = true;
+    return true;
+}
+
 // Whether object, whose entry is entry, can be placed in state, as it samples there: the object is
 // valid and as the scene authored it, the model affine, and the styles, opacity, progress and
 // scale finite, with no width, radius or scale below zero.
-static bool _placeable(const Object* object, const ObjectEntry& entry, const VisualState& state)
+static bool _placeable(const Object* object, const ObjectEntry& entry, const VisualState& state, bool* known)
 {
-    return valid(object) && entry.fingerprint == fingerprint(object) && _affine(state.model)
+    return _authored(object, entry, known) && _affine(state.model)
            && std::isfinite(state.width) && state.width >= 0.0f
            && std::isfinite(state.radius) && state.radius >= 0.0f
            && std::isfinite(state.dashOffset)
@@ -1829,20 +1839,18 @@ static Result _modify(const RuntimeModifier* modifiers, uint32_t count, const Ob
 }
 
 Result Scene::Impl::world(const Object* object, float time, VisualState& state, bool& visible,
-                          WorldOpacity opacity, const Object* shared) const noexcept
+                          WorldOpacity opacity, const Object* shared, bool* known) const noexcept
 {
     visible = false;
     auto item = entry(object);
     if (!item) return Result::InvalidArguments;
     if (!sample(*item, time, state)) return Result::Success;
     state.inheritedProgressEmpty = false;
-    if (!_placeable(object, *item, state)) return Result::InvalidArguments;
+    auto knows = [this, known](const ObjectEntry* found) { return known ? known + (found - objects) : nullptr; };
+    if (!_placeable(object, *item, state, knows(item))) return Result::InvalidArguments;
     if (state.morph) {
         auto morphEntry = entry(state.morph);
-        if (!morphEntry || !valid(state.morph)
-            || morphEntry->fingerprint != fingerprint(state.morph)) {
-            return Result::InvalidArguments;
-        }
+        if (!morphEntry || !_authored(state.morph, *morphEntry, knows(morphEntry))) return Result::InvalidArguments;
     }
     auto modified = _modify(runtimeModifiers, runtimeModifierCnt, object, time, state);
     if (modified != Result::Success) return modified;
@@ -1872,7 +1880,7 @@ Result Scene::Impl::world(const Object* object, float time, VisualState& state, 
         auto parent = entry(parentObject);
         VisualState parentState;
         if (!parent || !sample(*parent, time, parentState)) return Result::Success;
-        if (!_placeable(parentObject, *parent, parentState)) return Result::InvalidArguments;
+        if (!_placeable(parentObject, *parent, parentState, knows(parent))) return Result::InvalidArguments;
         modified = _modify(runtimeModifiers, runtimeModifierCnt, parentObject, time, parentState);
         if (modified != Result::Success) return modified;
         if (parentObject->type() == Type::Angle) {
@@ -2433,12 +2441,15 @@ Result Scene::Impl::build(float time, DisplayList& list, bool sort, const ViewFr
     for (auto i = 0u; i < objectCnt && !layered; i++)
         layered = composited(objects[i].object);
     auto opacity = layered ? WorldOpacity::Drawing : WorldOpacity::All;
+    // Whether each object is valid and as authored, found once for this build (see world()); without
+    // the room for it, world() checks each time.
+    auto known = std::unique_ptr<bool[]>(new (std::nothrow) bool[objectCnt]{});
     for (auto i = 0u; i < objectCnt; i++) {
         VisualState state;
         auto object = objects[i].object;
         list.object = object;
         auto visible = false;
-        auto sampled = world(object, time, state, visible, opacity);
+        auto sampled = world(object, time, state, visible, opacity, nullptr, known.get());
         if (sampled != Result::Success) return sampled;
         if (!visible) continue;
         if (layered) {

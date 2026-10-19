@@ -928,10 +928,11 @@ struct Scene::Impl
     // The authored model chain used as a billboard's font-size reference.
     Mat4 billboardReference(const Object* object) const noexcept;
     // With WorldOpacity::Mask, group opacities stop at shared, the nearest common ancestor of
-    // the target and the object it masks (nullptr: none).
+    // the target and the object it masks (nullptr: none). Known, one flag for each object, keeps
+    // which objects a build has found valid and as authored, so it checks each once.
     Result world(const Object* object, float time, VisualState& state, bool& visible,
-                 WorldOpacity opacity = WorldOpacity::All,
-                 const Object* shared = nullptr) const noexcept;
+                 WorldOpacity opacity = WorldOpacity::All, const Object* shared = nullptr,
+                 bool* known = nullptr) const noexcept;
     Result bounds(const Object* object, float time, Bounds& bounds, bool& defined, bool hidden = false) const noexcept;
     // The layer object draws at at time, as world() gives it: its own, moved as far as the objects
     // above it moved theirs. An object not shown then keeps the layer it was authored with.
