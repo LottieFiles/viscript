@@ -25,9 +25,7 @@ static Panel* _panel(lua_State* lua)
     if (!detail::luaAuthoring(lua)) {
         luaL_error(lua, "UI authoring is unavailable after loading");
     }
-    auto handle = static_cast<LuaPanel*>(luaL_checkudata(lua, 1, PANEL_METATABLE));
-    if (!handle->panel) luaL_error(lua, "panel is no longer available");
-    return handle->panel;
+    return static_cast<LuaPanel*>(luaL_checkudata(lua, 1, PANEL_METATABLE))->panel;
 }
 
 static Vec2 _vec2(lua_State* lua, int index, const char* name)

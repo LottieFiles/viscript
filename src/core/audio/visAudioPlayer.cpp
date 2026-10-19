@@ -122,7 +122,6 @@ struct Player::Impl
 
     Asset* asset(const char* name) noexcept
     {
-        if (!name) return nullptr;
         for (auto i = 0u; i < assetCount; i++) {
             if (std::strcmp(assets[i].name, name) == 0) return assets + i;
         }
@@ -293,10 +292,12 @@ struct Player::Impl
         return seek(slot, 0u);
     }
 
-    Result gain(Cue cue, uint64_t frame, float& output) const noexcept
+    // The gain of cue at frame of the mix.
+    float gain(Cue cue, uint64_t frame) const noexcept
     {
-        auto time = static_cast<float>(static_cast<double>(frame) / mixRate);
-        return soundscape->sample(cue, time, output);
+        auto value = 0.0f;
+        soundscape->sample(cue, static_cast<float>(static_cast<double>(frame) / mixRate), value);
+        return value;
     }
 
     // Adds what cue plays over frames frames from frame first to output.
@@ -307,9 +308,7 @@ struct Player::Impl
         auto stop = cue.end > 0.0f ? _frame(cue.end, mixRate) : UINT64_MAX;
         auto last = first + frames;
         if (last <= start || first >= stop) return Result::Success;
-        auto source = asset(cue.asset);
-        if (!source) return Result::InsufficientCondition;
-        auto result = init(slot, *source);
+        auto result = init(slot, *asset(cue.asset));
         if (result != Result::Success) return result;
         if (!slot.length) return Result::Success;
         if (!cue.loop && slot.length < stop - start) stop = start + slot.length;
@@ -347,11 +346,8 @@ struct Player::Impl
             auto target = output + (frame - first) * 2u;
             while (frame < end) {
                 auto segment = frame - frame % GainStep;
-                float head;
-                float tail;
-                result = gain(handle, segment, head);
-                if (result == Result::Success) result = gain(handle, segment + GainStep, tail);
-                if (result != Result::Success) return result;
+                auto head = gain(handle, segment);
+                auto tail = gain(handle, segment + GainStep);
                 auto segmentEnd = segment + GainStep < end ? segment + GainStep : end;
                 for (; frame < segmentEnd; frame++, samples += 2u, target += 2u) {
                     auto progress = static_cast<float>(frame - segment) / static_cast<float>(GainStep);
@@ -413,16 +409,15 @@ Player* Player::gen(const PlayerConfig& config) noexcept
 
 Result Player::load(const char* name, const uint8_t* data, uint32_t size) noexcept
 {
-    if (!pImpl || !name || !data || !size || size > AssetByteLimit) {
+    if (!name || !data || !size || size > AssetByteLimit) {
         return Result::InvalidArguments;
     }
     auto nameSize = std::strlen(name);
-    if (!nameSize || nameSize > Soundscape::AssetNameLimit
-        || pImpl->assetCount >= AssetLimit
+    if (!nameSize || nameSize > Soundscape::AssetNameLimit) return Result::InvalidArguments;
+    if (pImpl->asset(name) || pImpl->assetCount >= AssetLimit
         || size > AssetTotalByteLimit - pImpl->assetBytes) {
-        return Result::InvalidArguments;
+        return Result::InsufficientCondition;
     }
-    if (pImpl->asset(name)) return Result::InsufficientCondition;
 
     auto copiedName = _duplicate(name);
     auto copiedData = new (std::nothrow) uint8_t[size];
@@ -455,7 +450,6 @@ Result Player::load(const char* name, const uint8_t* data, uint32_t size) noexce
 
 Result Player::start() noexcept
 {
-    if (!pImpl) return Result::InvalidArguments;
     auto result = pImpl->init();
     if (result != Result::Success || pImpl->started) return result;
     if (pImpl->config.device) {
@@ -469,7 +463,7 @@ Result Player::start() noexcept
 Result Player::play(const Playback& playback, Voice* output) noexcept
 {
     if (output) *output = {};
-    if (!pImpl || !playback.asset || !_bus(playback.bus)
+    if (!playback.asset || !_bus(playback.bus)
         || !_gain(playback.gain) || !_rate(playback.rate)) {
         return Result::InvalidArguments;
     }
@@ -478,14 +472,9 @@ Result Player::play(const Playback& playback, Voice* output) noexcept
     if (!pImpl->asset(playback.asset)) return Result::InvalidArguments;
     pImpl->collect();
 
-    auto index = Voice::Invalid;
-    for (auto i = 0u; i < pImpl->config.voiceLimit; i++) {
-        if (!pImpl->voices[i].initialized) {
-            index = i;
-            break;
-        }
-    }
-    if (index == Voice::Invalid) return Result::InsufficientCondition;
+    auto index = 0u;
+    while (index < pImpl->config.voiceLimit && pImpl->voices[index].initialized) index++;
+    if (index == pImpl->config.voiceLimit) return Result::InsufficientCondition;
 
     auto& slot = pImpl->voices[index];
     result = pImpl->init(slot.sound, playback);
@@ -505,7 +494,7 @@ Result Player::play(const Playback& playback, Voice* output) noexcept
 
 Result Player::stop(Voice voice) noexcept
 {
-    if (!pImpl || voice.index >= pImpl->config.voiceLimit) return Result::InvalidArguments;
+    if (voice.index >= pImpl->config.voiceLimit) return Result::InvalidArguments;
     auto& slot = pImpl->voices[voice.index];
     if (!slot.initialized || slot.generation != voice.generation) {
         return Result::InsufficientCondition;
@@ -518,7 +507,7 @@ Result Player::stop(Voice voice) noexcept
 
 bool Player::active(Voice voice) const noexcept
 {
-    if (!pImpl || voice.index >= pImpl->config.voiceLimit) return false;
+    if (voice.index >= pImpl->config.voiceLimit) return false;
     auto& slot = pImpl->voices[voice.index];
     return slot.initialized && slot.generation == voice.generation
         && ma_sound_is_playing(&slot.sound);
@@ -526,7 +515,7 @@ bool Player::active(Voice voice) const noexcept
 
 Result Player::gain(float value) noexcept
 {
-    if (!pImpl || !_gain(value)) return Result::InvalidArguments;
+    if (!_gain(value)) return Result::InvalidArguments;
     pImpl->masterGain = value;
     if (!pImpl->initialized) return Result::Success;
     return _result(ma_engine_set_volume(&pImpl->engine, value));
@@ -534,7 +523,7 @@ Result Player::gain(float value) noexcept
 
 Result Player::gain(Bus bus, float value) noexcept
 {
-    if (!pImpl || !_bus(bus) || !_gain(value)) return Result::InvalidArguments;
+    if (!_bus(bus) || !_gain(value)) return Result::InvalidArguments;
     pImpl->busGain[static_cast<uint8_t>(bus)] = value;
     if (pImpl->initialized) ma_sound_group_set_volume(pImpl->group(bus), value);
     return Result::Success;
@@ -542,7 +531,6 @@ Result Player::gain(Bus bus, float value) noexcept
 
 Result Player::bind(const Soundscape* soundscape) noexcept
 {
-    if (!pImpl || (soundscape && !soundscape->scene())) return Result::InvalidArguments;
     auto count = soundscape ? soundscape->count() : 0u;
     auto tracks = count ? new (std::nothrow) Impl::TrackSlot[count] : nullptr;
     if (count && !tracks) return Result::OutOfMemory;
@@ -558,7 +546,7 @@ Result Player::bind(const Soundscape* soundscape) noexcept
 
 Result Player::sync(const Transport& transport) noexcept
 {
-    if (!pImpl || !std::isfinite(transport.time) || transport.time < 0.0f
+    if (!std::isfinite(transport.time) || transport.time < 0.0f
         || !_rate(transport.rate)) {
         return Result::InvalidArguments;
     }
@@ -575,7 +563,7 @@ Result Player::sync(const Transport& transport) noexcept
              || transport.rate != last.rate || transport.playing != last.playing;
     for (auto i = 0u; i < pImpl->trackCount; i++) {
         CueConfig cue;
-        if (!pImpl->soundscape->cueAt(i, cue)) return Result::Unknown;
+        pImpl->soundscape->cueAt(i, cue);
         auto& slot = pImpl->tracks[i];
         result = pImpl->init(slot, cue);
         if (result != Result::Success) return result;
@@ -587,8 +575,7 @@ Result Player::sync(const Transport& transport) noexcept
         if (cue.loop && slot.length > 0.0f) offset = std::fmod(offset, slot.length);
 
         float value;
-        result = pImpl->soundscape->sample({i}, transport.time, value);
-        if (result != Result::Success) return result;
+        pImpl->soundscape->sample({i}, transport.time, value);
         ma_sound_set_volume(&slot.sound, value);
         ma_sound_set_pitch(&slot.sound, transport.rate);
 
@@ -621,7 +608,7 @@ Result Player::sync(const Transport& transport) noexcept
 
 Result Player::mix(uint32_t rate, uint64_t first, float* output, uint32_t frames) noexcept
 {
-    if (!pImpl || rate < MixRateMin || rate > MixRateMax || (frames && !output)
+    if (rate < MixRateMin || rate > MixRateMax || (frames && !output)
         || frames > UINT32_MAX / 2u || first > UINT64_MAX - frames) {
         return Result::InvalidArguments;
     }
@@ -632,7 +619,7 @@ Result Player::mix(uint32_t rate, uint64_t first, float* output, uint32_t frames
     auto count = soundscape->count();
     for (auto i = 0u; i < count; i++) {
         CueConfig cue;
-        if (!soundscape->cueAt(i, cue)) return Result::Unknown;
+        soundscape->cueAt(i, cue);
         if (!pImpl->asset(cue.asset)) return Result::InsufficientCondition;
     }
     if (pImpl->mixRate != rate || pImpl->mixCount != count) {

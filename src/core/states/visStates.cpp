@@ -7,6 +7,7 @@
 #include "vis_states.h"
 #include "../common/visFinite.h"
 #include "../common/visGrow.h"
+#include "../common/visMix.h"
 #include "../common/visRetarget.h"
 #include "../scene/visScene.h"
 
@@ -57,13 +58,6 @@ static void _copy(char* output, const char* value) noexcept
 {
     auto length = std::strlen(value);
     std::memcpy(output, value, length + 1u);
-}
-
-static float _clamp(float value) noexcept
-{
-    if (value < 0.0f) return 0.0f;
-    if (value > 1.0f) return 1.0f;
-    return value;
 }
 
 static State _interpolate(const State& from, const State& to,
@@ -128,6 +122,12 @@ struct Controller::Impl
         delete[] events;
     }
 
+    // Whether object is one of the scene's own.
+    bool owns(const Object* object) const noexcept
+    {
+        return object && scene->object(object->id()) == object;
+    }
+
     Definition* definition(uint32_t object, const char* name) const noexcept
     {
         for (auto i = 0u; i < definitionCount; i++) {
@@ -174,7 +174,7 @@ Controller::Controller(Scene* scene) noexcept : pImpl(new (std::nothrow) Impl)
 
 Controller::~Controller()
 {
-    if (pImpl && pImpl->scene) pImpl->scene->runtimeRemove(this);
+    if (pImpl) pImpl->scene->runtimeRemove(this);
     delete pImpl;
 }
 
@@ -190,37 +190,31 @@ Controller* Controller::gen(Scene* scene) noexcept
     modifier.object = modifyObject;
     modifier.data = controller;
     modifier.key = &RuntimeKey;
-    if (scene->runtimeAdd(&modifier) != Result::Success) {
-        delete controller;
-        return nullptr;
+    if (scene->runtimeAdd(&modifier) == Result::Success
+        && scene->add(controller) == Result::Success) {
+        return controller;
     }
-    if (scene->add(controller) == Result::Success) return controller;
-    scene->runtimeRemove(controller);
     delete controller;
     return nullptr;
 }
 
 Scene* Controller::scene() const noexcept
 {
-    return pImpl ? pImpl->scene : nullptr;
+    return pImpl->scene;
 }
 
 Result Controller::define(Object* object, const char* name, const State& state) noexcept
 {
-    if (!pImpl || !pImpl->scene || !object || object == this || !_identifier(name)
-        || !_valid(state) || !object->id()
-        || pImpl->scene->object(object->id()) != object) {
+    if (object == this || !pImpl->owns(object) || !_identifier(name) || !_valid(state)) {
         return Result::InvalidArguments;
     }
     if (pImpl->definition(object->id(), name)) return Result::InsufficientCondition;
     if (pImpl->definitionCount == StateLimit) return Result::InsufficientCondition;
     auto resolved = state;
-    if (!resolved.originEnabled) {
-        if (!_localOrigin(object, resolved.origin)) {
-            return Result::InsufficientCondition;
-        }
-        resolved.originEnabled = true;
+    if (!resolved.originEnabled && !_localOrigin(object, resolved.origin)) {
+        return Result::InsufficientCondition;
     }
+    resolved.originEnabled = true;
     if (!grow(pImpl->definitions, pImpl->definitionCount,
               pImpl->definitionCapacity, 1u, 8u, StateLimit)) {
         return Result::OutOfMemory;
@@ -242,16 +236,14 @@ Result Controller::transition(Object* object, const char* state, float duration,
 Result Controller::transition(const Target* targets, uint32_t count, float duration,
                               const AnimCurve& curve) noexcept
 {
-    if (!pImpl || !pImpl->scene || !targets || !count || count > ObjectLimit
-        || !std::isfinite(duration) || duration < 0.0f || !curve.valid()) {
+    if (!targets || !count || count > ObjectLimit || !std::isfinite(duration) || duration < 0.0f || !curve.valid()) {
         return Result::InvalidArguments;
     }
     auto newTracks = 0u;
     for (auto i = 0u; i < count; i++) {
         auto& target = targets[i];
-        if (!target.object || target.object == this || !_identifier(target.state)
-            || !target.object->id()
-            || pImpl->scene->object(target.object->id()) != target.object) {
+        if (target.object == this || !pImpl->owns(target.object)
+            || !_identifier(target.state)) {
             return Result::InvalidArguments;
         }
         if (!pImpl->definition(target.object->id(), target.state)) {
@@ -300,9 +292,7 @@ Result Controller::transition(const Target* targets, uint32_t count, float durat
 
 Result Controller::advance(float elapsed) noexcept
 {
-    if (!pImpl || !std::isfinite(elapsed) || elapsed < 0.0f) {
-        return Result::InvalidArguments;
-    }
+    if (!std::isfinite(elapsed) || elapsed < 0.0f) return Result::InvalidArguments;
     auto next = pImpl->clock + static_cast<double>(elapsed);
     if (!std::isfinite(next)) return Result::InvalidArguments;
     pImpl->clock = next;
@@ -311,10 +301,7 @@ Result Controller::advance(float elapsed) noexcept
 
 Result Controller::sample(const Object* object, State& state) const noexcept
 {
-    if (!pImpl || !pImpl->scene || !object || !object->id()
-        || pImpl->scene->object(object->id()) != object) {
-        return Result::InvalidArguments;
-    }
+    if (!pImpl->owns(object)) return Result::InvalidArguments;
     auto track = pImpl->track(object->id());
     if (!track) return Result::InsufficientCondition;
     state = detail::retargetSample(track->motion, pImpl->clock, 0.0,
@@ -324,12 +311,11 @@ Result Controller::sample(const Object* object, State& state) const noexcept
 
 double Controller::time() const noexcept
 {
-    return pImpl ? pImpl->clock : 0.0;
+    return pImpl->clock;
 }
 
 bool Controller::active() const noexcept
 {
-    if (!pImpl) return false;
     for (auto i = 0u; i < pImpl->trackCount; i++) {
         if (detail::retargetActive(pImpl->tracks[i].motion, pImpl->clock)) {
             return true;
@@ -340,47 +326,39 @@ bool Controller::active() const noexcept
 
 uint32_t Controller::definitionCount() const noexcept
 {
-    return pImpl ? pImpl->definitionCount : 0u;
+    return pImpl->definitionCount;
 }
 
 uint32_t Controller::eventCount() const noexcept
 {
-    return pImpl ? pImpl->eventCount : 0u;
+    return pImpl->eventCount;
 }
 
 bool Controller::eventAt(uint32_t index, Event& event) const noexcept
 {
-    if (!pImpl || index >= pImpl->eventCount) return false;
+    if (index >= pImpl->eventCount) return false;
     event = pImpl->events[index];
     return true;
 }
 
 void Controller::clearEvents() noexcept
 {
-    if (pImpl) pImpl->eventCount = 0u;
+    pImpl->eventCount = 0u;
 }
 
 Result Controller::modifyObject(const Object* object, float time, Mat4& model,
                                 float& opacity, float& progress, void* data) noexcept
 {
-    auto controller = static_cast<Controller*>(data);
-    if (!controller || !controller->pImpl || !object || !std::isfinite(time)
-        || time < 0.0f) {
-        return Result::InvalidArguments;
-    }
-    auto track = controller->pImpl->track(object->id());
+    if (!std::isfinite(time) || time < 0.0f) return Result::InvalidArguments;
+    auto& impl = *static_cast<Controller*>(data)->pImpl;
+    auto track = impl.track(object->id());
     if (!track) return Result::Success;
-    auto state = detail::retargetSample(track->motion,
-                                        controller->pImpl->clock, 0.0,
-                                        _interpolate);
-    auto origin = model * state.origin;
-    if (!_finite(origin)) return Result::InvalidArguments;
-    model = _matrix(state, origin) * model;
+    // The renderer checks the model it gets back.
+    auto state = detail::retargetSample(track->motion, impl.clock, 0.0, _interpolate);
+    model = _matrix(state, model * state.origin) * model;
     opacity = _clamp(opacity * state.opacity);
     progress = _clamp(progress * state.progress);
-    return _finite(model) && std::isfinite(opacity) && std::isfinite(progress)
-        ? Result::Success
-        : Result::InvalidArguments;
+    return Result::Success;
 }
 
 }  // namespace vis::states

@@ -29,7 +29,6 @@ static Controller* _controller(lua_State* lua)
     }
     auto handle = static_cast<LuaController*>(
         luaL_checkudata(lua, 1, CONTROLLER_METATABLE));
-    if (!handle->controller) luaL_error(lua, "input controller is no longer available");
     return handle->controller;
 }
 

@@ -141,6 +141,50 @@ static void soundscape()
     delete scene;
 }
 
+// A full soundscape or player refuses more with InsufficientCondition and keeps what it holds.
+static void limits()
+{
+    auto scene = Scene::gen();
+    auto soundscape = Soundscape::gen(scene);
+    CHECK(scene && soundscape);
+    if (!scene || !soundscape) {
+        delete scene;
+        return;
+    }
+    CueConfig config;
+    config.asset = "tone.wav";
+    Cue cue;
+    for (auto i = 0u; i < Soundscape::CueLimit; i++) {
+        CHECK(soundscape->cue(config, cue) == Result::Success);
+    }
+    CHECK(soundscape->cue(config, cue) == Result::InsufficientCondition && !cue);
+    CHECK(soundscape->count() == Soundscape::CueLimit);
+    cue.index = 0u;
+    auto curve = AnimCurve::preset(AnimCurvePreset::Linear);
+    for (auto i = 0u; i < Soundscape::GainLimit; i++) {
+        CHECK(soundscape->gain(cue, 0.5f, static_cast<float>(i), 1.0f, curve) == Result::Success);
+    }
+    auto past = static_cast<float>(Soundscape::GainLimit);
+    CHECK(soundscape->gain(cue, 0.5f, past, 1.0f, curve) == Result::InsufficientCondition);
+    CHECK(near(soundscape->duration(), past));
+    delete scene;
+
+    PlayerConfig playerConfig;
+    playerConfig.device = false;
+    auto player = Player::gen(playerConfig);
+    CHECK(player != nullptr);
+    if (!player) return;
+    uint8_t wav[WavSize] = {};
+    _wav(wav);
+    char name[16];
+    for (auto i = 0u; i < Player::AssetLimit; i++) {
+        std::snprintf(name, sizeof(name), "tone%u.wav", i);
+        CHECK(player->load(name, wav, WavSize) == Result::Success);
+    }
+    CHECK(player->load("more.wav", wav, WavSize) == Result::InsufficientCondition);
+    delete player;
+}
+
 static void player()
 {
     PlayerConfig invalid;
@@ -502,6 +546,7 @@ return scene
 int main()
 {
     soundscape();
+    limits();
     player();
     mixing();
     lua();

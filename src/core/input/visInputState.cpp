@@ -21,13 +21,14 @@ enum struct Source : uint8_t
     Pointer
 };
 
+// The length of an action name of 1 to NameLimit bytes, and 0 for any other.
 static uint32_t _length(const char* value) noexcept
 {
-    if (!value) return UINT32_MAX;
+    if (!value) return 0u;
     for (auto length = 0u; length <= ActionMap::NameLimit; length++) {
         if (!value[length]) return length;
     }
-    return UINT32_MAX;
+    return 0u;
 }
 
 static float _clamp(float value) noexcept
@@ -52,6 +53,17 @@ struct State::Impl
         }
         return nullptr;
     }
+
+    // A slot for a new pointer: an unused one, else that of a pointer that has left and has no
+    // press or release left to report this frame.
+    PointerState* slot() noexcept
+    {
+        if (pointerCount < PointerLimit) return pointers + pointerCount++;
+        for (auto& state : pointers) {
+            if (!state.active && !state.pressed && !state.released) return &state;
+        }
+        return nullptr;
+    }
 };
 
 State::State() noexcept : pImpl(new (std::nothrow) Impl)
@@ -73,9 +85,7 @@ State* State::gen() noexcept
 
 Result State::begin(float time) noexcept
 {
-    if (!pImpl || !std::isfinite(time) || time < 0.0f) {
-        return Result::InvalidArguments;
-    }
+    if (!std::isfinite(time) || time < 0.0f) return Result::InvalidArguments;
     if (pImpl->frame == UINT64_MAX) return Result::InsufficientCondition;
     for (auto& state : pImpl->keys) {
         state.previous = state.down;
@@ -97,7 +107,7 @@ Result State::begin(float time) noexcept
 
 Result State::input(const InputEvent& event) noexcept
 {
-    if (!pImpl || !validEvent(event)) return Result::InvalidArguments;
+    if (!validEvent(event)) return Result::InvalidArguments;
     pImpl->time = event.time;
     if (event.kind == InputKind::KeyDown || event.kind == InputKind::KeyUp) {
         auto& state = pImpl->keys[static_cast<uint32_t>(event.key)];
@@ -118,8 +128,9 @@ Result State::input(const InputEvent& event) noexcept
     auto state = pImpl->pointer(event.pointer);
     if (!state) {
         if (event.kind == InputKind::PointerCancel) return Result::Success;
-        if (pImpl->pointerCount == PointerLimit) return Result::InsufficientCondition;
-        state = pImpl->pointers + pImpl->pointerCount++;
+        state = pImpl->slot();
+        if (!state) return Result::InsufficientCondition;
+        *state = {};
         state->pointer = event.pointer;
     }
     state->position = event.position;
@@ -140,7 +151,7 @@ Result State::input(const InputEvent& event) noexcept
 
 Result State::release(float time) noexcept
 {
-    if (!pImpl || !std::isfinite(time) || time < 0.0f) return Result::InvalidArguments;
+    if (!std::isfinite(time) || time < 0.0f) return Result::InvalidArguments;
     for (auto& state : pImpl->keys) {
         if (!state.down) continue;
         state.down = false;
@@ -159,14 +170,13 @@ Result State::release(float time) noexcept
 
 Result State::key(Key key, DigitalState& state) const noexcept
 {
-    if (!pImpl || !validKey(key)) return Result::InvalidArguments;
+    if (!validKey(key)) return Result::InvalidArguments;
     state = pImpl->keys[static_cast<uint32_t>(key)];
     return Result::Success;
 }
 
 Result State::pointer(uint32_t pointer, PointerState& state) const noexcept
 {
-    if (!pImpl) return Result::InvalidArguments;
     auto found = pImpl->pointer(pointer);
     if (!found) return Result::InsufficientCondition;
     state = *found;
@@ -175,12 +185,12 @@ Result State::pointer(uint32_t pointer, PointerState& state) const noexcept
 
 uint64_t State::frame() const noexcept
 {
-    return pImpl ? pImpl->frame : 0u;
+    return pImpl->frame;
 }
 
 float State::time() const noexcept
 {
-    return pImpl ? pImpl->time : 0.0f;
+    return pImpl->time;
 }
 
 struct ActionMap::Impl
@@ -225,7 +235,7 @@ struct ActionMap::Impl
                 uint8_t button, const Vec2& value) noexcept
     {
         auto length = _length(action);
-        if (!length || length == UINT32_MAX || !_finite(value)
+        if (!length || !_finite(value)
             || (value.x == 0.0f && value.y == 0.0f)) {
             return Result::InvalidArguments;
         }
@@ -268,22 +278,21 @@ ActionMap* ActionMap::gen() noexcept
 
 Result ActionMap::key(const char* action, Key key, const Vec2& value) noexcept
 {
-    if (!pImpl || !validKey(key)) return Result::InvalidArguments;
+    if (!validKey(key)) return Result::InvalidArguments;
     return pImpl->bind(action, Source::Key, key, 0u, 0u, value);
 }
 
 Result ActionMap::pointer(const char* action, uint32_t button, const Vec2& value,
                           uint32_t pointer) noexcept
 {
-    if (!pImpl || button >= 32u) return Result::InvalidArguments;
+    if (button >= 32u) return Result::InvalidArguments;
     return pImpl->bind(action, Source::Pointer, Key::Unknown, pointer,
                        static_cast<uint8_t>(button), value);
 }
 
 Result ActionMap::remove(const char* action) noexcept
 {
-    auto length = _length(action);
-    if (!pImpl || !length || length == UINT32_MAX) return Result::InvalidArguments;
+    if (!_length(action)) return Result::InvalidArguments;
     auto removed = false;
     for (auto i = 0u; i < pImpl->bindingCount;) {
         if (std::strcmp(pImpl->bindings[i].action, action) != 0) {
@@ -298,16 +307,13 @@ Result ActionMap::remove(const char* action) noexcept
 
 void ActionMap::clear() noexcept
 {
-    if (pImpl) pImpl->bindingCount = 0u;
+    pImpl->bindingCount = 0u;
 }
 
 Result ActionMap::state(const State* input, const char* action,
                         ActionState& state) const noexcept
 {
-    auto length = _length(action);
-    if (!pImpl || !input || !length || length == UINT32_MAX) {
-        return Result::InvalidArguments;
-    }
+    if (!input || !_length(action)) return Result::InvalidArguments;
     ActionState sampled;
     auto found = false;
     auto previous = false;
@@ -318,38 +324,24 @@ Result ActionMap::state(const State* input, const char* action,
         auto& binding = pImpl->bindings[i];
         if (std::strcmp(binding.action, action) != 0) continue;
         found = true;
-        auto wasDown = false;
-        auto down = false;
-        auto wasPressed = false;
-        auto wasReleased = false;
+        // The binding's key, or its button of a pointer the input has seen.
+        DigitalState digital;
+        PointerState pointer;
         if (binding.source == Source::Key) {
-            DigitalState digital;
-            auto result = input->key(binding.key, digital);
-            if (result != Result::Success) return result;
-            wasDown = digital.previous;
-            down = digital.down;
-            wasPressed = digital.pressed;
-            wasReleased = digital.released;
-        } else {
-            PointerState pointer;
-            auto result = input->pointer(binding.pointer, pointer);
-            if (result != Result::Success && result != Result::InsufficientCondition) {
-                return result;
-            }
-            if (result == Result::Success) {
-                auto mask = 1u << binding.button;
-                wasDown = (pointer.previousButtons & mask) != 0u;
-                down = (pointer.buttons & mask) != 0u;
-                wasPressed = (pointer.pressed & mask) != 0u;
-                wasReleased = (pointer.released & mask) != 0u;
-            }
+            input->key(binding.key, digital);
+        } else if (input->pointer(binding.pointer, pointer) == Result::Success) {
+            auto mask = 1u << binding.button;
+            digital.previous = (pointer.previousButtons & mask) != 0u;
+            digital.down = (pointer.buttons & mask) != 0u;
+            digital.pressed = (pointer.pressed & mask) != 0u;
+            digital.released = (pointer.released & mask) != 0u;
         }
-        if (wasDown) sampled.previous = sampled.previous + binding.value;
-        if (down) sampled.value = sampled.value + binding.value;
-        previous = previous || wasDown;
-        current = current || down;
-        pressed = pressed || wasPressed;
-        released = released || wasReleased;
+        if (digital.previous) sampled.previous = sampled.previous + binding.value;
+        if (digital.down) sampled.value = sampled.value + binding.value;
+        previous = previous || digital.previous;
+        current = current || digital.down;
+        pressed = pressed || digital.pressed;
+        released = released || digital.released;
     }
     if (!found) return Result::InsufficientCondition;
     sampled.previous = {_clamp(sampled.previous.x), _clamp(sampled.previous.y)};
@@ -364,7 +356,7 @@ Result ActionMap::state(const State* input, const char* action,
 
 uint32_t ActionMap::count() const noexcept
 {
-    return pImpl ? pImpl->bindingCount : 0u;
+    return pImpl->bindingCount;
 }
 
 }  // namespace vis::input

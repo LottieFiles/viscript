@@ -46,20 +46,13 @@ static void _fieldAsset(lua_State* lua, int index,
 static constexpr LuaName<Bus> BUSES[] = {
     {"music", Bus::Music}, {"effect", Bus::Effect}, {"ui", Bus::Ui}};
 
-static LuaCue* _cue(lua_State* lua)
-{
-    auto cue = static_cast<LuaCue*>(luaL_checkudata(lua, 1, CUE_METATABLE));
-    if (!cue->soundscape || !cue->cue) luaL_error(lua, "audio cue is unavailable");
-    return cue;
-}
-
 static int _gain(lua_State* lua)
 {
     detail::luaTiming(lua, 4);
     if (!detail::luaAuthoring(lua)) {
         return luaL_error(lua, "audio authoring is unavailable after loading");
     }
-    auto cue = _cue(lua);
+    auto cue = static_cast<LuaCue*>(luaL_checkudata(lua, 1, CUE_METATABLE));
     auto value = _number(lua, 2, "audio gain");
     auto begin = _number(lua, 3, "audio gain begin");
     auto duration = lua_isnoneornil(lua, 4) ? 1.0f : _number(lua, 4, "audio gain duration");

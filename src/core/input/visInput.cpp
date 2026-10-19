@@ -102,7 +102,7 @@ struct Controller::Impl
     // the controller, a period, room under the binding limit and no pointer follow on target.
     Result admit(const Object* target, float period, const Object* controller) const noexcept
     {
-        if (!scene || !target || !std::isfinite(period) || period < 0.0f
+        if (!target || !std::isfinite(period) || period < 0.0f
             || scene->object(target->id()) != target || family(target, controller)) {
             return Result::InvalidArguments;
         }
@@ -127,13 +127,6 @@ struct Controller::Impl
         return stateCount++;
     }
 
-    float elapsed(float time, float started) const noexcept
-    {
-        auto value = time - started;
-        if (value < 0.0f && scene && scene->duration() > 0.0f) value += scene->duration();
-        return std::fmax(0.0f, value);
-    }
-
     static Motion interpolate(const Motion& from, const Motion& to,
                               float progress) noexcept
     {
@@ -145,10 +138,17 @@ struct Controller::Impl
 
     void sample(const State& state, float time, Vec3& shift, Vec3& rotation) const noexcept
     {
-        auto cycle = scene ? scene->duration() : 0.0f;
-        auto motion = detail::retargetSample(state.motion, time, cycle, interpolate);
+        auto motion = detail::retargetSample(state.motion, time, scene->duration(), interpolate);
         shift = motion.shift;
         rotation = motion.rotation;
+    }
+
+    // Whether binding moves the state at index and its key is down.
+    bool down(const KeyBinding& binding, uint32_t index) const noexcept
+    {
+        DigitalState key;
+        inputState->key(binding.config.key, key);
+        return binding.state == index && key.down;
     }
 
     void sample(uint32_t index, float time, Vec3& shift, Vec3& rotation) noexcept
@@ -156,12 +156,9 @@ struct Controller::Impl
         sample(states[index], time, shift, rotation);
         for (auto i = 0u; i < keyCount; i++) {
             auto& binding = keys[i];
-            DigitalState key;
-            if (binding.state != index || !inputState
-                || inputState->key(binding.config.key, key) != Result::Success
-                || !key.down) continue;
-            auto delta = elapsed(time, binding.sampled);
-            binding.held += delta;
+            if (!down(binding, index)) continue;
+            binding.held += static_cast<float>(
+                detail::retargetElapsed(time, binding.sampled, scene->duration()));
             binding.sampled = time;
             shift = shift + binding.config.shift * _keyAmount(binding.held,
                                                                binding.config.period);
@@ -173,16 +170,11 @@ struct Controller::Impl
         Vec3 shift;
         Vec3 rotation;
         sample(index, time, shift, rotation);
-        auto& state = states[index];
-        detail::retargetSet(state.motion, Motion{shift, rotation});
+        detail::retargetSet(states[index].motion, Motion{shift, rotation});
         for (auto i = 0u; i < keyCount; i++) {
-            auto& binding = keys[i];
-            DigitalState key;
-            if (binding.state != index || !inputState
-                || inputState->key(binding.config.key, key) != Result::Success
-                || !key.down) continue;
-            binding.sampled = time;
-            binding.held = 0.0f;
+            if (!down(keys[i], index)) continue;
+            keys[i].sampled = time;
+            keys[i].held = 0.0f;
         }
     }
 
@@ -197,9 +189,8 @@ struct Controller::Impl
     void transition(State& state, float time, const Vec3& shift, const Vec3& rotation,
                     float period) noexcept
     {
-        auto cycle = scene ? scene->duration() : 0.0f;
         detail::retarget(state.motion, Motion{shift, rotation}, time, period,
-                         AnimCurve::preset(AnimCurvePreset::Smooth), cycle,
+                         AnimCurve::preset(AnimCurvePreset::Smooth), scene->duration(),
                          interpolate);
     }
 };
@@ -213,7 +204,7 @@ Controller::Controller(Scene* scene) noexcept : pImpl(new (std::nothrow) Impl)
 
 Controller::~Controller()
 {
-    if (pImpl && pImpl->scene) pImpl->scene->runtimeRemove(this);
+    if (pImpl) pImpl->scene->runtimeRemove(this);
     delete pImpl;
 }
 
@@ -231,29 +222,27 @@ Controller* Controller::gen(Scene* scene) noexcept
     modifier.input = modifyInput;
     modifier.data = controller;
     modifier.key = &RuntimeKey;
-    if (scene->runtimeAdd(&modifier) != Result::Success) {
-        delete controller;
-        return nullptr;
+    if (scene->runtimeAdd(&modifier) == Result::Success
+        && scene->add(controller) == Result::Success) {
+        return controller;
     }
-    if (scene->add(controller) == Result::Success) return controller;
-    scene->runtimeRemove(controller);
     delete controller;
     return nullptr;
 }
 
 Scene* Controller::scene() const noexcept
 {
-    return pImpl ? pImpl->scene : nullptr;
+    return pImpl->scene;
 }
 
 State* Controller::state() const noexcept
 {
-    return pImpl ? pImpl->inputState : nullptr;
+    return pImpl->inputState;
 }
 
 Result Controller::pointerFollow(const PointerFollow& binding) noexcept
 {
-    if (!pImpl || !validRegion(binding.region) || !_finite(binding.targetOrigin)
+    if (!validRegion(binding.region) || !_finite(binding.targetOrigin)
         || !_finite(binding.mapOrigin) || !_finite(binding.mapX) || !_finite(binding.mapY)
         || !std::isfinite(binding.angleOffset)) {
         return Result::InvalidArguments;
@@ -274,7 +263,7 @@ Result Controller::pointerFollow(const PointerFollow& binding) noexcept
 
 Result Controller::keyMove(const KeyMove& binding) noexcept
 {
-    if (!pImpl || !validKey(binding.key) || !_finite(binding.shift)) {
+    if (!validKey(binding.key) || !_finite(binding.shift)) {
         return Result::InvalidArguments;
     }
     auto result = pImpl->admit(binding.target, binding.period, this);
@@ -294,63 +283,17 @@ Result Controller::keyMove(const KeyMove& binding) noexcept
 
 InputResult Controller::input(const InputEvent& event) noexcept
 {
-    if (!pImpl || !validEvent(event)) return {false, false, Result::InvalidArguments};
+    if (!validEvent(event)) return {false, false, Result::InvalidArguments};
     InputResult result;
-    if (event.kind == InputKind::KeyDown && event.modifiers & ShortcutModifiers) {
-        return result;
-    }
-    DigitalState previous;
-    auto keyEvent = event.kind == InputKind::KeyDown || event.kind == InputKind::KeyUp;
-    if (keyEvent && pImpl->inputState->key(event.key, previous) != Result::Success) {
-        return {false, false, Result::InvalidArguments};
-    }
-    if (!keyEvent) {
-        result.status = pImpl->inputState->input(event);
-        if (result.status != Result::Success) return result;
-    }
-    if (event.kind == InputKind::PointerMove || event.kind == InputKind::PointerCancel) {
-        for (auto i = 0u; i < pImpl->pointerCount; i++) {
-            auto& binding = pImpl->pointers[i];
-            auto& config = binding.config;
-            auto& state = pImpl->states[binding.state];
-            // A cancel leaves every region.
-            if (event.kind == InputKind::PointerCancel
-                || !contains(config.region, event.position)) {
-                if (!binding.hovered) continue;
-                binding.hovered = false;
-                result.handled = true;
-                if (!config.resetOnLeave) continue;
-                pImpl->transition(state, event.time, {}, {}, config.period);
-                result.redraw = true;
-                continue;
-            }
-            binding.hovered = true;
-            auto u = clamp01((event.position.x - config.region.x) / config.region.width);
-            auto v = clamp01((event.position.y - config.region.y) / config.region.height);
-            auto mapped = config.mapOrigin + config.mapX * u + config.mapY * v;
-            Vec3 currentShift;
-            Vec3 currentRotation;
-            pImpl->sample(state, event.time, currentShift, currentRotation);
-            auto targetShift = mapped - config.targetOrigin;
-            auto targetRotation = currentRotation;
-            auto direction = targetShift - currentShift;
-            if (config.rotate && (std::fabs(direction.x) > 1.0e-6f
-                                  || std::fabs(direction.y) > 1.0e-6f)) {
-                targetRotation.z = _angle(currentRotation.z,
-                    std::atan2(direction.y, direction.x) + config.angleOffset);
-            }
-            pImpl->transition(state, event.time, targetShift, targetRotation, config.period);
-            result.handled = true;
-            result.redraw = true;
-        }
-    } else if (keyEvent) {
+    if (event.kind == InputKind::KeyDown || event.kind == InputKind::KeyUp) {
+        auto down = event.kind == InputKind::KeyDown;
+        if (down && event.modifiers & ShortcutModifiers) return result;
+        // A key that goes down or up restarts the moves of its targets from where they are.
+        DigitalState previous;
+        pImpl->inputState->key(event.key, previous);
         auto moved = pImpl->hasMove(event.key);
-        if (event.kind == InputKind::KeyDown) {
-            result.handled = moved;
-            if (previous.down) {
-                result.status = pImpl->inputState->input(event);
-                return result;
-            }
+        result.handled = moved && (down || previous.down);
+        if (previous.down != down) {
             for (auto i = 0u; i < pImpl->keyCount; i++) {
                 auto& binding = pImpl->keys[i];
                 if (binding.config.key != event.key) continue;
@@ -358,52 +301,68 @@ InputResult Controller::input(const InputEvent& event) noexcept
                 binding.sampled = event.time;
                 binding.held = 0.0f;
             }
-            result.status = pImpl->inputState->input(event);
-            if (result.status != Result::Success) return result;
-            result.redraw = moved;
-        } else {
-            if (!previous.down) {
-                result.status = pImpl->inputState->input(event);
-                return result;
-            }
-            result.handled = moved;
-            for (auto i = 0u; i < pImpl->keyCount; i++) {
-                auto& binding = pImpl->keys[i];
-                if (binding.config.key != event.key) continue;
-                pImpl->rebase(binding.state, event.time);
-            }
-            result.status = pImpl->inputState->input(event);
-            if (result.status != Result::Success) return result;
             result.redraw = moved;
         }
+        result.status = pImpl->inputState->input(event);
+        return result;
+    }
+    result.status = pImpl->inputState->input(event);
+    if (result.status != Result::Success) return result;
+    if (event.kind != InputKind::PointerMove && event.kind != InputKind::PointerCancel) {
+        return result;
+    }
+    for (auto i = 0u; i < pImpl->pointerCount; i++) {
+        auto& binding = pImpl->pointers[i];
+        auto& config = binding.config;
+        auto& state = pImpl->states[binding.state];
+        // A cancel leaves every region.
+        if (event.kind == InputKind::PointerCancel || !contains(config.region, event.position)) {
+            if (!binding.hovered) continue;
+            binding.hovered = false;
+            result.handled = true;
+            if (!config.resetOnLeave) continue;
+            pImpl->transition(state, event.time, {}, {}, config.period);
+            result.redraw = true;
+            continue;
+        }
+        binding.hovered = true;
+        auto u = clamp01((event.position.x - config.region.x) / config.region.width);
+        auto v = clamp01((event.position.y - config.region.y) / config.region.height);
+        auto mapped = config.mapOrigin + config.mapX * u + config.mapY * v;
+        Vec3 currentShift;
+        Vec3 currentRotation;
+        pImpl->sample(state, event.time, currentShift, currentRotation);
+        auto targetShift = mapped - config.targetOrigin;
+        auto targetRotation = currentRotation;
+        auto direction = targetShift - currentShift;
+        if (config.rotate
+            && (std::fabs(direction.x) > 1.0e-6f || std::fabs(direction.y) > 1.0e-6f)) {
+            targetRotation.z = _angle(currentRotation.z,
+                                      std::atan2(direction.y, direction.x) + config.angleOffset);
+        }
+        pImpl->transition(state, event.time, targetShift, targetRotation, config.period);
+        result.handled = true;
+        result.redraw = true;
     }
     return result;
 }
 
 InputResult Controller::release(float time) noexcept
 {
-    if (!pImpl || !std::isfinite(time) || time < 0.0f) {
-        return {false, false, Result::InvalidArguments};
-    }
+    if (!std::isfinite(time) || time < 0.0f) return {false, false, Result::InvalidArguments};
+    // A key-up for every key and a cancel for the pointer; neither fails at a valid time.
     InputResult released;
+    InputEvent event;
+    event.kind = InputKind::KeyUp;
+    event.time = time;
     for (auto value = static_cast<uint32_t>(Key::ArrowLeft); value < KeyCount; value++) {
-        auto key = static_cast<Key>(value);
-        DigitalState state;
-        if (pImpl->inputState->key(key, state) != Result::Success || !state.down) continue;
-        InputEvent event;
-        event.kind = InputKind::KeyUp;
-        event.key = key;
-        event.time = time;
+        event.key = static_cast<Key>(value);
         auto result = input(event);
-        if (result.status != Result::Success) return result;
         released.handled = released.handled || result.handled;
         released.redraw = released.redraw || result.redraw;
     }
-    InputEvent cancel;
-    cancel.kind = InputKind::PointerCancel;
-    cancel.time = time;
-    auto result = input(cancel);
-    if (result.status != Result::Success) return result;
+    event.kind = InputKind::PointerCancel;
+    auto result = input(event);
     released.handled = released.handled || result.handled;
     released.redraw = released.redraw || result.redraw;
     released.status = pImpl->inputState->release(time);
@@ -412,7 +371,7 @@ InputResult Controller::release(float time) noexcept
 
 Result Controller::camera(CameraAction action, const Vec2& delta) noexcept
 {
-    return pImpl ? pImpl->camera.act(action, delta) : Result::InvalidArguments;
+    return pImpl->camera.act(action, delta);
 }
 
 Result Controller::cameraMove(const Vec2& delta) noexcept
@@ -437,50 +396,39 @@ Result Controller::cameraReset() noexcept
 
 Result Controller::cameraView(CameraView view) noexcept
 {
-    return pImpl ? pImpl->camera.view(view) : Result::InvalidArguments;
+    return pImpl->camera.view(view);
 }
 
 Result Controller::modifyObject(const Object* object, float time, Mat4& model, float&,
                                 float&, void* data) noexcept
 {
-    auto controller = static_cast<Controller*>(data);
-    if (!controller || !controller->pImpl || !object
-        || !std::isfinite(time) || time < 0.0f) {
-        return Result::InvalidArguments;
-    }
-    auto& impl = *controller->pImpl;
-    for (auto i = 0u; i < impl.stateCount; i++) {
-        auto& state = impl.states[i];
-        if (state.object != object) continue;
-        Vec3 shift;
-        Vec3 rotation;
-        impl.sample(i, time, shift, rotation);
-        auto transform = Mat4::translate(state.origin + shift)
-                       * Mat4::rotateZ(rotation.z)
-                       * Mat4::rotateY(rotation.y)
-                       * Mat4::rotateX(rotation.x)
-                       * Mat4::translate(state.origin * -1.0f);
-        model = transform * model;
-        return _finite(model) ? Result::Success : Result::InvalidArguments;
-    }
+    if (!std::isfinite(time) || time < 0.0f) return Result::InvalidArguments;
+    auto& impl = *static_cast<Controller*>(data)->pImpl;
+    auto index = impl.find(object);
+    if (index == UINT32_MAX) return Result::Success;
+    auto& state = impl.states[index];
+    Vec3 shift;
+    Vec3 rotation;
+    impl.sample(index, time, shift, rotation);
+    auto transform = Mat4::translate(state.origin + shift)
+                   * Mat4::rotateZ(rotation.z)
+                   * Mat4::rotateY(rotation.y)
+                   * Mat4::rotateX(rotation.x)
+                   * Mat4::translate(state.origin * -1.0f);
+    model = transform * model;
     return Result::Success;
 }
 
 Result Controller::modifyCamera(float time, Camera& camera, CameraView& view,
                                 void* data) noexcept
 {
-    auto controller = static_cast<Controller*>(data);
-    if (!controller || !controller->pImpl || !std::isfinite(time) || time < 0.0f) {
-        return Result::InvalidArguments;
-    }
-    return controller->pImpl->camera.apply(camera, view);
+    if (!std::isfinite(time) || time < 0.0f) return Result::InvalidArguments;
+    return static_cast<Controller*>(data)->pImpl->camera.apply(camera, view);
 }
 
 Result Controller::modifyInput(const CameraInput& input, void* data) noexcept
 {
-    auto controller = static_cast<Controller*>(data);
-    return controller ? controller->camera(input.action, input.delta)
-                      : Result::InvalidArguments;
+    return static_cast<Controller*>(data)->camera(input.action, input.delta);
 }
 
 }  // namespace vis::input

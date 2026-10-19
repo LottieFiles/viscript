@@ -169,10 +169,38 @@ static void rawState()
     for (auto i = 0u; i < State::PointerLimit; i++) {
         event = pointer(static_cast<float>(i), 0.0f, 0.0f);
         event.pointer = i;
+        event.delta = {1.0f, 0.0f};
         CHECK(state->input(event) == Result::Success);
     }
     event.pointer = State::PointerLimit;
     CHECK(state->input(event) == Result::InsufficientCondition);
+
+    // A pointer that has left gives its slot to a new one once its edges are reported, so
+    // touches, which bring a new ID each, keep working past the limit.
+    event.kind = InputKind::PointerCancel;
+    event.pointer = 5u;
+    CHECK(state->input(event) == Result::Success);
+    event.kind = InputKind::PointerMove;
+    event.pointer = State::PointerLimit;
+    CHECK(state->input(event) == Result::Success);
+    CHECK(state->pointer(5u, pointerState) == Result::InsufficientCondition);
+    CHECK(state->pointer(State::PointerLimit, pointerState) == Result::Success);
+    CHECK(pointerState.active && precise(pointerState.delta.x, 1.0f));
+
+    event.kind = InputKind::PointerDown;
+    event.pointer = 3u;
+    event.button = 0;
+    event.buttons = 1u;
+    CHECK(state->input(event) == Result::Success);
+    event.kind = InputKind::PointerCancel;
+    CHECK(state->input(event) == Result::Success);
+    event.kind = InputKind::PointerMove;
+    event.pointer = State::PointerLimit + 1u;
+    event.buttons = 0u;
+    CHECK(state->input(event) == Result::InsufficientCondition);
+    CHECK(state->begin(0.1f) == Result::Success);
+    CHECK(state->input(event) == Result::Success);
+    CHECK(state->pointer(3u, pointerState) == Result::InsufficientCondition);
     delete state;
 }
 

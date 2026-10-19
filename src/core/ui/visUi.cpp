@@ -62,7 +62,8 @@ static UITransform _buttonLerp(const UITransform& from, const UITransform& to,
     return output;
 }
 
-static bool _compose(const UITransform& transform, Mat4& model, float& opacity,
+// Applies transform over model, opacity and progress; the renderer checks what comes out.
+static void _compose(const UITransform& transform, Mat4& model, float& opacity,
                      float& progress) noexcept
 {
     auto local = Mat4::translate(transform.shift)
@@ -73,7 +74,6 @@ static bool _compose(const UITransform& transform, Mat4& model, float& opacity,
     model = local * model;
     opacity = clamp01(opacity * transform.opacity);
     progress = clamp01(progress * transform.progress);
-    return _finite(model) && std::isfinite(opacity) && std::isfinite(progress);
 }
 
 }  // namespace
@@ -445,7 +445,7 @@ struct Panel::Impl
     // swatch.
     bool bindable(const Object* object) const noexcept
     {
-        if (!object || !scene || scene->object(object->id()) != object) return false;
+        if (!object || scene->object(object->id()) != object) return false;
         for (auto i = 0u; i < bindingCount; i++) {
             auto& binding = bindings[i];
             if (binding.kind == BindingKind::SampleArea
@@ -472,7 +472,7 @@ Panel::Panel(Scene* scene) noexcept : UIObject(nullptr, {}), pImpl(new (std::not
 
 Panel::~Panel()
 {
-    if (pImpl && pImpl->scene) pImpl->scene->runtimeRemove(this);
+    if (pImpl) pImpl->scene->runtimeRemove(this);
     delete pImpl;
 }
 
@@ -491,34 +491,28 @@ Panel* Panel::gen(Scene* scene) noexcept
     modifier.input = modifyInput;
     modifier.data = panel;
     modifier.key = &RuntimeKey;
-    if (scene->runtimeAdd(&modifier) != Result::Success) {
-        delete panel;
-        return nullptr;
+    if (scene->runtimeAdd(&modifier) == Result::Success
+        && scene->add(panel) == Result::Success) {
+        return panel;
     }
-    if (scene->add(panel) == Result::Success) return panel;
-    scene->runtimeRemove(panel);
     delete panel;
     return nullptr;
 }
 
 Scene* Panel::scene() const noexcept
 {
-    return pImpl ? pImpl->scene : nullptr;
+    return pImpl->scene;
 }
 
+// add() sets a control's panel as it lists the control.
 bool Panel::registered(const UIObject* control) const noexcept
 {
-    if (!pImpl || !control) return false;
-    for (auto i = 0u; i < pImpl->controlCount; i++) {
-        if (pImpl->controls[i] == control) return true;
-    }
-    return false;
+    return control && control->uiPanel == this;
 }
 
 Result Panel::add(UIObject* control) noexcept
 {
-    if (!pImpl || !control || control == this || control->uiPanel || registered(control)
-        || !validRegion(control->region())) {
+    if (!control || control == this || control->uiPanel || !validRegion(control->region())) {
         return Result::InvalidArguments;
     }
     if (control->visual()) {
@@ -557,17 +551,16 @@ Result Panel::add(UIObject* control) noexcept
 
 uint32_t Panel::count() const noexcept
 {
-    return pImpl ? pImpl->controlCount : 0u;
+    return pImpl->controlCount;
 }
 
 UIObject* Panel::controlAt(uint32_t index) const noexcept
 {
-    return pImpl && index < pImpl->controlCount ? pImpl->controls[index] : nullptr;
+    return index < pImpl->controlCount ? pImpl->controls[index] : nullptr;
 }
 
 void Panel::invalidate(UIObject* control) noexcept
 {
-    if (!pImpl || !control) return;
     auto changed = false;
     if (pImpl->hovered == control) {
         pImpl->hovered = nullptr;
@@ -584,7 +577,6 @@ void Panel::invalidate(UIObject* control) noexcept
 
 void Panel::resetInteraction() noexcept
 {
-    if (!pImpl) return;
     auto captured = pImpl->captured;
     auto hovered = pImpl->hovered;
     if (captured) {
@@ -604,7 +596,7 @@ void Panel::resetInteraction() noexcept
 
 InputResult Panel::input(const InputEvent& event) noexcept
 {
-    if (!pImpl || !_valid(event)) return {};
+    if (!_valid(event)) return {};
     InputResult result;
     auto consumePending = [this, &result]() {
         result.handled = result.handled || pImpl->pendingRelease;
@@ -790,7 +782,7 @@ InputResult Panel::input(const InputEvent& event) noexcept
 
 Result Panel::bind(Button* control, CameraAction action, const Vec2& delta) noexcept
 {
-    if (!pImpl || !registered(control) || control->toggleMode
+    if (!registered(control) || control->toggleMode
         || static_cast<uint8_t>(action) > static_cast<uint8_t>(CameraAction::View3D)
         || !_finite(delta)) {
         return Result::InvalidArguments;
@@ -806,7 +798,7 @@ Result Panel::bind(Button* control, CameraAction action, const Vec2& delta) noex
 Result Panel::bind(Button* control, Object* object, const UITransform& transform,
                    float duration) noexcept
 {
-    if (!pImpl || !registered(control) || control->toggleMode || !_valid(transform)
+    if (!registered(control) || control->toggleMode || !_valid(transform)
         || !std::isfinite(duration) || duration < 0.0f || !pImpl->bindable(object)) {
         return Result::InvalidArguments;
     }
@@ -822,7 +814,7 @@ Result Panel::bind(Button* control, Object* object, const UITransform& transform
 Result Panel::toggle(Button* control, Object* object, const UITransform& off,
                      const UITransform& on, bool value, float duration) noexcept
 {
-    if (!pImpl || !registered(control) || !_valid(off) || !_valid(on)
+    if (!registered(control) || !_valid(off) || !_valid(on)
         || !std::isfinite(duration) || duration < 0.0f || !pImpl->bindable(object)) {
         return Result::InvalidArguments;
     }
@@ -865,8 +857,7 @@ Result Panel::toggle(Button* control, Object* object, const UITransform& off,
 Result Panel::bind(Slider* control, Object* object, const UITransform& from,
                    const UITransform& to) noexcept
 {
-    if (!pImpl || !registered(control) || !_valid(from) || !_valid(to)
-        || !pImpl->bindable(object)) {
+    if (!registered(control) || !_valid(from) || !_valid(to) || !pImpl->bindable(object)) {
         return Result::InvalidArguments;
     }
     Impl::Binding binding;
@@ -880,8 +871,7 @@ Result Panel::bind(Slider* control, Object* object, const UITransform& from,
 
 Result Panel::bind(SampleArea* control, const SampleBinding& sample) noexcept
 {
-    if (!pImpl || !registered(control) || !pImpl->scene
-        || !_finite(sample.markerOrigin) || !_finite(sample.markerX)
+    if (!registered(control) || !_finite(sample.markerOrigin) || !_finite(sample.markerX)
         || !_finite(sample.markerY)) {
         return Result::InvalidArguments;
     }
@@ -968,7 +958,7 @@ Result Panel::bind(SampleArea* control, const SampleBinding& sample) noexcept
 
 Result Panel::sampler(SampleCallback callback, void* data) noexcept
 {
-    if (!pImpl || (!callback && data)) return Result::InvalidArguments;
+    if (!callback && data) return Result::InvalidArguments;
     pImpl->sample = callback;
     pImpl->sampleData = data;
     return Result::Success;
@@ -977,10 +967,7 @@ Result Panel::sampler(SampleCallback callback, void* data) noexcept
 Result Panel::states(Button* control, Object* hover, Object* pressed) noexcept
 {
     auto normal = control ? control->visual() : nullptr;
-    if (!pImpl || !registered(control) || !normal || (!hover && !pressed)
-        || !pImpl->scene) {
-        return Result::InvalidArguments;
-    }
+    if (!registered(control) || !normal || (!hover && !pressed)) return Result::InvalidArguments;
     Object* faces[] = {normal, hover, pressed};
     for (auto i = 0u; i < 3u; i++) {
         if (!faces[i]) continue;
@@ -1044,7 +1031,7 @@ Result Panel::states(Button* control, Object* hover, Object* pressed) noexcept
 
 Result Panel::camera(CameraAction action, const Vec2& delta) noexcept
 {
-    return pImpl ? pImpl->camera.act(action, delta) : Result::InvalidArguments;
+    return pImpl->camera.act(action, delta);
 }
 
 Result Panel::cameraMove(const Vec2& delta) noexcept
@@ -1069,16 +1056,14 @@ Result Panel::cameraReset() noexcept
 
 Result Panel::cameraView(CameraView view) noexcept
 {
-    return pImpl ? pImpl->camera.view(view) : Result::InvalidArguments;
+    return pImpl->camera.view(view);
 }
 
 Result Panel::modifyObject(const Object* object, float time, Mat4& model, float& opacity,
                            float& progress, void* data) noexcept
 {
+    if (!std::isfinite(time) || time < 0.0f) return Result::InvalidArguments;
     auto panel = static_cast<Panel*>(data);
-    if (!panel || !panel->pImpl || !object || !std::isfinite(time) || time < 0.0f) {
-        return Result::InvalidArguments;
-    }
     for (auto i = 0u; i < panel->pImpl->bindingCount; i++) {
         auto& binding = panel->pImpl->bindings[i];
         if (binding.kind == Impl::BindingKind::SampleArea) {
@@ -1092,9 +1077,7 @@ Result Panel::modifyObject(const Object* object, float time, Mat4& model, float&
             transform.shift = binding.markerOrigin
                             + binding.markerX * area->value().x
                             + binding.markerY * area->value().y;
-            if (!_compose(transform, model, opacity, progress)) {
-                return Result::InvalidArguments;
-            }
+            _compose(transform, model, opacity, progress);
             continue;
         }
         if (binding.kind == Impl::BindingKind::ButtonStates) {
@@ -1115,22 +1098,15 @@ Result Panel::modifyObject(const Object* object, float time, Mat4& model, float&
             continue;
         }
         if (binding.object != object) continue;
-        if (binding.kind == Impl::BindingKind::ButtonObject
-            || binding.kind == Impl::BindingKind::ButtonToggle) {
-            if (binding.active) {
-                auto transform = detail::retargetSample(
-                    binding.transition, time, panel->pImpl->scene->duration(),
-                    _buttonLerp);
-                if (!_compose(transform, model, opacity, progress)) {
-                    return Result::InvalidArguments;
-                }
-            }
+        if ((binding.kind == Impl::BindingKind::ButtonObject
+             || binding.kind == Impl::BindingKind::ButtonToggle)
+            && binding.active) {
+            auto transform = detail::retargetSample(binding.transition, time,
+                                                    panel->pImpl->scene->duration(), _buttonLerp);
+            _compose(transform, model, opacity, progress);
         } else if (binding.kind == Impl::BindingKind::SliderObject) {
             auto slider = static_cast<Slider*>(binding.control);
-            if (!_compose(_lerp(binding.from, binding.to, slider->value()), model, opacity,
-                          progress)) {
-                return Result::InvalidArguments;
-            }
+            _compose(_lerp(binding.from, binding.to, slider->value()), model, opacity, progress);
         }
     }
     return Result::Success;
@@ -1138,10 +1114,8 @@ Result Panel::modifyObject(const Object* object, float time, Mat4& model, float&
 
 Result Panel::modifyFill(const Object* object, float time, Color& fill, void* data) noexcept
 {
+    if (!std::isfinite(time) || time < 0.0f) return Result::InvalidArguments;
     auto panel = static_cast<Panel*>(data);
-    if (!panel || !panel->pImpl || !object || !std::isfinite(time) || time < 0.0f) {
-        return Result::InvalidArguments;
-    }
     for (auto i = 0u; i < panel->pImpl->bindingCount; i++) {
         auto& binding = panel->pImpl->bindings[i];
         if (binding.kind != Impl::BindingKind::SampleArea || binding.swatch != object) {
@@ -1155,17 +1129,13 @@ Result Panel::modifyFill(const Object* object, float time, Color& fill, void* da
 
 Result Panel::modifyCamera(float time, Camera& camera, CameraView& view, void* data) noexcept
 {
-    auto panel = static_cast<Panel*>(data);
-    if (!panel || !panel->pImpl || !std::isfinite(time) || time < 0.0f) {
-        return Result::InvalidArguments;
-    }
-    return panel->pImpl->camera.apply(camera, view);
+    if (!std::isfinite(time) || time < 0.0f) return Result::InvalidArguments;
+    return static_cast<Panel*>(data)->pImpl->camera.apply(camera, view);
 }
 
 Result Panel::modifyInput(const CameraInput& input, void* data) noexcept
 {
-    auto panel = static_cast<Panel*>(data);
-    return panel ? panel->camera(input.action, input.delta) : Result::InvalidArguments;
+    return static_cast<Panel*>(data)->camera(input.action, input.delta);
 }
 
 }  // namespace vis::ui

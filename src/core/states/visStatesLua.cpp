@@ -28,9 +28,7 @@ struct LuaController
 static Controller* _controller(lua_State* lua)
 {
     auto handle = static_cast<LuaController*>(luaL_checkudata(lua, 1, StatesMetatable));
-    if (!handle->controller || !handle->controller->scene()) {
-        luaL_error(lua, "states controller is no longer available");
-    }
+    if (!handle->controller) luaL_error(lua, "states controller is no longer available");
     return handle->controller;
 }
 

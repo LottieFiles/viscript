@@ -11,6 +11,7 @@ extern "C" {
 
 #include "vis_lua_runtime.h"
 #include "../common/visFinite.h"
+#include "../common/visMix.h"
 #include "../lua/visLuaExtension.h"
 #include "../lua/visLuaValues.h"
 #include "visLuaRuntimeExtension.h"
@@ -49,7 +50,6 @@ static bool _valid(const SoundEvent& event) noexcept
 
 static void _message(char* output, uint32_t size, const char* message) noexcept
 {
-    if (!output || !size) return;
     if (!message) message = "unknown retained Lua error";
     auto length = std::strlen(message);
     if (length >= size) length = size - 1u;
@@ -78,7 +78,6 @@ struct Runtime::Impl
 
     Scene* scene = nullptr;
     lua_State* lua = nullptr;
-    lua_State* prepared = nullptr;
     Entry states[ObjectLimit];
     Entry staged[ObjectLimit];
     SoundEvent sounds[SoundEventLimit];
@@ -117,8 +116,7 @@ struct Runtime::Impl
     // update() and clear() take any object of the scene but the runtime itself.
     bool accepts(const Object* object, const Runtime* runtime) const noexcept
     {
-        return scene && object && object != runtime && object->id()
-            && scene->object(object->id()) == object;
+        return object && object != runtime && scene->object(object->id()) == object;
     }
 
     // Calls inside a callback change the staged entries, which commit when it succeeds.
@@ -143,9 +141,8 @@ struct Runtime::Impl
 
     const Entry* find(const Object* object) const noexcept
     {
-        auto id = object ? object->id() : 0u;
         for (auto i = 0u; i < stateCount; i++) {
-            if (states[i].object == id) return states + i;
+            if (states[i].object == object->id()) return states + i;
         }
         return nullptr;
     }
@@ -168,46 +165,31 @@ namespace detail
 
 struct RuntimeAccess
 {
-    static Result prepare(Runtime* runtime, lua_State* lua, int callback,
-                          int handle) noexcept
+    // The callback and the handle it gets, as references in the registry of the VM that loads the
+    // scene; retain() keeps that VM once the load succeeds.
+    static void prepare(Runtime* runtime, int callback, int handle) noexcept
     {
-        if (!runtime || !runtime->pImpl || !lua || callback == LUA_NOREF
-            || handle == LUA_NOREF) {
-            return Result::InvalidArguments;
-        }
-        auto& impl = *runtime->pImpl;
-        if (impl.prepared || impl.lua) return Result::InsufficientCondition;
-        impl.prepared = lua;
-        impl.callback = callback;
-        impl.handle = handle;
-        return Result::Success;
+        runtime->pImpl->callback = callback;
+        runtime->pImpl->handle = handle;
     }
 
     static Result retain(Runtime* runtime, lua_State* lua) noexcept
     {
-        if (!runtime || !runtime->pImpl || !lua) return Result::InvalidArguments;
         auto& impl = *runtime->pImpl;
-        if (impl.lua || impl.prepared != lua || impl.callback == LUA_NOREF
-            || impl.handle == LUA_NOREF) {
-            return Result::InsufficientCondition;
-        }
+        if (impl.lua || impl.callback == LUA_NOREF) return Result::InsufficientCondition;
         impl.lua = lua;
-        impl.prepared = nullptr;
         return Result::Success;
     }
 
     static bool running(const Runtime* runtime) noexcept
     {
-        return runtime && runtime->pImpl && runtime->pImpl->running;
+        return runtime->pImpl->running;
     }
 
     static Result key(Runtime* runtime, const char* action, input::Key key,
                       const Vec2& value) noexcept
     {
-        if (!runtime || !runtime->pImpl) return Result::InvalidArguments;
         auto& impl = *runtime->pImpl;
-        if (!impl.actions) impl.actions = input::ActionMap::gen();
-        if (!impl.actions) return Result::OutOfMemory;
         auto result = impl.actions->key(action, key, value);
         if (result == Result::Success) {
             impl.keyClaims |= uint64_t{1u} << static_cast<uint32_t>(key);
@@ -218,10 +200,7 @@ struct RuntimeAccess
     static Result pointer(Runtime* runtime, const char* action, uint32_t button,
                           const Vec2& value, uint32_t pointer) noexcept
     {
-        if (!runtime || !runtime->pImpl) return Result::InvalidArguments;
         auto& impl = *runtime->pImpl;
-        if (!impl.actions) impl.actions = input::ActionMap::gen();
-        if (!impl.actions) return Result::OutOfMemory;
         auto result = impl.actions->pointer(action, button, value, pointer);
         if (result != Result::Success) return result;
         for (auto i = 0u; i < impl.pointerClaimCount; i++) {
@@ -229,9 +208,7 @@ struct RuntimeAccess
             impl.pointerClaims[i].buttons |= 1u << button;
             return result;
         }
-        if (impl.pointerClaimCount >= input::ActionMap::BindingLimit) {
-            return Result::InsufficientCondition;
-        }
+        // Each claimed pointer has bindings of its own, so the claims fit as the bindings do.
         auto& claim = impl.pointerClaims[impl.pointerClaimCount++];
         claim.pointer = pointer;
         claim.buttons = 1u << button;
@@ -241,9 +218,8 @@ struct RuntimeAccess
     static Result action(Runtime* runtime, const char* action,
                          input::ActionState& state) noexcept
     {
-        if (!runtime || !runtime->pImpl) return Result::InvalidArguments;
         auto& impl = *runtime->pImpl;
-        if (!impl.input || !impl.actions) return Result::InsufficientCondition;
+        if (!impl.input) return Result::InsufficientCondition;
         auto result = impl.actions->state(impl.input, action, state);
         if (result != Result::Success || impl.stepIndex == 0u) return result;
         state.previous = state.value;
@@ -256,9 +232,7 @@ struct RuntimeAccess
     static Result key(Runtime* runtime, input::Key key,
                       input::DigitalState& state) noexcept
     {
-        if (!runtime || !runtime->pImpl || !runtime->pImpl->input) {
-            return Result::InsufficientCondition;
-        }
+        if (!runtime->pImpl->input) return Result::InsufficientCondition;
         auto result = runtime->pImpl->input->key(key, state);
         if (result != Result::Success || runtime->pImpl->stepIndex == 0u) return result;
         state.previous = state.down;
@@ -270,9 +244,7 @@ struct RuntimeAccess
     static Result pointer(Runtime* runtime, uint32_t id,
                           input::PointerState& state) noexcept
     {
-        if (!runtime || !runtime->pImpl || !runtime->pImpl->input) {
-            return Result::InsufficientCondition;
-        }
+        if (!runtime->pImpl->input) return Result::InsufficientCondition;
         auto result = runtime->pImpl->input->pointer(id, state);
         if (result != Result::Success || runtime->pImpl->stepIndex == 0u) return result;
         state.previousButtons = state.buttons;
@@ -292,12 +264,14 @@ Runtime::Runtime(Scene* scene, const Config& config) noexcept
     if (!pImpl) return;
     pImpl->scene = scene;
     pImpl->config = config;
+    pImpl->actions = input::ActionMap::gen();
 }
 
 Runtime::~Runtime()
 {
-    if (pImpl && pImpl->scene) pImpl->scene->runtimeRemove(this);
-    if (pImpl && pImpl->lua) {
+    if (!pImpl) return;
+    pImpl->scene->runtimeRemove(this);
+    if (pImpl->lua) {
         auto lua = pImpl->lua;
         pImpl->lua = nullptr;
         vis::detail::luaClose(lua);
@@ -312,7 +286,7 @@ Runtime* Runtime::gen(Scene* scene, const Config& config) noexcept
         return nullptr;
     }
     auto runtime = new (std::nothrow) Runtime(scene, config);
-    if (!runtime || !runtime->pImpl) {
+    if (!runtime || !runtime->pImpl || !runtime->pImpl->actions) {
         delete runtime;
         return nullptr;
     }
@@ -321,30 +295,26 @@ Runtime* Runtime::gen(Scene* scene, const Config& config) noexcept
     modifier.fill = modifyFill;
     modifier.data = runtime;
     modifier.key = &RuntimeKey;
-    if (scene->runtimeAdd(&modifier) != Result::Success) {
-        delete runtime;
-        return nullptr;
+    if (scene->runtimeAdd(&modifier) == Result::Success
+        && scene->add(runtime) == Result::Success) {
+        return runtime;
     }
-    if (scene->add(runtime) == Result::Success) return runtime;
-    scene->runtimeRemove(runtime);
     delete runtime;
     return nullptr;
 }
 
 Scene* Runtime::scene() const noexcept
 {
-    return pImpl ? pImpl->scene : nullptr;
+    return pImpl->scene;
 }
 
 Result Runtime::update(Object* object, const ObjectState& state) noexcept
 {
-    if (!pImpl || !pImpl->accepts(object, this) || !_valid(state)) {
-        return Result::InvalidArguments;
-    }
+    if (!pImpl->accepts(object, this) || !_valid(state)) return Result::InvalidArguments;
     auto entry = pImpl->entry(object->id());
     auto resolved = state;
     if (!resolved.originEnabled) {
-        if (entry && entry->state.originEnabled) {
+        if (entry) {
             resolved.origin = entry->state.origin;
         } else {
             Bounds bounds;
@@ -365,7 +335,7 @@ Result Runtime::update(Object* object, const ObjectState& state) noexcept
 
 Result Runtime::clear(Object* object) noexcept
 {
-    if (!pImpl || !pImpl->accepts(object, this)) return Result::InvalidArguments;
+    if (!pImpl->accepts(object, this)) return Result::InvalidArguments;
     auto entry = pImpl->entry(object->id());
     if (!entry) return Result::InsufficientCondition;
     auto& count = pImpl->count();
@@ -375,12 +345,12 @@ Result Runtime::clear(Object* object) noexcept
 
 void Runtime::clear() noexcept
 {
-    if (pImpl) pImpl->count() = 0u;
+    pImpl->count() = 0u;
 }
 
 Result Runtime::sound(const SoundEvent& event) noexcept
 {
-    if (!pImpl || !_valid(event)) return Result::InvalidArguments;
+    if (!_valid(event)) return Result::InvalidArguments;
     if (!pImpl->running || pImpl->soundCount >= SoundEventLimit) {
         return Result::InsufficientCondition;
     }
@@ -390,22 +360,19 @@ Result Runtime::sound(const SoundEvent& event) noexcept
 
 uint32_t Runtime::soundCount() const noexcept
 {
-    return pImpl ? pImpl->soundCount : 0u;
+    return pImpl->soundCount;
 }
 
 bool Runtime::soundAt(uint32_t index, SoundEvent& output) const noexcept
 {
-    if (!pImpl || index >= pImpl->soundCount) return false;
+    if (index >= pImpl->soundCount) return false;
     output = pImpl->sounds[index];
     return true;
 }
 
 Result Runtime::advance(float elapsed) noexcept
 {
-    if (!pImpl || !pImpl->lua || pImpl->callback == LUA_NOREF
-        || pImpl->handle == LUA_NOREF) {
-        return Result::InsufficientCondition;
-    }
+    if (!pImpl->lua) return Result::InsufficientCondition;
     if (!std::isfinite(elapsed) || elapsed < 0.0f) return Result::InvalidArguments;
     if (pImpl->failed) return Result::ScriptError;
     if (pImpl->running) return Result::InsufficientCondition;
@@ -445,7 +412,6 @@ Result Runtime::advance(float elapsed) noexcept
             _message(pImpl->error, sizeof(pImpl->error),
                      lua_tostring(pImpl->lua, -1));
             lua_pop(pImpl->lua, 1);
-            pImpl->stagedCount = 0u;
             pImpl->soundCount = soundCheckpoint;
             pImpl->accumulator = available;
             pImpl->failed = true;
@@ -464,19 +430,17 @@ Result Runtime::advance(float elapsed) noexcept
 
 Result Runtime::input(const input::State* state) noexcept
 {
-    if (!pImpl) return Result::InvalidArguments;
     pImpl->input = state;
     return Result::Success;
 }
 
 bool Runtime::claimsKey(uint32_t key) const noexcept
 {
-    return pImpl && key < 64u && (pImpl->keyClaims & (uint64_t{1u} << key));
+    return key < 64u && (pImpl->keyClaims & (uint64_t{1u} << key));
 }
 
 uint32_t Runtime::claimsPointer(uint32_t pointer) const noexcept
 {
-    if (!pImpl) return 0u;
     for (auto i = 0u; i < pImpl->pointerClaimCount; i++) {
         if (pImpl->pointerClaims[i].pointer == pointer) {
             return pImpl->pointerClaims[i].buttons;
@@ -487,57 +451,49 @@ uint32_t Runtime::claimsPointer(uint32_t pointer) const noexcept
 
 float Runtime::fixedStep() const noexcept
 {
-    return pImpl ? pImpl->config.fixedStep : 0.0f;
+    return pImpl->config.fixedStep;
 }
 
 float Runtime::interpolation() const noexcept
 {
-    if (!pImpl) return 0.0f;
-    auto value = static_cast<float>(pImpl->accumulator / pImpl->config.fixedStep);
-    if (value < 0.0f) return 0.0f;
-    if (value > 1.0f) return 1.0f;
-    return value;
+    return _clamp(static_cast<float>(pImpl->accumulator / pImpl->config.fixedStep));
 }
 
 double Runtime::time() const noexcept
 {
-    return pImpl ? pImpl->elapsed : 0.0;
+    return pImpl->elapsed;
 }
 
 double Runtime::dropped() const noexcept
 {
-    return pImpl ? pImpl->dropped : 0.0;
+    return pImpl->dropped;
 }
 
 uint64_t Runtime::tick() const noexcept
 {
-    return pImpl ? pImpl->tick : 0u;
+    return pImpl->tick;
 }
 
 uint32_t Runtime::steps() const noexcept
 {
-    return pImpl ? pImpl->steps : 0u;
+    return pImpl->steps;
 }
 
 bool Runtime::failed() const noexcept
 {
-    return pImpl && pImpl->failed;
+    return pImpl->failed;
 }
 
 const char* Runtime::error() const noexcept
 {
-    return pImpl ? pImpl->error : "retained Lua runtime is unavailable";
+    return pImpl->error;
 }
 
 Result Runtime::modifyObject(const Object* object, float time, Mat4& model,
                              float& opacity, float& progress, void* data) noexcept
 {
-    auto runtime = static_cast<Runtime*>(data);
-    if (!runtime || !runtime->pImpl || !object || !std::isfinite(time)
-        || time < 0.0f) {
-        return Result::InvalidArguments;
-    }
-    auto entry = runtime->pImpl->find(object);
+    if (!std::isfinite(time) || time < 0.0f) return Result::InvalidArguments;
+    auto entry = static_cast<Runtime*>(data)->pImpl->find(object);
     if (!entry) return Result::Success;
     auto& state = entry->state;
     auto local = Mat4::translate(state.origin + state.shift)
@@ -546,23 +502,20 @@ Result Runtime::modifyObject(const Object* object, float time, Mat4& model,
                * Mat4::rotateX(state.rotation.x)
                * Mat4::scale(state.scale)
                * Mat4::translate(state.origin * -1.0f);
+    // The renderer checks the model, opacity and progress it gets back.
     model = local * model;
     opacity *= state.opacity;
     progress *= state.progress;
-    return _finite(model) && std::isfinite(opacity) && std::isfinite(progress)
-               ? Result::Success : Result::InvalidArguments;
+    return Result::Success;
 }
 
 Result Runtime::modifyFill(const Object* object, float time, Color& fill,
                            void* data) noexcept
 {
-    auto runtime = static_cast<Runtime*>(data);
-    if (!runtime || !runtime->pImpl || !object || !std::isfinite(time)
-        || time < 0.0f) {
-        return Result::InvalidArguments;
-    }
+    if (!std::isfinite(time) || time < 0.0f) return Result::InvalidArguments;
+    auto& impl = *static_cast<Runtime*>(data)->pImpl;
     for (auto current = object; current; current = current->parent()) {
-        auto entry = runtime->pImpl->find(current);
+        auto entry = impl.find(current);
         if (!entry || !entry->state.fillEnabled) continue;
         fill = entry->state.fill;
         break;
@@ -582,9 +535,7 @@ static Runtime* _runtime(lua_State* lua)
 {
     auto handle = static_cast<LuaRuntime*>(
         luaL_checkudata(lua, 1, RuntimeMetatable));
-    if (!handle->runtime || !handle->runtime->scene()) {
-        luaL_error(lua, "retained Lua runtime is no longer available");
-    }
+    if (!handle->runtime) luaL_error(lua, "retained Lua runtime is no longer available");
     return handle->runtime;
 }
 
@@ -693,12 +644,8 @@ static int _sound(lua_State* lua)
         return luaL_error(
             lua, "sound gain must be 0..4 and rate must be 0.125..8");
     }
-    auto result = runtime->sound(event);
-    if (result != Result::Success && result != Result::InsufficientCondition) {
-        return luaL_error(lua, "could not queue runtime sound: %s",
-                          vis::result(result));
-    }
-    lua_pushboolean(lua, result == Result::Success);
+    // A full queue answers false; the event itself is valid by now.
+    lua_pushboolean(lua, runtime->sound(event) == Result::Success);
     return 1;
 }
 
@@ -896,14 +843,7 @@ static int _newRuntime(lua_State* lua)
     lua_pushvalue(lua, 1);
     lua_setiuservalue(lua, -2, 1);
     lua_pushvalue(lua, -1);
-    auto reference = luaL_ref(lua, LUA_REGISTRYINDEX);
-    auto result = detail::RuntimeAccess::prepare(runtime, lua, callback, reference);
-    if (result != Result::Success) {
-        luaL_unref(lua, LUA_REGISTRYINDEX, callback);
-        luaL_unref(lua, LUA_REGISTRYINDEX, reference);
-        return luaL_error(lua, "could not prepare retained Lua runtime: %s",
-                          vis::result(result));
-    }
+    detail::RuntimeAccess::prepare(runtime, callback, luaL_ref(lua, LUA_REGISTRYINDEX));
     return 1;
 }
 

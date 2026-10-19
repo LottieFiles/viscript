@@ -129,6 +129,8 @@ struct ActionState
 
 struct State final
 {
+    // Pointers held at once; a new pointer takes the place of one that has left (by a cancel or
+    // release) once that one's press and release edges are reported.
     static constexpr uint32_t PointerLimit = 16u;
 
     static State* gen() noexcept;

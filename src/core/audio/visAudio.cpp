@@ -80,22 +80,21 @@ Soundscape* Soundscape::gen(Scene* scene) noexcept
 
 Scene* Soundscape::scene() const noexcept
 {
-    return pImpl ? pImpl->scene : nullptr;
+    return pImpl->scene;
 }
 
 Result Soundscape::cue(const CueConfig& config, Cue& output) noexcept
 {
     output = {};
-    if (!pImpl || !config.asset || !_bus(config.bus)
+    if (!config.asset || !_bus(config.bus)
         || !std::isfinite(config.begin) || config.begin < 0.0f
         || !std::isfinite(config.end) || (config.end != 0.0f && config.end <= config.begin)
         || !_gain(config.gain)) {
         return Result::InvalidArguments;
     }
     auto size = std::strlen(config.asset);
-    if (!size || size > AssetNameLimit || pImpl->cueCount >= CueLimit) {
-        return Result::InvalidArguments;
-    }
+    if (!size || size > AssetNameLimit) return Result::InvalidArguments;
+    if (pImpl->cueCount >= CueLimit) return Result::InsufficientCondition;
     auto asset = _duplicate(config.asset);
     if (!asset || !grow(pImpl->cues, pImpl->cueCount, pImpl->cueCapacity, 1u, 8u, CueLimit)) {
         delete[] asset;
@@ -111,28 +110,24 @@ Result Soundscape::cue(const CueConfig& config, Cue& output) noexcept
 Result Soundscape::gain(Cue cue, float value, float begin, float duration,
                         const AnimCurve& curve) noexcept
 {
-    if (!pImpl || cue.index >= pImpl->cueCount || !_gain(value)
+    if (cue.index >= pImpl->cueCount || !_gain(value)
         || !std::isfinite(begin) || begin < 0.0f
-        || !std::isfinite(duration) || duration <= 0.0f || !curve.valid()
-        || pImpl->gainCount >= GainLimit) {
+        || !std::isfinite(duration) || duration <= 0.0f || !curve.valid()) {
         return Result::InvalidArguments;
     }
     auto end = static_cast<double>(begin) + duration;
     if (!std::isfinite(end) || end > static_cast<double>(std::numeric_limits<float>::max())) {
         return Result::InvalidArguments;
     }
+    // A clip begins no sooner than the cue's last one ends.
     auto lastEnd = 0.0f;
-    auto found = false;
     for (auto i = 0u; i < pImpl->gainCount; i++) {
-        auto& clip = pImpl->gains[i];
-        if (clip.cue.index != cue.index) continue;
-        lastEnd = clip.end;
-        found = true;
+        if (pImpl->gains[i].cue.index == cue.index) lastEnd = pImpl->gains[i].end;
     }
-    if (found && begin < lastEnd) return Result::InvalidArguments;
+    if (begin < lastEnd) return Result::InvalidArguments;
+    if (pImpl->gainCount >= GainLimit) return Result::InsufficientCondition;
     auto from = 0.0f;
-    auto result = sample(cue, begin, from);
-    if (result != Result::Success) return result;
+    sample(cue, begin, from);
     if (!grow(pImpl->gains, pImpl->gainCount, pImpl->gainCapacity, 1u, 16u, GainLimit)) {
         return Result::OutOfMemory;
     }
@@ -148,19 +143,19 @@ Result Soundscape::gain(Cue cue, float value, float begin, float duration,
 
 uint32_t Soundscape::count() const noexcept
 {
-    return pImpl ? pImpl->cueCount : 0u;
+    return pImpl->cueCount;
 }
 
 bool Soundscape::cueAt(uint32_t index, CueConfig& output) const noexcept
 {
-    if (!pImpl || index >= pImpl->cueCount) return false;
+    if (index >= pImpl->cueCount) return false;
     output = pImpl->cues[index];
     return true;
 }
 
 Result Soundscape::sample(Cue cue, float time, float& output) const noexcept
 {
-    if (!pImpl || cue.index >= pImpl->cueCount || !std::isfinite(time) || time < 0.0f) {
+    if (cue.index >= pImpl->cueCount || !std::isfinite(time) || time < 0.0f) {
         return Result::InvalidArguments;
     }
     output = pImpl->cues[cue.index].gain;
@@ -182,7 +177,6 @@ Result Soundscape::sample(Cue cue, float time, float& output) const noexcept
 
 float Soundscape::duration() const noexcept
 {
-    if (!pImpl) return 0.0f;
     auto value = 0.0f;
     for (auto i = 0u; i < pImpl->cueCount; i++) {
         auto& cue = pImpl->cues[i];

@@ -78,6 +78,8 @@ struct Soundscape final : Group
     static Soundscape* gen(Scene* scene) noexcept;
 
     Scene* scene() const noexcept;
+    // A soundscape that holds CueLimit cues, or GainLimit gain clips, refuses more with
+    // InsufficientCondition.
     Result cue(const CueConfig& config, Cue& output) noexcept;
     // Finite gain is in [0, 4]; gain clips on a cue may not overlap.
     Result gain(Cue cue, float value, float begin, float duration = 1.0f,
@@ -110,6 +112,8 @@ struct Player
 
     // Voice capacity is 1..256 (default 32); saturation fails without stealing voices.
     static Player* gen(const PlayerConfig& config = {}) noexcept;
+    // A name already loaded, or an asset past AssetLimit or AssetTotalByteLimit, fails with
+    // InsufficientCondition.
     Result load(const char* name, const uint8_t* data, uint32_t size) noexcept;
     // Browser audio must start from a user gesture on the window/main thread.
     Result start() noexcept;
