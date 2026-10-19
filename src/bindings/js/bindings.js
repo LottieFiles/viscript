@@ -218,6 +218,13 @@ function _known(value, names, label) {
     if (unknown !== undefined) throw new TypeError(`${label}: ${unknown}`);
 }
 
+// Throws unless the options of a call are a plain object and, given names, unless each key is
+// one of them; name names the call in the messages.
+function _plainOptions(options, name, names) {
+    if (!_plain(options)) throw new TypeError(`${name} options must be a plain object`);
+    if (names) _known(options, names, `Unknown ${name} option`);
+}
+
 function _string(value) {
     if (value.includes("\0")) throw new TypeError("Strings cannot contain zero bytes");
     const escaped = value.replace(/[\\"\x01-\x1f\x7f]/g, (character) => {
@@ -237,8 +244,8 @@ const GRADIENT_KEYS = Object.freeze({
     conic: ["type", "stops", "center", "angle"],
 });
 
-// Maps the camelCase JS gradient description onto the Lua `gradient` table.
-// Booleans and end-stop colors keep the legacy two-stop linear form.
+// Maps the camelCase JS gradient description onto the Lua `gradient` table; booleans and
+// end-stop colors pass as they are.
 function _gradient(value) {
     if (value === undefined || typeof value === "boolean" || typeof value === "string") return value;
     if (!_plain(value)) {
@@ -939,33 +946,32 @@ function _curveEase(value) {
     };
 }
 
-function _timingValues(options, fallback = 1, zero = false, name = "Timing") {
-    const duration = options.duration === undefined ? fallback : options.duration;
+// Reads timing options: a duration, fallback when not given and zero only where the fallback is,
+// a curve, a lag, and the other fields a call takes, which come back as options.
+function _timing(options, fields = [], fallback = 1, name = "Timing") {
+    _plainOptions(options, name, ["duration", "curve", ...fields]);
+    const {duration = fallback, lag = 0} = options;
     const curve = options.curve ?? "smooth";
-    const lag = options.lag === undefined ? 0 : options.lag;
+    const zero = fallback === 0;
     if (!Number.isFinite(duration) || (zero ? duration < 0 : duration <= 0)) {
         throw new RangeError(`${name} duration must be a finite ${zero ? "non-negative" : "positive"} number of seconds`);
     }
     if (!Number.isFinite(lag) || lag < 0) throw new RangeError("Lag must be finite and non-negative");
     _curveValue(curve);
-    return {duration, curve, lag};
+    const given = fields.filter((key) => Object.hasOwn(options, key)).map((key) => [key, options[key]]);
+    return {duration, curve, lag, options: Object.fromEntries(given)};
 }
 
-function _timing(options, fallback = 1, stagger = false, zero = false, fields = [], name = "Timing") {
-    if (!_plain(options)) {
-        throw new TypeError(`${name} options must be a plain object`);
-    }
-    _known(options, ["duration", "curve", ...(stagger ? ["lag"] : []), ...fields], `Unknown ${name} option`);
-    return {..._timingValues(options, fallback, zero, name),
-        options: Object.fromEntries(fields.filter((key) => Object.hasOwn(options, key)).map((key) => [key, options[key]]))};
+// The timing a call takes as positional values, or as one options object in their place at
+// args[index], which is then the last argument and may hold fields too.
+function _timingArguments(args, index, values, fields = [], fallback = 1) {
+    if (typeof args[index] !== "object") return values;
+    if (args.length > index + 1) throw new TypeError("Timing options cannot be combined with positional arguments");
+    return _timing(args[index], fields, fallback);
 }
 
 function _effectOptions(value, defaults, name, minimumScale) {
-    if (!_plain(value)) {
-        throw new TypeError(`${name} options must be a plain object`);
-    }
-    _known(value, Object.keys(defaults), `Unknown ${name} option`);
-    _timingValues(value, defaults.duration, false, name);
+    _timing(value, Object.keys(defaults), defaults.duration, name);
     const options = { ...defaults, ...value };
     if (Object.hasOwn(defaults, "scale") && (!Number.isFinite(options.scale) || options.scale <= minimumScale)) {
         const comparison = minimumScale === 1 ? "greater than 1" : "positive";
@@ -1098,10 +1104,7 @@ export class AudioCueHandle {
     }
 
     gain(value, begin, duration = 1, curve = "smooth") {
-        if (typeof duration === "object") {
-            if (arguments.length > 3) throw new TypeError("Timing options cannot be combined with positional arguments");
-            ({duration, curve} = _timing(duration));
-        }
+        ({duration, curve} = _timingArguments(arguments, 2, {duration, curve}));
         this.owner._assertQuiet();
         if (!Number.isFinite(value) || value < 0 || value > 4) {
             throw new RangeError("Audio gain must be finite and between 0 and 4");
@@ -1128,9 +1131,8 @@ export class ViewHandle {
         Object.freeze(this);
     }
 
-    look(camera, duration = 1, easing = "smooth") {
-        if (typeof duration === "object" && arguments.length > 2) throw new TypeError("Timing options cannot be combined with positional arguments");
-        this.owner._look(this.name, camera, duration, easing);
+    look(camera, duration = 1, curve = "smooth") {
+        this.owner._look(this.name, camera, _timingArguments(arguments, 1, {duration, curve}));
         return this;
     }
 
@@ -1146,11 +1148,8 @@ export class ViewHandle {
     }
 
     // Fades the whole view; the fades of a view follow one another.
-    fade(opacity, duration = 1, easing = "smooth") {
-        if (typeof duration === "object") {
-            if (arguments.length > 2) throw new TypeError("Timing options cannot be combined with positional arguments");
-            ({duration, curve: easing} = _timing(duration));
-        }
+    fade(opacity, duration = 1, curve = "smooth") {
+        ({duration, curve} = _timingArguments(arguments, 1, {duration, curve}));
         this.owner._assertMutable();
         if (!Number.isFinite(opacity) || opacity < 0 || opacity > 1) {
             throw new RangeError("View opacity must be between 0 and 1");
@@ -1158,8 +1157,8 @@ export class ViewHandle {
         if (!Number.isFinite(duration) || duration <= 0) {
             throw new RangeError("View fade duration must be a positive number");
         }
-        _curveValue(easing);
-        const values = [opacity, duration, easing].map(_lua).join(",");
+        _curveValue(curve);
+        const values = [opacity, duration, curve].map(_lua).join(",");
         SCENE_STATES.get(this.owner).lines.push(() => `${this.name}:fade(${values})`);
         return this;
     }
@@ -1230,10 +1229,7 @@ class GroupHandle extends Handle {
         if (!(typeof find === "string" && find.length) && !(find instanceof RegExp)) {
             throw new TypeError("Search needs a non-empty string or a RegExp to find");
         }
-        if (!_plain(options)) {
-            throw new TypeError("Search options must be a plain object");
-        }
-        _known(options, SEARCH_OPTIONS, "Unknown Search option");
+        _plainOptions(options, "Search", SEARCH_OPTIONS);
         const query = _codeQuery(options, "");
         const spans = _codeSpans(code.text, code.language);
         const covered = new Set();
@@ -1272,10 +1268,7 @@ function _sampleField(handle, callback, options, spatial) {
     handle.owner._assertQuiet();
     const name = spatial ? "voxel" : "cell";
     if (typeof callback !== "function") throw new TypeError(`${name} callback must be a function`);
-    if (!_plain(options)) {
-        throw new TypeError(`${name} options must be a plain object`);
-    }
-    _known(options, ["mode", "padding", "duration", "fps"], `Unknown ${name} option`);
+    _plainOptions(options, name, ["mode", "padding", "duration", "fps"]);
     const mode = options.mode ?? "padd";
     const padding = options.padding ?? 0.05;
     const durationValue = options.duration ?? 0;
@@ -1359,7 +1352,7 @@ class SpaceHandle extends Handle {
     // It makes objects and lays out handles, so the tracks that wait keep waiting, as in Lua.
     labels(options) {
         this.owner._assertQuiet();
-        return this.owner._placeLabels(this, this.owner._labelsTable(options));
+        return this.owner._labels(this, options);
     }
 }
 
@@ -1888,9 +1881,10 @@ class Tracker {
     }
 }
 
-// The state a binding's function gives for the values its trackers have reached, or for values.
-function _boundState(binding, values = binding.trackers.map((tracker) => TRACKERS.get(tracker).value)) {
-    const state = binding.fn(...values);
+// The state a binding's function gives for the values its trackers have reached, or for values;
+// the function runs as a sampling callback of scene.
+function _boundState(scene, binding, values = binding.trackers.map((tracker) => TRACKERS.get(tracker).value)) {
+    const state = _sampling(scene, () => binding.fn(...values));
     if (!_plain(state)) {
         throw new TypeError("A bound function must return a state object");
     }
@@ -2026,7 +2020,7 @@ function _playGroup(scene, group, lines) {
     for (let i = 1; i < kept.length; i++) {
         const from = kept[i - 1];
         const to = kept[i];
-        const state = _boundState(binding, binding.trackers.map((tracker) => _valueAt(group, tracker, to.time)));
+        const state = _boundState(scene, binding, binding.trackers.map((tracker) => _valueAt(group, tracker, to.time)));
         const [descriptor] = scene._descriptors([_boundDescriptor(binding, state)], "play");
         lines.push((name) => {
             const begin = `times[${from.track.first + from.step}]`;
@@ -2156,13 +2150,6 @@ export class SceneBuilder {
             throw new TypeError("Space axis_width must be zero or more pixels");
         }
         if (method === "surface") options = _surfaceOptions(this, options);
-        // A space places the labels it is given once it is made, as space:labels does.
-        let labels = null;
-        if (method === "space" && options && typeof options === "object" && Object.hasOwn(options, "labels")) {
-            const { labels: value, ...rest } = options;
-            labels = this._labelsTable(value);
-            options = rest;
-        }
         const state = SCENE_STATES.get(this);
         const name = `objects[${++state.handles}]`;
         const value = method === "plot" ? this._plotOptions(options) : this._options(options);
@@ -2181,14 +2168,13 @@ export class SceneBuilder {
                 handle, typeof label === "object" ? label.id : undefined);
             if (tex && Array.isArray(label.tex)) this._texParts(child, label.tex, label.id);
         }
-        if (labels) this._placeLabels(handle, labels);
         return handle;
     }
 
-    // The labels of a space as a Lua table, and the labels in the order the scene places them:
-    // x, y and z, each in the order given. A label is a string, which becomes a text, or a handle,
-    // which the script names.
-    _labelsTable(options) {
+    // Places labels beside the ticks of a space, as Lua space:labels does, and returns their
+    // handles in the order the scene places them: x, y and z, each in the order given. A string
+    // becomes a new text below the space, and a handle, which the script names, stays as it is.
+    _labels(space, options) {
         if (!_plain(options)) {
             throw new TypeError("Space labels must be a plain object of x, y and z lists of [value, label]");
         }
@@ -2217,15 +2203,9 @@ export class SceneBuilder {
             });
             return `[${_string(key)}]={${entries.join(",")}}`;
         });
-        return { table: `{${fields.join(",")}}`, labels };
-    }
-
-    // Places the labels of a table beside the ticks of a space and returns their handles: a new
-    // text, below the space, for each string, and each handle given as it is.
-    _placeLabels(space, { table, labels }) {
         const state = SCENE_STATES.get(this);
         const list = `objects[${++state.handles}]`;
-        state.lines.push(() => `${list} = ${space.name}:labels ${table}`);
+        state.lines.push(() => `${list} = ${space.name}:labels {${fields.join(",")}}`);
         const id = [...state.ids].find(([, handle]) => handle === space)?.[0];
         const numbers = { x: 0, y: 0, z: 0 };
         return labels.map(({ axis, label }, index) => {
@@ -2243,9 +2223,7 @@ export class SceneBuilder {
     // Materialize function plots as endpoint and uncut-column samples. Native playback blends
     // columns and recuts bands; non-finite explicit points split polylines.
     _plotOptions(options) {
-        if (!_plain(options)) {
-            throw new TypeError("Plot options must be a plain object");
-        }
+        _plainOptions(options, "Plot");
         const { fn, points, ...rest } = options;
         const fields = _styleOptions(rest);
         if (fields.endpoint_radius !== undefined
@@ -2307,7 +2285,7 @@ export class SceneBuilder {
         if (!Array.isArray(parts) || !parts.length) {
             throw new TypeError("Spans require a non-empty array of strings and part objects");
         }
-        if (!_plain(options)) throw new TypeError("Spans options must be a plain object");
+        _plainOptions(options, "Spans");
         const items = parts.map((part) => {
             if (typeof part === "string") return _lua(part);
             if (!_plain(part)) throw new TypeError("A spans part must be a string or a plain object");
@@ -2348,7 +2326,7 @@ export class SceneBuilder {
     // formula's, as the module names them; part() finds glyphs and shapes by their TeX.
     _tex(options, parent = null) {
         this._assertQuiet();
-        if (!_plain(options)) throw new TypeError("Tex options must be a plain object");
+        _plainOptions(options, "Tex");
         _texSource(options.tex, "Tex");
         const value = this._texTable(options);
         const state = SCENE_STATES.get(this);
@@ -2391,9 +2369,7 @@ export class SceneBuilder {
     // the script returns them; the label is undefined when there is none.
     _brace(options, parent = null) {
         this._assertQuiet();
-        if (!_plain(options)) {
-            throw new TypeError("Brace options must be a plain object");
-        }
+        _plainOptions(options, "Brace");
         const label = options.label;
         if (label !== undefined && typeof label !== "string" && !(label instanceof Handle)) {
             throw new TypeError("Brace label must be a string or a handle");
@@ -2417,9 +2393,7 @@ export class SceneBuilder {
     // the tokens.
     _code(options, parent = null) {
         this._assertQuiet();
-        if (!_plain(options)) {
-            throw new TypeError("Code options must be a plain object");
-        }
+        _plainOptions(options, "Code");
         if (typeof options.text !== "string") throw new TypeError("Code requires a text string");
         const language = options.language ?? "plain";
         if (!CODE_LANGUAGES.has(language)) {
@@ -2469,9 +2443,7 @@ export class SceneBuilder {
     // calls the functions, as Lua area does at each step.
     _area(options, parent = null) {
         this._assertQuiet();
-        if (!_plain(options)) {
-            throw new TypeError("Area options must be a plain object");
-        }
+        _plainOptions(options, "Area");
         const { fn, x_range: xRange, base, ...style } = options;
         if (typeof fn !== "function") throw new TypeError("Area requires fn, a function");
         if (xRange === undefined) throw new TypeError("Area requires x_range");
@@ -2480,19 +2452,12 @@ export class SceneBuilder {
         }
         const range = _spaceRange(xRange, "Area x_range");
         const steps = _rangeSteps(range, "Area x_range", 499999);
-        const points = [];
-        for (let i = 0; i <= steps; i++) {
-            const x = _stepAt(range, i, steps);
-            points.push([x, _sampleNumber(fn, x, "Area fn")]);
-        }
-        if (typeof base === "function") {
-            for (let i = steps; i >= 0; i--) {
-                const x = _stepAt(range, i, steps);
-                points.push([x, _sampleNumber(base, x, "Area base")]);
-            }
-        } else {
-            points.push([range[1], base ?? 0], [range[0], base ?? 0]);
-        }
+        const xs = Array.from({ length: steps + 1 }, (_, i) => _stepAt(range, i, steps));
+        const points = _sampling(this, () => {
+            const graph = xs.map((x) => [x, _sampleNumber(fn, x, "Area fn")]);
+            if (typeof base !== "function") return [...graph, [range[1], base ?? 0], [range[0], base ?? 0]];
+            return [...graph, ...xs.reverse().map((x) => [x, _sampleNumber(base, x, "Area base")])];
+        });
         return this._object("polygon", { ...style, points }, parent);
     }
 
@@ -2500,9 +2465,7 @@ export class SceneBuilder {
     // the rectangles: the builder calls fn where Lua riemann would and emits the heights.
     _riemann(options, parent = null) {
         this._assertQuiet();
-        if (!_plain(options)) {
-            throw new TypeError("Riemann options must be a plain object");
-        }
+        _plainOptions(options, "Riemann");
         const { fn, values, sample, x_range: xRange, ...style } = options;
         if (xRange === undefined) throw new TypeError("Riemann requires x_range");
         const range = _spaceRange(xRange, "Riemann x_range");
@@ -2513,11 +2476,11 @@ export class SceneBuilder {
             if (typeof fn !== "function") throw new TypeError("Riemann fn must be a function");
             const share = { left: 0, right: 1, midpoint: 0.5 }[sample ?? "left"];
             if (share === undefined) throw new TypeError("Riemann sample must be left, right, or midpoint");
-            heights = Array.from({ length: steps }, (_, i) => {
+            heights = _sampling(this, () => Array.from({ length: steps }, (_, i) => {
                 const left = _stepAt(range, i, steps);
                 const right = _stepAt(range, i + 1, steps);
                 return _sampleNumber(fn, Math.fround(left + (right - left) * share), "Riemann fn");
-            });
+            }));
         } else {
             if (sample !== undefined) throw new TypeError("Riemann sample needs fn, since values are the heights themselves");
             if (!Array.isArray(values) || values.length !== steps || !values.every(Number.isFinite)) {
@@ -2572,9 +2535,7 @@ export class SceneBuilder {
     // Scalar samples cross into Lua as values; the core traces the bilinear field they define.
     _contour(options, parent = null) {
         this._assertQuiet();
-        if (!_plain(options)) {
-            throw new TypeError("Contour options must be a plain object");
-        }
+        _plainOptions(options, "Contour");
         const { fn, values, levels, x_range: xRange, y_range: yRange, ...style } = options;
         const allowed = ["colors", "id", "color", "stroke", "width", "dash", "dash_offset", "opacity",
             "progress", "layer", "isolate", "mask", "blend", "blur", "shadow", "labels"];
@@ -2626,9 +2587,7 @@ export class SceneBuilder {
     // the vectors as values.
     _vectorField(options, parent = null) {
         this._assertQuiet();
-        if (!_plain(options)) {
-            throw new TypeError("Vector field options must be a plain object");
-        }
+        _plainOptions(options, "Vector field");
         const { fn, values, x_range: xRange, y_range: yRange, ...style } = options;
         if (xRange === undefined) throw new TypeError("Vector field requires x_range");
         if (yRange === undefined) throw new TypeError("Vector field requires y_range");
@@ -2649,7 +2608,7 @@ export class SceneBuilder {
         let vectors = values;
         if (fn !== undefined) {
             if (typeof fn !== "function") throw new TypeError("Vector field fn must be a function");
-            vectors = ys.flatMap((y) => xs.map((x) => _sampleVector(fn, x, y, "Vector field fn")));
+            vectors = _sampling(this, () => ys.flatMap((y) => xs.map((x) => _sampleVector(fn, x, y, "Vector field fn"))));
         } else if (!Array.isArray(values) || values.length !== count
             || !values.every((v) => Array.isArray(v) && v.length === 2 && v.every((n) => Number.isFinite(Math.fround(n))))) {
             throw new TypeError(`Vector field values must hold one [x, y] for each of the ${count} samples of x_range and y_range`);
@@ -2683,9 +2642,7 @@ export class SceneBuilder {
     // each a group of the texts of its entries, and then its two brackets.
     _matrix(options, parent = null) {
         this._assertQuiet();
-        if (!_plain(options)) {
-            throw new TypeError("Matrix options must be a plain object");
-        }
+        _plainOptions(options, "Matrix");
         const rows = _gridRows(options.rows, "Matrix");
         if (options.reserve !== undefined && typeof options.reserve !== "string"
             && (!Array.isArray(options.reserve) || options.reserve.length !== rows[0].length
@@ -2731,9 +2688,7 @@ export class SceneBuilder {
     // rows, each a group of the texts of its entries, then its stripes and then its rules.
     _table(options, parent = null) {
         this._assertQuiet();
-        if (!_plain(options)) {
-            throw new TypeError("Table options must be a plain object");
-        }
+        _plainOptions(options, "Table");
         const body = _gridRows(options.rows, "Table");
         const columns = body[0].length;
         const { header, stripes } = options;
@@ -2794,9 +2749,7 @@ export class SceneBuilder {
         // A copy takes no time, but it takes the state its source shows, which the tracks set.
         this._assertMutable("instant");
         const sourceName = this._handle(source);
-        if (!_plain(options)) {
-            throw new TypeError("Clone options must be a plain object");
-        }
+        _plainOptions(options, "Clone");
         const state = SCENE_STATES.get(this);
         // The handles below source, each after its parent, taken before the copy joins any.
         const tree = [];
@@ -2845,10 +2798,7 @@ export class SceneBuilder {
 
     sound(options) {
         this._assertMutable();
-        if (!_plain(options)) {
-            throw new TypeError("Sound options must be a plain object");
-        }
-        _known(options, ["asset", "bus", "begin", "end", "gain", "loop"], "Unknown Sound option");
+        _plainOptions(options, "Sound", ["asset", "bus", "begin", "end", "gain", "loop"]);
         if (typeof options.asset !== "string" || !options.asset.length
             || options.asset.includes("\0")
             || new TextEncoder().encode(options.asset).length > 255) {
@@ -2884,9 +2834,7 @@ export class SceneBuilder {
         this._assertQuiet();
         const fromName = this._handle(from);
         const toName = this._handle(to);
-        if (!_plain(options)) {
-            throw new TypeError("Connector options must be a plain object");
-        }
+        _plainOptions(options, "Connector");
         if (Object.hasOwn(options, "from") || Object.hasOwn(options, "to")) {
             throw new TypeError("Connector endpoints must be passed as handles");
         }
@@ -2923,10 +2871,7 @@ export class SceneBuilder {
         // A view takes no time, but its camera may aim at an object where the tracks leave it.
         this._assertMutable("instant");
         const rect = _lua(_viewportBounds(bounds));
-        if (!_plain(options)) {
-            throw new TypeError("View options must be a plain object");
-        }
-        _known(options, VIEW_OPTIONS, "Unknown View option");
+        _plainOptions(options, "View", VIEW_OPTIONS);
         const { camera, optical, background, opacity, layer, hide } = options;
         if (camera !== undefined && (!camera || typeof camera !== "object" || Array.isArray(camera))) {
             throw new TypeError("View camera must be a look camera object");
@@ -2970,9 +2915,7 @@ export class SceneBuilder {
         if (stages.length > 16) throw new RangeError("Scene transition supports at most 16 stages");
         const state = SCENE_STATES.get(this);
         if (state.transition) throw new TypeError("A scene can own only one scene transition");
-        if (!_plain(options)) {
-            throw new TypeError("Scene transition options must be a plain object");
-        }
+        _plainOptions(options, "Scene transition");
         const fields = ["duration", "hold", "live", "curve", "viewport", "styles"];
         _known(options, [...fields, ...TRANSITION_STYLE_OPTIONS], "Unknown scene transition option");
         const normalized = { ...options };
@@ -3131,12 +3074,9 @@ export class SceneBuilder {
         return this;
     }
 
-    fillReveal(target, duration = 1, easing = "smooth", lag = 0) {
-        if (typeof duration === "object") {
-            if (arguments.length > 2) throw new TypeError("Timing options cannot be combined with positional arguments");
-            ({duration, curve: easing, lag} = _timing(duration, 1, true));
-        }
-        return this._animate("fill_reveal", target, [duration, easing, lag]);
+    fillReveal(target, duration = 1, curve = "smooth", lag = 0) {
+        ({duration, curve, lag} = _timingArguments(arguments, 1, {duration, curve, lag}, ["lag"]));
+        return this._animate("fill_reveal", target, [duration, curve, lag]);
     }
 
     _effect(method, target, options, defaults, name, minimumScale) {
@@ -3155,14 +3095,11 @@ export class SceneBuilder {
         return this._effect("fade_out", target, options, FADE_OPTIONS, "FadeOut", 0);
     }
 
-    growFromEdge(target, edge, duration = 1, easing = "smooth") {
-        if (typeof duration === "object") {
-            if (arguments.length > 3) throw new TypeError("Timing options cannot be combined with positional arguments");
-            ({duration, curve: easing} = _timing(duration));
-        }
+    growFromEdge(target, edge, duration = 1, curve = "smooth") {
+        ({duration, curve} = _timingArguments(arguments, 2, {duration, curve}));
         this._assertMutable();
         _growthEdge(edge);
-        return this._animate("grow_from_edge", target, [edge, duration, easing]);
+        return this._animate("grow_from_edge", target, [edge, duration, curve]);
     }
 
     // Flashes a handle, or each of an array of handles at once, such as the tokens a search
@@ -3225,11 +3162,9 @@ export class SceneBuilder {
         return this._effect("ripple", target, options, RIPPLE_OPTIONS, "Ripple", 0);
     }
 
-    morph(source, target, duration = 1, easing = "smooth", lag) {
-        if (typeof duration === "object") {
-            if (arguments.length > 3) throw new TypeError("Timing options cannot be combined with positional arguments");
-            ({duration, curve: easing, options: lag} = _timing(duration, 1, true, false, ["lag", "copy", "pairs"]));
-        }
+    morph(source, target, duration = 1, curve = "smooth", lag) {
+        ({duration, curve, options: lag} =
+            _timingArguments(arguments, 2, {duration, curve, options: lag}, ["lag", "copy", "pairs"]));
         this._assertMutable();
         const sourceArray = Array.isArray(source);
         const targetArray = Array.isArray(target);
@@ -3293,46 +3228,39 @@ export class SceneBuilder {
         const sourceName = this._target(source);
         const targetName = this._target(target);
         const durationValue = _lua(duration);
-        const easingValue = _lua(easing);
+        const curveValue = _lua(curve);
         SCENE_STATES.get(this).lines.push(
-            (scene) => `${scene}:morph(${sourceName},${targetName},${durationValue},${easingValue}${lagValue})`,
+            (scene) => `${scene}:morph(${sourceName},${targetName},${durationValue},${curveValue}${lagValue})`,
         );
         return this;
     }
 
-    fadeTransform(source, target, duration = 1, easing = "smooth") {
-        if (typeof duration === "object") {
-            if (arguments.length > 3) throw new TypeError("Timing options cannot be combined with positional arguments");
-            ({duration, curve: easing} = _timing(duration));
-        }
+    fadeTransform(source, target, duration = 1, curve = "smooth") {
+        ({duration, curve} = _timingArguments(arguments, 2, {duration, curve}));
         this._assertMutable();
         const sourceName = this._handle(source);
         const targetName = this._handle(target);
         if (sourceName === targetName) {
             throw new TypeError("FadeTransform source and target must be distinct handles");
         }
+        const durationValue = _lua(duration);
+        const curveValue = _lua(curve);
         SCENE_STATES.get(this).lines.push(
-            (scene) => `${scene}:fade_transform(${sourceName},${targetName},${_lua(duration)},${_lua(easing)})`,
+            (scene) => `${scene}:fade_transform(${sourceName},${targetName},${durationValue},${curveValue})`,
         );
         return this;
     }
 
     // Serializes rotate, scale, and moveAlong options; an `about` handle names its local.
-    matchTransform(source, target, duration = 1, easing = "smooth", options = {}) {
-        if (typeof duration === "object") {
-            if (arguments.length > 3) throw new TypeError("Timing options cannot be combined with positional arguments");
-            ({duration, curve: easing, options} = _timing(duration, 1, true, false, MATCH_OPTIONS));
-        }
+    matchTransform(source, target, duration = 1, curve = "smooth", options = {}) {
+        ({duration, curve, options} = _timingArguments(arguments, 2, {duration, curve, options}, MATCH_OPTIONS));
         this._assertMutable();
         const sourceName = this._handle(source);
         const targetName = this._handle(target);
         if (sourceName === targetName) {
             throw new TypeError("MatchTransform source and target must be distinct handles");
         }
-        if (!_plain(options)) {
-            throw new TypeError("MatchTransform options must be a plain object");
-        }
-        _known(options, MATCH_OPTIONS, "Unknown MatchTransform option");
+        _plainOptions(options, "MatchTransform", MATCH_OPTIONS);
         if (options.arc !== undefined && !(Number.isFinite(options.arc) && Math.abs(options.arc) < 2 * Math.PI)) {
             throw new RangeError("MatchTransform arc must be a finite angle between -2*pi and 2*pi radians");
         }
@@ -3377,9 +3305,9 @@ export class SceneBuilder {
         if (options.copy !== undefined) entries.push(`["copy"]=${_lua(options.copy)}`);
         const value = entries.length ? `,{${entries.join(",")}}` : "";
         const durationValue = _lua(duration);
-        const easingValue = _lua(easing);
+        const curveValue = _lua(curve);
         SCENE_STATES.get(this).lines.push(
-            (scene) => `${scene}:match_transform(${sourceName},${targetName},${durationValue},${easingValue}${value})`,
+            (scene) => `${scene}:match_transform(${sourceName},${targetName},${durationValue},${curveValue}${value})`,
         );
         return this;
     }
@@ -3389,21 +3317,15 @@ export class SceneBuilder {
     // The builder applies the edits, so the script receives the edited text whole; the new
     // block keeps the look, place and parent of block and takes options.id or the id of block
     // with the first free .2, .3 and so on.
-    edit(block, edits, duration = 1, easing = "smooth", options = {}) {
-        if (typeof duration === "object") {
-            if (arguments.length > 3) throw new TypeError("Timing options cannot be combined with positional arguments");
-            ({duration, curve: easing, options} = _timing(duration, 1, true, false, EDIT_OPTIONS));
-        }
+    edit(block, edits, duration = 1, curve = "smooth", options = {}) {
+        ({duration, curve, options} = _timingArguments(arguments, 2, {duration, curve, options}, EDIT_OPTIONS));
         this._assertMutable();
         const blockName = this._handle(block);
         const code = CODE_BLOCKS.get(block);
         if (!code) throw new TypeError("Edit needs a block that code made");
         const list = Array.isArray(edits) ? edits : [edits];
         if (!list.length || list.length > 1024) throw new TypeError("Edit takes an edit or an array of 1 to 1024 edits");
-        if (!_plain(options)) {
-            throw new TypeError("Edit options must be a plain object");
-        }
-        _known(options, EDIT_OPTIONS, "Unknown Edit option");
+        _plainOptions(options, "Edit", EDIT_OPTIONS);
         if (options.id !== undefined && typeof options.id !== "string") throw new TypeError("Edit id must be a string");
         if (options.arc !== undefined && !(Number.isFinite(options.arc) && Math.abs(options.arc) < 2 * Math.PI)) {
             throw new RangeError("Edit arc must be a finite angle between -2*pi and 2*pi radians");
@@ -3438,7 +3360,7 @@ export class SceneBuilder {
         const held = ended && !text.endsWith("\n") ? `${text}\n` : text;
         const values = [
             blockName, `{{["replace"]={1,${_codeLineCount(code.text)}},["with"]=${_string(value)}}}`, _lua(duration),
-            _lua(easing),
+            _lua(curve),
         ];
         if (entries.length) values.push(`{${entries.join(",")}}`);
         return this._codeBlock((scene) => `${scene}:edit(${values.join(",")})`, code.parent, id, held, code.language);
@@ -3446,11 +3368,8 @@ export class SceneBuilder {
 
     // Lays items, a group's children or an array of sibling handles in order, one after
     // another over duration, as Lua arrange does; an item added at the cursor grows in.
-    arrange(items, duration = 1, easing = "smooth", options = {}) {
-        if (typeof duration === "object") {
-            if (arguments.length > 2) throw new TypeError("Timing options cannot be combined with positional arguments");
-            ({duration, curve: easing, options} = _timing(duration, 1, false, false, ARRANGE_OPTIONS));
-        }
+    arrange(items, duration = 1, curve = "smooth", options = {}) {
+        ({duration, curve, options} = _timingArguments(arguments, 1, {duration, curve, options}, ARRANGE_OPTIONS));
         this._assertMutable();
         let itemsValue;
         if (items instanceof GroupHandle) {
@@ -3460,10 +3379,7 @@ export class SceneBuilder {
         } else {
             throw new TypeError("Arrange takes a group or a non-empty array of handles");
         }
-        if (!_plain(options)) {
-            throw new TypeError("Arrange options must be a plain object");
-        }
-        _known(options, ARRANGE_OPTIONS, "Unknown Arrange option");
+        _plainOptions(options, "Arrange", ARRANGE_OPTIONS);
         if (options.gap !== undefined && !(Number.isFinite(options.gap) && options.gap >= 0)) {
             throw new RangeError("Arrange gap must be a finite number of zero or more");
         }
@@ -3476,9 +3392,9 @@ export class SceneBuilder {
         }
         const value = Object.keys(options).length ? `,${_lua(options)}` : "";
         const durationValue = _lua(duration);
-        const easingValue = _lua(easing);
+        const curveValue = _lua(curve);
         SCENE_STATES.get(this).lines.push(
-            (scene) => `${scene}:arrange(${itemsValue},${durationValue},${easingValue}${value})`,
+            (scene) => `${scene}:arrange(${itemsValue},${durationValue},${curveValue}${value})`,
         );
         return this;
     }
@@ -3524,11 +3440,7 @@ export class SceneBuilder {
     }
 
     _motionOptions(options, allowed, name) {
-        if (!_plain(options)) {
-            throw new TypeError(`${name} options must be a plain object`);
-        }
-        _known(options, allowed, `Unknown ${name} option`);
-        _timingValues(options, 1, false, name);
+        _timing(options, allowed, 1, name);
         if (options.arc !== undefined && !(Number.isFinite(options.arc) && Math.abs(options.arc) < 2 * Math.PI)) {
             throw new RangeError(`${name} arc must be a finite angle between -2*pi and 2*pi radians`);
         }
@@ -3593,13 +3505,13 @@ export class SceneBuilder {
 
     // Sample the plane map in target-parent space and emit its images; z stays unchanged.
     // The grid must cover every target point. Native spline interpolation preserves quadratic maps.
-    warp(target, fn, duration = 1, easing = "smooth", options = undefined) {
+    warp(target, fn, duration = 1, curve = "smooth", options = undefined) {
         this._assertMutable();
         if (duration !== null && typeof duration === "object") {
             if (arguments.length > 3) {
                 throw new TypeError("Warp takes (target, fn, options) or (target, fn, duration, curve, options)");
             }
-            ({duration, curve: easing, options} = _timing(duration, 1, false, false, WARP_OPTIONS, "Warp"));
+            ({duration, curve, options} = _timing(duration, WARP_OPTIONS, 1, "Warp"));
         }
         const targetName = this._target(target);
         if (typeof fn !== "function") throw new TypeError("Warp fn must be a function of x and y that returns [x, y]");
@@ -3619,7 +3531,7 @@ export class SceneBuilder {
         if (options.step !== undefined && !(Number.isFinite(options.step) && options.step > 0)) {
             throw new RangeError("Warp step must be a positive length");
         }
-        const timing = `${_lua(duration)},${_lua(easing)}`;
+        const timing = `${_lua(duration)},${_lua(curve)}`;
         const values = _sampling(this, () => rows.samples.flatMap((y) =>
             columns.samples.map((x) => _sampleVector(fn, x, y, "Warp fn").map(_single))));
         const state = SCENE_STATES.get(this);
@@ -3629,36 +3541,30 @@ export class SceneBuilder {
         return this;
     }
 
-    transition(from, to, duration = 1, easing = "smooth") {
-        if (typeof duration === "object") {
-            if (arguments.length > 3) throw new TypeError("Timing options cannot be combined with positional arguments");
-            ({duration, curve: easing} = _timing(duration));
-        }
+    transition(from, to, duration = 1, curve = "smooth") {
+        ({duration, curve} = _timingArguments(arguments, 2, {duration, curve}));
         this._assertMutable();
         const fromName = this._target(from);
         const toName = this._target(to);
         const durationValue = _lua(duration);
-        const easingValue = _lua(easing);
+        const curveValue = _lua(curve);
         SCENE_STATES.get(this).lines.push(
-            (scene) => `${scene}:transition(${fromName},${toName},${durationValue},${easingValue})`,
+            (scene) => `${scene}:transition(${fromName},${toName},${durationValue},${curveValue})`,
         );
         return this;
     }
 
-    play(specification, duration = 1, easing = "smooth", lag = 0) {
-        if (typeof duration === "object") {
-            if (arguments.length > 2) throw new TypeError("Timing options cannot be combined with positional arguments");
-            ({duration, curve: easing, lag} = _timing(duration, 1, true));
-        }
+    play(specification, duration = 1, curve = "smooth", lag = 0) {
+        ({duration, curve, lag} = _timingArguments(arguments, 1, {duration, curve, lag}, ["lag"]));
         const timing = SCENE_TRACKERS.get(this);
         const { anchor, time } = timing.clock;
         this._assertMutable();
         const descriptors = this._descriptors(specification, "play");
         const durationValue = _lua(duration);
-        const easingValue = _lua(easing);
+        const curveValue = _lua(curve);
         const lagValue = _lua(lag);
         SCENE_STATES.get(this).lines.push(
-            (scene) => `${scene}:play({${descriptors.join(",")}},${durationValue},${easingValue},${lagValue})`,
+            (scene) => `${scene}:play({${descriptors.join(",")}},${durationValue},${curveValue},${lagValue})`,
         );
         // A play lasts its duration and the lag of each later target, as the scene counts it.
         if (Number.isFinite(duration) && duration > 0 && Number.isFinite(lag) && lag >= 0) {
@@ -3689,11 +3595,8 @@ export class SceneBuilder {
 
     // Brings each target back to the newest state save recorded for it: over duration seconds,
     // each later target lag of the duration later, or at once without a duration.
-    restore(target, duration = 0, easing = "smooth", lag = 0) {
-        if (typeof duration === "object") {
-            if (arguments.length > 2) throw new TypeError("Timing options cannot be combined with positional arguments");
-            ({duration, curve: easing, lag} = _timing(duration, 0, true, true));
-        }
+    restore(target, duration = 0, curve = "smooth", lag = 0) {
+        ({duration, curve, lag} = _timingArguments(arguments, 1, {duration, curve, lag}, ["lag"], 0));
         this._assertMutable();
         const targetName = this._target(target);
         if (!(Number.isFinite(duration) && duration >= 0)) {
@@ -3701,10 +3604,10 @@ export class SceneBuilder {
         }
         if (!(Number.isFinite(lag) && lag >= 0)) throw new RangeError("Restore lag must be zero or positive");
         const durationValue = _lua(duration);
-        const easingValue = _lua(easing);
+        const curveValue = _lua(curve);
         const lagValue = _lua(lag);
         SCENE_STATES.get(this).lines.push(
-            (scene) => `${scene}:restore(${targetName},${durationValue},${easingValue},${lagValue})`,
+            (scene) => `${scene}:restore(${targetName},${durationValue},${curveValue},${lagValue})`,
         );
         return this;
     }
@@ -3741,7 +3644,7 @@ export class SceneBuilder {
             throw new TypeError("An object can follow only one binding");
         }
         const binding = { target, trackers: [...list], fn, shift: [0, 0, 0], windows: [] };
-        this._set(_boundDescriptor(binding, _boundState(binding)));
+        this._set(_boundDescriptor(binding, _boundState(this, binding)));
         tracks.bound.add(target.name);
         tracks.bindings.push(binding);
         return target;
@@ -3848,7 +3751,7 @@ export class SceneBuilder {
                 const checks = [];
                 affected.forEach((binding, index) => {
                     if (overlapping.has(binding)) return;
-                    row[index] = _boundState(binding);
+                    row[index] = _boundState(this, binding);
                     checks.push(_boundDescriptor({ target: binding.target, shift: [0, 0, 0] }, row[index]));
                 });
                 if (checks.length) this._descriptors(checks, "play");
@@ -4075,20 +3978,18 @@ export class SceneBuilder {
 
     // Moves the camera; a target that is a handle or an array of handles aims it at the center of
     // their authored bounds, as focus frames them, and the eye keeps its offset.
-    look(camera, duration = 1, easing = "smooth") {
-        if (typeof duration === "object" && arguments.length > 2) throw new TypeError("Timing options cannot be combined with positional arguments");
-        return this._look(null, camera, duration, easing);
+    look(camera, duration = 1, curve = "smooth") {
+        return this._look(null, camera, _timingArguments(arguments, 1, {duration, curve}));
     }
 
     // The camera calls below move the scene's camera, or with a receiver the view of that name.
-    _look(receiver, camera, duration, easing) {
-        if (typeof duration === "object") ({duration, curve: easing} = _timing(duration));
+    _look(receiver, camera, {duration, curve}) {
         this._assertMutable();
         const cameraValue = this._camera(camera);
         const durationValue = _lua(duration);
-        const easingValue = _lua(easing);
+        const curveValue = _lua(curve);
         SCENE_STATES.get(this).lines.push(
-            (scene) => `${receiver ?? scene}:look(${cameraValue},${durationValue},${easingValue})`,
+            (scene) => `${receiver ?? scene}:look(${cameraValue},${durationValue},${curveValue})`,
         );
         return this;
     }
@@ -4247,39 +4148,30 @@ for (const method of ["tex", "brace", "code", "area", "riemann", "vectorField", 
 for (const [method, lua] of [["create", "create"], ["uncreate", "uncreate"], ["write", "write"],
     ["drawBorderThenFill", "draw_border_then_fill"]]) {
     const fallback = method === "uncreate" ? "forward" : undefined;
-    SceneBuilder.prototype[method] = function (target, duration = 1, easing = "smooth", lag = 0, direction = fallback) {
-        if (typeof duration === "object") {
-            if (arguments.length > 2) throw new TypeError("Timing options cannot be combined with positional arguments");
-            ({duration, curve: easing, lag, options: {direction = fallback}} =
-                _timing(duration, 1, true, false, ["direction"]));
-        }
-        if (direction === undefined) return this._animate(lua, target, [duration, easing, lag]);
+    SceneBuilder.prototype[method] = function (target, duration = 1, curve = "smooth", lag = 0, direction = fallback) {
+        ({duration, curve, lag, options: {direction = fallback}} =
+            _timingArguments(arguments, 1, {duration, curve, lag, options: {direction}}, ["lag", "direction"]));
+        if (direction === undefined) return this._animate(lua, target, [duration, curve, lag]);
         this._assertMutable();
         _direction(direction);
-        return this._animate(lua, target, [duration, easing, lag, direction]);
+        return this._animate(lua, target, [duration, curve, lag, direction]);
     };
 }
 
 // The animations that grow targets from their centers or shrink them to them.
 for (const [method, lua] of [["growFromCenter", "grow_from_center"], ["shrinkToCenter", "shrink_to_center"]]) {
-    SceneBuilder.prototype[method] = function (target, duration = 1, easing = "smooth") {
-        if (typeof duration === "object") {
-            if (arguments.length > 2) throw new TypeError("Timing options cannot be combined with positional arguments");
-            ({duration, curve: easing} = _timing(duration));
-        }
-        return this._animate(lua, target, [duration, easing]);
+    SceneBuilder.prototype[method] = function (target, duration = 1, curve = "smooth") {
+        ({duration, curve} = _timingArguments(arguments, 1, {duration, curve}));
+        return this._animate(lua, target, [duration, curve]);
     };
 }
 
 // The animations of targets to a value; shift and transform move them, which a connector cannot.
 for (const method of ["shift", "transform", "fade", "stroke", "fill"]) {
-    SceneBuilder.prototype[method] = function (target, value, duration = 1, easing = "smooth") {
-        if (typeof duration === "object") {
-            if (arguments.length > 3) throw new TypeError("Timing options cannot be combined with positional arguments");
-            ({duration, curve: easing} = _timing(duration));
-        }
+    SceneBuilder.prototype[method] = function (target, value, duration = 1, curve = "smooth") {
+        ({duration, curve} = _timingArguments(arguments, 2, {duration, curve}));
         if (method === "shift" || method === "transform") this._assertTransformable(target);
-        return this._animate(method, target, [value, duration, easing]);
+        return this._animate(method, target, [value, duration, curve]);
     };
 }
 

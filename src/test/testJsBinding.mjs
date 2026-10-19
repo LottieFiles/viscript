@@ -637,6 +637,9 @@ assert.throws(
 assert.throws(() => invalidEffects.morph(invalidEffectForeign, invalidEffectTarget), /same scene/);
 assert.throws(() => invalidEffects.fadeTransform(invalidEffectSource, invalidEffectSource), /distinct handles/);
 assert.throws(() => invalidEffects.fadeTransform(invalidEffectSource, invalidEffectForeign), /same scene/);
+// A duration the script cannot hold stops the call, not the compile after it.
+assert.throws(() => invalidEffects.fadeTransform(invalidEffectSource, invalidEffectTarget, Infinity),
+    /Scene numbers must be finite/);
 assert.equal(compileScene(invalidEffects), invalidEffectsBefore);
 
 // Named emphasis effects compile to their Lua calls with every option spelled out, and a wiggle
@@ -1144,21 +1147,20 @@ const replotScript = [
     "",
 ].join("\n");
 
-// A space takes ticks and labels as Lua space does, and labels() places more and returns their
-// handles in order: a new text below the space for each string, and each handle given as it
-// is, which the script names.
+// A space takes ticks as Lua space does, and labels() places labels and returns their handles in
+// order: a new text below the space for each string, and each handle given as it is, which the
+// script names.
 const graphing = vis.scene({ width: 320, height: 180, camera: { mode: "fixed", view: "2d", height: 6 } });
 const tag = graphing.rectangle({ size: [0.5, 0.25], id: "tag" });
 const graph = graphing.space({
-    x: [-3, 3, 1], y: [-2, 2, 1], ticks: { x: Math.PI / 2, y: true }, tick_length: 10,
-    labels: { x: [[Math.PI / 2, "half"], [-Math.PI / 2, tag]], gap: 6 }, id: "graph",
+    x: [-3, 3, 1], y: [-2, 2, 1], ticks: { x: Math.PI / 2, y: true }, tick_length: 10, id: "graph",
 });
+graph.labels({ x: [[Math.PI / 2, "half"], [-Math.PI / 2, tag]], gap: 6 });
 const graphLabels = graph.labels({ y: [[1, "one"], [-1, tag]], side: { y: "right" }, size: 18, color: "#ff0000" });
 assert.deepEqual(graphLabels.map((handle) => handle.name), ["objects[4][1]", "objects[1]"]);
 assert.equal(graphLabels[1], tag);
 assert.deepEqual(graph.children().map((handle) => handle.name), ["objects[3][1]", "objects[4][1]"]);
 assert.throws(() => graph.labels(5), /Space labels must be a plain object of x, y and z lists of \[value, label\]/);
-assert.throws(() => graphing.space({ labels: [] }), /Space labels must be a plain object/);
 assert.throws(() => graph.labels({ x: [[1, "a"]], w: [] }), /Unknown space labels option: w/);
 assert.throws(() => graph.labels({ x: 5 }), /Space labels x must be an array of \[value, label\]/);
 for (const entry of [5, null, [1], [1, "a", 2], [NaN, "a"], [1, 2], ["1", "a"]]) {
@@ -1176,8 +1178,8 @@ assert.deepEqual(graphingLines.slice(3, 6), [
 assert.equal(graphingLines.filter((line) => line.includes(":labels ")).length, 2);
 const screenLabels = vis.scene({width: 320, height: 180,
     camera: {mode: "fixed", view: "2d", height: 6}});
-const screenAxes = screenLabels.space({id: "screen-axes", x: [-2, 2, 1], y: [-1, 1, 1],
-    labels: {placement: "screen", x: [[-2, "x"]], gap: 10, size: 18}});
+const screenAxes = screenLabels.space({id: "screen-axes", x: [-2, 2, 1], y: [-1, 1, 1]});
+screenAxes.labels({placement: "screen", x: [[-2, "x"]], gap: 10, size: 18});
 const suppliedScreen = screenAxes.text({id: "screen-supplied", text: "y", size: 24});
 assert.equal(screenAxes.labels({placement: "screen", y: [[1, suppliedScreen]], gap: 10})[0], suppliedScreen);
 assert.throws(() => screenAxes.labels({placement: "other"}), /Space labels placement must be 'world' or 'screen'/);
@@ -1189,8 +1191,8 @@ assert.match(screenLabelLua, /\["placement"\]="screen"/);
 // Generated ids continue independently on each axis and preserve supplied handle ids.
 const labelIds = vis.scene({ camera: { mode: "fixed", view: "2d", height: 6 } });
 const keptLabel = labelIds.text({ id: "axes/label/x/1", text: "kept" });
-const namedAxes = labelIds.space({ id: "axes", x: [-2, 2, 1], y: [-2, 2, 1], z: [-2, 2, 1],
-    labels: { x: [[1, keptLabel], [-1, "first"]], y: [[1, "up"]], z: [[1, "depth"]] } });
+const namedAxes = labelIds.space({ id: "axes", x: [-2, 2, 1], y: [-2, 2, 1], z: [-2, 2, 1] });
+namedAxes.labels({ x: [[1, keptLabel], [-1, "first"]], y: [[1, "up"]], z: [[1, "depth"]] });
 const firstLabel = namedAxes.children()[0];
 assert.equal(labelIds.find("axes/label/x/2"), firstLabel);
 const moreLabels = namedAxes.labels({ x: [[1, "second"], [-1, keptLabel]], y: [[-1, "down"]] });
@@ -1203,7 +1205,8 @@ assert.equal(labelIds.find("axes/label/x/4"), lastLabel);
 assert.equal(labelIds.find("axes/label/y/1"), namedAxes.children()[1]);
 assert.equal(labelIds.find("axes/label/y/2"), moreLabels[2]);
 assert.equal(labelIds.find("axes/label/z/1"), namedAxes.children()[2]);
-const anonymousAxes = labelIds.space({ labels: { x: [[1, "anonymous"]] } });
+const anonymousAxes = labelIds.space({});
+anonymousAxes.labels({ x: [[1, "anonymous"]] });
 assert.equal(anonymousAxes.labels({ x: [[2, "another"]] }).length, 1);
 assert.equal(namedAxes.children().length, 6);
 // labels() makes and lays out objects, so the tracks that wait keep waiting: tracks of two
@@ -2054,6 +2057,26 @@ assert.equal(compileScene(broken), brokenBefore);
 broken.parallel((scene) => scene.track(brokenX, 1, 2), (scene) => scene.wait(1).track(brokenZ, 1, 1));
 assert.throws(() => compileScene(broken), /A bound function must return a state object/);
 assert.throws(() => broken.fade(broken.circle({ radius: 0.5 }), 0.5, 1), /A bound function must return a state object/);
+// A bound function runs as a sampling callback at bind, at track and where waiting tracks play,
+// so it cannot author the scene; an animation it started where tracks play used to play them
+// again without end.
+const authoring = vis.scene({ fps: 10 });
+const authoringX = authoring.tracker(0);
+const authoringZ = authoring.tracker(0);
+const unavailable = /Scene authoring is unavailable inside a sampling callback/;
+assert.throws(() => authoring.bind(authoring.circle(), authoringX, () => authoring.wait(1)), unavailable);
+const authoringDot = authoring.circle();
+let author = () => {};
+authoring.bind(authoringDot, [authoringX, authoringZ], (x, z) => {
+    author();
+    return { opacity: x * z };
+});
+author = () => authoring.circle();
+assert.throws(() => authoring.track(authoringX, 1, 1), unavailable);
+author = () => {};
+authoring.parallel((scene) => scene.track(authoringX, 1, 1), (scene) => scene.track(authoringZ, 1, 1));
+author = () => authoring.fade(authoringDot, 0.5);
+assert.throws(() => compileScene(authoring), unavailable);
 
 // A parallel merges its branches also after a call whose length only the scene computes, and a
 // viewport child merges its tracks before its parent takes it. Tracks the builder cannot time
@@ -3166,6 +3189,20 @@ assert.throws(() => shadedAxes.vectorField({ values: [[1, 0]], x_range: [0, 0, 1
     /Vector field length must be a positive number of world units/);
 assert.throws(() => shadedAxes.vectorField({ values: [[1, 0]], x_range: [0, 0, 1], y_range: [0, 0, 1], scale: -1 }),
     /Vector field scale must be a positive number/);
+// Area, riemann and vectorField call their functions as plot does, where they cannot author the
+// scene.
+const authorAt = (x) => {
+    shaded.wait(1);
+    return x;
+};
+for (const make of [
+    () => shadedAxes.area({ fn: authorAt, x_range: [0, 1, 0.5] }),
+    () => shadedAxes.area({ fn: () => 1, base: authorAt, x_range: [0, 1, 0.5] }),
+    () => shadedAxes.riemann({ fn: authorAt, x_range: [0, 1, 0.5] }),
+    () => shadedAxes.vectorField({ fn: (x, y) => [authorAt(x), y], x_range: [0, 1, 1], y_range: [0, 1, 1] }),
+]) {
+    assert.throws(make, /Scene authoring is unavailable inside a sampling callback/);
+}
 
 // A region names the shapes it combines as the script does.
 const venn = vis.scene({ width: 320, height: 180 });
@@ -3608,6 +3645,11 @@ try {
     assert.equal(inspectScript("surface.lua", surfaceLua).scene.duration, 1);
 
     assert.equal(inspectScript("shapes.lua", compileScene(shapes)).scene.duration, 1);
+
+    // Labels go through labels(): a space hands a labels option to Lua space, which refuses it.
+    const unlabeled = vis.scene();
+    unlabeled.space({labels: {x: [[1, "one"]]}});
+    assert.match(refusal("space-labels.lua", compileScene(unlabeled)), /unknown option 'labels'/);
 
     // A measured text measures in its font while the script runs, or in the default font without it.
     const measuredPath = writeScript("measured.lua", measuredLua);

@@ -75,10 +75,10 @@ const world = definition.space({
 });
 const frame = world.space({matrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]});
 const halfPi = definition.tex({tex: "\\frac{\\pi}{2}"});
-const axes = definition.space({
-    x: [-4, 4, 1], y: [-2, 2, 1], ticks: {x: Math.PI / 2, y: true}, tick_length: 10,
-    labels: {x: [[Math.PI / 2, halfPi], [-Math.PI / 2, "-pi/2"]], gap: 6},
-});
+const axes = definition.space({x: [-4, 4, 1], y: [-2, 2, 1], ticks: {x: Math.PI / 2, y: true}, tick_length: 10});
+axes.labels({x: [[Math.PI / 2, halfPi], [-Math.PI / 2, "-pi/2"]], gap: 6});
+// @ts-expect-error a space places its labels with labels().
+definition.space({labels: {x: [[1, "1"]]}});
 definition.space({ticks: true});
 const axisLabels: ObjectHandle[] = axes.labels({
     y: [[1, "1"], [-1, axes.text({text: "-1"})]], side: {y: "right"}, size: 18, color: "#ff0000",
@@ -244,6 +244,10 @@ definition.circle({gradient: {type: "conic", radius: 1}});
 definition.circle({gradient: {type: "linear", center: [0, 0]}});
 // @ts-expect-error unknown gradient type
 definition.circle({gradient: {type: "diamond"}});
+// @ts-expect-error a gradient paints vector shapes, not texts.
+definition.text({text: "x", gradient: true});
+// @ts-expect-error a gradient paints vector shapes, not spaces.
+definition.space({gradient: "#fedcba"});
 definition.arrow({from: [-1, 0], to: [1, 0]});
 definition.vector({value: [1, 2, 3]});
 definition.rectangle({size: [2, 1]});
@@ -631,6 +635,10 @@ definition.fadeOut(point, {easing: "smooth"});
 definition.picture({asset: "pixels", pixels: ["#fff"], size: [1, 1]});
 // @ts-expect-error Inline picture pixels require their buffer dimensions.
 definition.picture({pixels: ["#fff"]});
+// @ts-expect-error A picture keeps its source colors and has no outline to dash.
+definition.picture({asset: "pixels", dash: [4, 2]});
+// @ts-expect-error A cell is painted by its color, texture and patches, with no outline.
+definition.cell({size: [2, 2], width: 2});
 // @ts-expect-error Animation curve preset names are closed.
 vis.animCurve.preset("warp");
 

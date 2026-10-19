@@ -178,6 +178,13 @@ export async function createVis(...args) {
     const assertAlive = () => {
         if (!engine) throw new Error("viscript instance has been destroyed");
     };
+    // Whether a scene has loaded; a failed load keeps the scene before it. The calls that render
+    // or read the scene check it first.
+    let loaded = false;
+    const assertScene = () => {
+        assertAlive();
+        if (!loaded) throw new Error("No scene is loaded; call load with a Lua or JavaScript scene first");
+    };
     const encoder = new TextEncoder();
     const lastError = () => module.UTF8ToString(module._vis_last_error(engine));
     const check = (result, operation) => {
@@ -209,6 +216,7 @@ export async function createVis(...args) {
         if (!name.length || name.includes(0)) throw new Error("Scene name must be non-empty and cannot contain zero bytes");
         check(withMemory([source, name], (sourcePtr, namePtr) =>
             module._vis_load_lua(engine, sourcePtr, source.length, namePtr)), "Lua load");
+        loaded = true;
         return module._vis_duration(engine);
     };
 
@@ -228,7 +236,7 @@ export async function createVis(...args) {
     // Renders a frame and returns a view of its pixels, which the next render, a resize or WASM
     // memory growth leaves stale: render hands out a copy, draw puts the view on a canvas.
     const renderFrame = (time, pixelRatio) => {
-        assertAlive();
+        assertScene();
         check(renderPixels(engine, time, pixelRatio), "Render");
         return new Uint8ClampedArray(module.HEAPU8.buffer, module._vis_pixels(engine), module._vis_pixels_size(engine));
     };
@@ -243,7 +251,7 @@ export async function createVis(...args) {
         return encoded;
     };
     const bounds = (object, time = 0) => {
-        assertAlive();
+        assertScene();
         nonNegative(time, "Bounds time");
         const target = encodedObject(object, "Bounds target");
         const [x, y, width, height] = withMemory([target, 16], (objectPtr, outputPtr) => {
@@ -253,7 +261,7 @@ export async function createVis(...args) {
         return Object.freeze({x, y, width, height});
     };
     const intersects = (first, second, time = 0, padding = 0) => {
-        assertAlive();
+        assertScene();
         nonNegative(time, "Intersection time");
         nonNegative(padding, "Intersection padding");
         const firstTarget = encodedObject(first, "First intersection target");
@@ -264,7 +272,7 @@ export async function createVis(...args) {
         });
     };
     const layoutReport = (time = 0, padding = 0) => {
-        assertAlive();
+        assertScene();
         nonNegative(time, "Layout report time");
         nonNegative(padding, "Layout report padding");
         check(module._vis_layout_report(engine, time, padding), "Layout report");
@@ -407,7 +415,7 @@ export async function createVis(...args) {
     })() : undefined;
 
     const cameraInput = (action, x = 0, y = 0) => {
-        assertAlive();
+        assertScene();
         const code = CAMERA_ACTIONS[action];
         if (code === undefined) throw new TypeError(`Unknown camera action '${action}'`);
         if (!Number.isFinite(x) || !Number.isFinite(y)) throw new TypeError("Camera deltas must be finite numbers");
@@ -622,7 +630,7 @@ export async function createVis(...args) {
         ...(advanceRuntime ? {advanceRuntime} : {}),
         hostTheme,
         draw(canvas, time, pixelRatio = 1) {
-            assertAlive();
+            assertScene();
             const logicalWidth = module._vis_width(engine);
             const logicalHeight = module._vis_height(engine);
             if (!Number.isInteger(pixelRatio) || pixelRatio < 1 || pixelRatio > 0xffffffff
@@ -648,7 +656,7 @@ export async function createVis(...args) {
             return [module._vis_width(engine), module._vis_height(engine)];
         },
         resize(width, height) {
-            assertAlive();
+            assertScene();
             if (!Number.isInteger(width) || !Number.isInteger(height) || width <= 0 || height <= 0 ||
                 width > 0xffffffff || height > Math.floor(67108864 / width)) {
                 throw new Error("Size must be positive integers with at most 67108864 pixels");

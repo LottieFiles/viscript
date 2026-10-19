@@ -2,8 +2,8 @@
 export type Color = string;
 export type ThemeColorRole = "background" | "foreground" | "muted" | "accent" | "secondary" |
     "success" | "warning" | "danger" | "info" | "surface" | "border" | "result" | "focus";
-export type Easing = "linear" | "smooth" | "ease_in" | "ease_out" | "ease_in_out";
-export type AnimCurvePreset = Easing | "gentle" | "snappy" | "back" | "bounce" | "elastic";
+export type AnimCurvePreset = "linear" | "smooth" | "ease_in" | "ease_out" | "ease_in_out" |
+    "gentle" | "snappy" | "back" | "bounce" | "elastic";
 export type AnimCurve = AnimCurvePreset |
     Readonly<{preset: AnimCurvePreset; strength: number; reverse?: boolean}> |
     Readonly<{bezier: readonly [number, number, number, number]; strength: number; reverse?: boolean}>;
@@ -217,7 +217,7 @@ export interface Style {
     color?: Color;
     stroke?: Color;
     fill?: Color;
-    /** `true`/end-stop color keep the legacy two-stop linear ramp. */
+    /** `true` ramps from the paint color to the theme's end_gradient_stop; a color sets that end stop. */
     gradient?: boolean | Color | GradientOptions;
     width?: number;
     radius?: number;
@@ -249,7 +249,7 @@ export interface GroupOptions extends Omit<Style, "color" | "gradient" | "radius
 export interface LineOptions extends Style {from: WorldVector; to: WorldVector; trimDistance?: number | [number, number]}
 export interface ArrowOptions extends LineOptions {tail?: number; tip?: number}
 export interface PointOptions extends Style {point: WorldVector}
-export interface TextOptions extends Style {
+export interface TextOptions extends Omit<Style, "gradient"> {
     text: string;
     point?: WorldVector;
     size?: number;
@@ -269,7 +269,7 @@ export interface TextOptions extends Style {
     baseline?: boolean;
 }
 /** A text that writes a number; play, set and trackers animate it as `value`. */
-export interface NumberOptions extends Style {
+export interface NumberOptions extends Omit<Style, "gradient"> {
     value?: number;
     /** Digits after the decimal point, 0 to 6. */
     decimals?: number;
@@ -460,7 +460,7 @@ export type CodeEdit =
     {prepend: string};
 /** trimDistance uses the same object-local endpoint distances as LineOptions. */
 export interface VectorOptions extends Style {value: WorldVector; origin?: WorldVector; trimDistance?: number | [number, number]; tail?: number; tip?: number}
-export interface SpaceOptions extends Style {
+export interface SpaceOptions extends Omit<Style, "gradient"> {
     x?: Range;
     y?: Range;
     z?: Range;
@@ -478,8 +478,6 @@ export interface SpaceOptions extends Style {
     ticks?: boolean | SpaceTicks;
     /** Tick length in pixels, centered on the axis; 8 by default. */
     tick_length?: number;
-    /** Labels beside the ticks, placed once the space is made, as SpaceHandle.labels places them. */
-    labels?: SpaceLabelsOptions;
 }
 /** The step between ticks on each axis, which sit at its multiples inside the range but not at 0; 0 or false
  * for none, true for the step of the range. */
@@ -748,7 +746,7 @@ export interface CloneOptions extends Style {
     shift?: WorldVector;
 }
 /** Picture from a registered asset (SVG stays vector, PNG is raster; native builds also read JPG and WebP) or inline RGBA pixels. */
-export type PictureOptions = Omit<Style, "color" | "stroke" | "fill" | "radius"> & ({
+export type PictureOptions = Omit<Style, "color" | "stroke" | "fill" | "gradient" | "radius" | "dash" | "dash_offset"> & ({
     asset: string;
     pixels?: never;
     size?: never;
@@ -767,7 +765,7 @@ export type CellRegion = readonly [number, number, number, number] | {
     width: number;
     height: number;
 };
-export type CellOptions = Omit<Style, "stroke" | "fill" | "radius"> & {
+export type CellOptions = Omit<Style, "stroke" | "fill" | "gradient" | "width" | "radius" | "dash" | "dash_offset"> & {
     origin?: WorldVector;
     size: readonly [number, number];
     mode?: "full" | "padd";

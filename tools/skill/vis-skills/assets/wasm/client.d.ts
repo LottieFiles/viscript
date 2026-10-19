@@ -321,7 +321,8 @@ export function createVisModule(moduleOptions?: VisModuleOptions): Promise<VisMo
 
 /**
  * Starts an engine in `moduleOptions.module`, or in a new WebAssembly instance. It holds no scene until `load`, so
- * fonts, assets and a host theme can be registered before the first scene uses them.
+ * fonts, assets and a host theme can be registered before the first scene uses them; render, draw, bounds,
+ * intersects, layoutReport, resize and cameraInput throw until then.
  */
 export function createVis(moduleOptions?: VisModuleOptions): Promise<VisScene>;
 /** Starts an engine as `createVis(moduleOptions)` does and loads `source` into it. */

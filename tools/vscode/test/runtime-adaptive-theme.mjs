@@ -13,7 +13,10 @@ const serifHeadingFont = fs.readFileSync(path.join(extensionRoot, "runtime", "So
 const runtime = await createVis({wasmBinary});
 assert.equal(runtime.duration, 0);
 assert.deepEqual(runtime.size(), [0, 0]);
-assert.throws(() => runtime.render(0), /InsufficientCondition/);
+for (const read of [() => runtime.render(0), () => runtime.bounds("a"), () => runtime.layoutReport(),
+    () => runtime.resize(8, 8)]) {
+    assert.throws(read, /No scene is loaded; call load with a Lua or JavaScript scene first/);
+}
 runtime.font("IBM Plex Sans KR", headingFont, "ttf");
 runtime.font("Source Serif 4", serifHeadingFont, "ttf");
 runtime.font("JetBrainsMono", codeFont, "ttf");
