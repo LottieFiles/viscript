@@ -387,6 +387,52 @@ static void pointerFollow(Renderer* renderer)
     delete scene;
 }
 
+// Any finite angle offset turns the follower to one angle, however many turns it holds.
+static void pointerAngle(Renderer* renderer)
+{
+    Config config;
+    config.width = 200u;
+    config.height = 100u;
+    config.camera.orthoHeight = 4.0f;
+    auto scene = Scene::gen(config);
+    auto target = Rectangle::gen({}, {1.2f, 0.3f});
+    CHECK(scene && target && renderer);
+    if (!scene || !target || !renderer) {
+        delete scene;
+        delete target;
+        return;
+    }
+    CHECK(scene->add(target) == Result::Success);
+    CHECK(scene->wait(3.0f) == Result::Success);
+    auto controller = Controller::gen(scene);
+    CHECK(controller != nullptr);
+    if (!controller) {
+        delete scene;
+        return;
+    }
+    PointerFollow binding;
+    binding.target = target;
+    binding.region = {0.0f, 0.0f, 200.0f, 100.0f};
+    binding.mapOrigin = {-4.0f, 2.0f, 0.0f};
+    binding.mapX = {8.0f, 0.0f, 0.0f};
+    binding.mapY = {0.0f, -4.0f, 0.0f};
+    binding.period = 0.4f;
+    binding.angleOffset = 1.0e30f;
+    CHECK(controller->pointerFollow(binding) == Result::Success);
+    auto result = controller->input(pointer(150.0f, 25.0f, 0.0f));
+    CHECK(result.handled && result.redraw && result.status == Result::Success);
+    BBox first;
+    BBox second;
+    CHECK(renderer->bounds(scene, target, 0.4f, first) == Result::Success);
+    // Such an offset leaves no room for the pointer's direction, so a move the other way keeps
+    // the angle.
+    result = controller->input(pointer(50.0f, 75.0f, 0.4f));
+    CHECK(result.handled && result.redraw && result.status == Result::Success);
+    CHECK(renderer->bounds(scene, target, 0.8f, second) == Result::Success);
+    CHECK(near(second.width, first.width, 0.5f) && near(second.height, first.height, 0.5f));
+    delete scene;
+}
+
 static void keyboard(Renderer* renderer)
 {
     Config config;
@@ -586,6 +632,7 @@ int main()
     CHECK(renderer != nullptr);
     if (renderer) {
         pointerFollow(renderer);
+        pointerAngle(renderer);
         keyboard(renderer);
     }
     camera();

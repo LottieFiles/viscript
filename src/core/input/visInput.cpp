@@ -18,11 +18,14 @@ namespace
 constexpr uint32_t ShortcutModifiers = 2u | 4u | 8u;
 uint8_t RuntimeKey = 0u;
 
+// The angle a whole number of turns from target that lies nearest current, so that a turn takes
+// the short way. Target comes within half a turn of zero first, which keeps its distance from
+// current exact in double however large it is, so that any finite target settles on one angle.
 static float _angle(float current, float target) noexcept
 {
-    while (target - current > PI) target -= TWO_PI;
-    while (target - current < -PI) target += TWO_PI;
-    return target;
+    auto turn = static_cast<double>(TWO_PI);
+    auto angle = std::remainder(static_cast<double>(target), turn);
+    return static_cast<float>(current + std::remainder(angle - current, turn));
 }
 
 static float _keyAmount(float elapsed, float period) noexcept
