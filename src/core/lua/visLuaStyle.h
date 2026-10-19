@@ -71,23 +71,18 @@ static void _gradientStops(lua_State* lua, int index, Gradient& gradient, const 
 
 static Gradient _gradient(lua_State* lua, int index, const Theme* theme)
 {
+    static constexpr LuaName<GradientType> TYPES[] = {
+        {"linear", GradientType::Linear}, {"radial", GradientType::Radial}, {"conic", GradientType::Conic}};
     index = lua_absindex(lua, index);
-    auto parseType = [&]() {
-        lua_getfield(lua, index, "type");
-        if (lua_type(lua, -1) != LUA_TSTRING) {
-            luaL_error(lua, "gradient.type must be \"linear\", \"radial\" or \"conic\"");
-        }
-        auto name = lua_tostring(lua, -1);
-        auto type = GradientType::None;
-        if (std::strcmp(name, "linear") == 0) type = GradientType::Linear;
-        else if (std::strcmp(name, "radial") == 0) type = GradientType::Radial;
-        else if (std::strcmp(name, "conic") == 0) type = GradientType::Conic;
-        else luaL_error(lua, "gradient.type must be \"linear\", \"radial\" or \"conic\", got '%s'", name);
-        lua_pop(lua, 1);
-        return type;
-    };
+    lua_getfield(lua, index, "type");
+    if (lua_type(lua, -1) != LUA_TSTRING) luaL_error(lua, "gradient.type must be \"linear\", \"radial\" or \"conic\"");
+    size_t size;
+    auto name = lua_tolstring(lua, -1, &size);
+    auto type = _findName(name, size, TYPES);
+    if (!type) luaL_error(lua, "gradient.type must be \"linear\", \"radial\" or \"conic\", got '%s'", name);
+    lua_pop(lua, 1);
     Gradient gradient;
-    gradient.type = parseType();
+    gradient.type = type ? type->value : GradientType::None;
     const char* allowed[6] = {"type", "stops", nullptr, nullptr, nullptr, nullptr};
     switch (gradient.type) {
         case GradientType::Linear: allowed[2] = "from"; allowed[3] = "to"; break;
@@ -179,41 +174,29 @@ static Shadow _shadow(lua_State* lua, int index, const Theme* theme, Shadow base
 
 static BlendMode _blendMode(lua_State* lua, int index)
 {
-    static constexpr const char* names[] = {
-        "normal", "multiply", "screen", "overlay", "darken", "lighten", "color_dodge", "color_burn", "hard_light",
-        "soft_light", "difference", "exclusion", "hue", "saturation", "color", "luminosity", "add"};
-    static_assert(sizeof(names) / sizeof(names[0]) == static_cast<size_t>(BlendMode::Add) + 1u,
+    static constexpr LuaName<BlendMode> MODES[] = {
+        {"normal", BlendMode::Normal}, {"multiply", BlendMode::Multiply}, {"screen", BlendMode::Screen},
+        {"overlay", BlendMode::Overlay}, {"darken", BlendMode::Darken}, {"lighten", BlendMode::Lighten},
+        {"color_dodge", BlendMode::ColorDodge}, {"color_burn", BlendMode::ColorBurn},
+        {"hard_light", BlendMode::HardLight}, {"soft_light", BlendMode::SoftLight},
+        {"difference", BlendMode::Difference}, {"exclusion", BlendMode::Exclusion}, {"hue", BlendMode::Hue},
+        {"saturation", BlendMode::Saturation}, {"color", BlendMode::Color}, {"luminosity", BlendMode::Luminosity},
+        {"add", BlendMode::Add}};
+    static_assert(sizeof(MODES) / sizeof(MODES[0]) == static_cast<size_t>(BlendMode::Add) + 1u,
                   "a name for every blend mode");
     if (lua_type(lua, index) != LUA_TSTRING) luaL_error(lua, "blend must be a string");
-    auto name = lua_tostring(lua, index);
-    for (auto i = 0u; i < sizeof(names) / sizeof(names[0]); i++) {
-        if (std::strcmp(name, names[i]) == 0) return static_cast<BlendMode>(i);
-    }
-    luaL_error(lua, "blend must be 'normal', 'multiply', 'screen', 'overlay', 'darken', 'lighten', 'color_dodge', "
-                    "'color_burn', 'hard_light', 'soft_light', 'difference', 'exclusion', 'hue', 'saturation', "
-                    "'color', 'luminosity' or 'add'");
-    return BlendMode::Normal;
+    return _enum(lua, index, "blend", MODES);
 }
 
-static TextRole _textRole(lua_State* lua, const char* role)
-{
-    if (std::strcmp(role, "h1") == 0) return TextRole::H1;
-    if (std::strcmp(role, "h2") == 0) return TextRole::H2;
-    if (std::strcmp(role, "h3") == 0) return TextRole::H3;
-    if (std::strcmp(role, "text") == 0) return TextRole::Text;
-    if (std::strcmp(role, "code") == 0) return TextRole::Code;
-    luaL_error(lua, "text role must be 'h1', 'h2', 'h3', 'text' or 'code'");
-    return TextRole::Text;
-}
+// The roles a text and a part of a spans row take.
+static constexpr LuaName<TextRole> TEXT_ROLES[] = {{"h1", TextRole::H1}, {"h2", TextRole::H2}, {"h3", TextRole::H3},
+                                                   {"text", TextRole::Text}, {"code", TextRole::Code}};
 
 static TextOrientation _textOrientation(lua_State* lua, int index)
 {
-    auto name = _fieldOptionalString(lua, index, "orientation", "billboard");
-    auto orientation = TextOrientation::Billboard;
-    if (std::strcmp(name, "plane") == 0) orientation = TextOrientation::Plane;
-    else if (std::strcmp(name, "billboard") != 0) luaL_error(lua, "text orientation must be 'billboard' or 'plane'");
-    lua_pop(lua, 1);
-    return orientation;
+    static constexpr LuaName<TextOrientation> ORIENTATIONS[] = {
+        {"billboard", TextOrientation::Billboard}, {"plane", TextOrientation::Plane}};
+    return _fieldEnum(lua, index, "orientation", TextOrientation::Billboard, ORIENTATIONS, "text orientation");
 }
 
 static void _textFont(lua_State* lua, int index, Text* object)
@@ -233,9 +216,7 @@ static void _text(lua_State* lua, int index, Text* object)
     lua_pop(lua, 1);
     object->size = _fieldNumber(lua, index, "size", object->size);
     object->align = _fieldVec2(lua, index, "align", object->align);
-    auto role = _fieldOptionalString(lua, index, "role", "text");
-    object->role = _textRole(lua, role);
-    lua_pop(lua, 1);
+    object->role = _fieldEnum(lua, index, "role", TextRole::Text, TEXT_ROLES, "text role");
     object->orientation = _textOrientation(lua, index);
     if (sized && object->size <= 0.0f) luaL_error(lua, "size must be positive");
     object->tabular = _fieldBool(lua, index, "tabular", object->tabular);

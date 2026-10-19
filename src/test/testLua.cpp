@@ -627,11 +627,15 @@ int main()
     _error("local s=vis.scene{}; s:line{from={0,0},to={1,0},width=-1}; return s", "width-negative.lua");
     _error("local s=vis.scene{}; s:text{text='x',gradient=true}; return s", "text-gradient.lua");
     _error("local s=vis.scene{}; s:circle{gradient=1}; return s", "shape-gradient-type.lua");
-    _error("local s=vis.scene{}; s:line{dash={}}; return s", "dash-empty.lua");
-    _error("local s=vis.scene{}; s:line{dash={1,2,3,4,5}}; return s", "dash-limit.lua");
-    _error("local s=vis.scene{}; s:line{dash={0,0}}; return s", "dash-zero.lua");
-    _error("local s=vis.scene{}; s:line{dash={4,-1}}; return s", "dash-negative.lua");
-    _error("local s=vis.scene{}; s:line{dash_offset=1}; return s", "dash-offset.lua");
+    // The limits in these messages go through lua_pushfstring, which knows %d but not %u or %zu.
+    _scriptError("local s=vis.scene{}; s:circle{dash={}}; return s", "diagnostic.lua:1: dash must contain 1 to 4 values");
+    _scriptError("local s=vis.scene{}; s:circle{dash={1,2,3,4,5}}; return s",
+                 "diagnostic.lua:1: dash must contain 1 to 4 values");
+    _scriptError("local s=vis.scene{}; s:circle{id=string.rep('x', 257)}; return s",
+                 "diagnostic.lua:1: id must be 1 to 256 bytes without zero bytes");
+    _error("local s=vis.scene{}; s:circle{dash={0,0}}; return s", "dash-zero.lua");
+    _error("local s=vis.scene{}; s:circle{dash={4,-1}}; return s", "dash-negative.lua");
+    _error("local s=vis.scene{}; s:circle{dash_offset=1}; return s", "dash-offset.lua");
     _error("local s=vis.scene{}; s:route{points={{0,0},{1,0}},tip=-1}; return s", "route-tip.lua");
     _error("local s=vis.scene{}; local r=s:rectangle{}; s:play({target=r,tip=2}); return s", "play-tip-target.lua");
     _error("local s=vis.scene{}; local a=s:arrow{}; s:play({target=a,tail=-1}); return s", "play-tail-negative.lua");

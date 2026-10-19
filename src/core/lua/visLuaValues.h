@@ -223,7 +223,9 @@ static inline void _matrix(lua_State* lua, int index, float* values, uint32_t co
 {
     luaL_checktype(lua, index, LUA_TTABLE);
     index = lua_absindex(lua, index);
-    if (lua_rawlen(lua, index) != count) luaL_error(lua, "%s must contain exactly %u numbers", name, count);
+    if (lua_rawlen(lua, index) != count) {
+        luaL_error(lua, "%s must contain exactly %d numbers", name, static_cast<int>(count));
+    }
     for (auto i = 0u; i < count; i++) {
         lua_rawgeti(lua, index, i + 1);
         values[i] = _number(lua, -1, name);
@@ -256,6 +258,62 @@ static inline const char* _fieldOptionalString(lua_State* lua, int index, const 
     auto value = luaL_checklstring(lua, -1, &length);
     if (std::strlen(value) != length) luaL_error(lua, "field '%s' cannot contain zero bytes", name);
     return value;
+}
+
+// A name a string option takes and the value it stands for.
+template<typename Value>
+struct LuaName
+{
+    const char* name;
+    Value value;
+};
+
+// The entry of names that the size bytes at value spell, or nullptr.
+template<typename Value, size_t N>
+static inline const LuaName<Value>* _findName(const char* value, size_t size, const LuaName<Value> (&names)[N])
+{
+    for (auto& name : names) {
+        if (std::strlen(name.name) == size && std::memcmp(name.name, value, size) == 0) return &name;
+    }
+    return nullptr;
+}
+
+// The value of the string at index among names; any other string stops the script with
+// "what must be 'a', 'b' or 'c'", listing the names in order.
+template<typename Value, size_t N>
+static inline Value _enum(lua_State* lua, int index, const char* what, const LuaName<Value> (&names)[N])
+{
+    size_t size;
+    auto value = luaL_checklstring(lua, index, &size);
+    if (auto found = _findName(value, size, names)) return found->value;
+    luaL_where(lua, 1);
+    lua_pushfstring(lua, "%s must be '%s'", what, names[0].name);
+    for (auto i = size_t{1}; i < N; i++) {
+        lua_pushfstring(lua, i + 1u < N ? ", '%s'" : " or '%s'", names[i].name);
+        lua_concat(lua, 2);
+    }
+    lua_concat(lua, 2);
+    lua_error(lua);
+    return names[0].value;
+}
+
+// The value of the string field name of the table at index among names, or fallback without
+// the field, read as _fieldOptionalString reads it; what names the option in the message, the
+// field itself unless given.
+template<typename Value, size_t N>
+static inline Value _fieldEnum(lua_State* lua, int index, const char* name, Value fallback,
+                               const LuaName<Value> (&names)[N], const char* what = nullptr)
+{
+    index = lua_absindex(lua, index);
+    lua_getfield(lua, index, name);
+    if (!lua_isnil(lua, -1)) {
+        size_t size;
+        auto value = luaL_checklstring(lua, -1, &size);
+        if (std::strlen(value) != size) luaL_error(lua, "field '%s' cannot contain zero bytes", name);
+        fallback = _enum(lua, -1, what ? what : name, names);
+    }
+    lua_pop(lua, 1);
+    return fallback;
 }
 
 static inline bool _option(const char* name, std::initializer_list<const char*> fields, bool style)
@@ -381,7 +439,7 @@ static inline Vec3* _points(lua_State* lua, int index, uint32_t minimum, uint32_
     luaL_checktype(lua, index, LUA_TTABLE);
     index = lua_absindex(lua, index);
     auto size = lua_rawlen(lua, index);
-    if (size < minimum) luaL_error(lua, "points must contain at least %u vectors", minimum);
+    if (size < minimum) luaL_error(lua, "points must contain at least %d vectors", static_cast<int>(minimum));
     if (size > UINT32_MAX || size > LUA_MEMORY_LIMIT / sizeof(Vec3)) luaL_error(lua, "points array is too large");
     count = static_cast<uint32_t>(size);
     auto points = static_cast<Vec3*>(lua_newuserdatauv(lua, sizeof(Vec3) * size, 0));

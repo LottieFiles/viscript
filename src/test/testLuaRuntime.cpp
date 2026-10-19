@@ -365,6 +365,21 @@ return scene
     CHECK(near(committed.x, rolledBack.x) && near(committed.y, rolledBack.y));
     delete renderer;
     delete scene;
+
+    // A layout method of an object stops in the same way, naming the object.
+    static constexpr char moving[] = R"lua(
+local scene = vis.scene {width = 320, height = 180}
+local subject = scene:rectangle {center = {0, 0}, size = {2, 2}}
+vis.runtime(scene, {fixed_step = 0.1, update = function() subject:move_to({1, 0}) end})
+return scene
+)lua";
+    scene = nullptr;
+    detail::LuaHostContext movingContext;
+    CHECK(load(moving, scene, movingContext, error, sizeof(error)) == Result::Success && scene);
+    runtime = movingContext.runtime.runtime;
+    CHECK(runtime && runtime->advance(0.1f) == Result::ScriptError);
+    CHECK(runtime && std::strstr(runtime->error(), "object authoring is unavailable after loading"));
+    delete scene;
 }
 
 #if defined(VIS_INPUT)

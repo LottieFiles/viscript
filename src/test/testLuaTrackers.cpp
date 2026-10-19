@@ -616,9 +616,9 @@ void _trackerLines()
     _scriptError("local s = vis.scene {}\nlocal t = s:tracker(0)\n"
                  "s:bind(s:circle {radius = 1}, t, function(v) return {opacity = v} end)\n"
                  "s:track(t, 1, 1, \"nope\")\nreturn s",
-                 "diagnostic.lua:4: unknown animation curve preset");
+                 "diagnostic.lua:4: animation curve preset must be 'linear', 'smooth'");
     _scriptError("local s = vis.scene {}\nlocal t = s:tracker(0)\ns:track(t, 1, 1, \"nope\")\nreturn s",
-                 "diagnostic.lua:3: unknown animation curve preset");
+                 "diagnostic.lua:3: animation curve preset must be 'linear', 'smooth'");
     _scriptError("local s = vis.scene {}\nlocal t = s:tracker(0)\ns:track(t, 1, 1, true)\nreturn s",
                  "diagnostic.lua:3: animation curve must be a preset name or a table");
     // An entry of the array form that is no {tracker, value} pair.

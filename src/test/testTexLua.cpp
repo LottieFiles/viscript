@@ -551,6 +551,19 @@ return s
            "tex-span-duplicate.lua", "duplicate id 'r/2'");
 }
 
+// spans and matrix call the tex part's maker and place from C, and its errors still name the
+// line of the script.
+static void _spanLines()
+{
+    _error("local s = vis.scene {}\ns:spans {'a ', {tex = 'a+\\\\foo'}}\nreturn s", "tex-span-line.lua",
+           "tex-span-line.lua:2: tex: unknown command '\\foo' at 3");
+    _error("local s = vis.scene {}\ns:circle {id = 'taken'}\ns:spans {'a ', {tex = {'x', {'y', id = 'taken'}}}}\n"
+           "return s",
+           "tex-span-place.lua", "tex-span-place.lua:3: duplicate id 'taken'");
+    _error("local s = vis.scene {}\ns:matrix {rows = {{'\\\\frac{'}}}\nreturn s", "tex-matrix-line.lua",
+           "tex-matrix-line.lua:2: tex: missing '}'");
+}
+
 // An inline formula applies its resolved row or part layer to every painted piece.
 static void _inlineLayers(Renderer* renderer)
 {
@@ -832,6 +845,7 @@ int main()
         _framing(renderer);
         _bracing(renderer);
         _inline(renderer);
+        _spanLines();
         _matrixEntries();
         _inlineLayers(renderer);
         _leading();
