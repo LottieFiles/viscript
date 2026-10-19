@@ -284,7 +284,7 @@ return root
     };
     fails("p:scene_transition({a,b},{hold={1}})", "hold must list one duration for each of the 2 stages");
     fails("p:scene_transition({a,b},{hold={1,-1}})", "hold must be non-negative");
-    fails("p:scene_transition({a,b},{hold={1,'slow'}})", "number expected, got string");
+    fails("p:scene_transition({a,b},{hold={1,'slow'}})", "hold must be a number, got string");
     fails("p:scene_transition({a,b},{live=1})", "live must be a boolean");
     fails("p:scene_transition({a,b},{style='wipe'})",
           "unknown transition style 'wipe'; use 'match', 'fade', 'slide', 'zoom_in' or 'zoom_out'");
@@ -313,7 +313,7 @@ return root
     fails("p:scene_transition({a,b},{style='zoom_in',area='card',area_margin=1e300})",
           "area_margin must be a finite number");
     fails("p:scene_transition({a,b},{style='zoom_in',area='card',area_margin=true})",
-          "number expected, got boolean");
+          "area_margin must be a number, got boolean");
     fails("p:scene_transition({a,b},{style='zoom_in',area={x=0,y=0,width=1,height=1},area_margin=0})",
           "area_margin applies only to an object zoom area");
     fails("p:scene_transition({a,b},{style='fade',area_margin=0})",

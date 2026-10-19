@@ -144,6 +144,7 @@ return s
                  "handle belongs to another scene");
     _scriptError("local s = vis.scene {} local c = s:circle {radius = 1} s:look({target = {c, 2}}) return s",
                  "expected an object handle, got number");
+    _scriptError("local s = vis.scene {} s:focus({}) return s", "focus targets have no bounds");
 }
 
 static bool _sameCamera(const Camera& first, const Camera& second)

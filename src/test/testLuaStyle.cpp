@@ -98,6 +98,11 @@ return scene
     delete scene;
     _scriptError("local s=vis.scene{}; s:group{color='#ff0000'}; return s", "a group draws nothing itself");
     _scriptError("local s=vis.scene{}; s:group{dash={4,2}}; return s", "a group draws nothing itself");
+    _scriptError("local s=vis.scene{}; s:group{gradient=true}; return s",
+                 "a group draws nothing itself, so gradient is unsupported");
+    _scriptError("local s=vis.scene{}; s:space{gradient=true}; return s", "gradient is supported only by vector Shapes");
+    _scriptError("local s=vis.scene{}; s:number{value=1, gradient=true}; return s",
+                 "gradient is supported only by vector Shapes");
     // Every shape that takes the group's color adds a clip to the script's budget.
     _scriptError("local s=vis.scene{}; local g=s:group{}; for i=1,1000 do g:point{point={0,0}} end;"
                  " for i=1,66 do s:play({target=g, fill=i%2==0 and '#ff0000' or '#00ff00'}, 0.1) end; return s",
@@ -249,6 +254,8 @@ return s
     _scriptError("local s = vis.scene {} s:angle {right = 'yes'} return s", "right must be 'auto', 'never' or 'always'");
     _scriptError("local s = vis.scene {} s:angle {label_distance = -1} return s", "label_distance must be zero or more");
     _scriptError("local s = vis.scene {} s:angle {label = 1} return s", "label must be text or a text or tex table");
+    _scriptError("local s = vis.scene {} s:angle {label = {text = 'x', size = 'big'}} return s",
+                 "diagnostic.lua:1: size must be a number, got string");
     _scriptError("local s = vis.scene {} local a = s:circle {} s:play {target = a, start = 1} return s", "start needs an arc and finite radians");
 }
 
@@ -548,6 +555,16 @@ return named
     delete scene;
     _scriptError("return vis.scene {theme = {preset = 'pro_black', roundness = 0.75}}",
                  "theme roundness must be between 0 and 0.5");
+    // A color read before the scene has a theme takes a hex value alone, and the message says so.
+    for (auto source : {"return vis.scene {background = 'accent'}", "return vis.scene {theme = {colors = {muted = 'accent'}}}"}) {
+        char error[256] = {};
+        Scene* failed = nullptr;
+        detail::LuaHostContext context;
+        _load(source, "theme-hex.lua", failed, error, sizeof(error), context);
+        auto end = std::strstr(error, " must be a hex color");
+        CHECK(!failed && end && std::strcmp(end, " must be a hex color") == 0);
+        if (!end || std::strcmp(end, " must be a hex color") != 0) std::fprintf(stderr, "  got: %s\n", error);
+    }
 
     static constexpr auto semanticSource = R"lua(
 local scene = vis.scene {

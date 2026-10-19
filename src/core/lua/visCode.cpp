@@ -252,27 +252,6 @@ CodeClass _word(const Grammar& grammar, const char* line, uint32_t begin, uint32
 
 }  // namespace
 
-bool codeLanguage(const char* name, CodeLanguage& output) noexcept
-{
-    struct Entry
-    {
-        const char* name;
-        CodeLanguage language;
-    };
-    static constexpr Entry ENTRIES[] = {
-        {"plain", CodeLanguage::Plain},           {"lua", CodeLanguage::Lua},
-        {"python", CodeLanguage::Python},         {"javascript", CodeLanguage::JavaScript},
-        {"typescript", CodeLanguage::TypeScript}, {"c", CodeLanguage::C},
-        {"cpp", CodeLanguage::Cpp}};
-    for (auto& entry : ENTRIES) {
-        if (std::strcmp(entry.name, name) == 0) {
-            output = entry.language;
-            return true;
-        }
-    }
-    return false;
-}
-
 uint32_t codeTokens(CodeLanguage language, const char* line, uint32_t size, CodeState& state,
                     CodeToken* output, uint32_t capacity) noexcept
 {

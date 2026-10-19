@@ -186,7 +186,7 @@ return s
     _scriptError("local s=vis.scene{}; s:code{text='a', pitch=0}; return s", "pitch must be a positive distance");
     _scriptError("local s=vis.scene{}; s:code{text='a', pitch=-1}; return s", "pitch must be a positive distance");
     _scriptError("local s=vis.scene{}; s:code{text='a', pitch=math.huge}; return s", "pitch must be a finite number");
-    _scriptError("local s=vis.scene{}; s:code{text='a', pitch='x'}; return s", "number expected");
+    _scriptError("local s=vis.scene{}; s:code{text='a', pitch='x'}; return s", "pitch must be a number, got string");
     _scriptError("local s=vis.scene{}; s:code{text='a', pitch=3, leading=1}; return s", "code takes pitch or leading, not both");
 }
 

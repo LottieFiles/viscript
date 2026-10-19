@@ -196,7 +196,7 @@ static TextOrientation _textOrientation(lua_State* lua, int index)
 static void _textFont(lua_State* lua, int index, Text* object)
 {
     size_t size;
-    auto font = luaL_checklstring(lua, index, &size);
+    auto font = _checkString(lua, index, "font", &size);
     if (std::strlen(font) != size) luaL_error(lua, "font cannot contain zero bytes");
     if (size > LUA_PATH_LIMIT) luaL_error(lua, "font name exceeds the 4096-byte limit");
     if (object->font(font) != Result::Success) luaL_error(lua, "out of memory while copying font");

@@ -49,15 +49,6 @@ struct LuaHostContext
 #endif
 };
 
-inline void luaHostResetFailedLoad(LuaHostContext& context) noexcept
-{
-#if defined(VIS_STATES)
-    context.states = {};
-#else
-    (void) context;
-#endif
-}
-
 // One set of hooks for each optional module.
 constexpr uint32_t LUA_HOST_HOOK_LIMIT = 7u;
 
@@ -93,6 +84,44 @@ inline LuaHookSpan luaHostHooks(LuaHostContext& context,
     return {storage, count};
 }
 
+// Where a host load leaves its Lua state for the runtime module, or nullptr without the module,
+// so that the load closes the state itself.
+inline lua_State** luaHostRetained(lua_State*& retained) noexcept
+{
+#if defined(VIS_LUA_RUNTIME)
+    return &retained;
+#else
+    (void) retained;
+    return nullptr;
+#endif
+}
+
+// Ends a host load with its result. With the runtime module, a scene with a runtime keeps the
+// retained Lua state, which closes otherwise; when the runtime cannot keep it, the scene goes
+// after the state. A failed load leaves the states module nothing it gathered.
+inline Result luaHostEnd(Result result, lua_State* retained, Scene** output, LuaHostContext& context) noexcept
+{
+#if defined(VIS_LUA_RUNTIME)
+    if (result == Result::Success && context.runtime.runtime) {
+        result = lua_runtime::lua_extension::retain(context.runtime, retained);
+        if (result == Result::Success) return result;
+        luaClose(retained);
+        delete *output;
+        *output = nullptr;
+    } else {
+        luaClose(retained);
+    }
+#else
+    (void) retained;
+    (void) output;
+    (void) context;
+#endif
+#if defined(VIS_STATES)
+    if (result != Result::Success) context.states = {};
+#endif
+    return result;
+}
+
 inline Result luaHostLoad(const char* source, uint32_t size, const char* name,
                           Scene** output, char* error, uint32_t errorSize,
                           Lua::AssetResolver resolver, void* resolverData,
@@ -100,64 +129,21 @@ inline Result luaHostLoad(const char* source, uint32_t size, const char* name,
                           LuaHostContext& context) noexcept
 {
     LuaHooks storage[LUA_HOST_HOOK_LIMIT];
-    auto hooks = luaHostHooks(context, storage);
-#if defined(VIS_LUA_RUNTIME)
     lua_State* retained = nullptr;
-    auto result = luaLoad(source, size, name, output, error, errorSize, resolver,
-                          resolverData, nullptr, 0u, adaptiveTheme,
-                          adaptiveThemeUsed, hooks, &retained);
-    if (result != Result::Success) {
-        luaHostResetFailedLoad(context);
-        return result;
-    }
-    if (context.runtime.runtime) {
-        result = lua_runtime::lua_extension::retain(context.runtime, retained);
-        if (result == Result::Success) return result;
-        luaClose(retained);
-        delete *output;
-        *output = nullptr;
-        luaHostResetFailedLoad(context);
-        return result;
-    }
-    luaClose(retained);
-    return result;
-#else
-    auto result = luaLoad(source, size, name, output, error, errorSize, resolver,
-                          resolverData, nullptr, 0u, adaptiveTheme,
-                          adaptiveThemeUsed, hooks);
-    if (result != Result::Success) luaHostResetFailedLoad(context);
-    return result;
-#endif
+    auto result = luaLoad(source, size, name, output, error, errorSize, resolver, resolverData, nullptr, 0u,
+                          adaptiveTheme, adaptiveThemeUsed, luaHostHooks(context, storage),
+                          luaHostRetained(retained));
+    return luaHostEnd(result, retained, output, context);
 }
 
 inline Result luaHostLoadFile(const char* path, Scene** output, char* error,
                               uint32_t errorSize, LuaHostContext& context) noexcept
 {
     LuaHooks storage[LUA_HOST_HOOK_LIMIT];
-    auto hooks = luaHostHooks(context, storage);
-#if defined(VIS_LUA_RUNTIME)
     lua_State* retained = nullptr;
-    auto result = luaLoadFile(path, output, error, errorSize, hooks, &retained);
-    if (result != Result::Success) {
-        luaHostResetFailedLoad(context);
-        return result;
-    }
-    if (context.runtime.runtime) {
-        result = lua_runtime::lua_extension::retain(context.runtime, retained);
-        if (result == Result::Success) return result;
-        luaClose(retained);
-        delete *output;
-        *output = nullptr;
-        luaHostResetFailedLoad(context);
-        return result;
-    }
-    luaClose(retained);
-    return result;
-#else
-    auto result = luaLoadFile(path, output, error, errorSize, hooks);
-    if (result != Result::Success) luaHostResetFailedLoad(context);
-    return result;
-#endif
+    auto result = luaLoadFile(path, output, error, errorSize, luaHostHooks(context, storage),
+                              luaHostRetained(retained));
+    return luaHostEnd(result, retained, output, context);
 }
 
 }  // namespace vis::detail

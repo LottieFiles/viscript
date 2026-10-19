@@ -410,6 +410,23 @@ static LuaSpace _factory(lua_State* lua, std::initializer_list<const char*> fiel
     return space;
 }
 
+// Whether the options argument at index is given: nil leaves it out, and a table may name only
+// fields, and the shared styles with style.
+static bool _optionTable(lua_State* lua, int index, std::initializer_list<const char*> fields, bool style = false)
+{
+    if (lua_isnoneornil(lua, index)) return false;
+    luaL_checktype(lua, index, LUA_TTABLE);
+    _options(lua, index, fields, style);
+    return true;
+}
+
+// Stops a factory whose options at 2 name shape, a style the object it makes cannot take; why
+// says so, with %s for the style.
+static void _refuse(lua_State* lua, const char* shape, const char* why)
+{
+    if (_has(lua, 2, shape)) luaL_error(lua, why, shape);
+}
+
 // The object handle at index 1 of a layout method, while its scene can still be authored.
 static LuaObject* _layoutHandle(lua_State* lua)
 {
@@ -499,7 +516,7 @@ static const char* _fieldId(lua_State* lua, Scene* scene, int index)
         return nullptr;
     }
     size_t size;
-    auto id = luaL_checklstring(lua, -1, &size);
+    auto id = _checkString(lua, -1, "id", &size);
     if (!size || size > LUA_ID_LIMIT || std::strlen(id) != size) {
         luaL_error(lua, "id must be 1 to %d bytes without zero bytes", static_cast<int>(LUA_ID_LIMIT));
     }
@@ -570,7 +587,7 @@ static void _looks(lua_State* lua, Scene* scene, Object* object, int index)
         lua_pop(lua, 1);
         if (_has(lua, index, "dash_offset")) luaL_error(lua, "dash_offset requires dash");
     } else {
-        luaL_checktype(lua, -1, LUA_TTABLE);
+        _checkTable(lua, -1, "dash");
         auto count = lua_rawlen(lua, -1);
         if (!count || count > Style::DashLimit) {
             luaL_error(lua, "dash must contain 1 to %d values", static_cast<int>(Style::DashLimit));
@@ -1054,6 +1071,7 @@ static int _textObject(lua_State* lua, bool semanticLabel)
 {
     auto space = _factory(lua, {"text", "point", "size", "align", "font", "orientation", "role", "slant", "measure",
                                 "baseline", "reserve", "tabular"});
+    for (auto shape : {"gradient"}) _refuse(lua, shape, "%s is supported only by vector Shapes");
     size_t size;
     auto value = _fieldString(lua, 2, "text", &size);
     if (size > LUA_TEXT_LIMIT) return luaL_error(lua, "text exceeds the 1 MiB limit");
@@ -1087,7 +1105,7 @@ static const char* _fieldText(lua_State* lua, int index, const char* name)
     lua_getfield(lua, index, name);
     if (lua_isnil(lua, -1)) return nullptr;
     size_t length;
-    auto value = luaL_checklstring(lua, -1, &length);
+    auto value = _checkString(lua, -1, name, &length);
     if (std::strlen(value) != length) luaL_error(lua, "%s cannot contain zero bytes", name);
     if (length > LUA_TEXT_LIMIT) luaL_error(lua, "%s exceeds the 1 MiB limit", name);
     return value;
@@ -1099,6 +1117,7 @@ static int _numberText(lua_State* lua)
 {
     auto space = _factory(lua, {"value", "decimals", "sign", "separator", "prefix", "suffix", "point", "size", "align",
                                 "font", "orientation", "role", "slant", "measure", "baseline", "reserve", "tabular"});
+    for (auto shape : {"gradient"}) _refuse(lua, shape, "%s is supported only by vector Shapes");
     auto value = _fieldNumber(lua, 2, "value", 0.0f);
     auto decimals = _fieldNumber(lua, 2, "decimals", 0.0f);
     if (decimals < 0.0f || decimals > 6.0f || decimals != std::floor(decimals)) {
@@ -1827,6 +1846,12 @@ static constexpr const char* CODE_CLASSES[] = {
     "plain", "keyword", "string", "number", "comment", "function", "type", "operator"};
 static constexpr const char* CODE_COLORS[] = {
     "foreground", "secondary", "success", "danger", "muted", "accent", "warning", "foreground"};
+// The languages the language option names.
+static constexpr LuaName<detail::CodeLanguage> CODE_LANGUAGES[] = {
+    {"plain", detail::CodeLanguage::Plain}, {"lua", detail::CodeLanguage::Lua},
+    {"python", detail::CodeLanguage::Python}, {"javascript", detail::CodeLanguage::JavaScript},
+    {"typescript", detail::CodeLanguage::TypeScript}, {"c", detail::CodeLanguage::C},
+    {"cpp", detail::CodeLanguage::Cpp}};
 
 // One token of a code block, measured in world units before it attaches.
 struct LuaCodeToken
@@ -1955,11 +1980,7 @@ static int _codeBlock(lua_State* lua, const Mat4& model)
     size_t length;
     auto source = _fieldString(lua, 2, "text", &length);
     if (length > LUA_TEXT_LIMIT) return luaL_error(lua, "text exceeds the 1 MiB limit");
-    auto language = CodeLanguage::Plain;
-    if (!codeLanguage(_fieldOptionalString(lua, 2, "language", "plain"), language)) {
-        return luaL_error(lua, "language must be 'plain', 'lua', 'python', 'javascript', 'typescript', 'c' or 'cpp'");
-    }
-    lua_pop(lua, 1);
+    auto language = _fieldEnum(lua, 2, "language", CodeLanguage::Plain, CODE_LANGUAGES);
     auto scene = space.scene->scene;
     auto point = _fieldWorld(lua, 2, "point", {});
     auto align = _fieldVec2(lua, 2, "align", {0.5f, 0.5f});
@@ -2137,11 +2158,9 @@ static void _codeSource(lua_State* lua, int index, const char* method)
 // The language of the code block whose source is at index.
 static detail::CodeLanguage _codeLanguageOf(lua_State* lua, int index)
 {
-    auto language = detail::CodeLanguage::Plain;
     lua_getfield(lua, index, "options");
-    lua_getfield(lua, -1, "language");
-    if (lua_type(lua, -1) == LUA_TSTRING) detail::codeLanguage(lua_tostring(lua, -1), language);
-    lua_pop(lua, 2);
+    auto language = _fieldEnum(lua, -1, "language", detail::CodeLanguage::Plain, CODE_LANGUAGES);
+    lua_pop(lua, 1);
     return language;
 }
 
@@ -2383,11 +2402,7 @@ static int _search(lua_State* lua)
     LuaCodeQuery query;
     query.text = luaL_checklstring(lua, 2, &query.length);
     if (!query.length) return luaL_error(lua, "search needs a text to find");
-    if (!lua_isnoneornil(lua, 3)) {
-        luaL_checktype(lua, 3, LUA_TTABLE);
-        _options(lua, 3, {"match", "lines", "whole"}, false);
-        _codeQuery(lua, 3, query);
-    }
+    if (_optionTable(lua, 3, {"match", "lines", "whole"})) _codeQuery(lua, 3, query);
     _codeSource(lua, 1, "search");
     auto source = lua_gettop(lua);
     auto language = _codeLanguageOf(lua, source);
@@ -3124,10 +3139,9 @@ static int _vector(lua_State* lua)
 static int _groupGen(lua_State* lua)
 {
     auto space = _factory(lua, {"matrix", "typeset"});
-    for (auto shape : {"color", "radius", "dash", "dash_offset"}) {
-        if (_has(lua, 2, shape)) {
-            return luaL_error(lua, "a group draws nothing itself, so color, radius, dash and dash_offset are unsupported; the stroke, fill and width it sets pass to the shapes below it");
-        }
+    for (auto shape : {"color", "gradient", "radius", "dash", "dash_offset"}) {
+        _refuse(lua, shape, "a group draws nothing itself, so %s is unsupported; the stroke, fill and width it "
+                            "sets pass to the shapes below it");
     }
     auto typeset = _fieldBool(lua, 2, "typeset", false);
     auto owner = _owner(lua, space.scene);
@@ -3290,6 +3304,7 @@ static int _spaceGen(lua_State* lua)
 {
     auto space = _factory(lua, {"x", "y", "z", "matrix", "axis_x", "axis_y", "axis_z", "numbers", "number_mode",
                                 "number_size", "number_color", "ticks", "tick_length", "axis_width"});
+    for (auto shape : {"gradient"}) _refuse(lua, shape, "%s is supported only by vector Shapes");
     auto x = _fieldRange(lua, 2, "x", {});
     auto y = _fieldRange(lua, 2, "y", {});
     auto z = _fieldRange(lua, 2, "z", {});
@@ -3379,7 +3394,7 @@ static int _angle(lua_State* lua)
         auto tex = _has(lua, options, "tex");
         lua_getfield(lua, handle, tex ? "tex" : "text");
         lua_pushvalue(lua, handle); lua_pushvalue(lua, options);
-        lua_call(lua, 2, 1);
+        detail::luaCall(lua, 2, 1);
     }
     lua_settop(lua, handle);
     return 1;
@@ -3399,8 +3414,10 @@ static bool _surround(const Object* object, const Object* ancestor, Bounds& outp
         auto point = model * Vec3{corner & 1u ? own.max.x : own.min.x, corner & 2u ? own.max.y : own.min.y,
                                   corner & 4u ? own.max.z : own.min.z};
         if (!defined) output.min = output.max = point;
-        output.min = {std::min(output.min.x, point.x), std::min(output.min.y, point.y), std::min(output.min.z, point.z)};
-        output.max = {std::max(output.max.x, point.x), std::max(output.max.y, point.y), std::max(output.max.z, point.z)};
+        output.min = {std::fmin(output.min.x, point.x), std::fmin(output.min.y, point.y),
+                      std::fmin(output.min.z, point.z)};
+        output.max = {std::fmax(output.max.x, point.x), std::fmax(output.max.y, point.y),
+                      std::fmax(output.max.z, point.z)};
         defined = true;
     }
     return true;
@@ -3699,13 +3716,13 @@ static void _plotSegment(LuaPlotCut& cut, const LuaPlotSample& p, const LuaPlotS
 // nan, infinite or too large for the scene leaves it undefined.
 static bool _plotPoint(lua_State* lua, int index, LuaPlotSample& sample)
 {
-    luaL_checktype(lua, index, LUA_TTABLE);
+    _checkTable(lua, index, "point");
     index = lua_absindex(lua, index);
     auto defined = true;
     auto read = [&](const char* key, int item, double& value) {
         if (key) lua_getfield(lua, index, key);
         else lua_rawgeti(lua, index, item);
-        value = luaL_checknumber(lua, -1);
+        value = _checkNumber(lua, -1, key ? key : "point component");
         if (!(std::fabs(value) <= FLT_MAX)) defined = false;
         lua_pop(lua, 1);
     };
@@ -3947,11 +3964,11 @@ static void _plotStored(LuaPlotCut& cut)
     auto lua = cut.lua;
     _options(lua, cut.fn, {"points", "samples"}, false);
     lua_getfield(lua, cut.fn, "points");
-    luaL_checktype(lua, -1, LUA_TTABLE);
+    _checkTable(lua, -1, "points");
     _plotTable(cut, lua_gettop(lua));
     lua_pop(lua, 1);
     lua_getfield(lua, cut.fn, "samples");
-    luaL_checktype(lua, -1, LUA_TTABLE);
+    _checkTable(lua, -1, "samples");
     auto table = lua_gettop(lua);
     auto count = lua_rawlen(lua, table);
     if (count < 2u || count > LUA_POINT_LIMIT) {
@@ -3968,6 +3985,16 @@ static void _plotStored(LuaPlotCut& cut)
     cut.samples = {points, static_cast<uint32_t>(count), cut.band,
                    {static_cast<float>(cut.lo), static_cast<float>(cut.hi)}};
     if (!cut.samples.valid()) luaL_error(lua, "plot samples need an increasing x grid and a finite y_range");
+}
+
+// The range field name of the table at index, which what requires.
+static Range _requiredRange(lua_State* lua, int index, const char* name, const char* what)
+{
+    lua_getfield(lua, index, name);
+    if (lua_isnil(lua, -1)) luaL_error(lua, "%s requires %s", what, name);
+    auto range = _range(lua, -1, name);
+    lua_pop(lua, 1);
+    return range;
 }
 
 // The samples fn = f takes over x_range: from min every step up to max, which counts when a step
@@ -4128,10 +4155,7 @@ static int _plot(lua_State* lua)
         if (size > UINT32_MAX || size > LUA_MEMORY_LIMIT / sizeof(Vec3)) return luaL_error(lua, "points array is too large");
         samples = static_cast<uint32_t>(size);
     } else {
-        lua_getfield(lua, 2, "x_range");
-        if (lua_isnil(lua, -1)) return luaL_error(lua, "plot fn requires x_range");
-        range = _range(lua, -1, "x_range");
-        lua_pop(lua, 1);
+        range = _requiredRange(lua, 2, "x_range", "plot fn");
         samples = _plotSamples(lua, range);
     }
     cut.capacity = std::min(LUA_POINT_LIMIT, samples + 16u);
@@ -4232,10 +4256,7 @@ static int _area(lua_State* lua)
     lua_getfield(lua, 2, "fn");
     if (!lua_isfunction(lua, -1)) return luaL_error(lua, "area requires fn, a function");
     auto fn = lua_gettop(lua);
-    lua_getfield(lua, 2, "x_range");
-    if (lua_isnil(lua, -1)) return luaL_error(lua, "area requires x_range");
-    auto range = _range(lua, -1, "x_range");
-    lua_pop(lua, 1);
+    auto range = _requiredRange(lua, 2, "x_range", "area");
     lua_getfield(lua, 2, "base");
     auto base = lua_gettop(lua);
     auto curved = lua_isfunction(lua, base);
@@ -4330,10 +4351,7 @@ static int _riemann(lua_State* lua)
     auto space = _factory(lua, {"fn", "values", "x_range", "sample", "negative", "id", "color", "stroke", "fill",
                                 "gradient", "width", "dash", "dash_offset", "opacity", "progress", "layer", "isolate",
                                 "mask", "blend", "blur", "shadow"}, false);
-    lua_getfield(lua, 2, "x_range");
-    if (lua_isnil(lua, -1)) return luaL_error(lua, "riemann requires x_range");
-    auto range = _range(lua, -1, "x_range");
-    lua_pop(lua, 1);
+    auto range = _requiredRange(lua, 2, "x_range", "riemann");
     auto steps = _steps(lua, range, LUA_GROUP_LIMIT, "x_range");
     lua_getfield(lua, 2, "fn");
     auto fn = lua_gettop(lua);
@@ -4409,7 +4427,8 @@ static constexpr uint32_t LUA_FIELD_COLOR_LIMIT = 8;
 // The colors and the layer of a field reach each of its arrows or lines.
 static constexpr const char* FIELD_SHAPE_STYLES[] = {"color", "stroke", "width", "dash", "dash_offset", "layer"};
 
-// Default magnitude ramp: theme accent, success, warning and danger.
+// The colors a field's magnitudes ramp through, and the magnitude option's low and high, which
+// stay 0 to spread them over the field's own range.
 struct LuaColorMap
 {
     Color stops[LUA_FIELD_COLOR_LIMIT];
@@ -4574,14 +4593,8 @@ static int _contour(lua_State* lua)
         levels[i] = lua_tonumber(lua, -1);
         lua_pop(lua, 1);
     }
-    lua_getfield(lua, 2, "x_range");
-    if (lua_isnil(lua, -1)) return luaL_error(lua, "contour requires x_range");
-    auto xRange = _range(lua, -1, "x_range");
-    lua_pop(lua, 1);
-    lua_getfield(lua, 2, "y_range");
-    if (lua_isnil(lua, -1)) return luaL_error(lua, "contour requires y_range");
-    auto yRange = _range(lua, -1, "y_range");
-    lua_pop(lua, 1);
+    auto xRange = _requiredRange(lua, 2, "x_range", "contour");
+    auto yRange = _requiredRange(lua, 2, "y_range", "contour");
     auto columns = _samples(lua, xRange, 65536u, "x_range");
     auto rows = _samples(lua, yRange, 65536u, "y_range");
     if (columns < 2u || rows < 2u) return luaL_error(lua, "contour needs at least two samples along each range");
@@ -4813,14 +4826,8 @@ static int _vectorField(lua_State* lua)
                                 "magnitude", "tip", "id", "color", "stroke", "width", "dash", "dash_offset", "opacity",
                                 "progress", "layer", "isolate", "mask", "blend", "blur", "shadow"}, false);
     auto& theme = space.scene->scene->theme();
-    lua_getfield(lua, 2, "x_range");
-    if (lua_isnil(lua, -1)) return luaL_error(lua, "vector_field requires x_range");
-    auto xRange = _range(lua, -1, "x_range");
-    lua_pop(lua, 1);
-    lua_getfield(lua, 2, "y_range");
-    if (lua_isnil(lua, -1)) return luaL_error(lua, "vector_field requires y_range");
-    auto yRange = _range(lua, -1, "y_range");
-    lua_pop(lua, 1);
+    auto xRange = _requiredRange(lua, 2, "x_range", "vector_field");
+    auto yRange = _requiredRange(lua, 2, "y_range", "vector_field");
     auto columns = _samples(lua, xRange, LUA_GROUP_LIMIT, "x_range");
     auto rows = _samples(lua, yRange, LUA_GROUP_LIMIT, "y_range");
     if (static_cast<uint64_t>(columns) * rows > LUA_GROUP_LIMIT) {
@@ -4923,11 +4930,8 @@ static int _streamLines(lua_State* lua)
     uint32_t columns = 0;
     uint32_t rows = 0;
     if (ranged) {
-        lua_getfield(lua, 2, "x_range");
-        xRange = _range(lua, -1, "x_range");
-        lua_getfield(lua, 2, "y_range");
-        yRange = _range(lua, -1, "y_range");
-        lua_pop(lua, 2);
+        xRange = _requiredRange(lua, 2, "x_range", "stream_lines");
+        yRange = _requiredRange(lua, 2, "y_range", "stream_lines");
         columns = _samples(lua, xRange, LUA_GROUP_LIMIT, "x_range");
         rows = _samples(lua, yRange, LUA_GROUP_LIMIT, "y_range");
     }
@@ -5048,7 +5052,7 @@ static int _path(lua_State* lua)
     auto samples = _pathSamples(lua, 2, 24u);
     lua_getfield(lua, 2, "commands");
     if (lua_isnil(lua, -1)) return luaL_error(lua, "missing field 'commands'");
-    luaL_checktype(lua, -1, LUA_TTABLE);
+    _checkTable(lua, -1, "commands");
     auto table = lua_absindex(lua, -1);
     auto size = lua_rawlen(lua, table);
     if (size < 2u || size > UINT32_MAX || size > LUA_POINT_LIMIT) {
@@ -5063,7 +5067,7 @@ static int _path(lua_State* lua)
     auto points = 0u;
     for (auto i = 0u; i < count; i++) {
         lua_rawgeti(lua, table, i + 1u);
-        luaL_checktype(lua, -1, LUA_TTABLE);
+        _checkTable(lua, -1, "a path command");
         auto item = lua_absindex(lua, -1);
         size_t size;
         auto name = _fieldString(lua, item, "type", &size);
@@ -5266,14 +5270,9 @@ static Color _callColors(lua_State* lua, int index, const Theme& theme, const Ve
     lua_call(lua, 3, 1);
     size_t size = 0;
     auto value = lua_type(lua, -1) == LUA_TSTRING ? lua_tolstring(lua, -1, &size) : nullptr;
-    ThemeColorRole role;
     Color color;
-    if (value && _hex(value, size)) color = Color::hex(value);
-    else if (value && std::strlen(value) == size && _themeColorRole(value, size, role)) {
-        color = theme.color(role);
-    } else {
-        luaL_error(lua, "surface colors must return a hex color or Theme color role; at "
-                        "(%f, %f, %f) it did not",
+    if (!value || !_colorName(value, size, &theme, color)) {
+        luaL_error(lua, "surface colors must return a hex color or Theme color role; at (%f, %f, %f) it did not",
                    static_cast<lua_Number>(point.x), static_cast<lua_Number>(point.y),
                    static_cast<lua_Number>(point.z));
     }
@@ -5360,7 +5359,7 @@ static int _surface(lua_State* lua)
 
     lua_getfield(lua, 2, "points");
     if (lua_isnil(lua, -1)) return luaL_error(lua, "surface requires points");
-    luaL_checktype(lua, -1, LUA_TTABLE);
+    _checkTable(lua, -1, "points");
     auto table = lua_absindex(lua, -1);
     auto count = columns * rows;
     if (lua_rawlen(lua, table) != count) {
@@ -5494,10 +5493,8 @@ static const char* _assetReason(Result result)
 static int _picture(lua_State* lua)
 {
     auto space = _factory(lua, {"asset", "pixels", "size", "center", "filter"});
-    for (auto shape : {"color", "stroke", "fill", "radius", "dash", "dash_offset"}) {
-        if (_has(lua, 2, shape)) {
-            return luaL_error(lua, "picture preserves source colors; color, stroke, fill, radius, dash and dash_offset are unsupported");
-        }
+    for (auto shape : {"color", "stroke", "fill", "gradient", "radius", "dash", "dash_offset"}) {
+        _refuse(lua, shape, "picture preserves source colors, so %s is unsupported");
     }
     auto hasAsset = _has(lua, 2, "asset");
     auto hasPixels = _has(lua, 2, "pixels");
@@ -5529,7 +5526,7 @@ static int _picture(lua_State* lua)
         _size(lua, -1, columns, rows);
         lua_pop(lua, 1);
         lua_getfield(lua, 2, "pixels");
-        luaL_checktype(lua, -1, LUA_TTABLE);
+        _checkTable(lua, -1, "pixels");
         auto count = static_cast<size_t>(columns) * rows;
         if (lua_rawlen(lua, -1) != count) {
             return luaL_error(lua, "picture pixels must match columns times rows");
@@ -5570,10 +5567,8 @@ static int _cell(lua_State* lua)
 {
     auto space = _factory(lua, {"origin", "size", "mode", "padding", "depth", "texture", "source", "destination",
                                 "patches"});
-    for (auto shape : {"stroke", "fill", "width", "radius", "dash", "dash_offset"}) {
-        if (_has(lua, 2, shape)) {
-            return luaL_error(lua, "cell uses color, texture and patches; stroke, fill, width, radius, dash and dash_offset are unsupported");
-        }
+    for (auto shape : {"stroke", "fill", "gradient", "width", "radius", "dash", "dash_offset"}) {
+        _refuse(lua, shape, "cell uses color, texture and patches, so %s is unsupported");
     }
     if (!_has(lua, 2, "texture") && (_has(lua, 2, "source") || _has(lua, 2, "destination"))) {
         return luaL_error(lua, "cell source and destination require texture");
@@ -5619,14 +5614,14 @@ static int _cell(lua_State* lua)
     }
     if (object && _has(lua, 2, "patches")) {
         lua_getfield(lua, 2, "patches");
-        luaL_checktype(lua, -1, LUA_TTABLE);
+        _checkTable(lua, -1, "patches");
         auto patches = lua_rawlen(lua, -1);
         if (patches > 16384u) {
             return luaL_error(lua, "cell patch limit exceeded");
         }
         for (auto i = 0u; i < patches; i++) {
             lua_rawgeti(lua, -1, i + 1u);
-            luaL_checktype(lua, -1, LUA_TTABLE);
+            _checkTable(lua, -1, "a cell patch");
             _options(lua, -1, {"region", "color"}, false);
             auto region = _fieldRegion(lua, -1, "region");
             Color patchColor;
@@ -5811,9 +5806,7 @@ static int _sampleGen(lua_State* lua, bool spatial)
     auto mode = CellMode::Padd;
     auto padding = 0.05f;
     SampleTime time;
-    if (!lua_isnoneornil(lua, 3)) {
-        luaL_checktype(lua, 3, LUA_TTABLE);
-        _options(lua, 3, {"mode", "padding", "duration", "fps"}, false);
+    if (_optionTable(lua, 3, {"mode", "padding", "duration", "fps"})) {
         mode = _fieldEnum(lua, 3, "mode", mode, CELL_MODES, spatial ? "voxel mode" : "cell mode");
         padding = _fieldNumber(lua, 3, "padding", padding);
         time.duration = _fieldNumber(lua, 3, "duration", time.duration);
@@ -6658,9 +6651,7 @@ static bool _replot(lua_State* lua, int index, const Plot* plot, AnimationTarget
     uint32_t samples;
     if (function) {
         if (ranged) {
-            lua_getfield(lua, index, "x_range");
-            range = _range(lua, -1, "x_range");
-            lua_pop(lua, 1);
+            range = _requiredRange(lua, index, "x_range", "plot fn");
         } else if (kept && kept->sampled) {
             range = kept->range;
         } else {
@@ -7248,9 +7239,7 @@ struct LuaMotion
 static LuaMotion _motionOptions(lua_State* lua, int index, std::initializer_list<const char*> fields)
 {
     LuaMotion options;
-    if (lua_isnoneornil(lua, index)) return options;
-    luaL_checktype(lua, index, LUA_TTABLE);
-    _options(lua, index, fields, false);
+    if (!_optionTable(lua, index, fields)) return options;
     options.duration = _fieldDuration(lua, index, "duration", options.duration);
     options.lag = _lag(lua, _fieldNumber(lua, index, "lag", options.lag));
     options.curve = _fieldCurve(lua, index);
@@ -7699,9 +7688,7 @@ static int _warp(lua_State* lua)
     auto duration = _duration(lua, 4, 1.0f);
     auto curve = _curve(lua, 5);
     auto step = 0.05f;
-    if (!lua_isnil(lua, 6)) {
-        luaL_checktype(lua, 6, LUA_TTABLE);
-        _options(lua, 6, {"step"}, false);
+    if (_optionTable(lua, 6, {"step"})) {
         step = _fieldNumber(lua, 6, "step", step);
         if (!(step > 0.0f)) return luaL_error(lua, "warp step must be a positive length");
     }
@@ -7761,7 +7748,7 @@ static int _fade(lua_State* lua)
     });
 }
 
-struct FadeOptions
+struct LuaFadeOptions
 {
     Vec3 shift;
     float scale = 1.0f;
@@ -7769,9 +7756,9 @@ struct FadeOptions
     AnimCurve curve = AnimCurve::preset(AnimCurvePreset::Smooth);
 };
 
-static FadeOptions _fadeOptions(lua_State* lua, int index)
+static LuaFadeOptions _fadeOptions(lua_State* lua, int index)
 {
-    FadeOptions options;
+    LuaFadeOptions options;
     if (lua_isnoneornil(lua, index)) return options;
     luaL_checktype(lua, index, LUA_TTABLE);
     index = lua_absindex(lua, index);
@@ -7827,7 +7814,7 @@ static int _indicate(lua_State* lua)
 {
     auto box = _scene(lua);
     // Asked before the objects are stored above the arguments, where they could pass for options.
-    auto styled = !lua_isnoneornil(lua, 3);
+    auto styled = _optionTable(lua, 3, {"color", "scale", "duration", "curve"});
     uint32_t count;
     auto objects = _handles(lua, box->scene, 2, count);
     auto color = box->scene->theme().colors.focus;
@@ -7835,8 +7822,6 @@ static int _indicate(lua_State* lua)
     auto duration = 1.0f;
     auto curve = AnimCurve::preset(AnimCurvePreset::Smooth);
     if (styled) {
-        luaL_checktype(lua, 3, LUA_TTABLE);
-        _options(lua, 3, {"color", "scale", "duration", "curve"}, false);
         _fieldColor(lua, 3, "color", color, &box->scene->theme());
         scale = _fieldNumber(lua, 3, "scale", scale);
         if (scale <= 1.0f) return luaL_error(lua, "indicate scale must be greater than 1");
@@ -7857,9 +7842,7 @@ static int _wiggle(lua_State* lua)
     auto swings = 6.0f;
     auto duration = 2.0f;
     auto curve = AnimCurve::preset(AnimCurvePreset::Smooth);
-    if (!lua_isnoneornil(lua, 3)) {
-        luaL_checktype(lua, 3, LUA_TTABLE);
-        _options(lua, 3, {"scale", "angle", "swings", "duration", "curve"}, false);
+    if (_optionTable(lua, 3, {"scale", "angle", "swings", "duration", "curve"})) {
         scale = _fieldNumber(lua, 3, "scale", scale);
         if (scale <= 0.0f) return luaL_error(lua, "wiggle scale must be positive");
         angle = _fieldNumber(lua, 3, "angle", angle);
@@ -7886,9 +7869,7 @@ static int _emphasize(lua_State* lua, LuaScene* box, const char* name, Emphasis 
     // Ripple growth decelerates after its initial burst.
     auto curve = AnimCurve::preset(emphasis.kind == EmphasisKind::Ripple ? AnimCurvePreset::Snappy
                                                                           : AnimCurvePreset::Smooth);
-    if (!lua_isnoneornil(lua, 3)) {
-        luaL_checktype(lua, 3, LUA_TTABLE);
-        _options(lua, 3, fields, false);
+    if (_optionTable(lua, 3, fields)) {
         static constexpr LuaName<EmphasisShape> SHAPES[] = {
             {"rectangle", EmphasisShape::Rectangle}, {"ellipse", EmphasisShape::Ellipse}};
         emphasis.shape = _fieldEnum(lua, 3, "shape", emphasis.shape, SHAPES, "circumscribe shape");
@@ -8107,10 +8088,10 @@ static int _fadeTransform(lua_State* lua)
     auto box = _scene(lua);
     auto source = _object(lua, box->scene, 2);
     auto target = _object(lua, box->scene, 3);
+    auto duration = _duration(lua, 4, 1.0f);
     auto charge = _clipCharge(2u);
     _fit(lua, box, charge);
-    auto result = box->scene->fadeTransform(source, target, _duration(lua, 4, 1.0f),
-                                            _curve(lua, 5));
+    auto result = box->scene->fadeTransform(source, target, duration, _curve(lua, 5));
     _check(lua, box->scene, result, "could not fade transform");
     _spend(box, charge);
     return _evaluate(lua, box);
@@ -8137,9 +8118,7 @@ static int _matchTransform(lua_State* lua)
     auto duration = _duration(lua, 4, 1.0f);
     auto curve = _curve(lua, 5);
     MatchOptions options;
-    if (!lua_isnoneornil(lua, 6)) {
-        luaL_checktype(lua, 6, LUA_TTABLE);
-        _options(lua, 6, {"arc", "lag", "pairs", "strings", "diff", "shapes", "fade", "copy", "path"});
+    if (_optionTable(lua, 6, {"arc", "lag", "pairs", "strings", "diff", "shapes", "fade", "copy", "path"})) {
         options.arc = _fieldArc(lua, 6);
         lua_getfield(lua, 6, "path");
         if (!lua_isnil(lua, -1)) options.path = _object(lua, scene, -1);
@@ -8380,10 +8359,7 @@ static int _edit(lua_State* lua)
     auto source = _object(lua, scene, 2);
     luaL_checktype(lua, 3, LUA_TTABLE);
     lua_settop(lua, 6);
-    if (!lua_isnil(lua, 6)) {
-        luaL_checktype(lua, 6, LUA_TTABLE);
-        _options(lua, 6, {"id", "arc", "lag", "fade"}, false);
-    }
+    _optionTable(lua, 6, {"id", "arc", "lag", "fade"});
     _codeSource(lua, 2, "edit");
     auto entry = lua_gettop(lua);
     auto language = _codeLanguageOf(lua, entry);
@@ -8518,9 +8494,7 @@ static int _highlight(lua_State* lua)
     auto dim = 0.25f;
     auto duration = 0.5f;
     auto curve = AnimCurve::preset(AnimCurvePreset::Smooth);
-    if (!lua_isnoneornil(lua, optionsIndex)) {
-        luaL_checktype(lua, optionsIndex, LUA_TTABLE);
-        _options(lua, optionsIndex, {"dim", "duration", "curve"}, false);
+    if (_optionTable(lua, optionsIndex, {"dim", "duration", "curve"})) {
         dim = _fieldNumber(lua, optionsIndex, "dim", dim);
         if (dim < 0.0f || dim > 1.0f) return luaL_error(lua, "dim must be an opacity from 0 to 1");
         duration = _fieldDuration(lua, optionsIndex, "duration", duration);
@@ -8566,9 +8540,7 @@ static int _arrangeOver(lua_State* lua)
     auto direction = Vec3{1.0f, 0.0f, 0.0f};
     auto gap = 0.25f;
     auto center = Vec3{};
-    if (!lua_isnoneornil(lua, 5)) {
-        luaL_checktype(lua, 5, LUA_TTABLE);
-        _options(lua, 5, {"direction", "gap", "center"}, false);
+    if (_optionTable(lua, 5, {"direction", "gap", "center"})) {
         direction = _fieldWorld(lua, 5, "direction", direction);
         gap = _fieldNumber(lua, 5, "gap", gap);
         center = _fieldWorld(lua, 5, "center", center);
@@ -8580,51 +8552,26 @@ static int _arrangeOver(lua_State* lua)
     return _charge(lua, box, before);
 }
 
-static size_t _groupSize(lua_State* lua, int index)
-{
-    if (!lua_istable(lua, index)) return 1;
-    auto size = lua_rawlen(lua, index);
-    if (!size) luaL_error(lua, "handle array cannot be empty");
-    return size;
-}
-
-static Animation _transitionFade(lua_State* lua, Scene* scene, int index, float opacity)
-{
-    auto object = _object(lua, scene, index);
-    if (opacity > 0.0f && object->opacity != 0.0f) luaL_error(lua, "incoming transition objects must have opacity 0");
-    return Animation::fade(object, opacity);
-}
-
-static void _fadeGroup(lua_State* lua, Scene* scene, int index, Animation* animations, float opacity)
-{
-    if (!lua_istable(lua, index)) {
-        new (animations) Animation(_transitionFade(lua, scene, index, opacity));
-        return;
-    }
-    auto size = lua_rawlen(lua, index);
-    for (auto i = 0u; i < size; i++) {
-        lua_rawgeti(lua, index, i + 1);
-        new (animations + i) Animation(_transitionFade(lua, scene, -1, opacity));
-        lua_pop(lua, 1);
-    }
-}
-
+// scene:transition(outgoing, incoming, duration = 1, curve = "smooth"): fades out a handle or a
+// list of handles while the incoming ones, which must stand at opacity 0, fade in.
 static int _transition(lua_State* lua)
 {
     detail::luaTiming(lua, 4);
     auto box = _scene(lua);
-    // The animations are stored above the arguments, so absent ones must read as nil.
+    // The handles are stored above the arguments, so absent ones must read as nil.
     lua_settop(lua, 5);
-    auto fromCnt = _groupSize(lua, 2);
-    auto toCnt = _groupSize(lua, 3);
-    if (fromCnt > SIZE_MAX - toCnt || fromCnt + toCnt > LUA_MEMORY_LIMIT / sizeof(Animation)) {
-        return luaL_error(lua, "transition groups are too large");
+    auto duration = _duration(lua, 4, 1.0f);
+    auto curve = _curve(lua, 5);
+    uint32_t outgoing, incoming;
+    auto from = _handles(lua, box->scene, 2, outgoing);
+    auto to = _handles(lua, box->scene, 3, incoming);
+    auto animations = static_cast<Animation*>(lua_newuserdatauv(lua, sizeof(Animation) * (outgoing + incoming), 0));
+    for (auto i = 0u; i < outgoing; i++) new (animations + i) Animation(Animation::fade(from[i], 0.0f));
+    for (auto i = 0u; i < incoming; i++) {
+        if (to[i]->opacity != 0.0f) return luaL_error(lua, "incoming transition objects must have opacity 0");
+        new (animations + outgoing + i) Animation(Animation::fade(to[i], 1.0f));
     }
-    auto count = fromCnt + toCnt;
-    auto animations = static_cast<Animation*>(lua_newuserdatauv(lua, sizeof(Animation) * count, 0));
-    _fadeGroup(lua, box->scene, 2, animations, 0.0f);
-    _fadeGroup(lua, box->scene, 3, animations + fromCnt, 1.0f);
-    return _play(lua, box, animations, static_cast<uint32_t>(count), _duration(lua, 4, 1.0f), _curve(lua, 5));
+    return _play(lua, box, animations, outgoing + incoming, duration, curve);
 }
 
 // ---------- Object styles and queries ----------
@@ -8863,34 +8810,40 @@ static void _moveCamera(lua_State* lua, const LuaCamera& target, const Camera& c
     else _spend(box, LUA_CAMERA_CHARGE);
 }
 
-static bool _focusBounds(const Object* object, Bounds& output, bool& defined);
+// The world bounds of the targets of what at index: an object or a list of objects.
+static Bounds _framed(lua_State* lua, Scene* scene, int index, const char* what)
+{
+    index = lua_absindex(lua, index);
+    Bounds bounds;
+    auto defined = false;
+    if (lua_istable(lua, index)) {
+        auto count = lua_rawlen(lua, index);
+        for (auto i = 1u; i <= count; i++) {
+            lua_rawgeti(lua, index, static_cast<lua_Integer>(i));
+            _surround(_object(lua, scene, -1), nullptr, bounds, defined);
+            lua_pop(lua, 1);
+        }
+    } else {
+        _surround(_object(lua, scene, index), nullptr, bounds, defined);
+    }
+    // An empty list has no bounds either.
+    if (!defined) luaL_error(lua, "%s targets have no bounds", what);
+    return bounds;
+}
 
 // A look target given as an object or a list of objects, the forms focus takes, aims at the
 // center of the bounds focus frames; a point leaves center as it is and returns false.
 static bool _lookCenter(lua_State* lua, LuaScene* box, int index, Vec3& center)
 {
     lua_getfield(lua, index, "target");
-    auto field = lua_gettop(lua);
-    auto count = lua_istable(lua, field) ? lua_rawlen(lua, field) : 0u;
-    if (count) lua_rawgeti(lua, field, 1);
+    // The target, or the first item of a list, tells objects from a point.
+    if (lua_istable(lua, -1)) lua_rawgeti(lua, -1, 1);
+    else lua_pushvalue(lua, -1);
     auto objects = lua_isuserdata(lua, -1);
-    if (count) lua_pop(lua, 1);
-    if (!objects) {
-        lua_pop(lua, 1);
-        return false;
-    }
-    Bounds bounds;
-    auto defined = false;
-    if (count == 0) _focusBounds(_object(lua, box->scene, field), bounds, defined);
-    for (auto i = 1u; i <= count; i++) {
-        lua_rawgeti(lua, field, i);
-        _focusBounds(_object(lua, box->scene, lua_gettop(lua)), bounds, defined);
-        lua_pop(lua, 1);
-    }
     lua_pop(lua, 1);
-    if (!defined) luaL_error(lua, "look targets have no bounds");
-    center = bounds.center();
-    return true;
+    if (objects) center = _framed(lua, box->scene, -1, "look").center();
+    lua_pop(lua, 1);
+    return objects;
 }
 
 // Reads the look table at index into camera and view, which hold the camera it starts from.
@@ -8927,7 +8880,8 @@ static int _lookCamera(lua_State* lua, const LuaCamera& target)
     auto camera = target.camera;
     auto view = target.cameraView;
     _lookFields(lua, target.box, 2, camera, view);
-    _moveCamera(lua, target, camera, view, _duration(lua, 3, 1.0f), _curve(lua, 4));
+    auto duration = _duration(lua, 3, 1.0f);
+    _moveCamera(lua, target, camera, view, duration, _curve(lua, 4));
     return 0;
 }
 
@@ -9103,9 +9057,7 @@ static int _clone(lua_State* lua)
     LuaClone context;
     context.lua = lua;
     context.scene = box;
-    if (!lua_isnoneornil(lua, 3)) {
-        luaL_checktype(lua, 3, LUA_TTABLE);
-        _options(lua, 3, {"parent", "shift"});
+    if (_optionTable(lua, 3, {"parent", "shift"}, true)) {
         // The id stays on the stack until the scene copies it.
         options.tag = _fieldId(lua, scene, 3);
         lua_getfield(lua, 3, "parent");
@@ -9273,7 +9225,7 @@ static int _viewport(lua_State* lua)
         return luaL_error(lua, "scene native memory limit exceeded");
     }
     if (child->points > LUA_POINT_LIMIT - parent->points) return luaL_error(lua, "scene point limit exceeded");
-    if (child->clips > LUA_CLIP_LIMIT - parent->clips) return luaL_error(lua, "scene clip limit exceeded");
+    if (child->clips > LUA_CLIP_LIMIT - parent->clips) return luaL_error(lua, "scene animation limit exceeded");
     if (child->objects > LUA_OBJECT_LIMIT - parent->objects) return luaL_error(lua, "scene object limit exceeded");
     auto result = parent->scene->viewport(child->scene, viewport);
     _check(lua, parent->scene, result, "could not add viewport");
@@ -9471,7 +9423,8 @@ static int _sceneTransition(lua_State* lua)
     auto totalScenes = 0u;
     for (auto i = 0u; i < size; i++) {
         lua_rawgeti(lua, 2, i + 1u);
-        auto child = static_cast<LuaScene*>(luaL_checkudata(lua, -1, SCENE_METATABLE));
+        auto child = static_cast<LuaScene*>(luaL_testudata(lua, -1, SCENE_METATABLE));
+        if (!child) return luaL_error(lua, "scene transition stages must be scenes, got %s", luaL_typename(lua, -1));
         lua_pop(lua, 1);
         if (!child->scene) return luaL_error(lua, "scene transition stage is no longer available");
         if (!child->owner) return luaL_error(lua, "scene transition stage already has an owner");
@@ -9492,7 +9445,7 @@ static int _sceneTransition(lua_State* lua)
         totalNative += child->nativeUsed;
         if (child->objects > LUA_OBJECT_LIMIT - totalObjects) return luaL_error(lua, "scene object limit exceeded");
         if (child->points > LUA_POINT_LIMIT - totalPoints) return luaL_error(lua, "scene point limit exceeded");
-        if (child->clips > LUA_CLIP_LIMIT - totalClips) return luaL_error(lua, "scene clip limit exceeded");
+        if (child->clips > LUA_CLIP_LIMIT - totalClips) return luaL_error(lua, "scene animation limit exceeded");
         if (child->scenes > LUA_SCENE_LIMIT - totalScenes) return luaL_error(lua, "scene transition limit exceeded");
         totalObjects += child->objects;
         totalPoints += child->points;
@@ -9504,7 +9457,7 @@ static int _sceneTransition(lua_State* lua)
     if (totalScenes > LUA_SCENE_LIMIT - parent->scenes) return luaL_error(lua, "scene transition limit exceeded");
     if (totalObjects > LUA_OBJECT_LIMIT - parent->objects) return luaL_error(lua, "scene object limit exceeded");
     if (totalPoints > LUA_POINT_LIMIT - parent->points) return luaL_error(lua, "scene point limit exceeded");
-    if (totalClips > LUA_CLIP_LIMIT - parent->clips) return luaL_error(lua, "scene clip limit exceeded");
+    if (totalClips > LUA_CLIP_LIMIT - parent->clips) return luaL_error(lua, "scene animation limit exceeded");
     if (totalNative > LUA_NATIVE_MEMORY_LIMIT - parent->nativeUsed) {
         return luaL_error(lua, "scene native memory limit exceeded");
     }
@@ -9663,27 +9616,6 @@ static int _springResponse(lua_State* lua)
 
 // ---------- Focus and views ----------
 
-// scene:focus(target_or_array, {padding, duration, curve}) frames the targets'
-// authored world bounds with a 2D pan/zoom, so authors never compute camera numbers.
-static bool _focusBounds(const Object* object, Bounds& output, bool& defined)
-{
-    Bounds local;
-    if (!object->bounds(local)) return false;
-    auto chain = Mat4::identity();
-    for (auto parent = object->parent(); parent; parent = parent->parent()) chain = parent->model * chain;
-    for (auto corner = 0u; corner < 8u; corner++) {
-        auto point = chain * Vec3{corner & 1u ? local.max.x : local.min.x, corner & 2u ? local.max.y : local.min.y,
-                                  corner & 4u ? local.max.z : local.min.z};
-        if (!defined) output = {point, point};
-        output.min = {std::fmin(output.min.x, point.x), std::fmin(output.min.y, point.y),
-                      std::fmin(output.min.z, point.z)};
-        output.max = {std::fmax(output.max.x, point.x), std::fmax(output.max.y, point.y),
-                      std::fmax(output.max.z, point.z)};
-        defined = true;
-    }
-    return true;
-}
-
 // Pushes a look table that gives every field of camera, shown in view.
 static void _pushCamera(lua_State* lua, const Camera& camera, CameraView view)
 {
@@ -9715,10 +9647,11 @@ static void _pushCamera(lua_State* lua, const Camera& camera, CameraView view)
     number("far", camera.far);
 }
 
-// focus on the scene or on one of its views, framing the targets in the picture its camera fills.
+// focus(target_or_array, {padding, duration, curve}) on the scene or on one of its views frames
+// the targets' world bounds with a 2D pan and zoom in the picture its camera fills, so authors
+// never compute camera numbers.
 static int _focusCamera(lua_State* lua, const LuaCamera& target)
 {
-    auto box = target.box;
     // focus() or focus(nil, options) returns to the opening camera, the one before the first
     // camera move, from either view.
     auto home = lua_isnoneornil(lua, 2);
@@ -9727,33 +9660,16 @@ static int _focusCamera(lua_State* lua, const LuaCamera& target)
     }
     auto& opening = target.opening;
     auto openingView = target.openingView;
-    Bounds bounds;
-    auto defined = false;
-    auto count = lua_type(lua, 2) == LUA_TTABLE ? lua_rawlen(lua, 2) : 0u;
-    if (home) {
-        auto half = Vec3{0.0f, 0.0f, 0.0f};
-        bounds = {opening.target - half, opening.target + half};
-        defined = true;
-    } else if (count == 0) {
-        _focusBounds(_object(lua, box->scene, 2), bounds, defined);
-    }
-    for (auto i = 1u; i <= count; i++) {
-        lua_rawgeti(lua, 2, i);
-        _focusBounds(_object(lua, box->scene, lua_gettop(lua)), bounds, defined);
-        lua_pop(lua, 1);
-    }
-    if (!defined) return luaL_error(lua, "focus targets have no bounds");
+    auto bounds = home ? Bounds{opening.target, opening.target} : _framed(lua, target.box->scene, 2, "focus");
     auto padding = 0.15f, duration = 1.0f;
     lua_settop(lua, 3);
-    if (lua_isnil(lua, 3)) {
-        lua_pushnil(lua);
-    } else {
-        luaL_checktype(lua, 3, LUA_TTABLE);
-        _options(lua, 3, {"padding", "duration", "curve"}, false);
+    lua_pushnil(lua);
+    if (_optionTable(lua, 3, {"padding", "duration", "curve"})) {
         padding = _fieldNumber(lua, 3, "padding", padding);
         duration = _fieldNumber(lua, 3, "duration", duration);
-        if (!std::isfinite(padding) || padding < 0.0f) return luaL_error(lua, "padding must be a non-negative number");
+        if (padding < 0.0f) return luaL_error(lua, "padding must be a non-negative number");
         lua_getfield(lua, 3, "curve");
+        lua_replace(lua, 4);
     }
     if (home && (target.cameraView != CameraView::TwoD || openingView != CameraView::TwoD)) {
         // Outside the 2D view the whole opening camera comes back, its view and lens included.
@@ -9801,9 +9717,7 @@ static int _sceneView(lua_State* lua)
     view.camera = config.camera;
     view.cameraView = config.cameraView;
     view.background = config.background;
-    if (!lua_isnil(lua, 3)) {
-        luaL_checktype(lua, 3, LUA_TTABLE);
-        _options(lua, 3, {"camera", "optical", "background", "opacity", "layer", "hide", "follow"}, false);
+    if (_optionTable(lua, 3, {"camera", "optical", "background", "opacity", "layer", "hide", "follow"})) {
         lua_getfield(lua, 3, "camera");
         if (!lua_isnil(lua, -1)) _lookFields(lua, box, -1, view.camera, view.cameraView);
         lua_pop(lua, 1);
@@ -9899,9 +9813,6 @@ static ThemePreset _themePreset(lua_State* lua, int index)
     static constexpr LuaName<ThemePreset> PRESETS[] = {
         {"pro_white", ThemePreset::ProWhite}, {"pro_black", ThemePreset::ProBlack},
         {"adaptive_vscode", ThemePreset::AdaptiveVscode}};
-    size_t size;
-    auto value = luaL_checklstring(lua, index, &size);
-    if (std::strlen(value) != size) luaL_error(lua, "theme preset cannot contain zero bytes");
     return _enum(lua, index, "theme preset", PRESETS);
 }
 
@@ -9924,7 +9835,7 @@ static void _themeText(lua_State* lua, int index, const char* name, TextTheme& t
         lua_pop(lua, 1);
         return;
     }
-    luaL_checktype(lua, -1, LUA_TTABLE);
+    _checkTable(lua, -1, name);
     auto style = lua_absindex(lua, -1);
     _options(lua, style, {"font", "size", "color"}, false);
     lua_getfield(lua, style, "font");
@@ -9975,7 +9886,7 @@ static Theme _theme(lua_State* lua, int index)
 
     lua_getfield(lua, index, "text");
     if (!lua_isnil(lua, -1)) {
-        luaL_checktype(lua, -1, LUA_TTABLE);
+        _checkTable(lua, -1, "theme text");
         auto text = lua_absindex(lua, -1);
         _options(lua, text, {"h1", "h2", "h3", "text", "code"}, false);
         _themeText(lua, text, "h1", theme.h1);
@@ -9988,7 +9899,7 @@ static Theme _theme(lua_State* lua, int index)
 
     lua_getfield(lua, index, "colors");
     if (!lua_isnil(lua, -1)) {
-        luaL_checktype(lua, -1, LUA_TTABLE);
+        _checkTable(lua, -1, "theme colors");
         auto colors = lua_absindex(lua, -1);
         _options(lua, colors,
                  {"foreground", "muted", "accent", "secondary", "success", "warning",
@@ -9999,7 +9910,7 @@ static Theme _theme(lua_State* lua, int index)
 
     lua_getfield(lua, index, "objects");
     if (!lua_isnil(lua, -1)) {
-        luaL_checktype(lua, -1, LUA_TTABLE);
+        _checkTable(lua, -1, "theme objects");
         auto objects = lua_absindex(lua, -1);
         auto count = lua_rawlen(lua, objects);
         if (!count || count > Theme::ColorLimit) {
@@ -10033,7 +9944,7 @@ static Theme _theme(lua_State* lua, int index)
 
     lua_getfield(lua, index, "axis");
     if (!lua_isnil(lua, -1)) {
-        luaL_checktype(lua, -1, LUA_TTABLE);
+        _checkTable(lua, -1, "theme axis");
         auto axis = lua_absindex(lua, -1);
         _options(lua, axis, {"x", "y", "z", "grid", "label"}, false);
         _fieldColor(lua, axis, "x", theme.axis.x);
@@ -10065,18 +9976,8 @@ static int _sceneGen(lua_State* lua)
     config.width = static_cast<uint32_t>(width);
     config.height = static_cast<uint32_t>(height);
     config.fps = static_cast<uint32_t>(fps);
-    lua_getfield(lua, 1, "antialiasing");
-    if (!lua_isnil(lua, -1)) {
-        if (!lua_isboolean(lua, -1)) return luaL_error(lua, "antialiasing must be a boolean");
-        config.antialiasing = lua_toboolean(lua, -1);
-    }
-    lua_pop(lua, 1);
-    lua_getfield(lua, 1, "loop");
-    if (!lua_isnil(lua, -1)) {
-        if (!lua_isboolean(lua, -1)) return luaL_error(lua, "loop must be a boolean");
-        config.loop = lua_toboolean(lua, -1);
-    }
-    lua_pop(lua, 1);
+    config.antialiasing = _fieldBool(lua, 1, "antialiasing", config.antialiasing);
+    config.loop = _fieldBool(lua, 1, "loop", config.loop);
     if (config.height > LUA_PIXEL_LIMIT / config.width) return luaL_error(lua, "scene pixel limit exceeded");
     auto backgroundAuthored = _fieldColor(lua, 1, "background", config.background);
     auto hasTheme = _has(lua, 1, "theme");
@@ -10089,7 +9990,7 @@ static int _sceneGen(lua_State* lua)
 
     if (_has(lua, 1, "camera")) {
         lua_getfield(lua, 1, "camera");
-        luaL_checktype(lua, -1, LUA_TTABLE);
+        _checkTable(lua, -1, "camera");
         auto index = lua_absindex(lua, -1);
         _options(lua, index,
                  {"mode", "view", "target", "eye", "up", "height", "projection", "fov", "near", "far"},
@@ -10099,13 +10000,11 @@ static int _sceneGen(lua_State* lua)
         config.cameraMode = _fieldEnum(lua, index, "mode", CameraMode::Fixed, MODES, "camera mode");
         config.cameraView = _fieldEnum(lua, index, "view", CameraView::TwoD, CAMERA_VIEWS, "camera view");
         if (config.cameraView == CameraView::TwoD) {
-            auto target = _fieldWorld(lua, index, "target", {});
-            auto viewHeight = _fieldNumber(lua, index, "height", config.camera.orthoHeight);
-            config.camera.target = target;
-            config.camera.eye = target + Vec3{0.0f, 0.0f, 10.0f};
+            config.camera.target = _fieldWorld(lua, index, "target", {});
+            config.camera.eye = config.camera.target + Vec3{0.0f, 0.0f, 10.0f};
             config.camera.up = {0.0f, 1.0f, 0.0f};
             config.camera.projection = Projection::Orthographic;
-            config.camera.orthoHeight = viewHeight;
+            config.camera.orthoHeight = _fieldNumber(lua, index, "height", config.camera.orthoHeight);
         } else {
             config.camera.eye = _fieldWorld(lua, index, "eye", {6.0f, 4.0f, 6.0f});
             config.camera.target = _fieldWorld(lua, index, "target", config.camera.target);
@@ -10459,7 +10358,7 @@ Result detail::luaLoad(const char* source, uint32_t size, const char* name, Scen
     return Result::Success;
 }
 
-struct FileAssets
+struct LuaFileAssets
 {
     const char* path = nullptr;
     size_t root = 0;
@@ -10468,7 +10367,7 @@ struct FileAssets
 
 static const Asset* _fileAsset(const char* name, void* data)
 {
-    auto files = static_cast<FileAssets*>(data);
+    auto files = static_cast<LuaFileAssets*>(data);
     delete files->asset;
     files->asset = nullptr;
     auto absolute = name[0] == '/' || name[0] == '\\' || (std::strlen(name) > 2u && name[1] == ':');
@@ -10528,7 +10427,7 @@ Result detail::luaLoadFile(const char* path, Scene** scene, char* error,
         _message(error, errorSize, "could not read Lua file");
         return Result::IoError;
     }
-    FileAssets assets;
+    LuaFileAssets assets;
     assets.path = path;
     auto slash = std::strrchr(path, '/');
     auto backslash = std::strrchr(path, '\\');

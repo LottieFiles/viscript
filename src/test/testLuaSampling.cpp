@@ -140,7 +140,7 @@ return s
     _scriptError("local s=vis.scene{}; s:plot{points={{0,0},{1,1}},endpoint_radius=0/0}; return s",
                  "endpoint_radius must be a finite number");
     _scriptError("local s=vis.scene{}; s:plot{points={{0,0},{1,1}},endpoint_radius=true}; return s",
-                 "number expected");
+                 "endpoint_radius must be a number, got boolean");
     _scriptError("local s=vis.scene{}; s:plot{points={{0,0}},endpoint_radius=3}; return s",
                  "points must contain at least 2 vectors");
 }
@@ -376,7 +376,7 @@ return s
         _scriptError(script, expected);
     };
     fails("s:space{axis_width = -1}", "axis_width must be zero or more pixels");
-    fails("s:space{axis_width = 'wide'}", "number expected, got string");
+    fails("s:space{axis_width = 'wide'}", "axis_width must be a number, got string");
     fails("s:space{ticks = 1}", "ticks must be true or {x = step, y = step, z = step}");
     fails("s:space{ticks = {x = 'a'}}", "ticks must be true or {x = step, y = step, z = step}");
     fails("s:space{ticks = {x = -1}}", "ticks x must be zero or more");

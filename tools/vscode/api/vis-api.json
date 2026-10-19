@@ -931,8 +931,11 @@
     "CodeConfig": ["stroke", "fill", "gradient", "width", "radius", "dash", "dash_offset"],
     "SpansConfig": ["stroke", "gradient", "width", "radius", "dash", "dash_offset"],
     "TexConfig": ["stroke", "gradient", "width", "radius", "dash", "dash_offset"],
-    "GroupConfig": ["color", "radius", "dash", "dash_offset"],
-    "PictureConfig": ["color", "stroke", "fill", "radius", "dash", "dash_offset"],
-    "CellConfig": ["stroke", "fill", "width", "radius", "dash", "dash_offset"]
+    "GroupConfig": ["color", "gradient", "radius", "dash", "dash_offset"],
+    "PictureConfig": ["color", "stroke", "fill", "gradient", "radius", "dash", "dash_offset"],
+    "CellConfig": ["stroke", "fill", "gradient", "width", "radius", "dash", "dash_offset"],
+    "SpaceConfig": ["gradient"],
+    "TextConfig": ["gradient"],
+    "NumberConfig": ["gradient"]
   }
 }

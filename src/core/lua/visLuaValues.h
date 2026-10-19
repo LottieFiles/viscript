@@ -22,9 +22,40 @@ extern "C" {
 namespace vis
 {
 
+// Stops the script because the value at index is not of type expected. An argument is named by
+// its number, as luaL_checktype names it; a value pushed from a field or a list is named by name,
+// since its place on the stack means nothing to the script.
+static inline void _typeError(lua_State* lua, int index, const char* expected, const char* name)
+{
+    if (index > 0) luaL_typeerror(lua, index, expected);
+    luaL_error(lua, "%s must be a %s, got %s", name, expected, luaL_typename(lua, index));
+}
+
+// luaL_checknumber, luaL_checklstring and luaL_checktype for a table, naming the value as
+// _typeError does.
+static inline lua_Number _checkNumber(lua_State* lua, int index, const char* name)
+{
+    int number = 0;
+    auto value = lua_tonumberx(lua, index, &number);
+    if (!number) _typeError(lua, index, "number", name);
+    return value;
+}
+
+static inline const char* _checkString(lua_State* lua, int index, const char* name, size_t* size = nullptr)
+{
+    auto value = lua_tolstring(lua, index, size);
+    if (!value) _typeError(lua, index, "string", name);
+    return value;
+}
+
+static inline void _checkTable(lua_State* lua, int index, const char* name)
+{
+    if (!lua_istable(lua, index)) _typeError(lua, index, "table", name);
+}
+
 static inline float _number(lua_State* lua, int index, const char* name)
 {
-    auto value = luaL_checknumber(lua, index);
+    auto value = _checkNumber(lua, index, name);
     if (!std::isfinite(value) || value < -FLT_MAX || value > FLT_MAX) {
         luaL_error(lua, "%s must be a finite number", name);
     }
@@ -92,7 +123,7 @@ static inline float _component(lua_State* lua, int index, const char* key, int i
 
 static inline Vec2 _vec2(lua_State* lua, int index, const char* name)
 {
-    luaL_checktype(lua, index, LUA_TTABLE);
+    _checkTable(lua, index, name);
     index = lua_absindex(lua, index);
     auto keyed = _has(lua, index, "x") || _has(lua, index, "y") || _has(lua, index, "z");
     if (keyed) {
@@ -107,7 +138,7 @@ static inline Vec2 _vec2(lua_State* lua, int index, const char* name)
 
 static inline Vec3 _world(lua_State* lua, int index, const char* name)
 {
-    luaL_checktype(lua, index, LUA_TTABLE);
+    _checkTable(lua, index, name);
     index = lua_absindex(lua, index);
     auto keyed = _has(lua, index, "x") || _has(lua, index, "y") || _has(lua, index, "z");
     if (keyed) {
@@ -147,7 +178,7 @@ static inline Vec3 _fieldWorld(lua_State* lua, int index, const char* name, cons
 // third.
 static inline Vec3 _vec3(lua_State* lua, int index, const char* name, float z = 0.0f)
 {
-    luaL_checktype(lua, index, LUA_TTABLE);
+    _checkTable(lua, index, name);
     index = lua_absindex(lua, index);
     auto keyed = _has(lua, index, "x") || _has(lua, index, "y") || _has(lua, index, "z");
     if (keyed && (!_has(lua, index, "x") || !_has(lua, index, "y") || !_has(lua, index, "z"))) {
@@ -205,7 +236,7 @@ static inline void _overlay(lua_State* lua, int index, State& state)
 
 static inline Range _range(lua_State* lua, int index, const char* name)
 {
-    luaL_checktype(lua, index, LUA_TTABLE);
+    _checkTable(lua, index, name);
     index = lua_absindex(lua, index);
     Range range;
     auto keyed = _has(lua, index, "min") || _has(lua, index, "max") || _has(lua, index, "step");
@@ -233,7 +264,7 @@ static inline Range _fieldRange(lua_State* lua, int index, const char* name, con
 
 static inline CellRegion _region(lua_State* lua, int index, const char* name)
 {
-    luaL_checktype(lua, index, LUA_TTABLE);
+    _checkTable(lua, index, name);
     index = lua_absindex(lua, index);
     auto keyed = _has(lua, index, "x") || _has(lua, index, "y") || _has(lua, index, "width") || _has(lua, index, "height");
     lua_Integer values[4];
@@ -270,7 +301,7 @@ static inline BBox _fieldPointerRegion(lua_State* lua, int index)
     index = lua_absindex(lua, index);
     lua_getfield(lua, index, "region");
     if (lua_isnil(lua, -1)) luaL_error(lua, "missing field 'region'");
-    luaL_checktype(lua, -1, LUA_TTABLE);
+    _checkTable(lua, -1, "region");
     auto region = lua_absindex(lua, -1);
     auto keyed = _has(lua, region, "x") || _has(lua, region, "y") || _has(lua, region, "width") || _has(lua, region, "height");
     if (!keyed && lua_rawlen(lua, region) != 4u) luaL_error(lua, "region must contain x, y, width and height");
@@ -294,7 +325,7 @@ static inline BBox _fieldPointerRegion(lua_State* lua, int index)
 
 static inline void _size(lua_State* lua, int index, uint32_t& columns, uint32_t& rows)
 {
-    luaL_checktype(lua, index, LUA_TTABLE);
+    _checkTable(lua, index, "size");
     if (lua_rawlen(lua, index) != 2u) luaL_error(lua, "size must contain columns and rows");
     lua_rawgeti(lua, index, 1);
     auto width = _integer(lua, -1, "columns");
@@ -311,7 +342,7 @@ static inline void _size(lua_State* lua, int index, uint32_t& columns, uint32_t&
 
 static inline void _matrix(lua_State* lua, int index, float* values, uint32_t count, const char* name)
 {
-    luaL_checktype(lua, index, LUA_TTABLE);
+    _checkTable(lua, index, name);
     index = lua_absindex(lua, index);
     if (lua_rawlen(lua, index) != count) {
         luaL_error(lua, "%s must contain exactly %d numbers", name, static_cast<int>(count));
@@ -329,7 +360,7 @@ static inline const char* _fieldString(lua_State* lua, int index, const char* na
     lua_getfield(lua, index, name);
     if (lua_isnil(lua, -1)) luaL_error(lua, "missing field '%s'", name);
     size_t length;
-    auto value = luaL_checklstring(lua, -1, &length);
+    auto value = _checkString(lua, -1, name, &length);
     if (std::strlen(value) != length) luaL_error(lua, "field '%s' cannot contain zero bytes", name);
     if (size) *size = length;
     return value;
@@ -345,7 +376,7 @@ static inline const char* _fieldOptionalString(lua_State* lua, int index, const 
         return lua_tostring(lua, -1);
     }
     size_t length;
-    auto value = luaL_checklstring(lua, -1, &length);
+    auto value = _checkString(lua, -1, name, &length);
     if (std::strlen(value) != length) luaL_error(lua, "field '%s' cannot contain zero bytes", name);
     return value;
 }
@@ -385,7 +416,7 @@ template<typename Value, size_t N>
 static inline Value _enum(lua_State* lua, int index, const char* what, const LuaName<Value> (&names)[N])
 {
     size_t size;
-    auto value = luaL_checklstring(lua, index, &size);
+    auto value = _checkString(lua, index, what, &size);
     if (auto found = _findName(value, size, names)) return found->value;
     luaL_where(lua, 1);
     lua_pushfstring(lua, "%s must be '%s'", what, names[0].name);
@@ -399,20 +430,14 @@ static inline Value _enum(lua_State* lua, int index, const char* what, const Lua
 }
 
 // The value of the string field name of the table at index among names, or fallback without
-// the field, read as _fieldOptionalString reads it; what names the option in the message, the
-// field itself unless given.
+// the field; what names the option in the message, the field itself unless given.
 template<typename Value, size_t N>
 static inline Value _fieldEnum(lua_State* lua, int index, const char* name, Value fallback,
                                const LuaName<Value> (&names)[N], const char* what = nullptr)
 {
     index = lua_absindex(lua, index);
     lua_getfield(lua, index, name);
-    if (!lua_isnil(lua, -1)) {
-        size_t size;
-        auto value = luaL_checklstring(lua, -1, &size);
-        if (std::strlen(value) != size) luaL_error(lua, "field '%s' cannot contain zero bytes", name);
-        fallback = _enum(lua, -1, what ? what : name, names);
-    }
+    if (!lua_isnil(lua, -1)) fallback = _enum(lua, -1, what ? what : name, names);
     lua_pop(lua, 1);
     return fallback;
 }
@@ -490,44 +515,37 @@ static inline bool _hex(const char* value, size_t size)
     return true;
 }
 
-static inline bool _themeColorRole(const char* value, size_t size, ThemeColorRole& role)
+// The roles of a theme that a color may name in place of a hex value.
+static constexpr LuaName<ThemeColorRole> THEME_COLOR_ROLES[] = {
+    {"background", ThemeColorRole::Background}, {"foreground", ThemeColorRole::Foreground},
+    {"muted", ThemeColorRole::Muted}, {"accent", ThemeColorRole::Accent}, {"secondary", ThemeColorRole::Secondary},
+    {"success", ThemeColorRole::Success}, {"warning", ThemeColorRole::Warning}, {"danger", ThemeColorRole::Danger},
+    {"info", ThemeColorRole::Info}, {"surface", ThemeColorRole::Surface}, {"border", ThemeColorRole::Border},
+    {"result", ThemeColorRole::Result}, {"focus", ThemeColorRole::Focus}};
+
+// Reads the size bytes at value, a hex color or, with theme, the name of one of its roles, into
+// color; false for any other string.
+static inline bool _colorName(const char* value, size_t size, const Theme* theme, Color& color)
 {
-    struct Entry { const char* name; ThemeColorRole role; };
-    static constexpr Entry entries[] = {
-        {"background", ThemeColorRole::Background},
-        {"foreground", ThemeColorRole::Foreground},
-        {"muted", ThemeColorRole::Muted},
-        {"accent", ThemeColorRole::Accent},
-        {"secondary", ThemeColorRole::Secondary},
-        {"success", ThemeColorRole::Success},
-        {"warning", ThemeColorRole::Warning},
-        {"danger", ThemeColorRole::Danger},
-        {"info", ThemeColorRole::Info},
-        {"surface", ThemeColorRole::Surface},
-        {"border", ThemeColorRole::Border},
-        {"result", ThemeColorRole::Result},
-        {"focus", ThemeColorRole::Focus},
-    };
-    for (const auto& entry : entries) {
-        if (std::strlen(entry.name) == size && std::memcmp(value, entry.name, size) == 0) {
-            role = entry.role;
-            return true;
-        }
+    if (_hex(value, size)) {
+        color = Color::hex(value);
+        return true;
     }
-    return false;
+    auto role = theme ? _findName(value, size, THEME_COLOR_ROLES) : nullptr;
+    if (role) color = theme->color(role->value);
+    return role != nullptr;
 }
 
+// The color the string at index names; without a theme to take roles from, only a hex color.
 static inline Color _color(lua_State* lua, int index, const char* name, const Theme* theme = nullptr)
 {
     size_t size;
-    auto value = luaL_checklstring(lua, index, &size);
-    if (_hex(value, size)) return Color::hex(value);
-    ThemeColorRole role;
-    if (theme && std::strlen(value) == size && _themeColorRole(value, size, role)) {
-        return theme->color(role);
+    auto value = _checkString(lua, index, name, &size);
+    Color color;
+    if (!_colorName(value, size, theme, color)) {
+        luaL_error(lua, theme ? "%s must be a hex color or Theme color role" : "%s must be a hex color", name);
     }
-    luaL_error(lua, "%s must be a hex color or Theme color role", name);
-    return {};
+    return color;
 }
 
 static inline bool _fieldColor(lua_State* lua, int index, const char* name, Color& color,
@@ -546,7 +564,7 @@ static inline bool _fieldColor(lua_State* lua, int index, const char* name, Colo
 
 static inline Vec3* _points(lua_State* lua, int index, uint32_t minimum, uint32_t& count)
 {
-    luaL_checktype(lua, index, LUA_TTABLE);
+    _checkTable(lua, index, "points");
     index = lua_absindex(lua, index);
     auto size = lua_rawlen(lua, index);
     if (size < minimum) luaL_error(lua, "points must contain at least %d vectors", static_cast<int>(minimum));

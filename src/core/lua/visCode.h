@@ -48,9 +48,6 @@ struct CodeState
     uint32_t closeLength = 0;
 };
 
-// The language of a name such as "lua" or "typescript", false for an unknown name.
-bool codeLanguage(const char* name, CodeLanguage& output) noexcept;
-
 // Splits one line, without its line feed, into tokens and returns how many it has, writing
 // at most capacity of them. Blanks between tokens belong to none; a comment or string keeps
 // the blanks inside it. state carries block comments and long strings across lines.

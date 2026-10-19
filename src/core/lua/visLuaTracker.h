@@ -1,3 +1,5 @@
+// The value trackers of the Lua binding: the state keys a bound function may set, and the Lua
+// prelude that samples each binding into short linear segments.
 #ifndef _VIS_LUA_TRACKER_H_
 #define _VIS_LUA_TRACKER_H_
 

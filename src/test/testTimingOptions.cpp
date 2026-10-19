@@ -77,6 +77,7 @@ static void _lua(Renderer* renderer)
         "s:shift(a,{0,1},{easing='linear'})", "s:shift(a,{0,1},{curve='unknown'})",
         "s:shift(a,{0,1},timing,'linear')", "s:create(a,{lag=-.1})",
         "s:fill_reveal(a,{direction='reverse'})", "s:track({{s:tracker(0),1}},{lag=.2})",
+        "s:match_transform(a,b,.4,'linear',{color='accent'})",
     };
     for (auto call : invalid) {
         std::snprintf(script, sizeof(script), "%s%s; return s", prefix, call);
