@@ -8,18 +8,16 @@ const episode = ({file, ...details}) => ({
 export const THORVG = {
   id: "thorvg",
   title: "ThorVG",
-  tags: "CPU · OpenGL · renderer internals",
-  summary: "Source-backed visual traces of ThorVG's rasterization, task scheduling, fill rules, and stencil tests.",
   episodes: [
-    {file: "shape-stroke", title: "Fill + stroke to pixels", category: "CPU", loop: true,
+    {file: "shape-stroke", title: "Fill + stroke to pixels", loop: true,
      blurb: "Follow shapestroke5.lua from path commands through fill and stroke outlines, RLE spans, coverage, and the final surface.\nSpan arrays and pixel colors come from the original ThorVG trace."},
-    {file: "threads", title: "SW / GL thread scheduling", category: "Scheduling", loop: true,
+    {file: "threads", title: "SW / GL thread scheduling", loop: true,
      blurb: "Compare caller and worker activity across update(), draw(), and sync().\nSW workers prepare shapes; the GL caller records tasks and later issues drawing commands.\nHorizontal spacing shows event order."},
-    {file: "cpu-task", title: "CPU: SwShapeTask", category: "CPU", loop: true,
+    {file: "cpu-task", title: "CPU: SwShapeTask", loop: true,
      blurb: "A star becomes an outline and shape.rle on a worker.\nThe caller waits for task->done(), rasterizes the spans, and keeps render data available for the next frame."},
-    {file: "gl-fillrule", title: "GL: FillRule", category: "OpenGL", loop: true,
+    {file: "gl-fillrule", title: "GL: FillRule", loop: true,
      blurb: "Accumulate stencil values across a self-crossing path, then compare FillNonZero and FillEvenOdd.\nThe same center samples are covered under the nonzero rule and skipped under the even-odd rule."},
-    {file: "gl-stencil-test", title: "GL: Stencil test", category: "OpenGL",
+    {file: "gl-stencil-test", title: "GL: Stencil test",
      blurb: "Follow a circle, triangle, and rectangle through the fragment shader, stencil test, stencil operation, and color write.\nCompare ALWAYS, EQUAL, and NOTEQUAL against the same stencil buffer."},
   ].map(episode),
 };
@@ -27,16 +25,14 @@ export const THORVG = {
 export const THORVG_INTERACTION = {
   id: "thorvg-interaction",
   title: "ThorVG & Interaction",
-  tags: "OpenGL · selectable stages · playback ranges",
-  summary: "Select a renderer stage or draw input to replay the corresponding source-backed animation.",
   episodes: [
-    {file: "gl-stencil-cover", title: "GlStencilCoverTask", category: "OpenGL",
+    {file: "gl-stencil-cover", title: "GlStencilCoverTask",
      blurb: "Follow the same ten-point star as CPU: SwShapeTask through fan triangles, stencil values, the color cover, and the final color buffer.\nSelect a stage header to replay it; all 32 × 32 samples are computed from the path.",
      clips: ["RT_Stencil", "depthStencilBuffer", "RT_Color cover", "colorBuffer"].map((label, k) => ({
        label, bounds: [(20 + k * 193) / 800, 84 / 720, 181 / 800, 46 / 720],
        range: [k === 0 ? 0 : k * 6.4 + 0.2, k * 6.4 + 6.2],
      }))},
-    {file: "gl-draw-path", title: "GPU Draw Path Selection", category: "OpenGL",
+    {file: "gl-draw-path", title: "GPU Draw Path Selection",
      blurb: "Select a shape card to trace renderShape() to GlSolidBatch, GlRenderTask, or GlStencilCoverTask.\nCompare solid fill, opaque stroke, and gradient branches.",
      clips: ["back fill Color", "star fill Color", "star stroke a=255", "star LinearGradient"].map((label, k) => ({
        label, bounds: [20 / 800, (84 + k * 154) / 720, 210 / 800, 142 / 720],

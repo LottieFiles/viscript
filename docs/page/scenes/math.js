@@ -443,18 +443,16 @@ return scene`;
 export const MATH = {
   id: "math",
   title: "Math",
-  tags: "linear algebra · graphics",
-  summary: "The math that computer graphics runs on — vectors, matrices, eigenvectors and curves.",
   episodes: [
-    {id: "vectors", title: "Vectors", category: "Linear algebra", code: VECTORS, interactive: true,
+    {id: "vectors", title: "Vectors", code: VECTORS, interactive: true,
      blurb: "Addition is tip-to-tail; scaling stretches a vector and, for negative k, flips it."},
-    {id: "dot-product", title: "Dot product", category: "Linear algebra", code: DOT, interactive: true,
+    {id: "dot-product", title: "Dot product", code: DOT, interactive: true,
      blurb: "As v turns, its shadow on u is the dot product (up to |u|): positive, zero at 90°, negative beyond."},
-    {id: "matrix-transform", title: "Matrices as transformations", category: "Linear algebra", code: MATRIX, interactive: true,
+    {id: "matrix-transform", title: "Matrices as transformations", code: MATRIX, interactive: true,
      blurb: "The grid is carried by a 2×2 matrix: î and ĵ land on its columns. The yellow square's area is |det|."},
-    {id: "eigenvectors", title: "Eigenvectors", category: "Linear algebra", code: EIGEN, interactive: true,
+    {id: "eigenvectors", title: "Eigenvectors", code: EIGEN, interactive: true,
      blurb: "Apply A to vectors on a circle. Almost all of them change direction — except along the two dashed eigen-directions."},
-    {id: "bezier", title: "Bézier curves", category: "Graphics", code: BEZIER, interactive: true,
+    {id: "bezier", title: "Bézier curves", code: BEZIER, interactive: true,
      blurb: "de Casteljau's algorithm: interpolate between control points, then between those points, until one remains."},
   ],
 };
