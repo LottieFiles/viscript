@@ -13,6 +13,9 @@ type Api = {
     factories: Record<string, Factory>;
     methods: Record<string, Record<string, Callable>>;
     configs: Record<string, Record<string, Field>>;
+    // The config each config inherits, and the inherited fields it does not take.
+    configBases?: Record<string, string>;
+    configBaseExcept?: Record<string, string[]>;
 };
 
 const IDENTIFIER = "[A-Za-z_][A-Za-z0-9_]*";
@@ -280,12 +283,14 @@ function unmatchedBraces(source: string): number[] {
     return stack;
 }
 
+// The fields a config accepts: its own over those of its bases, less the names it excepts.
 function configFields(api: Api, config: string): Record<string, Field> {
-    const inheritsObject = !["SceneConfig", "GroupConfig", "SpaceConfig"].includes(config)
-        && Object.values(api.factories).some((factory) => factory.config === config);
-    return inheritsObject
-        ? {...api.configs.ObjectConfig, ...(api.configs[config] ?? {})}
-        : api.configs[config] ?? {};
+    const own = api.configs[config] ?? {};
+    const base = api.configBases?.[config];
+    if (!base) return own;
+    const fields = {...configFields(api, base)};
+    for (const name of api.configBaseExcept?.[config] ?? []) delete fields[name];
+    return {...fields, ...own};
 }
 
 function factoryCallable(factory: Factory): Callable {

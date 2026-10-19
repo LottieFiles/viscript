@@ -10,6 +10,10 @@ meson test -C build --print-errorlogs
 
 For the VS Code extension, run `npm ci` and `npm test` in `tools/vscode`.
 
+`meson test` also runs `api-sync`, which holds the editor's API schema,
+`tools/vscode/api/vis-api.json`, to the Lua binding. After changing the binding, update the
+schema and run `npm run generate:api` in `tools/vscode` to regenerate `vis.d.lua`.
+
 ## Comments and guides
 
 Guides explain how to use the current engine. API comments describe ownership,

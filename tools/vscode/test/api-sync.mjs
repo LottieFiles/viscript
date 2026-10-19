@@ -15,9 +15,13 @@ const runtimeBinding = fs.readFileSync(path.join(repositoryRoot, "src", "core", 
 const statesBinding = fs.readFileSync(path.join(repositoryRoot, "src", "core", "states", "visStatesLua.cpp"), "utf8");
 const diagramBinding = fs.readFileSync(path.join(repositoryRoot, "src", "core", "diagram", "visDiagramLua.cpp"), "utf8");
 const texBinding = fs.readFileSync(path.join(repositoryRoot, "src", "core", "tex", "visTexLua.cpp"), "utf8");
+const valuesHeader = fs.readFileSync(path.join(repositoryRoot, "src", "core", "lua", "visLuaValues.h"), "utf8");
+const trackerPrelude = fs.readFileSync(path.join(repositoryRoot, "src", "core", "lua", "visLuaTracker.h"), "utf8");
 
 const sharedFactories = registrationNames(binding, "FACTORY_METHODS");
-const sceneMethods = [...sharedFactories, ...registrationNames(binding, "SCENE_METHODS")].sort();
+// The tracker prelude defines Scene methods in Lua, besides those SCENE_METHODS registers.
+const preludeMethods = Array.from(trackerPrelude.matchAll(/^function methods\.(\w+)\(/gm), (match) => match[1]);
+const sceneMethods = [...sharedFactories, ...registrationNames(binding, "SCENE_METHODS"), ...preludeMethods].sort();
 const objectMethods = [...sharedFactories, ...registrationNames(binding, "OBJECT_METHODS")].sort();
 const groupMethods = registrationNames(binding, "GROUP_METHODS");
 const viewMethods = registrationNames(binding, "VIEW_METHODS");
@@ -57,6 +61,26 @@ assert.match(statesBinding, /lua_setfield\(lua, -2, "states"\)/);
 assert.deepEqual(api.globals.states.parameters, [{name: "scene", type: "Scene"}]);
 assert.equal(api.globals.states.returns, "StatesController");
 for (const factory of Object.values(api.factories)) assert.ok(api.configs[factory.config], `Missing ${factory.config}`);
+assert.deepEqual([...preludeMethods].sort(), ["bind", "track", "tracker"], "The tracker prelude's Scene methods changed");
+assert.match(trackerPrelude, /tracker\.get = function/);
+assert.deepEqual(Object.keys(api.methods.Tracker), ["get"], "Tracker API schema differs from the tracker prelude");
+assert.equal(api.methods.Scene.tracker.returns, "Tracker");
+// Each factory config lists the options its binding accepts: its own and, through configBases, the
+// style options _options() shares, less the configBaseExcept names.
+const sharedStyles = listNames(valuesHeader, "shared");
+// Three factories the scene and objects register themselves, since spaces have a cell of their own.
+const factoryFunctions = {...registrationTable(binding, "SCENE_METHODS"), ...registrationTable(binding, "FACTORY_METHODS")};
+// Factories that check their options in a helper, or refuse some of the shared styles in one.
+const OPTION_SOURCES = {
+    text: ["_textObject"], code: ["_codeOptions"], spans: ["_rowOptions", "_spanOption"],
+    union: ["_region"], intersection: ["_region"], difference: ["_region"], exclusion: ["_region"],
+};
+for (const [name, factory] of Object.entries(api.factories)) {
+    if (factory.module) continue;
+    const accepted = factoryOptionNames(binding, OPTION_SOURCES[name] ?? [factoryFunctions[name]], sharedStyles);
+    assert.deepEqual(Object.keys(configFields(factory.config)).sort(), accepted,
+        `${factory.config} differs from the options ${name} accepts`);
+}
 assert.equal(api.factories.contour.returns, "Group");
 assert.equal(api.configs.ContourConfig.levels.required, true);
 assert.equal(api.globals.spring_response.returns, "number");
@@ -127,6 +151,13 @@ assertConfig("TexPartConfig", [...listNames(texBinding, "GROUP_STYLES"), ...list
 for (const name of listNames(texBinding, "GROUP_STYLES")) {
     assert.deepEqual(api.configs.TexPartConfig[name], api.configs.ObjectConfig[name], `TexPartConfig ${name} differs from ObjectConfig`);
 }
+// A formula takes the group styles of ObjectConfig and none of the shape styles.
+assert.equal(api.configBases.TexConfig, "ObjectConfig");
+assert.deepEqual([...api.configBaseExcept.TexConfig].sort(), listNames(texBinding, "SHAPE_STYLES"),
+    "TexConfig excepts other styles than the tex binding refuses");
+assert.deepEqual(Object.keys(configFields("TexConfig")).sort(),
+    [...new Set([...listNames(texBinding, "GROUP_STYLES"), ...listNames(texBinding, "FORMULA_OPTIONS")])].sort(),
+    "TexConfig differs from the options tex accepts");
 // The tex module makes the {tex = ...} parts of spans; without it, the core names the module.
 assertConfig("TexSpanConfig", [...listNames(texBinding, "GROUP_STYLES"), ...listNames(texBinding, "SPAN_OPTIONS")].sort(),
     ["tex"]);
@@ -162,12 +193,25 @@ assert.deepEqual(api.methods.StatesController.transition.overloads.slice(1).map(
     [{name: "targets", type: "StateTarget[]"}, {name: "options", type: "TimingOptions"}],
 ]);
 for (const [name, base] of Object.entries(api.configBases)) {
-    assert.ok(api.configs[name] && api.configs[base], `Unknown timing config inheritance: ${name}`);
-    for (const key of Object.keys(api.configs[base])) assert.ok(api.configs[name][key], `Missing ${name}.${key}`);
+    assert.ok(api.configs[name] && api.configs[base], `Unknown config inheritance: ${name}`);
+}
+for (const [name, fields] of Object.entries(api.configBaseExcept)) {
+    const base = api.configBases[name];
+    assert.ok(base, `${name} excepts fields of no base`);
+    for (const field of fields) {
+        assert.ok(api.configs[base][field] && !api.configs[name][field],
+            `${name} excepts ${field}, which its base lacks or it declares itself`);
+    }
 }
 
 const meta = fs.readFileSync(path.join(extensionRoot, "api", "vis.d.lua"), "utf8");
 for (const name of sceneMethods) assert.match(meta, new RegExp(`function Scene:${name}\\(`));
+assert.match(meta, /---@class vis\.Tracker\n/);
+assert.match(meta, /function Tracker:get\(\)/);
+// A config that takes all of ObjectConfig inherits it; one that takes part of it is written out.
+assert.match(meta, /---@class vis\.CircleConfig: vis\.ObjectConfig\n/);
+assert.match(meta, /---@class vis\.MatrixConfig\n(?:---@field [^\n]*\n)*---@field opacity\?/);
+assert.doesNotMatch(meta, /---@class vis\.MatrixConfig\n(?:---@field [^\n]*\n)*---@field radius\?/);
 for (const name of groupMethods) assert.match(meta, new RegExp(`function Group:${name}\\(`));
 for (const name of viewMethods) assert.match(meta, new RegExp(`function View:${name}\\(`));
 assert.match(meta, /function Library\.scene\(/);
@@ -214,16 +258,60 @@ for (const owner of ["Scene", "Object", "Group", "Space"]) {
     for (const name of texFactories) assert.match(meta, new RegExp(`function ${owner}:${name}\\(config\\)`));
 }
 for (const name of texMethods.Group) assert.match(meta, new RegExp(`function Group:${name}\\(`));
-assert.match(meta, /---@class vis\.TexConfig: vis\.ObjectConfig/);
+assert.match(meta, /---@class vis\.TexConfig\n(?:---@field [^\n]*\n)*---@field tex /);
+assert.doesNotMatch(meta, /---@class vis\.TexConfig\n(?:---@field [^\n]*\n)*---@field stroke\?/);
 assert.match(meta, /---@class vis\.TexPartConfig\n/);
 assert.match(meta, /---@class vis\.TexSpanConfig\n/);
 
 console.log("Lua API schema and generated LuaLS metadata are synchronized");
 
 function registrationNames(source, constant) {
+    return Object.keys(registrationTable(source, constant)).sort();
+}
+
+// The functions a luaL_Reg table registers, by the name each is registered under.
+function registrationTable(source, constant) {
     const body = new RegExp(`static const luaL_Reg ${constant}\\[\\] = \\{([\\s\\S]*?)\\};`).exec(source)?.[1];
     assert.ok(body, `Could not find ${constant}`);
-    return Array.from(body.matchAll(/\{"([^"]+)",/g), (match) => match[1]).sort();
+    return Object.fromEntries(Array.from(body.matchAll(/\{"([^"]+)",\s*(\w+)\}/g), (match) => [match[1], match[2]]));
+}
+
+// The source of a file-level function, up to the next one.
+function functionBody(source, functionName) {
+    const escaped = functionName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const start = new RegExp(`static [^\\n]+ ${escaped}\\(`).exec(source)?.index;
+    assert.notEqual(start, undefined, `Could not find ${functionName}`);
+    const end = source.indexOf("\nstatic ", start + 1);
+    return source.slice(start, end < 0 ? source.length : end);
+}
+
+// The option names the core's _options() and _option() accept in the functions, with the shared
+// styles unless the style flag is false, less the names a `for (auto shape : {...})` loop refuses.
+function factoryOptionNames(source, functionNames, shared) {
+    const names = new Set();
+    const refused = new Set();
+    for (const functionName of functionNames) {
+        const body = functionBody(source, functionName);
+        const calls = body.matchAll(/_options\(lua,\s*(?:2|index),\s*\{([^}]*)\}(?:,\s*(true|false))?\)|_option\(name,\s*\{([^}]*)\},\s*(true|false)\)/g);
+        for (const match of calls) {
+            for (const name of (match[1] ?? match[3]).matchAll(/"([^"]+)"/g)) names.add(name[1]);
+            if ((match[2] ?? match[4]) !== "false") for (const name of shared) names.add(name);
+        }
+        for (const match of body.matchAll(/for \(auto shape : \{([^}]*)\}\)/g)) {
+            for (const name of match[1].matchAll(/"([^"]+)"/g)) refused.add(name[1]);
+        }
+    }
+    assert.ok(names.size, `No options in ${functionNames.join(", ")}`);
+    return [...names].filter((name) => !refused.has(name)).sort();
+}
+
+// The fields a config accepts: its own over those of its bases, less the names it excepts.
+function configFields(name) {
+    const parent = api.configBases?.[name];
+    if (!parent) return api.configs[name];
+    const fields = {...configFields(parent)};
+    for (const fieldName of api.configBaseExcept?.[name] ?? []) delete fields[fieldName];
+    return {...fields, ...api.configs[name]};
 }
 
 // The methods a module adds to the handles, by the kind of handle.

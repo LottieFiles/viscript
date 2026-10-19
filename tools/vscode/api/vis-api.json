@@ -59,7 +59,8 @@
     "InputController": {"description": "Scene-owned input binding controller; available only with optional Input support."},
     "Runtime": {"description": "Experimental retained Lua fixed-step context; available only with optional Lua Runtime support."},
     "StatesController": {"description": "Scene-owned semantic state-transition controller; available only with optional interactive support."},
-    "View": {"description": "A second view of a scene's live objects made by Scene:view; its camera moves and the whole view fades with the calls the scene's camera takes."}
+    "View": {"description": "A second view of a scene's live objects made by Scene:view; its camera moves and the whole view fades with the calls the scene's camera takes."},
+    "Tracker": {"description": "An animated number made by Scene:tracker, which the objects Scene:bind ties to it follow as Scene:track moves it."}
   },
   "factories": {
     "group": {"config": "GroupConfig", "returns": "Group", "description": "Create a semantic object container."},
@@ -200,7 +201,13 @@
       "clone": {"description": "Copy an object and what is below it in the state they show at the cursor, without their animations, beside it or below options.parent; returns the copy and a table that gives the copy of each object below the source by its handle.", "parameters": [{"name": "source", "type": "Object"}, {"name": "options", "type": "CloneConfig", "optional": true}], "returns": "Object, table<Object, Object>"},
       "find": {"description": "Return the handle of the object with this id, or nil.", "parameters": [{"name": "id", "type": "string"}], "returns": "Object|nil"},
       "bounds": {"description": "Return where a handle, or a list of handles, lies in world units, through the groups above each, as everything authored so far leaves them: the bounds rectangle{around} frames.", "parameters": [{"name": "target", "type": "Object|Object[]"}], "returns": "Bounds"},
-      "duration": {"description": "Return the authored scene duration in seconds: the later of the cursor and the latest time any call reached, or a longer mounted child Scene.", "parameters": [], "returns": "number"}
+      "duration": {"description": "Return the authored scene duration in seconds: the later of the cursor and the latest time any call reached, or a longer mounted child Scene.", "parameters": [], "returns": "number"},
+      "tracker": {"description": "Create a tracker, an animated number that bound objects follow, at a finite starting value; tie objects to it with bind and move it with track.", "parameters": [{"name": "value", "type": "number"}], "returns": "Tracker"},
+      "bind": {"description": "Make object follow one tracker or several: fn receives their values in order and returns a property state, a play descriptor without its target, whose shift is relative to the bound pose and transform absolute. An object follows one binding; keep fn pure.", "parameters": [{"name": "object", "type": "Object"}, {"name": "tracker", "type": "Tracker|Tracker[]"}, {"name": "fn", "type": "fun(...: number): table"}], "returns": "Object"},
+      "track": {"description": "Move one tracker, or each {tracker, value} of a list, to its value over duration along curve, sampling the bound functions once a frame into retained clips and leaving room for them on the timeline. The samples play at the next call that adds or reads clips, or when the script ends; until then a later overlapping track of other trackers merges with this one on a shared binding.", "parameters": [{"name": "tracker", "type": "Tracker"}, {"name": "value", "type": "number"}, {"name": "duration", "type": "number"}, {"name": "curve", "type": "Curve", "optional": true}], "returns": "Scene", "overloads": [{"parameters": [{"name": "tracker", "type": "Tracker"}, {"name": "value", "type": "number"}, {"name": "options", "type": "TimingOptions"}], "returns": "Scene"}, {"parameters": [{"name": "moves", "type": "{[1]: Tracker, [2]: number}[]"}, {"name": "duration", "type": "number"}, {"name": "curve", "type": "Curve", "optional": true}], "returns": "Scene"}, {"parameters": [{"name": "moves", "type": "{[1]: Tracker, [2]: number}[]"}, {"name": "options", "type": "TimingOptions"}], "returns": "Scene"}]}
+    },
+    "Tracker": {
+      "get": {"description": "Return the tracker's value as authored so far: where the latest track left it.", "parameters": [], "returns": "number"}
     },
     "View": {
       "look": {"description": "Animate the view's camera as Scene:look animates the scene's; a target of objects centers it on their bounds.", "parameters": [{"name": "camera", "type": "LookConfig"}, {"name": "duration", "type": "number", "optional": true}, {"name": "curve", "type": "Curve", "optional": true}],
@@ -880,5 +887,72 @@
       "step": {"type": "number", "description": "Longest straight piece, in the parent space of each target, that the warp maps without cutting it first; 0.05 by default."}
     }
   },
-  "configBases": {"AnimationOptions": "TimingOptions", "RevealOptions": "AnimationOptions", "MorphOptions": "AnimationOptions", "MatchOptions": "AnimationOptions", "EditOptions": "AnimationOptions", "ArrangeOptions": "TimingOptions", "WarpOptions": "TimingOptions", "RotateConfig": "AnimationOptions", "ScaleConfig": "AnimationOptions", "MoveAlongConfig": "AnimationOptions", "SceneTransitionConfig": "TimingOptions", "FadeConfig": "TimingOptions", "OrbitConfig": "TimingOptions", "FocusConfig": "TimingOptions", "IndicateConfig": "TimingOptions", "WiggleConfig": "TimingOptions", "CircumscribeConfig": "TimingOptions", "PassingFlashConfig": "TimingOptions", "FlashConfig": "TimingOptions", "RippleConfig": "TimingOptions", "HighlightConfig": "TimingOptions", "AdvectConfig": "TimingOptions"}
+  "configBases": {
+    "AnimationOptions": "TimingOptions",
+    "RevealOptions": "AnimationOptions",
+    "MorphOptions": "AnimationOptions",
+    "MatchOptions": "AnimationOptions",
+    "EditOptions": "AnimationOptions",
+    "ArrangeOptions": "TimingOptions",
+    "WarpOptions": "TimingOptions",
+    "RotateConfig": "AnimationOptions",
+    "ScaleConfig": "AnimationOptions",
+    "MoveAlongConfig": "AnimationOptions",
+    "SceneTransitionConfig": "TimingOptions",
+    "FadeConfig": "TimingOptions",
+    "OrbitConfig": "TimingOptions",
+    "FocusConfig": "TimingOptions",
+    "IndicateConfig": "TimingOptions",
+    "WiggleConfig": "TimingOptions",
+    "CircumscribeConfig": "TimingOptions",
+    "PassingFlashConfig": "TimingOptions",
+    "FlashConfig": "TimingOptions",
+    "RippleConfig": "TimingOptions",
+    "HighlightConfig": "TimingOptions",
+    "AdvectConfig": "TimingOptions",
+    "GroupConfig": "ObjectConfig",
+    "SpaceConfig": "ObjectConfig",
+    "PointConfig": "ObjectConfig",
+    "LineConfig": "ObjectConfig",
+    "ArrowConfig": "ObjectConfig",
+    "VectorConfig": "ObjectConfig",
+    "CircleConfig": "ObjectConfig",
+    "ArcConfig": "ObjectConfig",
+    "AngleConfig": "ObjectConfig",
+    "RectangleConfig": "ObjectConfig",
+    "BraceConfig": "ObjectConfig",
+    "PolygonConfig": "ObjectConfig",
+    "PlotConfig": "ObjectConfig",
+    "ContourConfig": "ObjectConfig",
+    "AreaConfig": "ObjectConfig",
+    "RiemannConfig": "ObjectConfig",
+    "VectorFieldConfig": "ObjectConfig",
+    "StreamLinesConfig": "ObjectConfig",
+    "RouteConfig": "ObjectConfig",
+    "PathConfig": "ObjectConfig",
+    "CombineConfig": "ObjectConfig",
+    "CurveConfig": "ObjectConfig",
+    "SurfaceConfig": "ObjectConfig",
+    "TextConfig": "ObjectConfig",
+    "SpansConfig": "ObjectConfig",
+    "CodeConfig": "ObjectConfig",
+    "TexConfig": "ObjectConfig",
+    "NumberConfig": "ObjectConfig",
+    "MatrixConfig": "ObjectConfig",
+    "TableConfig": "ObjectConfig",
+    "PictureConfig": "ObjectConfig",
+    "CellConfig": "ObjectConfig",
+    "ConnectorConfig": "ObjectConfig"
+  },
+  "configBaseExcept": {
+    "MatrixConfig": ["gradient", "radius", "dash", "dash_offset"],
+    "TableConfig": ["gradient", "radius", "dash", "dash_offset"],
+    "ContourConfig": ["fill", "gradient", "radius"],
+    "VectorFieldConfig": ["fill", "gradient", "radius"],
+    "StreamLinesConfig": ["fill", "gradient", "radius"],
+    "RiemannConfig": ["radius"],
+    "CodeConfig": ["stroke", "fill", "gradient", "width", "radius", "dash", "dash_offset"],
+    "SpansConfig": ["stroke", "gradient", "width", "radius", "dash", "dash_offset"],
+    "TexConfig": ["stroke", "gradient", "width", "radius", "dash", "dash_offset"]
+  }
 }

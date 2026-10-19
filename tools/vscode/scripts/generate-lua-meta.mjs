@@ -22,15 +22,18 @@ const output = [
     "",
 ];
 
+// A config inherits the base configBases names in LuaLS, which cannot leave fields out, so one
+// that takes only part of its base (configBaseExcept) is written out with the part it takes.
 for (const [name, fields] of Object.entries(api.configs)) {
     const parent = api.configBases?.[name];
-    const base = parent ? `: vis.${parent}` : name !== "SceneConfig" && name !== "ObjectConfig" && name.endsWith("Config") && api.factories
-        && Object.values(api.factories).some((factory) => factory.config === name)
-        ? ": vis.ObjectConfig"
-        : "";
-    output.push(`---@class vis.${name}${base}`);
+    const except = api.configBaseExcept?.[name];
+    output.push(`---@class vis.${name}${parent && !except ? `: vis.${parent}` : ""}`);
+    const emitted = new Map(except ? Object.entries(configFields(parent)).filter(([fieldName]) => !except.includes(fieldName)) : []);
     for (const [fieldName, field] of Object.entries(fields)) {
-        if (parent && JSON.stringify(api.configs[parent][fieldName]) === JSON.stringify(field)) continue;
+        if (parent && !except && JSON.stringify(api.configs[parent][fieldName]) === JSON.stringify(field)) continue;
+        emitted.set(fieldName, field);
+    }
+    for (const [fieldName, field] of emitted) {
         output.push(`---@field ${fieldName}${field.required ? "" : "?"} ${qualify(field.type)} ${field.description}`);
     }
     output.push("");
@@ -105,6 +108,15 @@ function emitCallable(lines, owner, name, callable, method) {
     if (callable.returns) lines.push(`---@return ${qualify(callable.returns)}`);
     const parameters = callable.parameters.map((parameter) => parameter.name).join(", ");
     lines.push(`function ${owner}${method ? ":" : "."}${name}(${parameters}) end`, "");
+}
+
+// The fields a config accepts: its own over those of its bases, less the names it excepts.
+function configFields(name) {
+    const parent = api.configBases?.[name];
+    if (!parent) return api.configs[name];
+    const fields = {...configFields(parent)};
+    for (const fieldName of api.configBaseExcept?.[name] ?? []) delete fields[fieldName];
+    return {...fields, ...api.configs[name]};
 }
 
 function qualify(type) {

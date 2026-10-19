@@ -176,9 +176,13 @@ foreach t : cpp_tests
     endif
 endforeach
 
-# Node/TypeScript tests drive the CLI and the JS bindings.
+# Node/TypeScript tests drive the CLI and the JS bindings, and keep the editor's API schema true.
+node = find_program('node', required: false)
+if node.found()
+    # The VS Code extension's schema and its generated LuaLS metadata must follow the Lua binding.
+    test('api-sync', node, args: [files('../../tools/vscode/test/api-sync.mjs')])
+endif
 if cli_enabled
-    node = find_program('node', required: false)
     if node.found() and cpu_enabled
         node_tests = {
             'js-binding': [files('testJsBinding.mjs', '../bindings/js/bindings.js'), vis_cli],

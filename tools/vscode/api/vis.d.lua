@@ -256,7 +256,6 @@
 
 ---@class vis.GroupConfig: vis.ObjectConfig
 ---@field matrix? vis.Mat4 Local-to-parent transform.
----@field id? string Stable object identifier.
 ---@field typeset? boolean Audit every text below this Group as one typeset block.
 
 ---@class vis.SpaceConfig: vis.ObjectConfig
@@ -275,7 +274,6 @@
 ---@field tick_length? number Tick length in pixels, centered on the axis; 8 by default.
 ---@field labels? vis.SpaceLabelsConfig Labels beside the ticks, as Space:labels takes them.
 ---@field matrix? vis.Mat4 Local-to-parent transform.
----@field id? string Stable object identifier.
 
 ---@class vis.SpaceTicksConfig
 ---@field x? number|boolean Step between x ticks, which sit at its multiples inside the range but not at 0; 0 or false for none, true for the step of the range.
@@ -300,8 +298,6 @@
 ---@field trim_distance? number|vis.Vec2 Finite nonnegative object-local endpoint distances, before transforms and drawing progress: one number for both ends, or {start, end}. Defaults to zero; a consumed segment has no drawing, bounds or outline. Warped geometry keeps its existing trim.
 ---@field from vis.Vec2|vis.Vec3 Start point.
 ---@field to vis.Vec2|vis.Vec3 End point.
----@field stroke? vis.Color|vis.ThemeColor Literal or semantic Theme stroke color.
----@field width? number Stroke width in pixels.
 
 ---@class vis.ArrowConfig: vis.ObjectConfig
 ---@field trim_distance? number|vis.Vec2 Finite nonnegative object-local endpoint distances, before transforms and drawing progress: one number for both ends, or {start, end}. Defaults to zero; a consumed segment has no drawing, bounds or outline. Warped geometry keeps its existing trim.
@@ -390,7 +386,23 @@
 ---@field x_range vis.Range Sampling range {a, b, step}.
 ---@field base? number|fun(x:number):number Lower boundary: a constant (0 by default) or a function.
 
----@class vis.RiemannConfig: vis.ObjectConfig
+---@class vis.RiemannConfig
+---@field id? string Stable object identifier.
+---@field opacity? number Opacity from 0 to 1.
+---@field color? vis.Color|vis.ThemeColor Apply one literal or semantic Theme color to available stroke and fill paints.
+---@field fill? vis.Color|vis.ThemeColor Literal or semantic Theme fill color.
+---@field stroke? vis.Color|vis.ThemeColor Literal or semantic Theme stroke color.
+---@field gradient? boolean|vis.Color|vis.ThemeColor|vis.GradientConfig true/false toggles the legacy two-stop linear ramp, a color sets its end stop, or a GradientConfig table selects a linear, radial, or conic gradient.
+---@field width? number Stroke width in pixels.
+---@field dash? number[] Stroke dash pattern.
+---@field dash_offset? number Stroke dash offset.
+---@field progress? number Draw progress from 0 to 1.
+---@field layer? integer Sibling paint order.
+---@field isolate? boolean Draw this object and its descendants into one layer.
+---@field mask? vis.Object|{target: vis.Object, mode?: string} Show this object only through another object.
+---@field blend? string Blend mode with what is drawn before it, as CSS mix-blend-mode.
+---@field blur? number Blur sigma in screen pixels, 0 to 256.
+---@field shadow? {color?: vis.Color|vis.ThemeColor, offset?: vis.Vec2, blur?: number} Shadow beneath the object, offset in screen pixels.
 ---@field fn? fun(x:number):number Function whose heights the rectangles take.
 ---@field values? number[] Heights given directly, one per step; instead of fn.
 ---@field x_range vis.Range Interval and width {a, b, dx}.
@@ -404,7 +416,21 @@
 ---@field padding? number Non-negative local stroke-gap and label clearance padding.
 ---@field upright? boolean Keep the local tangent angle between -pi/2 and pi/2.
 
----@class vis.ContourConfig: vis.ObjectConfig
+---@class vis.ContourConfig
+---@field id? string Stable object identifier.
+---@field opacity? number Opacity from 0 to 1.
+---@field color? vis.Color|vis.ThemeColor Apply one literal or semantic Theme color to available stroke and fill paints.
+---@field stroke? vis.Color|vis.ThemeColor Literal or semantic Theme stroke color.
+---@field width? number Stroke width in pixels.
+---@field dash? number[] Stroke dash pattern.
+---@field dash_offset? number Stroke dash offset.
+---@field progress? number Draw progress from 0 to 1.
+---@field layer? integer Sibling paint order.
+---@field isolate? boolean Draw this object and its descendants into one layer.
+---@field mask? vis.Object|{target: vis.Object, mode?: string} Show this object only through another object.
+---@field blend? string Blend mode with what is drawn before it, as CSS mix-blend-mode.
+---@field blur? number Blur sigma in screen pixels, 0 to 256.
+---@field shadow? {color?: vis.Color|vis.ThemeColor, offset?: vis.Vec2, blur?: number} Shadow beneath the object, offset in screen pixels.
 ---@field fn? fun(x:number, y:number):number Finite scalar field sampled at construction and during 40 edge bisections; instead of values.
 ---@field values? number[] Finite scalar samples, x varying fastest, row by row from the bottom left; crossings follow the bilinear grid instead of fn.
 ---@field levels number[] 1 to 1024 finite levels, in child order; a single level uses {0}. Empty levels of the field keep an empty plot handle.
@@ -413,7 +439,21 @@
 ---@field colors? (vis.Color|vis.ThemeColor)[]|"viridis"|"plasma"|"inferno"|"magma"|"cividis" One stroke color per level, or a colormap over the smallest to largest level; overrides stroke and color. Without it the common stroke or color applies.
 ---@field labels? boolean|vis.ContourLabelConfig Level text children with tangent rotation and stroke gaps; false by default. True uses default options. Placement follows sampled geometry and avoids the grid edge and earlier contour labels in the same parent.
 
----@class vis.VectorFieldConfig: vis.ObjectConfig
+---@class vis.VectorFieldConfig
+---@field id? string Stable object identifier.
+---@field opacity? number Opacity from 0 to 1.
+---@field color? vis.Color|vis.ThemeColor Apply one literal or semantic Theme color to available stroke and fill paints.
+---@field stroke? vis.Color|vis.ThemeColor Literal or semantic Theme stroke color.
+---@field width? number Stroke width in pixels.
+---@field dash? number[] Stroke dash pattern.
+---@field dash_offset? number Stroke dash offset.
+---@field progress? number Draw progress from 0 to 1.
+---@field layer? integer Sibling paint order.
+---@field isolate? boolean Draw this object and its descendants into one layer.
+---@field mask? vis.Object|{target: vis.Object, mode?: string} Show this object only through another object.
+---@field blend? string Blend mode with what is drawn before it, as CSS mix-blend-mode.
+---@field blur? number Blur sigma in screen pixels, 0 to 256.
+---@field shadow? {color?: vis.Color|vis.ThemeColor, offset?: vis.Vec2, blur?: number} Shadow beneath the object, offset in screen pixels.
 ---@field fn? fun(x:number, y:number):number|vis.Vec2, number? Field returning two numbers or {x, y} at a point.
 ---@field values? vis.Vec2[] Vectors given directly, row by row from the bottom left; instead of fn.
 ---@field x_range vis.Range Horizontal samples {min, max, step}.
@@ -425,7 +465,21 @@
 ---@field magnitude? vis.Vec2 Magnitude range {low, high} the colors spread over.
 ---@field tip? number Arrowhead size in pixels.
 
----@class vis.StreamLinesConfig: vis.ObjectConfig
+---@class vis.StreamLinesConfig
+---@field id? string Stable object identifier.
+---@field opacity? number Opacity from 0 to 1.
+---@field color? vis.Color|vis.ThemeColor Apply one literal or semantic Theme color to available stroke and fill paints.
+---@field stroke? vis.Color|vis.ThemeColor Literal or semantic Theme stroke color.
+---@field width? number Stroke width in pixels.
+---@field dash? number[] Stroke dash pattern.
+---@field dash_offset? number Stroke dash offset.
+---@field progress? number Draw progress from 0 to 1.
+---@field layer? integer Sibling paint order.
+---@field isolate? boolean Draw this object and its descendants into one layer.
+---@field mask? vis.Object|{target: vis.Object, mode?: string} Show this object only through another object.
+---@field blend? string Blend mode with what is drawn before it, as CSS mix-blend-mode.
+---@field blur? number Blur sigma in screen pixels, 0 to 256.
+---@field shadow? {color?: vis.Color|vis.ThemeColor, offset?: vis.Vec2, blur?: number} Shadow beneath the object, offset in screen pixels.
 ---@field fn fun(x:number, y:number):number|vis.Vec2, number? Field returning two numbers or {x, y} at a point.
 ---@field x_range? vis.Range Grid of seeds across, which also bounds the lines.
 ---@field y_range? vis.Range Grid of seeds up, which also bounds the lines.
@@ -488,11 +542,21 @@
 ---@field slant? number How far the glyphs lean right per unit of height above the baseline, -1 to 1.
 ---@field measure? boolean Measure the line box while the script runs so that layout can use it.
 
----@class vis.SpansConfig: vis.ObjectConfig
+---@class vis.SpansConfig
+---@field id? string Stable object identifier.
+---@field opacity? number Opacity from 0 to 1.
+---@field color? vis.Color|vis.ThemeColor Color of strings and parts that set none.
+---@field fill? vis.Color|vis.ThemeColor Literal or semantic Theme fill color.
+---@field progress? number Draw progress from 0 to 1.
+---@field layer? integer Sibling paint order.
+---@field isolate? boolean Draw this object and its descendants into one layer.
+---@field mask? vis.Object|{target: vis.Object, mode?: string} Show this object only through another object.
+---@field blend? string Blend mode with what is drawn before it, as CSS mix-blend-mode.
+---@field blur? number Blur sigma in screen pixels, 0 to 256.
+---@field shadow? {color?: vis.Color|vis.ThemeColor, offset?: vis.Vec2, blur?: number} Shadow beneath the object, offset in screen pixels.
 ---@field split? "none"|"words"|"letters" Cut strings into one text per word or per character.
 ---@field wrap? number Width in world units at which a row wraps.
 ---@field leading? number Baseline-to-baseline spacing as a multiple of the line height; a line moves down only where its ink would reach into the line above.
----@field color? vis.Color|vis.ThemeColor Color of strings and parts that set none.
 ---@field point? vis.Vec2|vis.Vec3 Anchor point.
 ---@field align? vis.Vec2 Horizontal and vertical alignment.
 ---@field baseline? boolean Pin the first baseline at point; align.x still places the lines along it and align.y is ignored.
@@ -501,13 +565,22 @@
 ---@field role? string Theme typography role.
 ---@field orientation? "billboard"|"plane" Billboard text keeps its pixel size; plane text lies in world units.
 
----@class vis.CodeConfig: vis.ObjectConfig
+---@class vis.CodeConfig
+---@field id? string Stable object identifier.
+---@field opacity? number Opacity from 0 to 1.
+---@field color? vis.Color|vis.ThemeColor One color for every token.
+---@field progress? number Draw progress from 0 to 1.
+---@field layer? integer Sibling paint order.
+---@field isolate? boolean Draw this object and its descendants into one layer.
+---@field mask? vis.Object|{target: vis.Object, mode?: string} Show this object only through another object.
+---@field blend? string Blend mode with what is drawn before it, as CSS mix-blend-mode.
+---@field blur? number Blur sigma in screen pixels, 0 to 256.
+---@field shadow? {color?: vis.Color|vis.ThemeColor, offset?: vis.Vec2, blur?: number} Shadow beneath the object, offset in screen pixels.
 ---@field text string Source code.
 ---@field language? "plain"|"lua"|"python"|"javascript"|"typescript"|"c"|"cpp" Language that classifies the tokens.
 ---@field leading? number Positive line spacing as a multiple of the line height (default 1); exclusive with pitch.
 ---@field pitch? number Positive distance between baselines in world units; exclusive with leading.
 ---@field baseline? boolean Pin the first line baseline at point; align.x places it and align.y is ignored.
----@field color? vis.Color|vis.ThemeColor One color for every token.
 ---@field colors? table<string, vis.Color|vis.ThemeColor> Colors by token class: plain, keyword, string, number, comment, function, type, operator.
 ---@field point? vis.Vec2|vis.Vec3 Anchor point.
 ---@field align? vis.Vec2 Horizontal and vertical alignment.
@@ -515,7 +588,18 @@
 ---@field font? string Registered font name; defaults to the Theme code font, monospaced JetBrainsMono in every preset.
 ---@field orientation? "billboard"|"plane" Billboard text keeps its pixel size; plane text lies in world units.
 
----@class vis.TexConfig: vis.ObjectConfig
+---@class vis.TexConfig
+---@field id? string Stable object identifier.
+---@field opacity? number Opacity from 0 to 1.
+---@field color? vis.Color|vis.ThemeColor Fill that colors the glyphs and shapes, as fill does.
+---@field fill? vis.Color|vis.ThemeColor Fill that colors the glyphs and shapes.
+---@field progress? number Draw progress from 0 to 1.
+---@field layer? integer Sibling paint order.
+---@field isolate? boolean Draw this object and its descendants into one layer.
+---@field mask? vis.Object|{target: vis.Object, mode?: string} Show this object only through another object.
+---@field blend? string Blend mode with what is drawn before it, as CSS mix-blend-mode.
+---@field blur? number Blur sigma in screen pixels, 0 to 256.
+---@field shadow? {color?: vis.Color|vis.ThemeColor, offset?: vis.Vec2, blur?: number} Shadow beneath the object, offset in screen pixels.
 ---@field tex string|(string|vis.TexPartConfig)[] TeX math, such as "a^2+b^2=c^2", or its parts, each set as a Group of its own below the formula.
 ---@field point? vis.Vec2|vis.Vec3 Where the formula's box, its width by its height and depth, is pinned.
 ---@field align? vis.Vec2 Horizontal and vertical alignment.
@@ -525,8 +609,6 @@
 ---@field role? string Theme typography role whose font, size and color the formula takes.
 ---@field orientation? "billboard"|"plane" Billboard glyphs keep their pixel size; plane glyphs lie in world units.
 ---@field display? boolean Display style, as $$...$$, unless false sets text style, as inline $...$.
----@field color? vis.Color|vis.ThemeColor Fill that colors the glyphs and shapes, as fill does.
----@field fill? vis.Color|vis.ThemeColor Fill that colors the glyphs and shapes.
 
 ---@class vis.TexPartConfig
 ---@field text? string TeX of the part, unless it comes first, as in {"c^2", color = "accent"}.
@@ -580,7 +662,20 @@
 ---@field role? string Theme typography role.
 ---@field orientation? "billboard"|"plane" Billboard text keeps its pixel size; plane text lies in world units.
 
----@class vis.MatrixConfig: vis.ObjectConfig
+---@class vis.MatrixConfig
+---@field id? string Stable object identifier.
+---@field opacity? number Opacity from 0 to 1.
+---@field color? vis.Color|vis.ThemeColor Apply one literal or semantic Theme color to available stroke and fill paints.
+---@field fill? vis.Color|vis.ThemeColor Literal or semantic Theme fill color.
+---@field stroke? vis.Color|vis.ThemeColor Literal or semantic Theme stroke color.
+---@field width? number Stroke width in pixels.
+---@field progress? number Draw progress from 0 to 1.
+---@field layer? integer Sibling paint order.
+---@field isolate? boolean Draw this object and its descendants into one layer.
+---@field mask? vis.Object|{target: vis.Object, mode?: string} Show this object only through another object.
+---@field blend? string Blend mode with what is drawn before it, as CSS mix-blend-mode.
+---@field blur? number Blur sigma in screen pixels, 0 to 256.
+---@field shadow? {color?: vis.Color|vis.ThemeColor, offset?: vis.Vec2, blur?: number} Shadow beneath the object, offset in screen pixels.
 ---@field tabular? boolean Center ASCII digits, minus and spaces in cells of the widest digit advance; false by default. Other characters keep their advances.
 ---@field reserve? string|string[] Sample for every column, or one string per column, reserving at least that width. Later strings may overflow.
 ---@field rows (number|string)[][] Rows of entries; numbers count.
@@ -595,7 +690,20 @@
 ---@field role? string Theme typography role.
 ---@field orientation? "billboard"|"plane" Billboard text keeps its pixel size; plane text lies in world units.
 
----@class vis.TableConfig: vis.ObjectConfig
+---@class vis.TableConfig
+---@field id? string Stable object identifier.
+---@field opacity? number Opacity from 0 to 1.
+---@field color? vis.Color|vis.ThemeColor Apply one literal or semantic Theme color to available stroke and fill paints.
+---@field fill? vis.Color|vis.ThemeColor Literal or semantic Theme fill color.
+---@field stroke? vis.Color|vis.ThemeColor Literal or semantic Theme stroke color.
+---@field width? number Stroke width in pixels.
+---@field progress? number Draw progress from 0 to 1.
+---@field layer? integer Sibling paint order.
+---@field isolate? boolean Draw this object and its descendants into one layer.
+---@field mask? vis.Object|{target: vis.Object, mode?: string} Show this object only through another object.
+---@field blend? string Blend mode with what is drawn before it, as CSS mix-blend-mode.
+---@field blur? number Blur sigma in screen pixels, 0 to 256.
+---@field shadow? {color?: vis.Color|vis.ThemeColor, offset?: vis.Vec2, blur?: number} Shadow beneath the object, offset in screen pixels.
 ---@field rows (number|string)[][] Rows of entries below the header; numbers count.
 ---@field header? (number|string)[] Header row, one entry per column.
 ---@field padding? number|vis.Vec2 Space around each entry in its cell.
@@ -2240,6 +2348,29 @@ function Scene:bounds(target) end
 ---@return number
 function Scene:duration() end
 
+---Create a tracker, an animated number that bound objects follow, at a finite starting value; tie objects to it with bind and move it with track.
+---@param value number
+---@return vis.Tracker
+function Scene:tracker(value) end
+
+---Make object follow one tracker or several: fn receives their values in order and returns a property state, a play descriptor without its target, whose shift is relative to the bound pose and transform absolute. An object follows one binding; keep fn pure.
+---@param object vis.Object
+---@param tracker vis.Tracker|vis.Tracker[]
+---@param fn fun(...: number): table
+---@return vis.Object
+function Scene:bind(object, tracker, fn) end
+
+---Move one tracker, or each {tracker, value} of a list, to its value over duration along curve, sampling the bound functions once a frame into retained clips and leaving room for them on the timeline. The samples play at the next call that adds or reads clips, or when the script ends; until then a later overlapping track of other trackers merges with this one on a shared binding.
+---@overload fun(self: vis.Scene, tracker: vis.Tracker, value: number, options: vis.TimingOptions): vis.Scene
+---@overload fun(self: vis.Scene, moves: {[1]: vis.Tracker, [2]: number}[], duration: number, curve?: vis.Curve): vis.Scene
+---@overload fun(self: vis.Scene, moves: {[1]: vis.Tracker, [2]: number}[], options: vis.TimingOptions): vis.Scene
+---@param tracker vis.Tracker
+---@param value number
+---@param duration number
+---@param curve? vis.Curve
+---@return vis.Scene
+function Scene:track(tracker, value, duration, curve) end
+
 ---Experimental Scene-owned interaction panel; available only with optional UI support.
 ---@class vis.Panel
 local Panel = {}
@@ -2541,6 +2672,14 @@ function View:orbit(radians, options) end
 ---@param duration? number
 ---@param curve? vis.Curve
 function View:fade(opacity, duration, curve) end
+
+---An animated number made by Scene:tracker, which the objects Scene:bind ties to it follow as Scene:track moves it.
+---@class vis.Tracker
+local Tracker = {}
+
+---Return the tracker's value as authored so far: where the latest track left it.
+---@return number
+function Tracker:get() end
 
 ---Experimental interactive UI module. It is available only when viscript is built with optional UI support; one Panel is limited to 256 controls and bindings.
 ---@class vis.UI
