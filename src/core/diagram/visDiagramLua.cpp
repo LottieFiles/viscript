@@ -409,8 +409,8 @@ static int _addEdge(lua_State* lua)
         auto waypointIndex = lua_absindex(lua, -1);
         auto count = lua_rawlen(lua, waypointIndex);
         if (!count || count > Diagram::WaypointLimit) {
-            return luaL_error(lua, "diagram waypoints must contain between 1 and %u points",
-                              Diagram::WaypointLimit);
+            return luaL_error(lua, "diagram waypoints must contain between 1 and %d points",
+                              static_cast<int>(Diagram::WaypointLimit));
         }
         auto points = static_cast<Vec2*>(lua_newuserdatauv(lua, sizeof(Vec2) * count, 0));
         for (auto i = 0u; i < count; i++) {
@@ -444,8 +444,8 @@ static int _addZone(lua_State* lua)
     auto memberIndex = lua_absindex(lua, -1);
     auto count = lua_rawlen(lua, memberIndex);
     if (!count || count > Diagram::NodeLimit) {
-        return luaL_error(lua, "diagram zone requires between 1 and %u members",
-                          Diagram::NodeLimit);
+        return luaL_error(lua, "diagram zone requires between 1 and %d members",
+                          static_cast<int>(Diagram::NodeLimit));
     }
     auto members = static_cast<Node*>(lua_newuserdatauv(lua, sizeof(Node) * count, 0));
     for (auto i = 0u; i < count; i++) {

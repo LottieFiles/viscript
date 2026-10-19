@@ -321,6 +321,7 @@ private:
     ~IR();
     explicit IR(Impl* impl) noexcept;
     friend struct Diagram;
+    friend struct Built;
     friend struct receipt_detail::DiagramRoot;
 };
 
@@ -350,6 +351,8 @@ struct Built
     Group* nodes() const noexcept;
     Group* annotations() const noexcept;
 
+    // These read the receipt that root() owns, so after release() they may be called only
+    // while the released tree is alive.
     Object* object(Node node) const noexcept;
     Rectangle* body(Node node) const noexcept;
     Text* label(Node node) const noexcept;

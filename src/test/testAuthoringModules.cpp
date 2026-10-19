@@ -108,6 +108,29 @@ return scene
     result = load(foreign, scene, error, sizeof(error), context);
     CHECK(result == Result::ScriptError && scene == nullptr);
     CHECK(std::strstr(error, "another diagram") != nullptr);
+
+    // Lua formats only %d, not %u, so these limits must reach the message as numbers.
+    static constexpr char waypoints[] = R"lua(
+local scene = vis.scene {}
+local d = vis.diagram(scene, {id = "limits"})
+local a, b = d:node {id = "a"}, d:node {id = "b"}
+d:connect {id = "e", from = a, to = b, waypoints = {}}
+return scene
+)lua";
+    context = {};
+    result = load(waypoints, scene, error, sizeof(error), context);
+    CHECK(result == Result::ScriptError && scene == nullptr);
+    CHECK(std::strstr(error, "between 1 and 16 points") != nullptr);
+
+    static constexpr char members[] = R"lua(
+local scene = vis.scene {}
+vis.diagram(scene, {id = "limits"}):zone {id = "z", members = {}}
+return scene
+)lua";
+    context = {};
+    result = load(members, scene, error, sizeof(error), context);
+    CHECK(result == Result::ScriptError && scene == nullptr);
+    CHECK(std::strstr(error, "between 1 and 256 members") != nullptr);
 }
 #endif
 

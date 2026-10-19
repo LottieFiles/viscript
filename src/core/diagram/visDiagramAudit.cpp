@@ -5,7 +5,7 @@
 #include <limits>
 #include <new>
 
-#include "vis_diagram.h"
+#include "visDiagramGeometry.h"
 
 namespace vis::diagram
 {
@@ -41,7 +41,9 @@ struct PhysicalConstraintReport::Impl
 namespace
 {
 
-constexpr float Epsilon = 1.0e-4f;
+// The audit measures root output pixels, which take a coarser tolerance than the world units
+// of detail::Epsilon.
+constexpr float PixelEpsilon = 1.0e-4f;
 
 struct PhysicalVisual
 {
@@ -99,8 +101,8 @@ static float _cross(const Vec2& first, const Vec2& second,
 
 static bool _between(float value, float first, float second) noexcept
 {
-    return value >= std::fmin(first, second) - Epsilon
-           && value <= std::fmax(first, second) + Epsilon;
+    return value >= std::fmin(first, second) - PixelEpsilon
+           && value <= std::fmax(first, second) + PixelEpsilon;
 }
 
 static bool _segmentsIntersect(const Vec2& firstA, const Vec2& firstB,
@@ -110,25 +112,25 @@ static bool _segmentsIntersect(const Vec2& firstA, const Vec2& firstB,
     auto firstEnd = _cross(firstA, firstB, secondB);
     auto secondStart = _cross(secondA, secondB, firstA);
     auto secondEnd = _cross(secondA, secondB, firstB);
-    if (((firstStart > Epsilon && firstEnd < -Epsilon)
-         || (firstStart < -Epsilon && firstEnd > Epsilon))
-        && ((secondStart > Epsilon && secondEnd < -Epsilon)
-            || (secondStart < -Epsilon && secondEnd > Epsilon))) {
+    if (((firstStart > PixelEpsilon && firstEnd < -PixelEpsilon)
+         || (firstStart < -PixelEpsilon && firstEnd > PixelEpsilon))
+        && ((secondStart > PixelEpsilon && secondEnd < -PixelEpsilon)
+            || (secondStart < -PixelEpsilon && secondEnd > PixelEpsilon))) {
         return true;
     }
-    if (std::fabs(firstStart) <= Epsilon && _between(secondA.x, firstA.x, firstB.x)
+    if (std::fabs(firstStart) <= PixelEpsilon && _between(secondA.x, firstA.x, firstB.x)
         && _between(secondA.y, firstA.y, firstB.y)) {
         return true;
     }
-    if (std::fabs(firstEnd) <= Epsilon && _between(secondB.x, firstA.x, firstB.x)
+    if (std::fabs(firstEnd) <= PixelEpsilon && _between(secondB.x, firstA.x, firstB.x)
         && _between(secondB.y, firstA.y, firstB.y)) {
         return true;
     }
-    if (std::fabs(secondStart) <= Epsilon && _between(firstA.x, secondA.x, secondB.x)
+    if (std::fabs(secondStart) <= PixelEpsilon && _between(firstA.x, secondA.x, secondB.x)
         && _between(firstA.y, secondA.y, secondB.y)) {
         return true;
     }
-    return std::fabs(secondEnd) <= Epsilon
+    return std::fabs(secondEnd) <= PixelEpsilon
            && _between(firstB.x, secondA.x, secondB.x)
            && _between(firstB.y, secondA.y, secondB.y);
 }
@@ -138,7 +140,7 @@ static float _pointSegment(const Vec2& point, const Vec2& from,
 {
     auto delta = to - from;
     auto length = delta.dot(delta);
-    if (length <= Epsilon * Epsilon) return (point - from).length();
+    if (length <= PixelEpsilon * PixelEpsilon) return (point - from).length();
     auto progress = (point - from).dot(delta) / length;
     if (progress < 0.0f) progress = 0.0f;
     else if (progress > 1.0f) progress = 1.0f;
@@ -183,28 +185,17 @@ static bool _inside(const Vec2& point, const BBox& bounds) noexcept
            && point.y >= bounds.y && point.y <= bounds.y + bounds.height;
 }
 
+// The part of segment inside bounds, as parameters 0 <= entry <= exit <= 1 along it.
 static bool _clip(const Segment& segment, const BBox& bounds,
                   float& entry, float& exit) noexcept
 {
     entry = 0.0f;
     exit = 1.0f;
     auto delta = segment.to - segment.from;
-    auto axis = [&](float start, float change, float minimum, float maximum) {
-        if (std::fabs(change) <= Epsilon) return start >= minimum && start <= maximum;
-        auto first = (minimum - start) / change;
-        auto second = (maximum - start) / change;
-        if (first > second) {
-            auto swap = first;
-            first = second;
-            second = swap;
-        }
-        entry = std::fmax(entry, first);
-        exit = std::fmin(exit, second);
-        return entry <= exit;
-    };
-    return axis(segment.from.x, delta.x, bounds.x, bounds.x + bounds.width)
-           && axis(segment.from.y, delta.y, bounds.y, bounds.y + bounds.height)
-           && exit >= 0.0f && entry <= 1.0f;
+    return detail::_axisInterval(segment.from.x, delta.x, bounds.x, bounds.x + bounds.width,
+                                 entry, exit, PixelEpsilon)
+           && detail::_axisInterval(segment.from.y, delta.y, bounds.y,
+                                    bounds.y + bounds.height, entry, exit, PixelEpsilon);
 }
 
 static uint32_t _subtract(const Segment& segment, const BBox& bounds,
@@ -216,12 +207,10 @@ static uint32_t _subtract(const Segment& segment, const BBox& bounds,
         output[0] = segment;
         return 1u;
     }
-    entry = std::fmax(0.0f, entry);
-    exit = std::fmin(1.0f, exit);
     auto delta = segment.to - segment.from;
     auto count = 0u;
-    if (entry > Epsilon) output[count++] = {segment.from, segment.from + delta * entry};
-    if (exit < 1.0f - Epsilon) output[count++] = {segment.from + delta * exit, segment.to};
+    if (entry > PixelEpsilon) output[count++] = {segment.from, segment.from + delta * entry};
+    if (exit < 1.0f - PixelEpsilon) output[count++] = {segment.from + delta * exit, segment.to};
     return count;
 }
 
@@ -268,11 +257,11 @@ static float _distance(const LayoutPath& first, const LayoutPath& second) noexce
             distance = std::fmin(distance,
                                  _segmentDistance(first.points[i], first.points[firstNext],
                                                   second.points[j], second.points[secondNext]));
-            if (distance <= Epsilon) break;
+            if (distance <= PixelEpsilon) break;
         }
-        if (distance <= Epsilon) break;
+        if (distance <= PixelEpsilon) break;
     }
-    if (distance > Epsilon
+    if (distance > PixelEpsilon
         && ((_inside(first.points[0], second)) || _inside(second.points[0], first))) {
         distance = 0.0f;
     }
@@ -307,7 +296,7 @@ static float _distance(const LayoutPath& first, const LayoutPath& second,
             }
         }
     }
-    if (distance > Epsilon) {
+    if (distance > PixelEpsilon) {
         for (auto i = 0u; i < first.count; i++) {
             if (!_excluded(first.points[i], excluded, excludedCount)
                 && _inside(first.points[i], second)) {
@@ -316,7 +305,7 @@ static float _distance(const LayoutPath& first, const LayoutPath& second,
             }
         }
     }
-    if (distance > Epsilon) {
+    if (distance > PixelEpsilon) {
         for (auto i = 0u; i < second.count; i++) {
             if (!_excluded(second.points[i], excluded, excludedCount)
                 && _inside(second.points[i], first)) {
@@ -330,24 +319,8 @@ static float _distance(const LayoutPath& first, const LayoutPath& second,
     return distance - firstRadius - secondRadius;
 }
 
-static float _distance(const LayoutReport& layout, uint32_t first,
-                       uint32_t second) noexcept
-{
-    auto distance = std::numeric_limits<float>::infinity();
-    for (auto i = 0u; i < layout.pathCount(); i++) {
-        auto firstPath = layout.pathAt(i);
-        if (!firstPath || firstPath->visual != first) continue;
-        for (auto j = 0u; j < layout.pathCount(); j++) {
-            auto secondPath = layout.pathAt(j);
-            if (!secondPath || secondPath->visual != second) continue;
-            distance = std::fmin(distance, _distance(*firstPath, *secondPath));
-        }
-    }
-    return distance;
-}
-
 static float _distance(const LayoutReport& layout, uint32_t first, uint32_t second,
-                       const BBox* excluded, uint32_t excludedCount) noexcept
+                       const BBox* excluded = nullptr, uint32_t excludedCount = 0u) noexcept
 {
     auto distance = std::numeric_limits<float>::infinity();
     for (auto i = 0u; i < layout.pathCount(); i++) {
@@ -396,7 +369,7 @@ static uint32_t _sharedEndpointExclusions(const IR& receipt,
     Node secondNodes[] = {second.from, second.to};
     auto count = 0u;
     auto margin = routeGap + std::fmax(_strokeRadius(layout, firstVisual),
-                                      _strokeRadius(layout, secondVisual)) + Epsilon;
+                                      _strokeRadius(layout, secondVisual)) + PixelEpsilon;
     for (auto i = 0u; i < 2u; i++) {
         for (auto j = 0u; j < 2u; j++) {
             if (firstNodes[i].index != secondNodes[j].index) continue;
@@ -451,10 +424,17 @@ static float _clearance(const BBox& inner, const BBox& outer) noexcept
     return std::fmin(std::fmin(left, top), std::fmin(right, bottom));
 }
 
+// Whether the visual is missing or cannot be seen, so nothing collides with it.
+static bool _hidden(const PhysicalVisual& item) noexcept
+{
+    return !item.visual || !item.visual->visible || item.visual->occluded
+           || item.visual->opacity <= 0.0f;
+}
+
 static bool _collision(float actual, float required) noexcept
 {
     if (!std::isfinite(actual)) return false;
-    return actual < required || (required <= Epsilon && actual <= Epsilon);
+    return actual < required || (required <= PixelEpsilon && actual <= PixelEpsilon);
 }
 
 static PhysicalConstraintIssue _issue(PhysicalConstraintCode code, Edge edge,
@@ -533,10 +513,7 @@ Result validatePhysical(const IR& receipt, const LayoutReport& layout,
             if (j == spec->from.index || j == spec->to.index) continue;
             auto node = Node{j};
             auto body = _visual(layout, scenePath, receipt.body(node));
-            if (!body.visual || !body.visual->visible || body.visual->occluded
-                || body.visual->opacity <= 0.0f) {
-                continue;
-            }
+            if (_hidden(body)) continue;
             auto actual = _distance(layout, route.index, body.index);
             if (!_collision(actual, routeGap)) continue;
             auto issue = _issue(PhysicalConstraintCode::RouteNodeCollision, edge,
@@ -547,63 +524,44 @@ Result validatePhysical(const IR& receipt, const LayoutReport& layout,
             if (!report.pImpl->add(issue)) return Result::OutOfMemory;
         }
 
+        // Reports the label of node, relatedEdge or zone, as kind says, when the route comes
+        // too near it.
+        auto reportLabel = [&](const Object* object, PhysicalEntityKind kind, Node node,
+                               Edge relatedEdge = {}, Zone zone = {}) {
+            auto label = _visual(layout, scenePath, object);
+            if (_hidden(label)) return true;
+            auto actual = _distance(layout, route.index, label.visual->paintBounds);
+            if (!_collision(actual, routeGap)) return true;
+            auto issue = _issue(PhysicalConstraintCode::RouteLabelCollision, edge, actual,
+                                routeGap, route.visual->paintBounds,
+                                label.visual->paintBounds);
+            issue.node = node;
+            issue.relatedEdge = relatedEdge;
+            issue.zone = zone;
+            issue.relatedKind = kind;
+            return report.pImpl->add(issue);
+        };
         for (auto j = 0u; j < receipt.nodeCount(); j++) {
             if (j == spec->from.index || j == spec->to.index) continue;
             auto node = Node{j};
-            const Object* labels[] = {receipt.label(node), receipt.detail(node)};
-            PhysicalEntityKind kinds[] = {PhysicalEntityKind::NodeLabel,
-                                          PhysicalEntityKind::NodeDetail};
-            for (auto k = 0u; k < 2u; k++) {
-                auto label = _visual(layout, scenePath, labels[k]);
-                if (!label.visual || !label.visual->visible || label.visual->occluded
-                    || label.visual->opacity <= 0.0f) {
-                    continue;
-                }
-                auto actual = _distance(layout, route.index,
-                                        label.visual->paintBounds);
-                if (!_collision(actual, routeGap)) continue;
-                auto issue = _issue(PhysicalConstraintCode::RouteLabelCollision, edge,
-                                    actual, routeGap, route.visual->paintBounds,
-                                    label.visual->paintBounds);
-                issue.node = node;
-                issue.relatedKind = kinds[k];
-                if (!report.pImpl->add(issue)) return Result::OutOfMemory;
+            if (!reportLabel(receipt.label(node), PhysicalEntityKind::NodeLabel, node)
+                || !reportLabel(receipt.detail(node), PhysicalEntityKind::NodeDetail, node)) {
+                return Result::OutOfMemory;
             }
         }
-
         for (auto j = 0u; j < receipt.edgeCount(); j++) {
             if (j == i) continue;
             auto relatedEdge = Edge{j};
-            auto label = _visual(layout, scenePath, receipt.label(relatedEdge));
-            if (!label.visual || !label.visual->visible || label.visual->occluded
-                || label.visual->opacity <= 0.0f) {
-                continue;
+            if (!reportLabel(receipt.label(relatedEdge), PhysicalEntityKind::EdgeLabel, {},
+                             relatedEdge)) {
+                return Result::OutOfMemory;
             }
-            auto actual = _distance(layout, route.index, label.visual->paintBounds);
-            if (!_collision(actual, routeGap)) continue;
-            auto issue = _issue(PhysicalConstraintCode::RouteLabelCollision, edge,
-                                actual, routeGap, route.visual->paintBounds,
-                                label.visual->paintBounds);
-            issue.relatedEdge = relatedEdge;
-            issue.relatedKind = PhysicalEntityKind::EdgeLabel;
-            if (!report.pImpl->add(issue)) return Result::OutOfMemory;
         }
-
         for (auto j = 0u; j < receipt.zoneCount(); j++) {
             auto zone = Zone{j};
-            auto label = _visual(layout, scenePath, receipt.label(zone));
-            if (!label.visual || !label.visual->visible || label.visual->occluded
-                || label.visual->opacity <= 0.0f) {
-                continue;
+            if (!reportLabel(receipt.label(zone), PhysicalEntityKind::ZoneLabel, {}, {}, zone)) {
+                return Result::OutOfMemory;
             }
-            auto actual = _distance(layout, route.index, label.visual->paintBounds);
-            if (!_collision(actual, routeGap)) continue;
-            auto issue = _issue(PhysicalConstraintCode::RouteLabelCollision, edge,
-                                actual, routeGap, route.visual->paintBounds,
-                                label.visual->paintBounds);
-            issue.zone = zone;
-            issue.relatedKind = PhysicalEntityKind::ZoneLabel;
-            if (!report.pImpl->add(issue)) return Result::OutOfMemory;
         }
 
         for (auto j = i + 1u; j < receipt.edgeCount(); j++) {
@@ -614,10 +572,7 @@ Result validatePhysical(const IR& receipt, const LayoutReport& layout,
                 return Result::InvalidArguments;
             }
             auto related = _visual(layout, scenePath, receipt.object(relatedEdge));
-            if (!related.visual || !related.visual->visible || related.visual->occluded
-                || related.visual->opacity <= 0.0f) {
-                continue;
-            }
+            if (_hidden(related)) continue;
             BBox excluded[2];
             auto excludedCount = _sharedEndpointExclusions(
                 receipt, layout, scenePath, *spec, *relatedSpec,

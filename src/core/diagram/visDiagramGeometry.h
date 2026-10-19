@@ -1,4 +1,4 @@
-// Vector and interval arithmetic that the diagram module's layout and routing share.
+// Vector and interval arithmetic that the diagram module's layout, routing and audit share.
 #ifndef _VIS_DIAGRAM_GEOMETRY_H_
 #define _VIS_DIAGRAM_GEOMETRY_H_
 
@@ -10,26 +10,6 @@ namespace vis::diagram::detail
 {
 
 constexpr float Epsilon = 1.0e-5f;
-
-static inline Vec2 _sub(const Vec2& lhs, const Vec2& rhs) noexcept
-{
-    return {lhs.x - rhs.x, lhs.y - rhs.y};
-}
-
-static inline Vec2 _add(const Vec2& lhs, const Vec2& rhs) noexcept
-{
-    return {lhs.x + rhs.x, lhs.y + rhs.y};
-}
-
-static inline Vec2 _mul(const Vec2& value, float scalar) noexcept
-{
-    return {value.x * scalar, value.y * scalar};
-}
-
-static inline float _length(const Vec2& value) noexcept
-{
-    return std::hypot(value.x, value.y);
-}
 
 static inline bool _near(float lhs, float rhs) noexcept
 {
@@ -61,10 +41,12 @@ static inline bool _boundsOverlap(const Vec2& firstCenter, const Vec2& firstSize
                            secondSize.y);
 }
 
+// Narrows [first, last] to the part of origin + t * delta inside [minimum, maximum]. A delta
+// within tolerance of zero keeps the range only when origin lies inside.
 static inline bool _axisInterval(float origin, float delta, float minimum, float maximum,
-                                 float& first, float& last) noexcept
+                                 float& first, float& last, float tolerance = Epsilon) noexcept
 {
-    if (_near(delta, 0.0f)) return origin >= minimum && origin <= maximum;
+    if (std::fabs(delta) <= tolerance) return origin >= minimum && origin <= maximum;
     auto begin = (minimum - origin) / delta;
     auto end = (maximum - origin) / delta;
     if (begin > end) {
@@ -78,19 +60,30 @@ static inline bool _axisInterval(float origin, float delta, float minimum, float
 }
 
 static inline bool _crosses(const Vec2& from, const Vec2& to, const Vec2& center,
-                            const Vec2& size, float padding = 0.0f) noexcept
+                            const Vec2& size, float padding) noexcept
 {
-    auto half = _add(_mul(size, 0.5f), {padding, padding});
-    auto minimum = Vec2{center.x - half.x + Epsilon,
-                        center.y - half.y + Epsilon};
-    auto maximum = Vec2{center.x + half.x - Epsilon,
-                        center.y + half.y - Epsilon};
+    auto half = size * 0.5f + Vec2{padding, padding};
+    auto minimum = center - half + Vec2{Epsilon, Epsilon};
+    auto maximum = center + half - Vec2{Epsilon, Epsilon};
     if (minimum.x > maximum.x || minimum.y > maximum.y) return false;
-    auto delta = _sub(to, from);
+    auto delta = to - from;
     auto first = 0.0f;
     auto last = 1.0f;
     return _axisInterval(from.x, delta.x, minimum.x, maximum.x, first, last)
            && _axisInterval(from.y, delta.y, minimum.y, maximum.y, first, last);
+}
+
+// Whether a route crosses a node's box widened by margin. When the node is the edge's source
+// or target, the segment that leaves or enters it only has to stay out of the bare box.
+static inline bool _routeCrosses(const Vec2* points, uint32_t count, const Vec2& center,
+                                 const Vec2& size, float margin, bool source,
+                                 bool target) noexcept
+{
+    for (auto i = 1u; i < count; i++) {
+        auto end = (source && i == 1u) || (target && i + 1u == count);
+        if (_crosses(points[i - 1u], points[i], center, size, end ? 0.0f : margin)) return true;
+    }
+    return false;
 }
 
 static inline Vec2 _outward(Port port) noexcept
@@ -108,9 +101,7 @@ static inline Vec2 _outward(Port port) noexcept
 static inline bool _outwardSegment(const Vec2& endpoint, const Vec2& adjacent,
                                    Port port) noexcept
 {
-    auto direction = _sub(adjacent, endpoint);
-    auto outward = _outward(port);
-    return direction.x * outward.x + direction.y * outward.y > Epsilon;
+    return (adjacent - endpoint).dot(_outward(port)) > Epsilon;
 }
 
 static inline float _routeMargin(const Config& config) noexcept

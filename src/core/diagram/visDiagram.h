@@ -7,46 +7,11 @@
 namespace vis::diagram::detail
 {
 
-struct NodeRecord
-{
-    char* id = nullptr;
-    char* label = nullptr;
-    char* detail = nullptr;
-    NodeKind kind = NodeKind::Default;
-    int32_t rank = -1;
-    int32_t row = -1;
-    int32_t column = -1;
-    float start = 0.0f;
-    float span = 0.0f;
-    Vec2 position;
-    Vec2 size;
-    bool manualPosition = false;
-};
-
-struct EdgeRecord
-{
-    char* id = nullptr;
-    char* label = nullptr;
-    Node from;
-    Node to;
-    Port fromPort = Port::Auto;
-    Port toPort = Port::Auto;
-    Route route = Route::Auto;
-    EdgeKind kind = EdgeKind::Directed;
-    Vec2* waypoints = nullptr;
-    uint32_t waypointCount = 0;
-    float flowOffset = 0.0f;
-    bool flow = false;
-};
-
-struct ZoneRecord
-{
-    char* id = nullptr;
-    char* label = nullptr;
-    Node* members = nullptr;
-    uint32_t memberCount = 0;
-    bool fullWidth = false;
-};
+// Diagram::add() keeps each spec as a record with the same fields, its strings, waypoints and
+// members copied into arrays the record owns.
+using NodeRecord = NodeSpec;
+using EdgeRecord = EdgeSpec;
+using ZoneRecord = ZoneSpec;
 
 struct NodeLayout
 {

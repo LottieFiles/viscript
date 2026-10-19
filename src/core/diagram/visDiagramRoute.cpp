@@ -35,8 +35,8 @@ static uint32_t _simplify(Vec2* points, uint32_t count) noexcept
             auto a = points[output - 3u];
             auto b = points[output - 2u];
             auto c = points[output - 1u];
-            auto ab = _sub(b, a);
-            auto bc = _sub(c, b);
+            auto ab = b - a;
+            auto bc = c - b;
             auto collinear = (_near(ab.x, 0.0f) && _near(bc.x, 0.0f)
                               && ab.y * bc.y > 0.0f)
                              || (_near(ab.y, 0.0f) && _near(bc.y, 0.0f)
@@ -53,13 +53,12 @@ bool axisAligned(const Vec2* points, uint32_t count) noexcept
 {
     if (count < 2u) return false;
     for (auto i = 1u; i < count; i++) {
-        auto delta = _sub(points[i], points[i - 1u]);
-        if (_length(delta) <= Epsilon) return false;
+        auto delta = points[i] - points[i - 1u];
+        if (delta.length() <= Epsilon) return false;
         if (!_near(delta.x, 0.0f) && !_near(delta.y, 0.0f)) return false;
         if (i < 2u) continue;
-        auto previous = _sub(points[i - 1u], points[i - 2u]);
-        auto dot = previous.x * delta.x + previous.y * delta.y;
-        if (dot < -Epsilon && (_near(previous.x, 0.0f) == _near(delta.x, 0.0f))) {
+        auto previous = points[i - 1u] - points[i - 2u];
+        if (previous.dot(delta) < -Epsilon && _near(previous.x, 0.0f) == _near(delta.x, 0.0f)) {
             return false;
         }
     }
@@ -103,8 +102,7 @@ static bool _drawable(const Config& config, const EdgeRecord& edge, Route route,
         || _dashed(edge)) {
         return true;
     }
-    return _length(_sub(points[count - 1u], points[count - 2u]))
-           > config.arrowLength + Epsilon;
+    return (points[count - 1u] - points[count - 2u]).length() > config.arrowLength + Epsilon;
 }
 
 static bool _routeClear(const Vec2* points, uint32_t count, const NodeLayout* nodes,
@@ -113,16 +111,9 @@ static bool _routeClear(const Vec2* points, uint32_t count, const NodeLayout* no
 {
     if (!axisAligned(points, count)) return false;
     for (auto i = 0u; i < nodeCount; i++) {
-        for (auto j = 1u; j < count; j++) {
-            auto padding = margin;
-            if ((i == edge.from.index && j == 1u)
-                || (i == edge.to.index && j + 1u == count)) {
-                padding = 0.0f;
-            }
-            if (_crosses(points[j - 1u], points[j], nodes[i].center,
-                         nodes[i].size, padding)) {
-                return false;
-            }
+        if (_routeCrosses(points, count, nodes[i].center, nodes[i].size, margin,
+                          i == edge.from.index, i == edge.to.index)) {
+            return false;
         }
     }
     return true;
@@ -151,21 +142,10 @@ static RouteBounds _blockingBounds(const Vec2* points, uint32_t count,
 {
     RouteBounds bounds;
     for (auto i = 0u; i < nodeCount; i++) {
-        auto blocked = false;
-        for (auto j = 1u; j < count; j++) {
-            auto padding = margin;
-            if ((i == edge.from.index && j == 1u)
-                || (i == edge.to.index && j + 1u == count)) {
-                padding = 0.0f;
-            }
-            if (!_crosses(points[j - 1u], points[j], nodes[i].center,
-                          nodes[i].size, padding)) {
-                continue;
-            }
-            blocked = true;
-            break;
+        if (_routeCrosses(points, count, nodes[i].center, nodes[i].size, margin,
+                          i == edge.from.index, i == edge.to.index)) {
+            _include(bounds, nodes[i], margin);
         }
-        if (blocked) _include(bounds, nodes[i], margin);
     }
     return bounds;
 }
@@ -173,8 +153,8 @@ static RouteBounds _blockingBounds(const Vec2* points, uint32_t count,
 static uint32_t _elbow(const EdgeLayout& layout, float stub, bool horizontal,
                        Vec2* output) noexcept
 {
-    auto from = _add(layout.from, _mul(_outward(layout.fromPort), stub));
-    auto to = _add(layout.to, _mul(_outward(layout.toPort), stub));
+    auto from = layout.from + _outward(layout.fromPort) * stub;
+    auto to = layout.to + _outward(layout.toPort) * stub;
     auto count = 0u;
     output[count++] = layout.from;
     output[count++] = from;
@@ -188,8 +168,8 @@ static uint32_t _corridor(const EdgeLayout& layout, float fromStub, float toStub
                           float coordinate, bool horizontal,
                           Vec2* output) noexcept
 {
-    auto from = _add(layout.from, _mul(_outward(layout.fromPort), fromStub));
-    auto to = _add(layout.to, _mul(_outward(layout.toPort), toStub));
+    auto from = layout.from + _outward(layout.fromPort) * fromStub;
+    auto to = layout.to + _outward(layout.toPort) * toStub;
     auto count = 0u;
     output[count++] = layout.from;
     output[count++] = from;
@@ -213,9 +193,7 @@ static void _consider(const Config& config, const Vec2* points, uint32_t count,
         return;
     }
     auto length = 0.0f;
-    for (auto i = 1u; i < count; i++) {
-        length += _length(_sub(points[i], points[i - 1u]));
-    }
+    for (auto i = 1u; i < count; i++) length += (points[i] - points[i - 1u]).length();
     auto bends = count > 2u ? count - 2u : 0u;
     if (choice.count && length > choice.length - Epsilon) {
         if (!_near(length, choice.length) || bends >= choice.bends) return;
@@ -316,16 +294,22 @@ uint32_t centerline(const Config& config, const EdgeRecord& edge,
     return choice.count;
 }
 
+static Vec2 _normal(const Vec2& delta) noexcept
+{
+    auto length = delta.length();
+    return {-delta.y / length, delta.x / length};
+}
+
 Path* orthogonalPath(const Config& config, const Vec2* route,
                              uint32_t count) noexcept
 {
     if (!axisAligned(route, count)) return nullptr;
-    auto last = _sub(route[count - 1u], route[count - 2u]);
-    auto lastLength = _length(last);
+    auto last = route[count - 1u] - route[count - 2u];
+    auto lastLength = last.length();
     if (lastLength <= config.arrowLength + Epsilon) return nullptr;
-    auto direction = _mul(last, 1.0f / lastLength);
+    auto direction = last * (1.0f / lastLength);
     auto normal = Vec2{-direction.y, direction.x};
-    auto base = _sub(route[count - 1u], _mul(direction, config.arrowLength));
+    auto base = route[count - 1u] - direction * config.arrowLength;
 
     Vec2 shaft[Diagram::WaypointLimit + 4u];
     auto shaftCount = count;
@@ -336,33 +320,14 @@ Path* orthogonalPath(const Config& config, const Vec2* route,
     Vec2 left[Diagram::WaypointLimit + 4u];
     Vec2 right[Diagram::WaypointLimit + 4u];
     auto half = config.routeWidth * 0.5f;
+    // Each point moves half the width along its segment's normal. At a right-angle bend the
+    // two normals add up to the corner where the offset sides meet.
     for (auto i = 0u; i < shaftCount; i++) {
-        Vec2 offset;
-        if (i == 0u) {
-            auto delta = _sub(shaft[1u], shaft[0u]);
-            auto length = _length(delta);
-            offset = _mul(Vec2{-delta.y / length, delta.x / length}, half);
-        } else if (i + 1u == shaftCount) {
-            auto delta = _sub(shaft[i], shaft[i - 1u]);
-            auto length = _length(delta);
-            offset = _mul(Vec2{-delta.y / length, delta.x / length}, half);
-        } else {
-            auto previous = _sub(shaft[i], shaft[i - 1u]);
-            auto next = _sub(shaft[i + 1u], shaft[i]);
-            auto previousLength = _length(previous);
-            auto nextLength = _length(next);
-            auto previousNormal = Vec2{-previous.y / previousLength,
-                                       previous.x / previousLength};
-            auto nextNormal = Vec2{-next.y / nextLength, next.x / nextLength};
-            if (_near(previousNormal.x, nextNormal.x)
-                && _near(previousNormal.y, nextNormal.y)) {
-                offset = _mul(previousNormal, half);
-            } else {
-                offset = _mul(_add(previousNormal, nextNormal), half);
-            }
-        }
-        left[i] = _add(shaft[i], offset);
-        right[i] = _sub(shaft[i], offset);
+        auto previous = _normal(i ? shaft[i] - shaft[i - 1u] : shaft[1u] - shaft[0u]);
+        auto next = i + 1u < shaftCount ? _normal(shaft[i + 1u] - shaft[i]) : previous;
+        auto offset = _same(previous, next) ? previous * half : (previous + next) * half;
+        left[i] = shaft[i] + offset;
+        right[i] = shaft[i] - offset;
     }
 
     PathCommand commands[(Diagram::WaypointLimit + 4u) * 2u + 5u];
@@ -372,8 +337,8 @@ Path* orthogonalPath(const Config& config, const Vec2* route,
         commands[commandCount++] = PathCommand::line({left[i].x, left[i].y, 0.0f});
     }
     auto headHalf = config.arrowWidth * 0.5f;
-    auto headLeft = _add(base, _mul(normal, headHalf));
-    auto headRight = _sub(base, _mul(normal, headHalf));
+    auto headLeft = base + normal * headHalf;
+    auto headRight = base - normal * headHalf;
     commands[commandCount++] = PathCommand::line({headLeft.x, headLeft.y, 0.0f});
     commands[commandCount++] = PathCommand::line(
         {route[count - 1u].x, route[count - 1u].y, 0.0f});
@@ -390,41 +355,29 @@ Vec2 labelPoint(const Config& config, const Vec2* points,
                         uint32_t count) noexcept
 {
     auto total = 0.0f;
-    for (auto i = 1u; i < count; i++) total += _length(_sub(points[i], points[i - 1u]));
+    for (auto i = 1u; i < count; i++) total += (points[i] - points[i - 1u]).length();
     auto target = total * 0.5f;
     auto cursor = 0.0f;
     for (auto i = 1u; i < count; i++) {
-        auto segment = _sub(points[i], points[i - 1u]);
-        auto length = _length(segment);
+        auto segment = points[i] - points[i - 1u];
+        auto length = segment.length();
         if (cursor + length >= target && length > Epsilon) {
             auto progress = (target - cursor) / length;
-            auto point = _add(points[i - 1u], _mul(segment, progress));
-            auto normal = Vec2{-segment.y / length, segment.x / length};
+            auto point = points[i - 1u] + segment * progress;
+            auto normal = _normal(segment);
             if (normal.y < -Epsilon
                 || (_near(normal.y, 0.0f) && normal.x < 0.0f)) {
-                normal = _mul(normal, -1.0f);
+                normal = normal * -1.0f;
             }
             // A corner that follows the Theme clears the label as the former 0.12 default
             // did, so labels keep their place whatever the Theme rounds.
             auto corner = config.corner >= 0.0f ? config.corner : 0.12f;
             auto gap = std::fmax(config.routeWidth * 2.0f, corner + 0.12f);
-            return _add(point, _mul(normal, gap));
+            return point + normal * gap;
         }
         cursor += length;
     }
     return points[count - 1u];
-}
-
-static uint32_t _portIndex(Port port) noexcept
-{
-    switch (port) {
-        case Port::Left: return 0u;
-        case Port::Right: return 1u;
-        case Port::Top: return 2u;
-        case Port::Bottom: return 3u;
-        case Port::Auto: break;
-    }
-    return 0u;
 }
 
 static Vec2 _port(const NodeLayout& node, Port port, uint32_t ordinal,
@@ -453,8 +406,9 @@ static Vec2 _port(const NodeLayout& node, Port port, uint32_t ordinal,
 Result layoutEdges(const Config& config, const EdgeRecord* edges, uint32_t edgeCount,
                    const NodeLayout* layouts, EdgeLayout* edgeLayouts) noexcept
 {
-    uint32_t portCount[Diagram::NodeLimit][4]{};
-    uint32_t portCursor[Diagram::NodeLimit][4]{};
+    // Edges per node side, indexed by the resolved Port, which is never Auto.
+    uint32_t portCount[Diagram::NodeLimit][5]{};
+    uint32_t portCursor[Diagram::NodeLimit][5]{};
 
     auto horizontal = config.direction == Direction::LeftToRight;
     auto resolvePort = [&](const NodeLayout& from, const NodeLayout& to, Port requested, bool destination) {
@@ -470,14 +424,14 @@ Result layoutEdges(const Config& config, const EdgeRecord* edges, uint32_t edgeC
         auto& layout = edgeLayouts[i];
         layout.fromPort = resolvePort(layouts[edge.from.index], layouts[edge.to.index], edge.fromPort, false);
         layout.toPort = resolvePort(layouts[edge.from.index], layouts[edge.to.index], edge.toPort, true);
-        portCount[edge.from.index][_portIndex(layout.fromPort)]++;
-        portCount[edge.to.index][_portIndex(layout.toPort)]++;
+        portCount[edge.from.index][static_cast<uint8_t>(layout.fromPort)]++;
+        portCount[edge.to.index][static_cast<uint8_t>(layout.toPort)]++;
     }
     for (auto i = 0u; i < edgeCount; i++) {
         auto& edge = edges[i];
         auto& layout = edgeLayouts[i];
-        auto fromSide = _portIndex(layout.fromPort);
-        auto toSide = _portIndex(layout.toPort);
+        auto fromSide = static_cast<uint8_t>(layout.fromPort);
+        auto toSide = static_cast<uint8_t>(layout.toPort);
         layout.from = _port(layouts[edge.from.index], layout.fromPort,
                             portCursor[edge.from.index][fromSide]++,
                             portCount[edge.from.index][fromSide]);

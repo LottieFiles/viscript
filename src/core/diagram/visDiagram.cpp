@@ -4,7 +4,9 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <initializer_list>
 #include <limits>
+#include <memory>
 #include <new>
 
 #include "visDiagram.h"
@@ -72,6 +74,88 @@ static bool _validText(const char* value, bool required = false) noexcept
 static bool _equal(const char* lhs, const char* rhs) noexcept
 {
     return lhs && rhs && std::strcmp(lhs, rhs) == 0;
+}
+
+// The bytes a copied string takes, terminator included.
+static size_t _bytes(const char* text) noexcept
+{
+    return text ? std::strlen(text) + 1u : 0u;
+}
+
+// Frees the strings and arrays that a copied spec owns.
+static void _release(NodeSpec& spec) noexcept
+{
+    delete[] spec.id;
+    delete[] spec.label;
+    delete[] spec.detail;
+}
+
+static void _release(EdgeSpec& spec) noexcept
+{
+    delete[] spec.id;
+    delete[] spec.label;
+    delete[] spec.waypoints;
+}
+
+static void _release(ZoneSpec& spec) noexcept
+{
+    delete[] spec.id;
+    delete[] spec.label;
+    delete[] spec.members;
+}
+
+template<typename Spec>
+static void _release(Spec* specs, uint32_t count) noexcept
+{
+    for (auto i = 0u; specs && i < count; i++) _release(specs[i]);
+    delete[] specs;
+}
+
+// Copies spec into target with strings and arrays of its own: a missing label takes the id,
+// and an empty detail or edge label is dropped. Out of memory leaves target empty.
+static bool _copy(const NodeSpec& spec, NodeSpec& target) noexcept
+{
+    target = spec;
+    target.id = _duplicate(spec.id);
+    target.label = _duplicate(spec.label ? spec.label : spec.id);
+    target.detail = spec.detail && spec.detail[0] ? _duplicate(spec.detail) : nullptr;
+    if (target.id && target.label && (target.detail || !spec.detail || !spec.detail[0])) {
+        return true;
+    }
+    _release(target);
+    target = {};
+    return false;
+}
+
+static bool _copy(const EdgeSpec& spec, EdgeSpec& target) noexcept
+{
+    target = spec;
+    target.id = _duplicate(spec.id);
+    target.label = spec.label && spec.label[0] ? _duplicate(spec.label) : nullptr;
+    auto waypoints = spec.waypointCount ? new (std::nothrow) Vec2[spec.waypointCount] : nullptr;
+    for (auto i = 0u; waypoints && i < spec.waypointCount; i++) waypoints[i] = spec.waypoints[i];
+    target.waypoints = waypoints;
+    if (target.id && (target.label || !spec.label || !spec.label[0])
+        && (waypoints || !spec.waypointCount)) {
+        return true;
+    }
+    _release(target);
+    target = {};
+    return false;
+}
+
+static bool _copy(const ZoneSpec& spec, ZoneSpec& target) noexcept
+{
+    target = spec;
+    target.id = _duplicate(spec.id);
+    target.label = _duplicate(spec.label ? spec.label : spec.id);
+    auto members = new (std::nothrow) Node[spec.memberCount];
+    for (auto i = 0u; members && i < spec.memberCount; i++) members[i] = spec.members[i];
+    target.members = members;
+    if (target.id && target.label && members) return true;
+    _release(target);
+    target = {};
+    return false;
 }
 
 static bool _valid(const Config& config) noexcept
@@ -165,33 +249,12 @@ struct IR::Impl
 
     ~Impl()
     {
-        if (nodes) {
-            for (auto i = 0u; i < nodeCount; i++) {
-                delete[] nodes[i].id;
-                delete[] nodes[i].label;
-                delete[] nodes[i].detail;
-            }
+        _release(nodes, nodeCount);
+        _release(edges, edgeCount);
+        _release(zones, zoneCount);
+        for (auto i = 0u; edgePlacements && i < edgeCount; i++) {
+            delete[] edgePlacements[i].centerline;
         }
-        if (edges) {
-            for (auto i = 0u; i < edgeCount; i++) {
-                delete[] edges[i].id;
-                delete[] edges[i].label;
-                delete[] edges[i].waypoints;
-            }
-        }
-        if (edgePlacements) {
-            for (auto i = 0u; i < edgeCount; i++) delete[] edgePlacements[i].centerline;
-        }
-        if (zones) {
-            for (auto i = 0u; i < zoneCount; i++) {
-                delete[] zones[i].id;
-                delete[] zones[i].label;
-                delete[] zones[i].members;
-            }
-        }
-        delete[] nodes;
-        delete[] edges;
-        delete[] zones;
         delete[] nodePlacements;
         delete[] edgePlacements;
         delete[] zonePlacements;
@@ -199,6 +262,22 @@ struct IR::Impl
         delete[] edgeViews;
         delete[] zoneViews;
         delete[] prefix;
+    }
+
+    // The objects built for a node, edge or zone; all null when the index is out of range.
+    NodeView view(Node node) const noexcept
+    {
+        return node.index < nodeCount ? nodeViews[node.index] : NodeView{};
+    }
+
+    EdgeView view(Edge edge) const noexcept
+    {
+        return edge.index < edgeCount ? edgeViews[edge.index] : EdgeView{};
+    }
+
+    ZoneView view(Zone zone) const noexcept
+    {
+        return zone.index < zoneCount ? zoneViews[zone.index] : ZoneView{};
     }
 
     Result copy(const Config& sourceConfig, const NodeRecord* sourceNodes,
@@ -211,7 +290,7 @@ struct IR::Impl
         if (!prefix) return Result::OutOfMemory;
         config = sourceConfig;
         config.id = prefix;
-        bytes += std::strlen(prefix) + 1u;
+        bytes += _bytes(prefix);
         nodeCount = sourceNodeCount;
         edgeCount = sourceEdgeCount;
         zoneCount = sourceZoneCount;
@@ -240,51 +319,16 @@ struct IR::Impl
                  + sizeof(ZoneView) * zoneCount;
 
         for (auto i = 0u; i < nodeCount; i++) {
-            auto& source = sourceNodes[i];
             auto& target = nodes[i];
-            target.id = _duplicate(source.id);
-            target.label = _duplicate(source.label);
-            target.detail = _duplicate(source.detail);
-            if (!target.id || !target.label || (source.detail && !target.detail)) {
-                return Result::OutOfMemory;
-            }
-            target.rank = source.rank;
-            target.position = source.position;
-            target.size = source.size;
-            target.manualPosition = source.manualPosition;
-            target.kind = source.kind;
-            target.row = source.row;
-            target.column = source.column;
-            target.start = source.start;
-            target.span = source.span;
+            if (!_copy(sourceNodes[i], target)) return Result::OutOfMemory;
             nodePlacements[i] = {layouts[i].center, layouts[i].size, layouts[i].rank};
-            bytes += std::strlen(target.id) + std::strlen(target.label) + 2u;
-            if (target.detail) bytes += std::strlen(target.detail) + 1u;
+            bytes += _bytes(target.id) + _bytes(target.label) + _bytes(target.detail);
         }
 
         for (auto i = 0u; i < edgeCount; i++) {
             auto& source = sourceEdges[i];
             auto& target = edges[i];
-            target.id = _duplicate(source.id);
-            target.label = _duplicate(source.label);
-            target.from = source.from;
-            target.to = source.to;
-            target.fromPort = source.fromPort;
-            target.toPort = source.toPort;
-            target.route = source.route;
-            target.waypointCount = source.waypointCount;
-            target.flowOffset = source.flowOffset;
-            target.flow = source.flow;
-            target.kind = source.kind;
-            if (source.waypointCount) {
-                auto waypoints = new (std::nothrow) Vec2[source.waypointCount];
-                if (!waypoints) return Result::OutOfMemory;
-                for (auto j = 0u; j < source.waypointCount; j++) {
-                    waypoints[j] = source.waypoints[j];
-                }
-                target.waypoints = waypoints;
-            }
-            if (!target.id || (source.label && !target.label)) return Result::OutOfMemory;
+            if (!_copy(source, target)) return Result::OutOfMemory;
 
             auto route = source.route;
             if (route == Route::Auto) {
@@ -305,7 +349,7 @@ struct IR::Impl
             for (auto j = 0u; j < centerlineCount; j++) {
                 if (!_finite(centerline[j])) return Result::InvalidArguments;
                 if (!j) continue;
-                auto length = _length(_sub(centerline[j], centerline[j - 1u]));
+                auto length = (centerline[j] - centerline[j - 1u]).length();
                 if (!_finite(length) || length <= Epsilon) {
                     return Result::InvalidArguments;
                 }
@@ -326,27 +370,15 @@ struct IR::Impl
                 placement.labelPoint = labelPoint(sourceConfig, centerline, centerlineCount);
                 if (!_finite(placement.labelPoint)) return Result::InvalidArguments;
             }
-            bytes += std::strlen(target.id) + 1u + sizeof(Vec2) * source.waypointCount
-                     + sizeof(Vec2) * centerlineCount;
-            if (target.label) bytes += std::strlen(target.label) + 1u;
+            bytes += _bytes(target.id) + _bytes(target.label)
+                     + sizeof(Vec2) * (target.waypointCount + centerlineCount);
         }
 
         for (auto i = 0u; i < zoneCount; i++) {
-            auto& source = sourceZones[i];
             auto& target = zones[i];
-            target.id = _duplicate(source.id);
-            target.label = _duplicate(source.label);
-            auto members = new (std::nothrow) Node[source.memberCount];
-            if (!target.id || !target.label || !members) {
-                delete[] members;
-                return Result::OutOfMemory;
-            }
-            for (auto j = 0u; j < source.memberCount; j++) members[j] = source.members[j];
-            target.members = members;
-            target.memberCount = source.memberCount;
-            target.fullWidth = source.fullWidth;
+            if (!_copy(sourceZones[i], target)) return Result::OutOfMemory;
             zonePlacements[i] = {zoneLayouts[i].center, zoneLayouts[i].size};
-            bytes += std::strlen(target.id) + std::strlen(target.label) + 2u
+            bytes += _bytes(target.id) + _bytes(target.label)
                      + sizeof(Node) * target.memberCount;
         }
         return Result::Success;
@@ -430,10 +462,10 @@ namespace
 
 static bool _contains(const NodePlacement& container, const NodePlacement& content) noexcept
 {
-    auto containerMin = _sub(container.center, _mul(container.size, 0.5f));
-    auto containerMax = _add(container.center, _mul(container.size, 0.5f));
-    auto contentMin = _sub(content.center, _mul(content.size, 0.5f));
-    auto contentMax = _add(content.center, _mul(content.size, 0.5f));
+    auto containerMin = container.center - container.size * 0.5f;
+    auto containerMax = container.center + container.size * 0.5f;
+    auto contentMin = content.center - content.size * 0.5f;
+    auto contentMax = content.center + content.size * 0.5f;
     return contentMin.x >= containerMin.x - Epsilon
            && contentMin.y >= containerMin.y - Epsilon
            && contentMax.x <= containerMax.x + Epsilon
@@ -452,7 +484,7 @@ static bool _overlap(const NodePlacement& first, const NodePlacement& second) no
 
 static bool _attached(const NodePlacement& node, const Vec2& point, Port port) noexcept
 {
-    auto half = _mul(node.size, 0.5f);
+    auto half = node.size * 0.5f;
     switch (port) {
         case Port::Left:
             return _near(point.x, node.center.x - half.x)
@@ -475,7 +507,71 @@ static bool _attached(const NodePlacement& node, const Vec2& point, Port port) n
     return false;
 }
 
+// Deletes the objects a failed step made but did not attach, children before their group.
+static void _discard(std::initializer_list<Object*> objects) noexcept
+{
+    for (auto object : objects) {
+        if (object && !object->parent()) delete object;
+    }
+}
+
+// The object that draws an edge along its centerline: an Arrow or a Line when straight, a
+// DirectedRoute or a Plot when bent and dashed or undirected, all stroked, and otherwise a
+// filled Path that ends in its arrowhead. Null when the edge cannot be drawn.
+static Object* _route(const Config& config, const Theme& theme, Color color, bool directed,
+                      bool dashed, const EdgePlacement& placement) noexcept
+{
+    auto line = placement.centerline;
+    auto count = placement.centerlineCount;
+    Object* object = nullptr;
+    if (placement.route == Route::Straight) {
+        Vec3 from = {line[0].x, line[0].y, 0.0f};
+        Vec3 to = {line[1].x, line[1].y, 0.0f};
+        if (directed) object = Arrow::gen(from, to);
+        else object = Line::gen(from, to);
+    } else if (directed && !dashed) {
+        auto path = orthogonalPath(config, line, count);
+        if (path) {
+            path->fill(color);
+            path->stroke({0, 0, 0, 0}, 0.0f);
+            path->layer = config.layers.routes;
+        }
+        return path;
+    } else {
+        Vec3 points[Diagram::WaypointLimit + 4u];
+        for (auto i = 0u; i < count; i++) points[i] = {line[i].x, line[i].y, 0.0f};
+        if (directed) object = vis::DirectedRoute::gen(points, count);
+        else object = Plot::gen(points, count);
+    }
+    if (object) {
+        object->stroke(color, theme.objectWidth);
+        object->layer = config.layers.routes;
+    }
+    return object;
+}
+
 }  // namespace
+
+struct Built::Impl
+{
+    Group* root = nullptr;
+    IR* receipt = nullptr;
+    Group* zones = nullptr;
+    Group* routes = nullptr;
+    Group* nodes = nullptr;
+    Group* annotations = nullptr;
+
+    ~Impl()
+    {
+        if (root) {
+            if (zones && !zones->parent()) delete zones;
+            if (routes && !routes->parent()) delete routes;
+            if (nodes && !nodes->parent()) delete nodes;
+            if (annotations && !annotations->parent()) delete annotations;
+        }
+        delete root;
+    }
+};
 
 struct Diagram::Impl
 {
@@ -490,55 +586,170 @@ struct Diagram::Impl
 
     ~Impl()
     {
-        for (auto i = 0u; i < nodeCount; i++) {
-            delete[] nodes[i].id;
-            delete[] nodes[i].label;
-            delete[] nodes[i].detail;
-        }
-        for (auto i = 0u; i < edgeCount; i++) {
-            delete[] edges[i].id;
-            delete[] edges[i].label;
-            delete[] edges[i].waypoints;
-        }
-        for (auto i = 0u; i < zoneCount; i++) {
-            delete[] zones[i].id;
-            delete[] zones[i].label;
-            delete[] zones[i].members;
-        }
-        delete[] nodes;
-        delete[] edges;
-        delete[] zones;
+        _release(nodes, nodeCount);
+        _release(edges, edgeCount);
+        _release(zones, zoneCount);
         delete[] prefix;
     }
-};
 
-struct Built::Impl
-{
-    Group* root = nullptr;
-    IR* receipt = nullptr;
-    Group* zones = nullptr;
-    Group* routes = nullptr;
-    Group* nodes = nullptr;
-    Group* annotations = nullptr;
-    NodeView* nodeViews = nullptr;
-    EdgeView* edgeViews = nullptr;
-    ZoneView* zoneViews = nullptr;
-    uint32_t nodeCount = 0u;
-    uint32_t edgeCount = 0u;
-    uint32_t zoneCount = 0u;
+    // build() fills the tree one layer at a time. Each step reads its geometry from the
+    // receipt, records what it made in the receipt's views and, when it fails, deletes only
+    // what it has not attached; Built::Impl frees the rest.
 
-    ~Impl()
+    // Creates, tags and attaches the four layer groups below the tagged root.
+    Result buildGroups(Built::Impl& built) const noexcept
     {
-        if (root) {
-            if (zones && !zones->parent()) delete zones;
-            if (routes && !routes->parent()) delete routes;
-            if (nodes && !nodes->parent()) delete nodes;
-            if (annotations && !annotations->parent()) delete annotations;
+        Group** groups[] = {&built.zones, &built.routes, &built.nodes, &built.annotations};
+        const char* names[] = {"zones", "routes", "nodes", "annotations"};
+        for (auto group : groups) *group = Group::gen();
+        auto result = _tag(built.root, prefix, "root");
+        for (auto i = 0u; i < 4u && result == Result::Success; i++) {
+            result = _tag(*groups[i], prefix, names[i]);
         }
-        delete root;
-        delete[] nodeViews;
-        delete[] edgeViews;
-        delete[] zoneViews;
+        for (auto i = 0u; i < 4u && result == Result::Success; i++) {
+            result = built.root->add(*groups[i]);
+        }
+        return result;
+    }
+
+    Result buildZones(Built::Impl& built, IR::Impl& receipt, const Theme& theme,
+                      float corner) const noexcept
+    {
+        for (auto i = 0u; i < zoneCount; i++) {
+            auto& record = zones[i];
+            auto& placement = receipt.zonePlacements[i];
+            auto minimum = placement.center - placement.size * 0.5f;
+            auto maximum = placement.center + placement.size * 0.5f;
+            auto zone = Group::gen();
+            auto body = Rectangle::gen({placement.center.x, placement.center.y, 0.0f},
+                                       placement.size, corner * 1.5f);
+            auto label = Text::gen(record.label, {minimum.x + config.zonePadding * 0.35f,
+                                                  maximum.y - config.zonePadding * 0.55f, 0.0f});
+            auto result = zone && body && label ? Result::Success : Result::OutOfMemory;
+            if (result == Result::Success) result = _tag(zone, prefix, "zone", record.id);
+            if (result == Result::Success) result = _tag(body, prefix, "zone", record.id, "body");
+            if (result == Result::Success) {
+                result = _tag(label, prefix, "zone", record.id, "label");
+            }
+            if (result == Result::Success) {
+                // A zone only outlines its members.
+                body->fill({0, 0, 0, 0});
+                body->stroke(theme.colors.border, theme.objectWidth);
+                body->layer = config.layers.zones;
+                label->fill(theme.colors.muted);
+                label->role = record.fullWidth ? TextRole::Code : TextRole::H3;
+                label->align = {0.0f, 0.5f};
+                label->layer = config.layers.annotations;
+                result = zone->add(body);
+            }
+            if (result == Result::Success) result = built.zones->add(zone);
+            if (result == Result::Success) result = built.annotations->add(label);
+            if (result != Result::Success) {
+                _discard({label, body, zone});
+                return result;
+            }
+            receipt.zoneViews[i] = {zone, body, label};
+        }
+        return Result::Success;
+    }
+
+    Result buildEdges(Built::Impl& built, IR::Impl& receipt, const Theme& theme) const noexcept
+    {
+        float pattern[] = {5.0f, 4.0f};
+        for (auto i = 0u; i < edgeCount; i++) {
+            auto& record = edges[i];
+            auto& placement = receipt.edgePlacements[i];
+            auto color = _edgeColor(theme, record);
+            auto dashed = _dashed(record);
+            auto object = _route(config, theme, color, record.kind != EdgeKind::Relation, dashed,
+                                 placement);
+            if (!object) return Result::InvalidArguments;
+            auto result = _tag(object, prefix, "edge", record.id);
+            if (result == Result::Success) result = built.routes->add(object);
+            if (result != Result::Success) {
+                delete object;
+                return result;
+            }
+            receipt.edgeViews[i].object = object;
+            if (dashed) result = object->dash(pattern, 2u, record.flowOffset);
+            if (result != Result::Success) return result;
+            if (!record.label) continue;
+
+            auto point = placement.labelPoint;
+            auto label = Text::gen(record.label, {point.x, point.y, 0.0f});
+            if (!label) return Result::OutOfMemory;
+            label->fill(color);
+            label->role = TextRole::Code;
+            label->layer = config.layers.annotations;
+            result = _tag(label, prefix, "edge", record.id, "label");
+            if (result == Result::Success) result = built.annotations->add(label);
+            if (result != Result::Success) {
+                delete label;
+                return result;
+            }
+            receipt.edgeViews[i].label = label;
+        }
+        return Result::Success;
+    }
+
+    Result buildNodes(Built::Impl& built, IR::Impl& receipt, const Theme& theme,
+                      float corner) const noexcept
+    {
+        for (auto i = 0u; i < nodeCount; i++) {
+            auto& record = nodes[i];
+            auto center = receipt.nodePlacements[i].center;
+            auto size = receipt.nodePlacements[i].size;
+            auto node = Group::gen();
+            // A Terminal is a pill once corners round, and square like the rest otherwise.
+            auto pill = record.kind == NodeKind::Terminal && corner > 0.0f;
+            auto body = Rectangle::gen({center.x, center.y, 0.0f}, size,
+                                       pill ? std::fmin(size.x, size.y) * 0.5f : corner);
+            auto labelPoint = record.detail ? Vec3{center.x, center.y + size.y * 0.27f, 0.0f}
+                                            : Vec3{center.x, center.y, 0.0f};
+            auto label = Text::gen(record.label, labelPoint);
+            auto detail = record.detail
+                              ? Text::gen(record.detail,
+                                          {center.x, center.y - size.y * 0.27f, 0.0f})
+                              : nullptr;
+            auto made = node && body && label && (detail || !record.detail);
+            auto result = made ? Result::Success : Result::OutOfMemory;
+            if (result == Result::Success) result = _tag(node, prefix, "node", record.id);
+            if (result == Result::Success) result = _tag(body, prefix, "node", record.id, "body");
+            if (result == Result::Success) {
+                result = _tag(label, prefix, "node", record.id, "label");
+            }
+            if (result == Result::Success && detail) {
+                result = _tag(detail, prefix, "node", record.id, "detail");
+            }
+            if (result == Result::Success) {
+                // Every kind is ink on the background; the author colors the node in focus.
+                body->fill(theme.background);
+                body->stroke(theme.colors.foreground, theme.objectWidth);
+                body->layer = config.layers.nodes;
+                label->fill(theme.colors.foreground);
+                label->role = record.kind == NodeKind::Cell || record.kind == NodeKind::Task
+                                      || record.kind == NodeKind::Terminal
+                                      || record.kind == NodeKind::Evidence
+                                  ? TextRole::Code
+                                  : TextRole::Text;
+                label->layer = config.layers.annotations;
+                if (detail) {
+                    detail->fill(theme.colors.muted);
+                    detail->role = TextRole::Code;
+                    detail->layer = config.layers.annotations;
+                }
+                result = node->add(body);
+            }
+            if (result == Result::Success) result = node->add(label);
+            if (result == Result::Success && detail) result = node->add(detail);
+            if (result == Result::Success) result = built.nodes->add(node);
+            if (result != Result::Success) {
+                _discard({body, label, detail, node});
+                return result;
+            }
+            receipt.nodeViews[i] = {node, body, label, detail};
+        }
+        return Result::Success;
     }
 };
 
@@ -618,28 +829,7 @@ Result Diagram::add(const NodeSpec& spec, Node& output) noexcept
         if (pImpl->config.layout == Layout::Grid && pImpl->nodes[i].row == spec.row
             && pImpl->nodes[i].column == spec.column) return Result::InvalidArguments;
     }
-    auto id = _duplicate(spec.id);
-    auto label = _duplicate(spec.label ? spec.label : spec.id);
-    auto detail = spec.detail && spec.detail[0] ? _duplicate(spec.detail) : nullptr;
-    if (!id || !label || (spec.detail && spec.detail[0] && !detail)) {
-        delete[] id;
-        delete[] label;
-        delete[] detail;
-        return Result::OutOfMemory;
-    }
-    auto& record = pImpl->nodes[pImpl->nodeCount];
-    record.id = id;
-    record.label = label;
-    record.detail = detail;
-    record.kind = spec.kind;
-    record.rank = spec.rank;
-    record.row = spec.row;
-    record.column = spec.column;
-    record.start = spec.start;
-    record.span = spec.span;
-    record.position = spec.position;
-    record.size = spec.size;
-    record.manualPosition = spec.manualPosition;
+    if (!_copy(spec, pImpl->nodes[pImpl->nodeCount])) return Result::OutOfMemory;
     output.index = pImpl->nodeCount++;
     return Result::Success;
 }
@@ -667,32 +857,7 @@ Result Diagram::add(const EdgeSpec& spec, Edge& output) noexcept
             return Result::InvalidArguments;
         }
     }
-    auto id = _duplicate(spec.id);
-    auto label = spec.label && spec.label[0] ? _duplicate(spec.label) : nullptr;
-    auto waypoints = spec.waypointCount
-                         ? new (std::nothrow) Vec2[spec.waypointCount]
-                         : nullptr;
-    if (!id || (spec.label && spec.label[0] && !label)
-        || (spec.waypointCount && !waypoints)) {
-        delete[] id;
-        delete[] label;
-        delete[] waypoints;
-        return Result::OutOfMemory;
-    }
-    for (auto i = 0u; i < spec.waypointCount; i++) waypoints[i] = spec.waypoints[i];
-    auto& record = pImpl->edges[pImpl->edgeCount];
-    record.id = id;
-    record.label = label;
-    record.from = spec.from;
-    record.to = spec.to;
-    record.fromPort = spec.fromPort;
-    record.toPort = spec.toPort;
-    record.route = spec.route;
-    record.kind = spec.kind;
-    record.waypoints = waypoints;
-    record.waypointCount = spec.waypointCount;
-    record.flowOffset = spec.flowOffset;
-    record.flow = spec.flow;
+    if (!_copy(spec, pImpl->edges[pImpl->edgeCount])) return Result::OutOfMemory;
     output.index = pImpl->edgeCount++;
     return Result::Success;
 }
@@ -718,22 +883,7 @@ Result Diagram::add(const ZoneSpec& spec, Zone& output) noexcept
             }
         }
     }
-    auto id = _duplicate(spec.id);
-    auto label = _duplicate(spec.label ? spec.label : spec.id);
-    auto members = new (std::nothrow) Node[spec.memberCount];
-    if (!id || !label || !members) {
-        delete[] id;
-        delete[] label;
-        delete[] members;
-        return Result::OutOfMemory;
-    }
-    for (auto i = 0u; i < spec.memberCount; i++) members[i] = spec.members[i];
-    auto& record = pImpl->zones[pImpl->zoneCount];
-    record.id = id;
-    record.label = label;
-    record.members = members;
-    record.memberCount = spec.memberCount;
-    record.fullWidth = spec.fullWidth;
+    if (!_copy(spec, pImpl->zones[pImpl->zoneCount])) return Result::OutOfMemory;
     output.index = pImpl->zoneCount++;
     return Result::Success;
 }
@@ -791,283 +941,23 @@ Result Diagram::build(const Theme& theme, Built*& output) const noexcept
         return result;
     }
 
-    auto builtImpl = new (std::nothrow) Built::Impl;
-    if (!builtImpl) {
+    // Once the root exists it owns the receipt, and the guard owns the root until Built does.
+    std::unique_ptr<Built::Impl> built(new (std::nothrow) Built::Impl);
+    if (built) built->root = new (std::nothrow) receipt_detail::DiagramRoot(receipt);
+    if (!built || !built->root) {
         delete receipt;
         return Result::OutOfMemory;
     }
-    builtImpl->root = new (std::nothrow) receipt_detail::DiagramRoot(receipt);
-    if (!builtImpl->root) {
-        delete receipt;
-        delete builtImpl;
-        return Result::OutOfMemory;
-    }
-    builtImpl->receipt = receipt;
-    builtImpl->nodeCount = pImpl->nodeCount;
-    builtImpl->edgeCount = pImpl->edgeCount;
-    builtImpl->zoneCount = pImpl->zoneCount;
-    builtImpl->nodeViews = new (std::nothrow) NodeView[pImpl->nodeCount]{};
-    if (pImpl->edgeCount) {
-        builtImpl->edgeViews = new (std::nothrow) EdgeView[pImpl->edgeCount]{};
-    }
-    if (pImpl->zoneCount) {
-        builtImpl->zoneViews = new (std::nothrow) ZoneView[pImpl->zoneCount]{};
-    }
-    if (!builtImpl->nodeViews || (pImpl->edgeCount && !builtImpl->edgeViews)
-        || (pImpl->zoneCount && !builtImpl->zoneViews)) {
-        delete builtImpl;
-        return Result::OutOfMemory;
-    }
-
-    builtImpl->zones = Group::gen();
-    builtImpl->routes = Group::gen();
-    builtImpl->nodes = Group::gen();
-    builtImpl->annotations = Group::gen();
-    result = _tag(builtImpl->root, pImpl->prefix, "root");
-    if (result == Result::Success) result = _tag(builtImpl->zones, pImpl->prefix, "zones");
-    if (result == Result::Success) result = _tag(builtImpl->routes, pImpl->prefix, "routes");
-    if (result == Result::Success) result = _tag(builtImpl->nodes, pImpl->prefix, "nodes");
-    if (result == Result::Success) {
-        result = _tag(builtImpl->annotations, pImpl->prefix, "annotations");
-    }
-    if (result != Result::Success) {
-        delete builtImpl;
+    built->receipt = receipt;
+    if ((result = pImpl->buildGroups(*built)) != Result::Success
+        || (result = pImpl->buildZones(*built, *receiptImpl, theme, corner)) != Result::Success
+        || (result = pImpl->buildEdges(*built, *receiptImpl, theme)) != Result::Success
+        || (result = pImpl->buildNodes(*built, *receiptImpl, theme, corner)) != Result::Success) {
         return result;
     }
-    if ((result = builtImpl->root->add(builtImpl->zones)) != Result::Success
-        || (result = builtImpl->root->add(builtImpl->routes)) != Result::Success
-        || (result = builtImpl->root->add(builtImpl->nodes)) != Result::Success
-        || (result = builtImpl->root->add(builtImpl->annotations)) != Result::Success) {
-        delete builtImpl;
-        return result;
-    }
-
-    for (auto i = 0u; i < pImpl->zoneCount; i++) {
-        auto& record = pImpl->zones[i];
-        auto& layout = zoneLayouts[i];
-        auto minimum = _sub(layout.center, _mul(layout.size, 0.5f));
-        auto maximum = _add(layout.center, _mul(layout.size, 0.5f));
-        auto zone = Group::gen();
-        auto body = Rectangle::gen({layout.center.x, layout.center.y, 0.0f}, layout.size,
-                                   corner * 1.5f);
-        auto label = Text::gen(record.label,
-                               {minimum.x + pImpl->config.zonePadding * 0.35f,
-                                maximum.y - pImpl->config.zonePadding * 0.55f, 0.0f});
-        if (!zone || !body || !label) {
-            delete zone;
-            delete body;
-            delete label;
-            delete builtImpl;
-            return Result::OutOfMemory;
-        }
-        if ((result = _tag(zone, pImpl->prefix, "zone", record.id)) != Result::Success
-            || (result = _tag(body, pImpl->prefix, "zone", record.id, "body"))
-                   != Result::Success
-            || (result = _tag(label, pImpl->prefix, "zone", record.id, "label"))
-                   != Result::Success) {
-            delete zone;
-            delete body;
-            delete label;
-            delete builtImpl;
-            return result;
-        }
-        // A zone only outlines its members.
-        body->fill({0, 0, 0, 0});
-        body->stroke(theme.colors.border, theme.objectWidth);
-        body->layer = pImpl->config.layers.zones;
-        label->fill(theme.colors.muted);
-        label->role = record.fullWidth ? TextRole::Code : TextRole::H3;
-        label->align = {0.0f, 0.5f};
-        label->layer = pImpl->config.layers.annotations;
-        if ((result = zone->add(body)) != Result::Success
-            || (result = builtImpl->zones->add(zone)) != Result::Success
-            || (result = builtImpl->annotations->add(label)) != Result::Success) {
-            if (!label->parent()) delete label;
-            if (!body->parent()) delete body;
-            if (!zone->parent()) delete zone;
-            delete builtImpl;
-            return result;
-        }
-        builtImpl->zoneViews[i] = {zone, body, label};
-        receiptImpl->zoneViews[i] = {zone, body, label};
-    }
-
-    for (auto i = 0u; i < pImpl->edgeCount; i++) {
-        auto& record = pImpl->edges[i];
-        auto& placement = receiptImpl->edgePlacements[i];
-        auto route = placement.route;
-        auto centerline = placement.centerline;
-        auto centerlineCount = placement.centerlineCount;
-        auto color = _edgeColor(theme, record);
-        auto dashed = _dashed(record);
-        auto directed = record.kind != EdgeKind::Relation;
-        Object* edgeObject = nullptr;
-        if (route == Route::Straight) {
-            if (directed) {
-                edgeObject = Arrow::gen({edgeLayouts[i].from.x, edgeLayouts[i].from.y, 0.0f},
-                                        {edgeLayouts[i].to.x, edgeLayouts[i].to.y, 0.0f});
-            } else {
-                edgeObject = Line::gen({edgeLayouts[i].from.x, edgeLayouts[i].from.y, 0.0f},
-                                       {edgeLayouts[i].to.x, edgeLayouts[i].to.y, 0.0f});
-            }
-            if (edgeObject) {
-                edgeObject->stroke(color, theme.objectWidth);
-                edgeObject->layer = pImpl->config.layers.routes;
-            }
-        } else if (!directed || dashed) {
-            Vec3 points[WaypointLimit + 4u];
-            for (auto j = 0u; j < centerlineCount; j++) {
-                points[j] = {centerline[j].x, centerline[j].y, 0.0f};
-            }
-            if (directed) {
-                edgeObject = vis::DirectedRoute::gen(points, centerlineCount);
-            } else {
-                edgeObject = Plot::gen(points, centerlineCount);
-            }
-            if (edgeObject) {
-                edgeObject->stroke(color, theme.objectWidth);
-                edgeObject->layer = pImpl->config.layers.routes;
-            }
-        } else {
-            auto path = orthogonalPath(pImpl->config, centerline, centerlineCount);
-            if (path) {
-                path->fill(color);
-                path->stroke({0, 0, 0, 0}, 0.0f);
-                path->layer = pImpl->config.layers.routes;
-            }
-            edgeObject = path;
-        }
-        if (!edgeObject) {
-            delete builtImpl;
-            return Result::InvalidArguments;
-        }
-        result = _tag(edgeObject, pImpl->prefix, "edge", record.id);
-        if (result != Result::Success) {
-            delete edgeObject;
-            delete builtImpl;
-            return result;
-        }
-        if ((result = builtImpl->routes->add(edgeObject)) != Result::Success) {
-            delete edgeObject;
-            delete builtImpl;
-            return result;
-        }
-        builtImpl->edgeViews[i].object = edgeObject;
-        receiptImpl->edgeViews[i].object = edgeObject;
-
-        if (dashed) {
-            float pattern[] = {5.0f, 4.0f};
-            result = edgeObject->dash(pattern, 2u, record.flowOffset);
-            if (result != Result::Success) {
-                delete builtImpl;
-                return result;
-            }
-        }
-        if (record.label) {
-            auto point = placement.labelPoint;
-            auto label = Text::gen(record.label, {point.x, point.y, 0.0f});
-            if (!label) {
-                delete builtImpl;
-                return Result::OutOfMemory;
-            }
-            label->fill(color);
-            label->role = TextRole::Code;
-            label->layer = pImpl->config.layers.annotations;
-            result = _tag(label, pImpl->prefix, "edge", record.id, "label");
-            if (result != Result::Success) {
-                delete label;
-                delete builtImpl;
-                return result;
-            }
-            if ((result = builtImpl->annotations->add(label)) != Result::Success) {
-                delete label;
-                delete builtImpl;
-                return result;
-            }
-            builtImpl->edgeViews[i].label = label;
-            receiptImpl->edgeViews[i].label = label;
-        }
-    }
-
-    for (auto i = 0u; i < pImpl->nodeCount; i++) {
-        auto& record = pImpl->nodes[i];
-        auto& layout = layouts[i];
-        auto node = Group::gen();
-        // A Terminal is a pill once corners round, and square like the rest otherwise.
-        auto pill = record.kind == NodeKind::Terminal && corner > 0.0f;
-        auto body = Rectangle::gen({layout.center.x, layout.center.y, 0.0f}, layout.size,
-                                   pill ? std::fmin(layout.size.x, layout.size.y) * 0.5f
-                                        : corner);
-        auto labelPoint = record.detail
-                              ? Vec3{layout.center.x, layout.center.y + layout.size.y * 0.27f,
-                                     0.0f}
-                              : Vec3{layout.center.x, layout.center.y, 0.0f};
-        auto label = Text::gen(record.label, labelPoint);
-        auto detail = record.detail
-                          ? Text::gen(record.detail,
-                                      {layout.center.x,
-                                       layout.center.y - layout.size.y * 0.27f, 0.0f})
-                          : nullptr;
-        if (!node || !body || !label || (record.detail && !detail)) {
-            delete node;
-            delete body;
-            delete label;
-            delete detail;
-            delete builtImpl;
-            return Result::OutOfMemory;
-        }
-        if ((result = _tag(node, pImpl->prefix, "node", record.id)) != Result::Success
-            || (result = _tag(body, pImpl->prefix, "node", record.id, "body"))
-                   != Result::Success
-            || (result = _tag(label, pImpl->prefix, "node", record.id, "label"))
-                   != Result::Success
-            || (detail
-                && (result = _tag(detail, pImpl->prefix, "node", record.id, "detail"))
-                       != Result::Success)) {
-            delete node;
-            delete body;
-            delete label;
-            delete detail;
-            delete builtImpl;
-            return result;
-        }
-        // Every kind is ink on the background; the author colors the node in focus.
-        body->fill(theme.background);
-        body->stroke(theme.colors.foreground, theme.objectWidth);
-        body->layer = pImpl->config.layers.nodes;
-        label->fill(theme.colors.foreground);
-        label->role = record.kind == NodeKind::Cell || record.kind == NodeKind::Task
-                              || record.kind == NodeKind::Terminal
-                              || record.kind == NodeKind::Evidence
-                          ? TextRole::Code
-                          : TextRole::Text;
-        label->layer = pImpl->config.layers.annotations;
-        if (detail) {
-            detail->fill(theme.colors.muted);
-            detail->role = TextRole::Code;
-            detail->layer = pImpl->config.layers.annotations;
-        }
-        if ((result = node->add(body)) != Result::Success
-            || (result = node->add(label)) != Result::Success
-            || (detail && (result = node->add(detail)) != Result::Success)
-            || (result = builtImpl->nodes->add(node)) != Result::Success) {
-            if (!body->parent()) delete body;
-            if (!label->parent()) delete label;
-            if (detail && !detail->parent()) delete detail;
-            if (!node->parent()) delete node;
-            delete builtImpl;
-            return result;
-        }
-        builtImpl->nodeViews[i] = {node, body, label, detail};
-        receiptImpl->nodeViews[i] = {node, body, label, detail};
-    }
-
-    auto built = new (std::nothrow) Built(builtImpl);
-    if (!built) {
-        delete builtImpl;
-        return Result::OutOfMemory;
-    }
-    output = built;
+    output = new (std::nothrow) Built(built.get());
+    if (!output) return Result::OutOfMemory;
+    built.release();
     return Result::Success;
 }
 
@@ -1133,65 +1023,47 @@ const ZonePlacement* IR::zonePlacementAt(uint32_t index) const noexcept
 
 const Object* IR::object(Node node) const noexcept
 {
-    return pImpl && node && node.index < pImpl->nodeCount
-               ? pImpl->nodeViews[node.index].object
-               : nullptr;
+    return pImpl ? pImpl->view(node).object : nullptr;
 }
 
 const Rectangle* IR::body(Node node) const noexcept
 {
-    return pImpl && node && node.index < pImpl->nodeCount
-               ? pImpl->nodeViews[node.index].body
-               : nullptr;
+    return pImpl ? pImpl->view(node).body : nullptr;
 }
 
 const Text* IR::label(Node node) const noexcept
 {
-    return pImpl && node && node.index < pImpl->nodeCount
-               ? pImpl->nodeViews[node.index].label
-               : nullptr;
+    return pImpl ? pImpl->view(node).label : nullptr;
 }
 
 const Text* IR::detail(Node node) const noexcept
 {
-    return pImpl && node && node.index < pImpl->nodeCount
-               ? pImpl->nodeViews[node.index].detail
-               : nullptr;
+    return pImpl ? pImpl->view(node).detail : nullptr;
 }
 
 const Object* IR::object(Edge edge) const noexcept
 {
-    return pImpl && edge && edge.index < pImpl->edgeCount
-               ? pImpl->edgeViews[edge.index].object
-               : nullptr;
+    return pImpl ? pImpl->view(edge).object : nullptr;
 }
 
 const Text* IR::label(Edge edge) const noexcept
 {
-    return pImpl && edge && edge.index < pImpl->edgeCount
-               ? pImpl->edgeViews[edge.index].label
-               : nullptr;
+    return pImpl ? pImpl->view(edge).label : nullptr;
 }
 
 const Object* IR::object(Zone zone) const noexcept
 {
-    return pImpl && zone && zone.index < pImpl->zoneCount
-               ? pImpl->zoneViews[zone.index].object
-               : nullptr;
+    return pImpl ? pImpl->view(zone).object : nullptr;
 }
 
 const Rectangle* IR::body(Zone zone) const noexcept
 {
-    return pImpl && zone && zone.index < pImpl->zoneCount
-               ? pImpl->zoneViews[zone.index].body
-               : nullptr;
+    return pImpl ? pImpl->view(zone).body : nullptr;
 }
 
 const Text* IR::label(Zone zone) const noexcept
 {
-    return pImpl && zone && zone.index < pImpl->zoneCount
-               ? pImpl->zoneViews[zone.index].label
-               : nullptr;
+    return pImpl ? pImpl->view(zone).label : nullptr;
 }
 
 size_t IR::byteSize() const noexcept
@@ -1260,92 +1132,44 @@ Result validate(const IR& receipt, ConstraintReport& report) noexcept
         auto to = receipt.nodePlacementAt(spec->to.index);
         if (!from || !to) return Result::InvalidArguments;
 
-        if (spec->fromPort != Port::Auto && spec->fromPort != placement->fromPort) {
+        // Reports a check that failed at the edge's source, or at its target when atTarget.
+        auto endpoint = [&](ConstraintCode code, bool atTarget, Port port) {
             ConstraintIssue issue;
-            issue.code = ConstraintCode::EdgePortMismatch;
-            issue.node = spec->from;
+            issue.code = code;
+            issue.node = atTarget ? spec->to : spec->from;
             issue.edge.index = i;
-            issue.endpoint = EdgeEndpoint::From;
-            issue.port = spec->fromPort;
-            if (!report.pImpl->add(issue)) return Result::OutOfMemory;
-        }
-        if (spec->toPort != Port::Auto && spec->toPort != placement->toPort) {
-            ConstraintIssue issue;
-            issue.code = ConstraintCode::EdgePortMismatch;
-            issue.node = spec->to;
-            issue.edge.index = i;
-            issue.endpoint = EdgeEndpoint::To;
-            issue.port = spec->toPort;
-            if (!report.pImpl->add(issue)) return Result::OutOfMemory;
-        }
-        auto fromAttached = _attached(*from, placement->centerline[0],
-                                      placement->fromPort);
-        if (!fromAttached) {
-            ConstraintIssue issue;
-            issue.code = ConstraintCode::EdgeEndpointDetached;
-            issue.node = spec->from;
-            issue.edge.index = i;
-            issue.endpoint = EdgeEndpoint::From;
-            issue.port = placement->fromPort;
-            if (!report.pImpl->add(issue)) return Result::OutOfMemory;
-        }
-        auto toAttached = _attached(
-            *to, placement->centerline[placement->centerlineCount - 1u],
-            placement->toPort);
-        if (!toAttached) {
-            ConstraintIssue issue;
-            issue.code = ConstraintCode::EdgeEndpointDetached;
-            issue.node = spec->to;
-            issue.edge.index = i;
-            issue.endpoint = EdgeEndpoint::To;
-            issue.port = placement->toPort;
-            if (!report.pImpl->add(issue)) return Result::OutOfMemory;
-        }
-        if (fromAttached
-            && !_outwardSegment(placement->centerline[0], placement->centerline[1],
-                                placement->fromPort)) {
-            ConstraintIssue issue;
-            issue.code = ConstraintCode::EdgeEndpointDirection;
-            issue.node = spec->from;
-            issue.edge.index = i;
-            issue.endpoint = EdgeEndpoint::From;
-            issue.port = placement->fromPort;
-            if (!report.pImpl->add(issue)) return Result::OutOfMemory;
-        }
-        if (toAttached
-            && !_outwardSegment(
-                placement->centerline[placement->centerlineCount - 1u],
-                placement->centerline[placement->centerlineCount - 2u],
-                placement->toPort)) {
-            ConstraintIssue issue;
-            issue.code = ConstraintCode::EdgeEndpointDirection;
-            issue.node = spec->to;
-            issue.edge.index = i;
-            issue.endpoint = EdgeEndpoint::To;
-            issue.port = placement->toPort;
-            if (!report.pImpl->add(issue)) return Result::OutOfMemory;
+            issue.endpoint = atTarget ? EdgeEndpoint::To : EdgeEndpoint::From;
+            issue.port = port;
+            return report.pImpl->add(issue);
+        };
+        auto line = placement->centerline;
+        auto last = placement->centerlineCount - 1u;
+        auto fromAttached = _attached(*from, line[0], placement->fromPort);
+        auto toAttached = _attached(*to, line[last], placement->toPort);
+        // Both ends answer one check before the next check runs.
+        if ((spec->fromPort != Port::Auto && spec->fromPort != placement->fromPort
+             && !endpoint(ConstraintCode::EdgePortMismatch, false, spec->fromPort))
+            || (spec->toPort != Port::Auto && spec->toPort != placement->toPort
+                && !endpoint(ConstraintCode::EdgePortMismatch, true, spec->toPort))
+            || (!fromAttached
+                && !endpoint(ConstraintCode::EdgeEndpointDetached, false, placement->fromPort))
+            || (!toAttached
+                && !endpoint(ConstraintCode::EdgeEndpointDetached, true, placement->toPort))
+            || (fromAttached && !_outwardSegment(line[0], line[1], placement->fromPort)
+                && !endpoint(ConstraintCode::EdgeEndpointDirection, false, placement->fromPort))
+            || (toAttached && !_outwardSegment(line[last], line[last - 1u], placement->toPort)
+                && !endpoint(ConstraintCode::EdgeEndpointDirection, true, placement->toPort))) {
+            return Result::OutOfMemory;
         }
 
         auto margin = _routeMargin(receipt.config());
         for (auto j = 0u; j < receipt.nodeCount(); j++) {
             auto node = receipt.nodePlacementAt(j);
             if (!node) return Result::InvalidArguments;
-            auto crosses = false;
-            for (auto k = 1u; k < placement->centerlineCount; k++) {
-                auto padding = margin;
-                if ((j == spec->from.index && k == 1u)
-                    || (j == spec->to.index
-                        && k + 1u == placement->centerlineCount)) {
-                    padding = 0.0f;
-                }
-                if (!_crosses(placement->centerline[k - 1u], placement->centerline[k],
-                              node->center, node->size, padding)) {
-                    continue;
-                }
-                crosses = true;
-                break;
+            if (!_routeCrosses(line, placement->centerlineCount, node->center, node->size, margin,
+                               j == spec->from.index, j == spec->to.index)) {
+                continue;
             }
-            if (!crosses) continue;
             ConstraintIssue issue;
             issue.code = ConstraintCode::RouteCrossesNode;
             issue.node.index = j;
@@ -1441,65 +1265,47 @@ Group* Built::annotations() const noexcept
 
 Object* Built::object(Node node) const noexcept
 {
-    return pImpl && node && node.index < pImpl->nodeCount
-               ? pImpl->nodeViews[node.index].object
-               : nullptr;
+    return pImpl ? pImpl->receipt->pImpl->view(node).object : nullptr;
 }
 
 Rectangle* Built::body(Node node) const noexcept
 {
-    return pImpl && node && node.index < pImpl->nodeCount
-               ? pImpl->nodeViews[node.index].body
-               : nullptr;
+    return pImpl ? pImpl->receipt->pImpl->view(node).body : nullptr;
 }
 
 Text* Built::label(Node node) const noexcept
 {
-    return pImpl && node && node.index < pImpl->nodeCount
-               ? pImpl->nodeViews[node.index].label
-               : nullptr;
+    return pImpl ? pImpl->receipt->pImpl->view(node).label : nullptr;
 }
 
 Text* Built::detail(Node node) const noexcept
 {
-    return pImpl && node && node.index < pImpl->nodeCount
-               ? pImpl->nodeViews[node.index].detail
-               : nullptr;
+    return pImpl ? pImpl->receipt->pImpl->view(node).detail : nullptr;
 }
 
 Object* Built::object(Edge edge) const noexcept
 {
-    return pImpl && edge && edge.index < pImpl->edgeCount
-               ? pImpl->edgeViews[edge.index].object
-               : nullptr;
+    return pImpl ? pImpl->receipt->pImpl->view(edge).object : nullptr;
 }
 
 Text* Built::label(Edge edge) const noexcept
 {
-    return pImpl && edge && edge.index < pImpl->edgeCount
-               ? pImpl->edgeViews[edge.index].label
-               : nullptr;
+    return pImpl ? pImpl->receipt->pImpl->view(edge).label : nullptr;
 }
 
 Object* Built::object(Zone zone) const noexcept
 {
-    return pImpl && zone && zone.index < pImpl->zoneCount
-               ? pImpl->zoneViews[zone.index].object
-               : nullptr;
+    return pImpl ? pImpl->receipt->pImpl->view(zone).object : nullptr;
 }
 
 Rectangle* Built::body(Zone zone) const noexcept
 {
-    return pImpl && zone && zone.index < pImpl->zoneCount
-               ? pImpl->zoneViews[zone.index].body
-               : nullptr;
+    return pImpl ? pImpl->receipt->pImpl->view(zone).body : nullptr;
 }
 
 Text* Built::label(Zone zone) const noexcept
 {
-    return pImpl && zone && zone.index < pImpl->zoneCount
-               ? pImpl->zoneViews[zone.index].label
-               : nullptr;
+    return pImpl ? pImpl->receipt->pImpl->view(zone).label : nullptr;
 }
 
 const IR* Built::ir() const noexcept

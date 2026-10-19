@@ -683,9 +683,9 @@ Result layoutNodes(const Config& config, const NodeRecord* nodes, uint32_t nodeC
             || layouts[i].rank >= Diagram::NodeLimit) {
             return Result::InvalidArguments;
         }
-        auto half = _mul(layouts[i].size, 0.5f);
-        auto minimum = _sub(layouts[i].center, half);
-        auto maximum = _add(layouts[i].center, half);
+        auto half = layouts[i].size * 0.5f;
+        auto minimum = layouts[i].center - half;
+        auto maximum = layouts[i].center + half;
         auto labelOffset = layouts[i].size.y * 0.27f;
         if (!_finite(minimum) || !_finite(maximum)
             || !_finite(layouts[i].center.y + labelOffset)
@@ -703,8 +703,8 @@ Result layoutZones(const Config& config, const ZoneRecord* zones, uint32_t zoneC
     for (auto i = 0u; i < zoneCount; i++) {
         auto& record = zones[i];
         auto& first = layouts[record.members[0].index];
-        auto minimum = _sub(first.center, _mul(first.size, 0.5f));
-        auto maximum = _add(first.center, _mul(first.size, 0.5f));
+        auto minimum = first.center - first.size * 0.5f;
+        auto maximum = first.center + first.size * 0.5f;
         for (auto j = 1u; j < record.memberCount; j++) {
             auto& member = layouts[record.members[j].index];
             minimum.x = std::fmin(minimum.x, member.center.x - member.size.x * 0.5f);
@@ -724,8 +724,8 @@ Result layoutZones(const Config& config, const ZoneRecord* zones, uint32_t zoneC
         minimum.y -= config.zonePadding;
         maximum.x += config.zonePadding;
         maximum.y += config.zonePadding * 1.45f;
-        zoneLayouts[i].center = _mul(_add(minimum, maximum), 0.5f);
-        zoneLayouts[i].size = _sub(maximum, minimum);
+        zoneLayouts[i].center = (minimum + maximum) * 0.5f;
+        zoneLayouts[i].size = maximum - minimum;
         auto labelPoint = Vec2{minimum.x + config.zonePadding * 0.35f,
                                maximum.y - config.zonePadding * 0.55f};
         if (!_finite(zoneLayouts[i].center) || !_finite(zoneLayouts[i].size)
