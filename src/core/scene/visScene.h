@@ -566,7 +566,6 @@ struct SceneStage
 {
     Scene* scene = nullptr;
     float start = 0.0f;
-    float begin = 0.0f;
     float end = 0.0f;
 };
 
@@ -743,19 +742,10 @@ struct Scene::Impl
 
     ~Impl();
     bool assign(const Theme& theme) noexcept;
-    bool growObjects(uint32_t count = 1) noexcept;
     bool growClips(uint32_t count) noexcept;
     // Adds the clip at index, the last one stored, to the list of the object it names. Every
     // clip is linked once its object is set, before anything samples that object.
     void link(uint32_t index) noexcept;
-    bool growCameras() noexcept;
-    // The latest time a camera move runs until, or 0 without one.
-    float cameraEnd() const noexcept;
-    // The earliest time after begin and before end at which the stored camera moves show the 2D
-    // view, or a negative number when they show the 3D view throughout.
-    float planarSince(float begin, float end) const noexcept;
-    bool growViewports() noexcept;
-    bool growViews() noexcept;
     // The camera timeline of the scene, or of view index - 1 for an index from 1.
     CameraTrack track(uint32_t index) noexcept;
     // Add a look or an orbit to track after the checks of Scene::look() and Scene::orbit() that
@@ -766,21 +756,15 @@ struct Scene::Impl
                  const AnimCurve& curve) noexcept;
     // How view index shows at time (see ViewFrame).
     Result frame(uint32_t index, float time, ViewFrame& frame) const noexcept;
-    bool growMarkers() noexcept;
     // Makes room for count more handoffs.
     bool growHandoffs(uint32_t count = 1u) noexcept;
-    bool growSaves(uint32_t count) noexcept;
-    bool growPaths() noexcept;
     // Copies the outline of source into the parent space of follower, or reuses a copy.
     Result follow(const Object* source, const Object* follower, uint32_t& index, bool relative = false) noexcept;
     void dropPaths(uint32_t count, uint32_t vertices) noexcept;
-    bool growMorphs() noexcept;
     // Pairs the outlines of a morph from its target to its related object, or the points of two
     // surfaces with the colors sampled between them, as the index of the pair.
     Result pair(const Animation& animation, uint32_t& index) noexcept;
     void dropMorphs(uint32_t count, uint32_t points) noexcept;
-    // Makes room for count more warps.
-    bool growWarps(uint32_t count) noexcept;
     // A copy of shape for a geometry clip, or nullptr when memory or the point budget runs out;
     // a copy of the same shape as reuse is reuse itself.
     const GeometryShape* reshape(const GeometryShape& shape, const GeometryShape* reuse = nullptr) noexcept;

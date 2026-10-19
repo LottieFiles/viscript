@@ -9,6 +9,7 @@
 #include "visDiagram.h"
 #include "visDiagramGeometry.h"
 #include "../common/visFinite.h"
+#include "../common/visSort.h"
 
 namespace vis::diagram::detail
 {
@@ -394,7 +395,7 @@ static Result _reflowRanked(const Config& config, const NodeRecord* nodes,
         auto candidateCapacity = static_cast<size_t>(intervalCount)
                                      * (2u + 4u * automaticCount)
                                  + separationCandidates + 1u;
-        auto candidates = new (std::nothrow) double[candidateCapacity];
+        auto candidates = new (std::nothrow) double[2u * candidateCapacity];
         if (!candidates) return Result::OutOfMemory;
         auto candidateCount = 0u;
         auto blockCenter = (blockMinimum + blockMaximum) * 0.5;
@@ -442,7 +443,11 @@ static Result _reflowRanked(const Config& config, const NodeRecord* nodes,
             }
         }
 
-        std::sort(candidates, candidates + candidateCount, _shiftLess);
+        stableSort(candidates, candidates + candidateCount, candidateCount,
+                   sizeof(double), [](const void* a, const void* b, const void*) {
+                       return _shiftLess(*static_cast<const double*>(a),
+                                         *static_cast<const double*>(b));
+                   });
         auto placed = false;
         for (auto i = 0u; i < candidateCount; i++) {
             if (i && candidates[i] == candidates[i - 1u]) continue;

@@ -30,6 +30,7 @@ extern "C" {
 
 #include "vis.h"
 #include "../common/visConstants.h"
+#include "../common/visSort.h"
 #include "visCode.h"
 #include "visLuaExtension.h"
 #include "visLuaApi.h"
@@ -4160,7 +4161,7 @@ static void _plotDiscontinuities(lua_State* lua, int index, LuaPlotCut& cut)
     auto size = lua_rawlen(lua, -1);
     if (size > LUA_POINT_LIMIT) luaL_error(lua, "discontinuities must hold at most %u numbers", LUA_POINT_LIMIT);
     auto count = static_cast<uint32_t>(size);
-    auto breaks = static_cast<double*>(lua_newuserdatauv(lua, sizeof(double) * (count ? count : 1u), 0));
+    auto breaks = static_cast<double*>(lua_newuserdatauv(lua, 2u * sizeof(double) * (count ? count : 1u), 0));
     for (auto i = 0u; i < count; i++) {
         lua_rawgeti(lua, -2, static_cast<lua_Integer>(i) + 1);
         auto number = 0;
@@ -4168,7 +4169,9 @@ static void _plotDiscontinuities(lua_State* lua, int index, LuaPlotCut& cut)
         if (!number || !std::isfinite(breaks[i])) luaL_error(lua, "discontinuities must be finite numbers");
         lua_pop(lua, 1);
     }
-    std::sort(breaks, breaks + count);
+    stableSort(breaks, breaks + count, count, sizeof(double), [](const void* a, const void* b, const void*) {
+        return *static_cast<const double*>(a) < *static_cast<const double*>(b);
+    });
     // The buffer takes the place of the table, so it stays on the stack while the plot is read.
     lua_replace(lua, -2);
     cut.breaks = breaks;

@@ -11,7 +11,6 @@
 //  / Saving and restoring / Warps / Runtime modifiers and camera input / Cameras and views
 //  / Frames and queries
 
-#include <algorithm>
 #include <atomic>
 #include <cmath>
 #include <cstdio>
@@ -28,6 +27,7 @@
 #include "visTimeline.h"
 #include "../common/visHash.h"
 #include "../common/visConstants.h"
+#include "../common/visGrow.h"
 #include "../common/visString.h"
 #include "visSceneValidation.h"
 #include "visWarp.h"
@@ -1192,13 +1192,7 @@ static VisualState _state(const Object* object)
     state.blur = object->blur;
     state.shadow = object->shadow;
     state.layer = object->layer;
-    state.fillProgress = 1.0f;
-    state.pixelScale = 1.0f;
     state.gradient = object->style.gradient;
-    state.direction = DrawDirection::Forward;
-    state.morph = nullptr;
-    state.morphShape = nullptr;
-    state.morphProgress = 0.0f;
     // A copy starts from the warp its source showed (see Scene::clone()); any other object
     // starts from its own geometry, whatever warps follow.
     if (auto born = bornWarp(object)) {
@@ -1515,9 +1509,6 @@ static VisualState _lerp(const VisualState& from, const VisualState& to, float p
     }
     state.traceFill = bounded < 1.0f ? from.traceFill : to.traceFill;
     state.direction = bounded < 1.0f ? from.direction : to.direction;
-    state.morph = nullptr;
-    state.morphShape = nullptr;
-    state.morphProgress = 0.0f;
     // A warp's points travel straight, past their images too when the curve overshoots.
     state.warp = to.warp;
     state.warpProgress = from.warp == to.warp ? to.warpProgress : progress;
@@ -2080,7 +2071,7 @@ Result Scene::Impl::follow(const Object* source, const Object* follower, uint32_
     auto parent = Mat4::identity();
     if (follower && !_inverse(_parentWorld(follower), parent)) return impl.fail(Result::InvalidArguments, MOTION_SPACE);
     if (source->type() == Type::Connector) {
-        if (!impl.growPaths()) return Result::OutOfMemory;
+        if (!grow(impl.paths, impl.pathCnt, impl.pathCap, 1u, 4u)) return Result::OutOfMemory;
         MotionPath path;
         path.source = source;
         path.parent = follower->parent();
@@ -2098,7 +2089,7 @@ Result Scene::Impl::follow(const Object* source, const Object* follower, uint32_
             return Result::Success;
         }
     }
-    if (!impl.growPaths()) return Result::OutOfMemory;
+    if (!grow(impl.paths, impl.pathCnt, impl.pathCap, 1u, 4u)) return Result::OutOfMemory;
     MotionPath path;
     auto result = _motionPath(source, space, path, relative);
     if (result == Result::InvalidArguments) return impl.fail(result, MOTION_OUTLINE);
@@ -2133,7 +2124,7 @@ void Scene::Impl::dropPaths(uint32_t count, uint32_t vertices) noexcept
 Result Scene::Impl::pair(const Animation& animation, uint32_t& index) noexcept
 {
     auto& impl = *this;
-    if (!impl.growMorphs()) return impl.fail(Result::OutOfMemory, SCENE_MEMORY);
+    if (!grow(impl.morphs, impl.morphCnt, impl.morphCap, 1u, 4u)) return impl.fail(Result::OutOfMemory, SCENE_MEMORY);
     MorphShape shape;
     auto multi = animation.target->type() != Type::SurfaceMesh
                  && (_morphPieceCount(animation.target) != 1u || _morphPieceCount(animation.related) != 1u);
@@ -2205,16 +2196,7 @@ const GeometryShape* Scene::Impl::reshape(const GeometryShape& shape, const Geom
     if (reuse && _same(*reuse, shape)) return reuse;
     auto total = shape.count + shape.samples.count;
     if (total > MAX_GEOMETRY_POINTS - geometryPoints) return nullptr;
-    if (geometryCnt == geometryCap) {
-        auto capacity = geometryCap ? geometryCap * 2u : 8u;
-        if (capacity < geometryCap) return nullptr;
-        auto grown = new (std::nothrow) GeometryShape*[capacity];
-        if (!grown) return nullptr;
-        if (geometryCnt) std::memcpy(grown, geometries, sizeof(GeometryShape*) * geometryCnt);
-        delete[] geometries;
-        geometries = grown;
-        geometryCap = capacity;
-    }
+    if (!grow(geometries, geometryCnt, geometryCap, 1u, 8u)) return nullptr;
     auto copy = new (std::nothrow) GeometryShape;
     auto points = copy && shape.count ? new (std::nothrow) Vec3[shape.count] : nullptr;
     auto ends = copy && shape.pieces > 1u ? new (std::nothrow) uint32_t[shape.pieces] : nullptr;
@@ -2471,52 +2453,9 @@ bool Scene::Impl::assign(const Theme& theme) noexcept
     return true;
 }
 
-bool Scene::Impl::growObjects(uint32_t count) noexcept
-{
-    if (count > UINT32_MAX - objectCnt) return false;
-    auto required = objectCnt + count;
-    if (required <= objectCap) return true;
-    auto capacity = objectCap ? objectCap * 2u : 8u;
-    if (capacity < objectCap) capacity = required;
-    while (capacity < required) {
-        if (capacity > UINT32_MAX / 2u) {
-            capacity = required;
-            break;
-        }
-        capacity *= 2u;
-    }
-    auto grown = new (std::nothrow) ObjectEntry[capacity];
-    if (!grown) return false;
-    for (auto i = 0u; i < objectCnt; i++)
-        grown[i] = objects[i];
-    delete[] objects;
-    objects = grown;
-    objectCap = capacity;
-    return true;
-}
-
 bool Scene::Impl::growClips(uint32_t count) noexcept
 {
-    if (count > UINT32_MAX - clipCnt) return false;
-    auto required = clipCnt + count;
-    if (required <= clipCap) return true;
-    auto capacity = clipCap ? clipCap * 2 : 16;
-    if (capacity < clipCap) capacity = required;
-    while (capacity < required) {
-        if (capacity > UINT32_MAX / 2u) {
-            capacity = required;
-            break;
-        }
-        capacity *= 2;
-    }
-    auto grown = new (std::nothrow) Clip[capacity];
-    if (!grown) return false;
-    for (auto i = 0u; i < clipCnt; i++)
-        grown[i] = clips[i];
-    delete[] clips;
-    clips = grown;
-    clipCap = capacity;
-    return true;
+    return grow(clips, clipCnt, clipCap, count, 16u);
 }
 
 void Scene::Impl::link(uint32_t index) noexcept
@@ -2532,26 +2471,7 @@ void Scene::Impl::link(uint32_t index) noexcept
     work += item->family;
 }
 
-static bool _growCameras(CameraClip*& cameras, uint32_t cameraCnt, uint32_t& cameraCap) noexcept
-{
-    if (cameraCnt < cameraCap) return true;
-    auto capacity = cameraCap ? cameraCap * 2u : 4u;
-    if (capacity < cameraCap) return false;
-    auto grown = new (std::nothrow) CameraClip[capacity];
-    if (!grown) return false;
-    for (auto i = 0u; i < cameraCnt; i++)
-        grown[i] = cameras[i];
-    delete[] cameras;
-    cameras = grown;
-    cameraCap = capacity;
-    return true;
-}
-
-bool Scene::Impl::growCameras() noexcept
-{
-    return _growCameras(cameras, cameraCnt, cameraCap);
-}
-
+// The latest time a camera move runs until, or 0 without one.
 static float _cameraEnd(const CameraClip* cameras, uint32_t cameraCnt) noexcept
 {
     auto end = 0.0f;
@@ -2559,11 +2479,8 @@ static float _cameraEnd(const CameraClip* cameras, uint32_t cameraCnt) noexcept
     return end;
 }
 
-float Scene::Impl::cameraEnd() const noexcept
-{
-    return _cameraEnd(cameras, cameraCnt);
-}
-
+// The earliest time after begin and before end at which the stored camera moves show the 2D
+// view, or a negative number when they show the 3D view throughout.
 static float _planarSince(const CameraClip* cameras, uint32_t cameraCnt, CameraView initialView,
                           float begin, float end) noexcept
 {
@@ -2606,48 +2523,11 @@ static float _planarSince(const CameraClip* cameras, uint32_t cameraCnt, CameraV
     return earliest;
 }
 
-float Scene::Impl::planarSince(float begin, float end) const noexcept
-{
-    return _planarSince(cameras, cameraCnt, initialView, begin, end);
-}
-
-bool Scene::Impl::growViewports() noexcept
-{
-    if (viewportCnt < viewportCap) return true;
-    auto capacity = viewportCap ? viewportCap * 2u : 4u;
-    if (capacity < viewportCap || capacity > MAX_VIEWPORTS) capacity = MAX_VIEWPORTS;
-    if (capacity <= viewportCnt) return false;
-    auto grown = new (std::nothrow) ViewportEntry[capacity];
-    if (!grown) return false;
-    for (auto i = 0u; i < viewportCnt; i++)
-        grown[i] = viewports[i];
-    delete[] viewports;
-    viewports = grown;
-    viewportCap = capacity;
-    return true;
-}
-
 ViewEntry::~ViewEntry()
 {
     delete[] hidden;
     delete[] cameras;
     delete[] fades;
-}
-
-bool Scene::Impl::growViews() noexcept
-{
-    if (viewCnt < viewCap) return true;
-    auto capacity = viewCap ? viewCap * 2u : 4u;
-    if (capacity < viewCap || capacity > MAX_VIEWS) capacity = MAX_VIEWS;
-    if (capacity <= viewCnt) return false;
-    auto grown = new (std::nothrow) ViewEntry*[capacity];
-    if (!grown) return false;
-    for (auto i = 0u; i < viewCnt; i++)
-        grown[i] = views[i];
-    delete[] views;
-    views = grown;
-    viewCap = capacity;
-    return true;
 }
 
 CameraTrack Scene::Impl::track(uint32_t index) noexcept
@@ -2658,91 +2538,9 @@ CameraTrack Scene::Impl::track(uint32_t index) noexcept
             view.camera, view.cameraView};
 }
 
-bool Scene::Impl::growMarkers() noexcept
-{
-    if (markerCnt < markerCap) return true;
-    auto capacity = markerCap ? markerCap * 2u : 8u;
-    if (capacity > MAX_MARKERS) capacity = MAX_MARKERS;
-    if (capacity <= markerCnt) return false;
-    auto grown = new (std::nothrow) SceneMarker[capacity];
-    if (!grown) return false;
-    for (auto i = 0u; i < markerCnt; i++)
-        grown[i] = markers[i];
-    delete[] markers;
-    markers = grown;
-    markerCap = capacity;
-    return true;
-}
-
 bool Scene::Impl::growHandoffs(uint32_t count) noexcept
 {
-    if (count <= handoffCap - handoffCnt) return true;
-    auto capacity = handoffCap ? handoffCap : 8u;
-    while (count > capacity - handoffCnt) {
-        if (capacity > UINT32_MAX / 2u) return false;
-        capacity *= 2u;
-    }
-    auto grown = new (std::nothrow) SceneHandoff[capacity];
-    if (!grown) return false;
-    for (auto i = 0u; i < handoffCnt; i++)
-        grown[i] = handoffs[i];
-    delete[] handoffs;
-    handoffs = grown;
-    handoffCap = capacity;
-    return true;
-}
-
-bool Scene::Impl::growSaves(uint32_t count) noexcept
-{
-    if (count > UINT32_MAX - saveCnt) return false;
-    auto required = saveCnt + count;
-    if (required <= saveCap) return true;
-    auto capacity = saveCap ? saveCap : 8u;
-    while (capacity < required) {
-        if (capacity > UINT32_MAX / 2u) {
-            capacity = required;
-            break;
-        }
-        capacity *= 2u;
-    }
-    auto grown = new (std::nothrow) SavedState[capacity];
-    if (!grown) return false;
-    for (auto i = 0u; i < saveCnt; i++)
-        grown[i] = saves[i];
-    delete[] saves;
-    saves = grown;
-    saveCap = capacity;
-    return true;
-}
-
-bool Scene::Impl::growPaths() noexcept
-{
-    if (pathCnt < pathCap) return true;
-    auto capacity = pathCap ? pathCap * 2u : 4u;
-    if (capacity < pathCap) return false;
-    auto grown = new (std::nothrow) MotionPath[capacity];
-    if (!grown) return false;
-    for (auto i = 0u; i < pathCnt; i++)
-        grown[i] = paths[i];
-    delete[] paths;
-    paths = grown;
-    pathCap = capacity;
-    return true;
-}
-
-bool Scene::Impl::growMorphs() noexcept
-{
-    if (morphCnt < morphCap) return true;
-    auto capacity = morphCap ? morphCap * 2u : 4u;
-    if (capacity < morphCap) return false;
-    auto grown = new (std::nothrow) MorphShape[capacity];
-    if (!grown) return false;
-    for (auto i = 0u; i < morphCnt; i++)
-        grown[i] = morphs[i];
-    delete[] morphs;
-    morphs = grown;
-    morphCap = capacity;
-    return true;
+    return grow(handoffs, handoffCnt, handoffCap, count, 8u);
 }
 
 void Scene::Impl::advance(float time) noexcept
@@ -3843,7 +3641,7 @@ Result Scene::attach(Object* object, Object* parent) noexcept
         delete[] tree;
         return Result::OutOfMemory;
     }
-    if (!pImpl->growObjects(count)) {
+    if (!grow(pImpl->objects, pImpl->objectCnt, pImpl->objectCap, count, 8u, MAX_OBJECTS)) {
         for (auto i = 0u; i < count; i++)
             delete[] fonts[i];
         delete[] fonts;
@@ -4932,7 +4730,9 @@ Result Scene::viewport(Scene* scene, const Viewport& viewport) noexcept
     auto childDepth = depth(scene);
     if (childDepth > MAX_VIEWPORT_DEPTH - ancestors) return pImpl->fail(Result::InsufficientCondition, VIEWPORT_LIMIT);
     if (pImpl->viewportCnt >= MAX_VIEWPORTS) return pImpl->fail(Result::InsufficientCondition, VIEWPORT_LIMIT);
-    if (!pImpl->growViewports()) return pImpl->fail(Result::OutOfMemory, SCENE_MEMORY);
+    if (!grow(pImpl->viewports, pImpl->viewportCnt, pImpl->viewportCap, 1u, 4u, MAX_VIEWPORTS)) {
+        return pImpl->fail(Result::OutOfMemory, SCENE_MEMORY);
+    }
     auto& entry = pImpl->viewports[pImpl->viewportCnt++];
     entry.scene = scene;
     entry.viewport = viewport;
@@ -5119,7 +4919,6 @@ Result Scene::transition(Scene* const* scenes, uint32_t count, const Viewport& v
     for (auto i = 0u; i < count; i++) {
         auto& stage = sequence->stages[i];
         stage.scene = scenes[i];
-        stage.begin = cursor;
         stage.start = i ? sequence->transitions[i - 1u].begin : cursor;
         stage.end = cursor;
         auto hold = holds[holdCount == 1u ? 0u : i];
@@ -8100,7 +7899,7 @@ Result Scene::save(Object* const* targets, uint32_t count) noexcept
         if (family > MAX_ANIMATION_GROUP - total) return impl.fail(Result::InvalidArguments, SAVE_GROUP);
         total += family;
     }
-    if (!impl.growSaves(count)) return impl.fail(Result::OutOfMemory, SCENE_MEMORY);
+    if (!grow(impl.saves, impl.saveCnt, impl.saveCap, count, 8u)) return impl.fail(Result::OutOfMemory, SCENE_MEMORY);
     // Every target is recorded before any joins the stacks, so a failure leaves them as they were.
     auto first = impl.saveCnt;
     for (auto i = 0u; i < count; i++) {
@@ -8410,25 +8209,6 @@ Result Scene::restore(Object* const* targets, uint32_t count, float duration, co
 
 // ---------- Warps ----------
 
-// Points the warps of one scene keep in all, each before and after: 48 MB at most.
-bool Scene::Impl::growWarps(uint32_t count) noexcept
-{
-    if (count <= warpCap - warpCnt) return true;
-    auto capacity = warpCap ? warpCap : 4u;
-    while (capacity - warpCnt < count) {
-        if (capacity > UINT32_MAX / 2u) return false;
-        capacity *= 2u;
-    }
-    auto grown = new (std::nothrow) WarpShape*[capacity];
-    if (!grown) return false;
-    for (auto i = 0u; i < warpCnt; i++)
-        grown[i] = warps[i];
-    delete[] warps;
-    warps = grown;
-    warpCap = capacity;
-    return true;
-}
-
 // An object a warp moves, with the matrix from its local space to the parent space of its target.
 struct WarpItem
 {
@@ -8570,7 +8350,7 @@ Result Scene::warp(Object* const* targets, uint32_t count, PointMap map, void* d
         }
         points += item.shape->count;
     }
-    if (!impl.growWarps(used) || !impl.growClips(used)) {
+    if (!grow(impl.warps, impl.warpCnt, impl.warpCap, used, 4u) || !impl.growClips(used)) {
         release();
         return impl.fail(Result::OutOfMemory, SCENE_MEMORY);
     }
@@ -8755,7 +8535,7 @@ Result Scene::Impl::look(const CameraTrack& track, const Camera& camera, CameraV
             if (planar >= 0.0f) return fail(Result::InsufficientCondition, _planarReason(reason, planar));
         }
     }
-    if (!_growCameras(track.clips, track.count, track.capacity)) return fail(Result::OutOfMemory, SCENE_MEMORY);
+    if (!grow(track.clips, track.count, track.capacity, 1u, 4u)) return fail(Result::OutOfMemory, SCENE_MEMORY);
     if (!track.count) {
         track.initial = track.camera;
         track.initialView = track.view;
@@ -8824,7 +8604,7 @@ Result Scene::Impl::orbit(const CameraTrack& track, float angle, const Vec3& axi
                                    std::numeric_limits<float>::infinity());
         if (planar >= 0.0f) return fail(Result::InsufficientCondition, _planarReason(reason, planar));
     }
-    if (!_growCameras(track.clips, track.count, track.capacity)) return fail(Result::OutOfMemory, SCENE_MEMORY);
+    if (!grow(track.clips, track.count, track.capacity, 1u, 4u)) return fail(Result::OutOfMemory, SCENE_MEMORY);
     if (!track.count) {
         track.initial = track.camera;
         track.initialView = track.view;
@@ -8866,7 +8646,9 @@ Result Scene::view(const SceneView& view, uint32_t* index) noexcept
         if (!view.hidden[i] || !pImpl->entry(view.hidden[i])) return pImpl->fail(Result::InvalidArguments, VIEW_OBJECT);
     }
     if (pImpl->viewCnt >= MAX_VIEWS) return pImpl->fail(Result::InsufficientCondition, VIEW_LIMIT);
-    if (!pImpl->growViews()) return pImpl->fail(Result::OutOfMemory, SCENE_MEMORY);
+    if (!grow(pImpl->views, pImpl->viewCnt, pImpl->viewCap, 1u, 4u, MAX_VIEWS)) {
+        return pImpl->fail(Result::OutOfMemory, SCENE_MEMORY);
+    }
     auto entry = new (std::nothrow) ViewEntry;
     if (!entry) return pImpl->fail(Result::OutOfMemory, SCENE_MEMORY);
     if (view.hiddenCount) {
@@ -8935,16 +8717,7 @@ Result Scene::fade(uint32_t view, float opacity, float duration, const AnimCurve
     if (!_timeline(cursor, duration, 0.0f, 1u, nextCursor)) {
         return pImpl->fail(Result::InvalidArguments, TIMELINE_RANGE);
     }
-    if (entry.fadeCnt == entry.fadeCap) {
-        auto capacity = entry.fadeCap ? entry.fadeCap * 2u : 4u;
-        auto grown = capacity > entry.fadeCap ? new (std::nothrow) ViewFade[capacity] : nullptr;
-        if (!grown) return pImpl->fail(Result::OutOfMemory, SCENE_MEMORY);
-        for (auto i = 0u; i < entry.fadeCnt; i++)
-            grown[i] = entry.fades[i];
-        delete[] entry.fades;
-        entry.fades = grown;
-        entry.fadeCap = capacity;
-    }
+    if (!grow(entry.fades, entry.fadeCnt, entry.fadeCap, 1u, 4u)) return pImpl->fail(Result::OutOfMemory, SCENE_MEMORY);
     auto& fade = entry.fades[entry.fadeCnt++];
     fade.begin = cursor;
     fade.end = nextCursor;

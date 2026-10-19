@@ -6,6 +6,7 @@
 
 #include "vis.h"
 #include "visDisplayList.h"
+#include "../common/visSort.h"
 
 // DisplayList::split(): the painter's order of a 3D scene sorts every drawing as one piece, so a
 // stroke partly behind a surface would draw wholly in front of it or wholly behind it. split()
@@ -210,7 +211,7 @@ struct DepthState
     uint32_t stamp = 0;
     DepthGroup* groups = nullptr;
     uint32_t groupCount = 0;
-    // The faces near the point _range() tests, one for each face at most.
+    // The faces near the point _range() tests, one for each face at most, and room to sort them.
     DepthVote* votes = nullptr;
 
     DepthState() = default;
@@ -420,7 +421,9 @@ DepthRange _range(DepthState& state, const DepthGroup& group, const Vec2& p, flo
     // Below every key, every face in front fails to hide the drawing; each key passed mends a
     // face in front or wrongs a face behind.
     auto vote = state.votes;
-    std::sort(vote, vote + votes, [](const DepthVote& a, const DepthVote& b) { return a.key < b.key; });
+    stableSort(vote, vote + state.faceCount, votes, sizeof(DepthVote), [](const void* a, const void* b, const void*) {
+        return static_cast<const DepthVote*>(a)->key < static_cast<const DepthVote*>(b)->key;
+    });
     auto wrong = 0.0f;
     for (auto i = 0u; i < votes; i++) {
         if (vote[i].front) wrong += vote[i].weight;
@@ -686,7 +689,7 @@ Result DisplayList::split(const Config& config) noexcept
     state.order = new (std::nothrow) uint32_t[state.faceCount];
     state.stamps = new (std::nothrow) uint32_t[state.faceCount];
     state.groups = new (std::nothrow) DepthGroup[state.faceCount];
-    state.votes = new (std::nothrow) DepthVote[state.faceCount];
+    state.votes = new (std::nothrow) DepthVote[2u * state.faceCount];
     if (!state.faces || !state.order || !state.stamps || !state.groups || !state.votes) return Result::OutOfMemory;
     auto faceIndex = 0u;
     for (auto i = 0u; i < count; i++) {

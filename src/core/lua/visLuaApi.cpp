@@ -12,6 +12,7 @@ extern "C" {
 #include "visLuaBudget.h"
 #include "visLuaExtension.h"
 #include "visLuaTracker.h"
+#include "../common/visSort.h"
 
 namespace vis
 {
@@ -93,8 +94,10 @@ struct LuaKey
     bool isInteger;
 };
 
-static bool _keyBefore(const LuaKey& a, const LuaKey& b)
+static bool _keyBefore(const void* first, const void* second, const void*)
 {
+    auto& a = *static_cast<const LuaKey*>(first);
+    auto& b = *static_cast<const LuaKey*>(second);
     if (!a.string != !b.string) return !a.string;
     if (a.string) {
         auto common = std::min(a.size, b.size);
@@ -121,8 +124,8 @@ static int _keys(lua_State* lua)
         }
         count++;
     }
-    if (static_cast<lua_Unsigned>(count) > LUA_MEMORY_LIMIT / sizeof(LuaKey)) return luaL_error(lua, "table has too many keys");
-    auto keys = static_cast<LuaKey*>(lua_newuserdatauv(lua, sizeof(LuaKey) * static_cast<size_t>(count), 0));
+    if (static_cast<lua_Unsigned>(count) > LUA_MEMORY_LIMIT / (2u * sizeof(LuaKey))) return luaL_error(lua, "table has too many keys");
+    auto keys = static_cast<LuaKey*>(lua_newuserdatauv(lua, 2u * sizeof(LuaKey) * static_cast<size_t>(count), 0));
     auto size = 0u;
     lua_pushnil(lua);
     while (lua_next(lua, 1)) {
@@ -134,7 +137,7 @@ static int _keys(lua_State* lua)
         // The table keeps its string keys alive while the result is built.
         key.string = lua_type(lua, -1) == LUA_TSTRING ? lua_tolstring(lua, -1, &key.size) : nullptr;
     }
-    std::sort(keys, keys + size, _keyBefore);
+    stableSort(keys, keys + size, size, sizeof(LuaKey), _keyBefore);
     lua_createtable(lua, static_cast<int>(size), 0);
     for (auto i = 0u; i < size; i++) {
         auto& key = keys[i];

@@ -1,6 +1,5 @@
 // DisplayList::blend(): a display list part way between two others, with matched commands
 // interpolated and the rest cross-faded.
-#include <algorithm>
 #include <cmath>
 #include <cstring>
 #include <limits>
@@ -462,7 +461,7 @@ Result DisplayList::blend(const DisplayList& from, const DisplayList& to,
     composite = 0u;
     visualKind = LayoutVisualKind::Stable;
     visualOpacity = 255u;
-    if (result == Result::Success) sort();
+    if (result == Result::Success) result = sort();
     return result;
 }
 

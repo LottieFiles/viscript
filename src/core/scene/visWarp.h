@@ -11,6 +11,7 @@ namespace vis
 
 struct WarpDraft
 {
+    // Points the warps of one scene keep in all, each before and after: 48 MB at most.
     static constexpr uint32_t PointLimit = 2097152;
     Vec3* points = nullptr;
     WarpRun* runs = nullptr;

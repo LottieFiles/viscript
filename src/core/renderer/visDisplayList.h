@@ -94,7 +94,6 @@ struct DrawCommand
     float slant = 0.0f;
     bool tabular = false;
     float number = 0.0f;
-    float rotation = 0.0f;
     float depth = 0.0f;
     // Per-point screen-linear depth: reciprocal camera distance in perspective, distance
     // in orthographic. Present for unfilled single-contour strokes and surface/point commands;
@@ -177,7 +176,8 @@ struct DisplayList
     bool masking(const DrawCommand& command) const noexcept;
     // Orders the commands back to front. Layers keep their drawings together: a layer takes
     // the place of its first drawing among its siblings, and its drawings sort within it.
-    void sort() noexcept;
+    // OutOfMemory leaves the commands in their order.
+    Result sort() noexcept;
     // Resolves surface occlusion within the same 3D layer/composite before sort().
     // Only unfilled single-contour strokes, route heads, points and numbers participate;
     // filled paths, text and pictures remain whole. At most 256 pieces/stroke and 8192 extra

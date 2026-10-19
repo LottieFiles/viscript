@@ -5,6 +5,7 @@
 
 #include "vis.h"
 #include "visScene.h"
+#include "../common/visSort.h"
 
 namespace vis
 {
@@ -168,36 +169,24 @@ static bool _near(const BooleanPoint& a, const BooleanPoint& b, double tolerance
     return std::fabs(a.x - b.x) <= tolerance && std::fabs(a.y - b.y) <= tolerance;
 }
 
-// Sorts by less, stably, through a buffer of the same size.
-template<typename T, typename Less>
-static bool _sort(T* items, uint32_t count, Less less)
+// The orders _combine() sorts by: cuts along each edge in turn, points (as their indices into
+// positions) from left to right, and pieces by the pair of vertices they join.
+static bool _splitBefore(const void* first, const void* second, const void*)
 {
-    if (count < 2u) return true;
-    auto buffer = new (std::nothrow) T[count];
-    if (!buffer) return false;
-    auto from = items;
-    auto to = buffer;
-    for (auto width = uint64_t{1}; width < count; width *= 2u) {
-        for (auto low = uint64_t{0}; low < count; low += 2u * width) {
-            auto middle = low + width < count ? low + width : count;
-            auto high = low + 2u * width < count ? low + 2u * width : count;
-            auto left = low;
-            auto right = middle;
-            for (auto out = low; out < high; out++) {
-                if (left < middle && (right >= high || !less(from[right], from[left]))) to[out] = from[left++];
-                else to[out] = from[right++];
-            }
-        }
-        auto swap = from;
-        from = to;
-        to = swap;
-    }
-    if (from != items) {
-        for (auto i = 0u; i < count; i++)
-            items[i] = from[i];
-    }
-    delete[] buffer;
-    return true;
+    auto& a = *static_cast<const BooleanSplit*>(first);
+    auto& b = *static_cast<const BooleanSplit*>(second);
+    return a.edge != b.edge ? a.edge < b.edge : a.t < b.t;
+}
+
+static bool _leftOf(const void* first, const void* second, const void* positions)
+{
+    auto points = static_cast<const BooleanPoint*>(positions);
+    return points[*static_cast<const uint32_t*>(first)].x < points[*static_cast<const uint32_t*>(second)].x;
+}
+
+static bool _segmentBefore(const void* first, const void* second, const void*)
+{
+    return static_cast<const BooleanSegment*>(first)->key < static_cast<const BooleanSegment*>(second)->key;
 }
 
 template<typename T>
@@ -423,12 +412,10 @@ static Result _combine(const BooleanRegion& first, const BooleanRegion& second, 
             }
         }
     }
-    if (result == Result::Success
-        && !_sort(splits, splitCount, [](const BooleanSplit& a, const BooleanSplit& b) {
-               return a.edge != b.edge ? a.edge < b.edge : a.t < b.t;
-           })) {
-        result = Result::OutOfMemory;
-    }
+    auto sorted = result == Result::Success ? new (std::nothrow) BooleanSplit[splitCount + 1u] : nullptr;
+    if (result == Result::Success && !sorted) result = Result::OutOfMemory;
+    if (sorted) stableSort(splits, sorted, splitCount, sizeof(BooleanSplit), _splitBefore);
+    delete[] sorted;
 
     // The pieces between the cuts, with the points at both ends.
     auto pieceCapacity = edgeCount + splitCount;
@@ -460,7 +447,7 @@ static Result _combine(const BooleanRegion& first, const BooleanRegion& second, 
 
     // Points closer than the tolerance are one vertex.
     auto pointCount = pieceCount * 2u;
-    auto order = result == Result::Success ? new (std::nothrow) uint32_t[pointCount + 1u] : nullptr;
+    auto order = result == Result::Success ? new (std::nothrow) uint32_t[pointCount * 2u + 1u] : nullptr;
     auto parents = result == Result::Success ? new (std::nothrow) uint32_t[pointCount + 1u] : nullptr;
     if (result == Result::Success && (!order || !parents)) result = Result::OutOfMemory;
     if (result == Result::Success) {
@@ -468,9 +455,7 @@ static Result _combine(const BooleanRegion& first, const BooleanRegion& second, 
             order[i] = i;
             parents[i] = i;
         }
-        if (!_sort(order, pointCount, [positions](uint32_t a, uint32_t b) { return positions[a].x < positions[b].x; })) {
-            result = Result::OutOfMemory;
-        }
+        stableSort(order, order + pointCount, pointCount, sizeof(uint32_t), _leftOf, positions);
     }
     if (result == Result::Success) {
         for (auto i = 0u; i < pointCount; i++) {
@@ -487,7 +472,7 @@ static Result _combine(const BooleanRegion& first, const BooleanRegion& second, 
     delete[] order;
 
     // Each piece by its two vertices; pieces on the same two vertices lie on top of each other.
-    auto segments = result == Result::Success ? new (std::nothrow) BooleanSegment[pieceCount + 1u] : nullptr;
+    auto segments = result == Result::Success ? new (std::nothrow) BooleanSegment[pieceCount * 2u + 1u] : nullptr;
     if (result == Result::Success && !segments) result = Result::OutOfMemory;
     auto segmentCount = 0u;
     if (result == Result::Success) {
@@ -499,9 +484,7 @@ static Result _combine(const BooleanRegion& first, const BooleanRegion& second, 
             auto high = from < to ? to : from;
             segments[segmentCount++] = {(static_cast<uint64_t>(low) << 32u) | high, from, to, regions[i]};
         }
-        if (!_sort(segments, segmentCount, [](const BooleanSegment& a, const BooleanSegment& b) { return a.key < b.key; })) {
-            result = Result::OutOfMemory;
-        }
+        stableSort(segments, segments + segmentCount, segmentCount, sizeof(BooleanSegment), _segmentBefore);
     }
     delete[] regions;
     delete[] parents;

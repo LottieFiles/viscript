@@ -1,1 +1,1 @@
-vis_sources += files('visMath.cpp')
+vis_sources += files('visMath.cpp', 'visSort.cpp')

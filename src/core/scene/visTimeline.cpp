@@ -3,6 +3,7 @@
 
 #include "visScene.h"
 #include "visTimeline.h"
+#include "../common/visGrow.h"
 #include "../common/visString.h"
 
 namespace vis
@@ -51,7 +52,7 @@ Result Scene::mark(const char* name) noexcept
         }
     }
     if (pImpl->markerCnt >= MAX_MARKERS) return pImpl->fail(Result::InsufficientCondition, "a scene holds at most 256 markers");
-    if (!pImpl->growMarkers()) return Result::OutOfMemory;
+    if (!grow(pImpl->markers, pImpl->markerCnt, pImpl->markerCap, 1u, 8u, MAX_MARKERS)) return Result::OutOfMemory;
     auto copy = _duplicate(name);
     if (!copy) return Result::OutOfMemory;
     auto& marker = pImpl->markers[pImpl->markerCnt++];

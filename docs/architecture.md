@@ -136,7 +136,7 @@ across the export timeline. See [Layout audit](layout-audit.md).
 
 | Directory | Responsibility |
 |---|---|
-| `src/core/common/` | Vector and matrix math, finiteness checks, hashing, and strings the rest share |
+| `src/core/common/` | Vector and matrix math, finiteness checks, hashing, strings, a stable sort and array growth the rest share |
 | `src/core/scene/` | Object model, timelines, sampling, and composition |
 | `src/core/renderer/` | Display lists, layout reports, and ThorVG paints |
 | `src/core/loaders/` | Assets and image decoding |

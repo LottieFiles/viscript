@@ -10,6 +10,8 @@
 #include "vis.h"
 #include "../common/visFinite.h"
 #include "../common/visConstants.h"
+#include "../common/visGrow.h"
+#include "../common/visSort.h"
 #include "visDisplayColor.h"
 #include "visDisplayList.h"
 #include "visScene.h"
@@ -266,7 +268,6 @@ static uint32_t _trimRoute(Vec2* points, uint32_t count, float start, float end,
         if (start < length) {
             points[first] = points[first] + segment * (start / length);
             if (depths) depths[first] += (depths[first + 1u] - depths[first]) * (start / length);
-            start = 0.0f;
             break;
         }
         start -= length;
@@ -292,7 +293,6 @@ static uint32_t _trimRoute(Vec2* points, uint32_t count, float start, float end,
             if (depths) {
                 depths[count - 1u] -= (depths[count - 1u] - depths[count - 2u]) * (end / length);
             }
-            end = 0.0f;
             break;
         }
         end -= length;
@@ -428,7 +428,6 @@ static Result _path(DisplayList& list, const Vec2* points, uint32_t count, bool 
     auto outputCnt = complete + 1;
     auto partial = scaled - static_cast<float>(complete);
     if (complete < segments && partial > 1e-6f) outputCnt++;
-    if (outputCnt > count + 1) outputCnt = count + 1;
 
     auto output = new (std::nothrow) Vec2[outputCnt];
     auto outputDepths = depths ? new (std::nothrow) float[outputCnt] : nullptr;
@@ -443,7 +442,7 @@ static Result _path(DisplayList& list, const Vec2* points, uint32_t count, bool 
         if (closed) return (count - index % count) % count;
         return count - 1u - index;
     };
-    for (auto i = 0u; i <= complete && i < outputCnt; i++) {
+    for (auto i = 0u; i <= complete; i++) {
         output[i] = points[at(i)];
         if (depths) outputDepths[i] = depths[at(i)];
     }
@@ -1033,36 +1032,15 @@ bool DisplayList::masking(const DrawCommand& command) const noexcept
 
 uint32_t DisplayList::add(const DisplayLayer& layer) noexcept
 {
-    if (layerCount >= DISPLAY_LAYER_LIMIT) return 0u;
-    if (layerCount == layerCapacity) {
-        auto grownCapacity = layerCapacity ? layerCapacity * 2u : 8u;
-        auto grown = new (std::nothrow) DisplayLayer[grownCapacity];
-        if (!grown) return 0u;
-        for (auto i = 0u; i < layerCount; i++)
-            grown[i] = layers[i];
-        delete[] layers;
-        layers = grown;
-        layerCapacity = grownCapacity;
-    }
+    if (!grow(layers, layerCount, layerCapacity, 1u, 8u, DISPLAY_LAYER_LIMIT)) return 0u;
     layers[layerCount] = layer;
     return ++layerCount;
 }
 
 DrawCommand* DisplayList::append() noexcept
 {
-    if (count >= DISPLAY_COMMAND_LIMIT) return nullptr;
-    if (count < capacity) {
-        commands[count] = {};
-    } else {
-        auto grownCapacity = capacity ? capacity * 2 : 32;
-        auto grown = new (std::nothrow) DrawCommand[grownCapacity];
-        if (!grown) return nullptr;
-        for (auto i = 0u; i < count; i++)
-            grown[i] = commands[i];
-        delete[] commands;
-        commands = grown;
-        capacity = grownCapacity;
-    }
+    if (!grow(commands, count, capacity, 1u, 32u, DISPLAY_COMMAND_LIMIT)) return nullptr;
+    commands[count] = {};
     commands[count].object = object;
     commands[count].counterpart = counterpart;
     commands[count].composite = composite;
@@ -1659,45 +1637,65 @@ static bool _before(const DisplayLayer* layers, const DrawCommand& a, const Draw
     return _before(firstLayer, firstDepth, firstOrder, secondLayer, secondDepth, secondOrder);
 }
 
-void DisplayList::sort() noexcept
+// _before() for two indices into the commands of the list data.
+static bool _commandBefore(const void* first, const void* second, const void* data)
 {
-    if (!layerCount) {
-        if (count < 2) return;
-        std::sort(commands, commands + count, [](const DrawCommand& a, const DrawCommand& b) {
-            return _before(a.layer, a.depth, a.order, b.layer, b.depth, b.order);
-        });
-        return;
-    }
+    auto list = static_cast<const DisplayList*>(data);
+    return _before(list->layers, list->commands[*static_cast<const uint32_t*>(first)],
+                   list->commands[*static_cast<const uint32_t*>(second)]);
+}
+
+Result DisplayList::sort() noexcept
+{
     // Each layer's place: its object's layer, then the mean depth and the first order of
     // every drawing inside it, nested layers included.
-    auto sums = new (std::nothrow) double[layerCount];
-    for (auto i = 0u; i < layerCount; i++) {
-        layers[i].order = UINT32_MAX;
-        layers[i].count = 0u;
-        layers[i].depth = 0.0f;
-        if (sums) sums[i] = 0.0;
-    }
-    for (auto i = 0u; i < count; i++) {
-        auto& command = commands[i];
-        // The pieces split() made of one drawing count as that drawing, once.
-        if (command.piece > 1u) continue;
-        auto depth = command.piece ? command.whole : command.depth;
-        for (auto index = command.composite; index; index = layers[index - 1u].parent) {
-            auto& layer = layers[index - 1u];
-            if (command.order < layer.order) layer.order = command.order;
-            layer.count++;
-            if (sums) sums[index - 1u] += static_cast<double>(depth);
+    if (layerCount) {
+        auto sums = new (std::nothrow) double[layerCount];
+        if (!sums) return Result::OutOfMemory;
+        for (auto i = 0u; i < layerCount; i++) {
+            layers[i].order = UINT32_MAX;
+            layers[i].count = 0u;
+            layers[i].depth = 0.0f;
+            sums[i] = 0.0;
         }
+        for (auto i = 0u; i < count; i++) {
+            auto& command = commands[i];
+            // The pieces split() made of one drawing count as that drawing, once.
+            if (command.piece > 1u) continue;
+            auto depth = command.piece ? command.whole : command.depth;
+            for (auto index = command.composite; index; index = layers[index - 1u].parent) {
+                auto& layer = layers[index - 1u];
+                if (command.order < layer.order) layer.order = command.order;
+                layer.count++;
+                sums[index - 1u] += static_cast<double>(depth);
+            }
+        }
+        for (auto i = 0u; i < layerCount; i++) {
+            if (layers[i].count) layers[i].depth = static_cast<float>(sums[i] / layers[i].count);
+        }
+        delete[] sums;
     }
-    for (auto i = 0u; i < layerCount; i++) {
-        if (sums && layers[i].count) layers[i].depth = static_cast<float>(sums[i] / layers[i].count);
+    if (count < 2) return Result::Success;
+    // Sorts the indices of the commands, which are large, and then moves each command once,
+    // along the cycles of the order.
+    auto order = new (std::nothrow) uint32_t[2u * count];
+    if (!order) return Result::OutOfMemory;
+    for (auto i = 0u; i < count; i++) order[i] = i;
+    stableSort(order, order + count, count, sizeof(uint32_t), _commandBefore, this);
+    for (auto i = 0u; i < count; i++) {
+        if (order[i] == i) continue;
+        auto held = commands[i];
+        auto at = i;
+        for (auto next = order[at]; next != i; next = order[at]) {
+            commands[at] = commands[next];
+            order[at] = at;
+            at = next;
+        }
+        commands[at] = held;
+        order[at] = at;
     }
-    delete[] sums;
-    if (count < 2) return;
-    auto table = layers;
-    std::sort(commands, commands + count, [table](const DrawCommand& a, const DrawCommand& b) {
-        return _before(table, a, b);
-    });
+    delete[] order;
+    return Result::Success;
 }
 
 static Result _labelledPieces(DisplayList& list, const Vec3* local, const Vec2* projected,
@@ -2511,7 +2509,7 @@ Result Scene::Impl::build(float time, DisplayList& list, bool sort, const ViewFr
                 auto point = static_cast<Point*>(object);
                 Vec2 pixel;
                 float depth;
-                if (progress > 0.0f && _point(_anchored(state, point->point), state.model, config, pixel, depth)) {
+                if (_point(_anchored(state, point->point), state.model, config, pixel, depth)) {
                     auto anchor = _screenDepth(depth, config);
                     result = list.circle(pixel, style.radius * progress, style, state.layer, depth,
                                          spatial ? &anchor : nullptr);
@@ -3072,9 +3070,7 @@ Result Scene::Impl::build(float time, DisplayList& list, bool sort, const ViewFr
     list.composite = 0u;
     if (!sort) return Result::Success;
     auto result = list.split(config);
-    if (result != Result::Success) return result;
-    list.sort();
-    return Result::Success;
+    return result == Result::Success ? list.sort() : result;
 }
 
 }  // namespace vis

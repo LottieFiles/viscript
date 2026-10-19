@@ -9,6 +9,7 @@
 #include "visMorph.h"
 #include "visGeometry64.h"
 #include "visMatch.h"
+#include "../common/visSort.h"
 
 namespace vis
 {
@@ -362,6 +363,15 @@ static Result _morphComponents(const Object* object, MorphComponent* pieces, uin
     return Result::Success;
 }
 
+// Whether the piece at index first of the components data pairs before the one at second:
+// closed pieces before open ones, and larger ones first.
+static bool _pairsBefore(const void* first, const void* second, const void* data)
+{
+    auto& a = static_cast<const MorphComponent*>(data)[*static_cast<const uint32_t*>(first)];
+    auto& b = static_cast<const MorphComponent*>(data)[*static_cast<const uint32_t*>(second)];
+    return a.outline.closed != b.outline.closed ? a.outline.closed : a.measure > b.measure;
+}
+
 Result pairMorphPieces(const Animation& animation, MorphShape& shape)
 {
     auto source = animation.target;
@@ -374,7 +384,7 @@ Result pairMorphPieces(const Animation& animation, MorphShape& shape)
     auto from = new (std::nothrow) MorphComponent[sourceCount];
     auto to = new (std::nothrow) MorphComponent[targetCount];
     auto parts = new (std::nothrow) MorphShape[capacity];
-    auto order = new (std::nothrow) uint32_t[sourceCount];
+    auto order = new (std::nothrow) uint32_t[2u * sourceCount];
     auto growth = new (std::nothrow) int8_t[capacity];
     auto result = Result::OutOfMemory;
     auto kept = 0u;
@@ -419,11 +429,7 @@ Result pairMorphPieces(const Animation& animation, MorphShape& shape)
         pair(from + animation.pairs[2u * i], to + animation.pairs[2u * i + 1u]);
     if (result == Result::Success) {
         for (auto i = 0u; i < sourceCount; i++) order[i] = i;
-        std::sort(order, order + sourceCount, [&](uint32_t a, uint32_t b) {
-            if (from[a].outline.closed != from[b].outline.closed) return from[a].outline.closed;
-            if (from[a].measure != from[b].measure) return from[a].measure > from[b].measure;
-            return a < b;
-        });
+        stableSort(order, order + sourceCount, sourceCount, sizeof(uint32_t), _pairsBefore, from);
         for (auto pass = 0u; pass < 2u; pass++) {
             for (auto i = 0u; i < sourceCount; i++) {
                 auto& own = from[order[i]];
