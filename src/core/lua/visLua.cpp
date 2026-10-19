@@ -403,6 +403,25 @@ static void _pushScene(lua_State* lua, int index)
     }
 }
 
+// Pushes what the registry table name keeps for the scene of the scene or handle at index, a
+// table made when make is set, or nil.
+static void _sceneTable(lua_State* lua, const char* name, int index, bool make)
+{
+    _pushScene(lua, index);
+    lua_getfield(lua, LUA_REGISTRYINDEX, name);
+    lua_pushvalue(lua, -2);
+    lua_rawget(lua, -2);
+    if (lua_isnil(lua, -1) && make) {
+        lua_pop(lua, 1);
+        lua_createtable(lua, 0, 1);
+        lua_pushvalue(lua, -3);
+        lua_pushvalue(lua, -2);
+        lua_rawset(lua, -4);
+    }
+    lua_replace(lua, -3);
+    lua_pop(lua, 1);
+}
+
 // The scene, or the object handle and its scene, at index 1 of a call that adds objects there.
 static LuaSpace _space(lua_State* lua)
 {
@@ -512,6 +531,21 @@ static LuaObject* _knownHandle(lua_State* lua, LuaScene* scene, int sceneIndex, 
     auto handle = _objectHandle(lua, scene, sceneIndex, object, false);
     _remember(lua, -1);
     return handle;
+}
+
+// Makes room for one more item in the userdata buffer at slot, which holds count items in room
+// for capacity: a full buffer is copied to one twice as large, or of 16 items at first, but of
+// at most limit, which the caller keeps count below; the copy takes the slot. Returns where the
+// items are.
+template<typename T>
+static T* _grow(lua_State* lua, int slot, T* items, uint32_t count, uint32_t& capacity, uint32_t limit = UINT32_MAX)
+{
+    if (count < capacity) return items;
+    capacity = std::min(limit, capacity ? 2u * capacity : 16u);
+    auto grown = static_cast<T*>(lua_newuserdatauv(lua, sizeof(T) * capacity, 0));
+    std::memcpy(static_cast<void*>(grown), items, sizeof(T) * count);
+    lua_replace(lua, slot);
+    return grown;
 }
 
 // ---------- Styles, charges and attaching ----------
@@ -1628,13 +1662,7 @@ static int _spans(lua_State* lua)
         if (spanCount == LUA_OBJECT_LIMIT) {
             luaL_error(lua, "spans would make more than %d texts", static_cast<int>(LUA_OBJECT_LIMIT));
         }
-        if (spanCount == capacity) {
-            capacity *= 2;
-            auto grown = static_cast<LuaSpan*>(lua_newuserdatauv(lua, sizeof(LuaSpan) * capacity, 0));
-            std::memcpy(static_cast<void*>(grown), spans, sizeof(LuaSpan) * spanCount);
-            lua_replace(lua, spanStore);
-            spans = grown;
-        }
+        spans = _grow(lua, spanStore, spans, spanCount, capacity);
         return *new (spans + spanCount) LuaSpan();
     };
     // Gives the span its style, which names it after the row unless it has an id of its own.
@@ -1948,28 +1976,10 @@ static constexpr const char* CODE_KEPT[] = {
     "language", "point", "align", "size", "font", "orientation", "leading", "pitch", "baseline", "color", "colors",
     "layer", "isolate", "blend", "blur", "shadow"};
 
-// Pushes the table of the code blocks of the scene at index, made when make is set, or nil.
-static void _codeSources(lua_State* lua, int index, bool make)
-{
-    index = lua_absindex(lua, index);
-    lua_getfield(lua, LUA_REGISTRYINDEX, CODE_REGISTRY);
-    lua_pushvalue(lua, index);
-    lua_rawget(lua, -2);
-    if (lua_isnil(lua, -1) && make) {
-        lua_pop(lua, 1);
-        lua_createtable(lua, 0, 1);
-        lua_pushvalue(lua, index);
-        lua_pushvalue(lua, -2);
-        lua_rawset(lua, -4);
-    }
-    lua_remove(lua, -2);
-}
-
 // Records the text and the kept options, at index 2, of the block code made at index.
 static void _codeRemember(lua_State* lua, int block)
 {
-    _pushScene(lua, 1);
-    _codeSources(lua, -1, true);
+    _sceneTable(lua, CODE_REGISTRY, 1, true);
     lua_pushlightuserdata(lua, static_cast<LuaObject*>(lua_touserdata(lua, block))->object);
     lua_createtable(lua, 0, 2);
     lua_getfield(lua, 2, "text");
@@ -1977,7 +1987,7 @@ static void _codeRemember(lua_State* lua, int block)
     _pickOptions(lua, CODE_KEPT);
     lua_setfield(lua, -2, "options");
     lua_rawset(lua, -3);
-    lua_pop(lua, 2);
+    lua_pop(lua, 1);
 }
 
 // scene:code{...}: source code set line by line in tokens colored by what they are. The block is
@@ -2059,13 +2069,7 @@ static int _codeBlock(lua_State* lua, const Mat4& model)
         auto after = 0u;
         for (auto i = 0u; i < count; i++) {
             auto& piece = found[i];
-            if (tokenCount == capacity) {
-                capacity *= 2u;
-                auto grown = static_cast<LuaCodeToken*>(lua_newuserdatauv(lua, sizeof(LuaCodeToken) * capacity, 0));
-                std::memcpy(static_cast<void*>(grown), tokens, sizeof(LuaCodeToken) * tokenCount);
-                lua_replace(lua, tokenStore);
-                tokens = grown;
-            }
+            tokens = _grow(lua, tokenStore, tokens, tokenCount, capacity);
             // A tab inside a comment or string widens to four spaces, as between tokens.
             lua_pushlstring(lua, line + piece.offset, piece.length);
             if (std::memchr(line + piece.offset, '\t', piece.length)) {
@@ -2154,17 +2158,14 @@ static int _codeMoved(lua_State* lua)
 // recorded, or stops the script.
 static void _codeSource(lua_State* lua, int index, const char* method)
 {
-    index = lua_absindex(lua, index);
     auto handle = _handle(lua, index);
-    _pushScene(lua, index);
-    _codeSources(lua, -1, false);
+    _sceneTable(lua, CODE_REGISTRY, index, false);
     if (!lua_isnil(lua, -1)) {
         lua_pushlightuserdata(lua, handle->object);
         lua_rawget(lua, -2);
+        lua_remove(lua, -2);
     }
     if (!lua_istable(lua, -1)) luaL_error(lua, "%s needs a block that code made", method);
-    lua_replace(lua, -3);
-    lua_pop(lua, 1);
 }
 
 // The language of the code block whose source is at index.
@@ -3435,6 +3436,25 @@ static bool _surround(const Object* object, const Object* ancestor, Bounds& outp
     return true;
 }
 
+// Calls add with the stack index of the handle at index, or of each handle in the list there,
+// which must not be empty; anything else stops the script with shape.
+template<typename Add>
+static void _eachHandle(lua_State* lua, int index, const char* shape, Add add)
+{
+    if (lua_type(lua, index) == LUA_TUSERDATA) {
+        add(index);
+        return;
+    }
+    auto count = lua_istable(lua, index) ? lua_rawlen(lua, index) : 0u;
+    if (!count) luaL_error(lua, "%s", shape);
+    for (auto i = 1u; i <= count; i++) {
+        lua_rawgeti(lua, index, static_cast<lua_Integer>(i));
+        if (lua_type(lua, -1) != LUA_TUSERDATA) luaL_error(lua, "%s", shape);
+        add(-1);
+        lua_pop(lua, 1);
+    }
+}
+
 // The around option of a rectangle, or of what else names itself as joiner: the bounds of a
 // handle, or of a list of handles, in the space it joins. Without a joiner, the value that
 // scene:bounds measures in the root's space.
@@ -3444,25 +3464,12 @@ static Bounds _around(lua_State* lua, const LuaSpace& space, int index, const ch
     auto shape = joiner ? "around must be a handle or a list of handles" : "bounds takes a handle or a list of handles";
     Bounds bounds;
     auto defined = false;
-    auto add = [&](int item) {
+    _eachHandle(lua, index, shape, [&](int item) {
         // Everything is below the root, so only a joiner in a group can miss.
         if (!_surround(_object(lua, scene, item), space.parent, bounds, defined)) {
             luaL_error(lua, "around takes objects below the group the %s joins", joiner ? joiner : "scene");
         }
-    };
-    if (lua_type(lua, index) == LUA_TUSERDATA) {
-        add(index);
-    } else if (lua_istable(lua, index) && lua_rawlen(lua, index) > 0) {
-        auto count = lua_rawlen(lua, index);
-        for (auto i = 1u; i <= count; i++) {
-            lua_rawgeti(lua, index, static_cast<lua_Integer>(i));
-            if (lua_type(lua, -1) != LUA_TUSERDATA) luaL_error(lua, "%s", shape);
-            add(-1);
-            lua_pop(lua, 1);
-        }
-    } else {
-        luaL_error(lua, "%s", shape);
-    }
+    });
     if (!defined) {
         luaL_error(lua, "%s needs objects with bounds, such as texts set with measure = true",
                    joiner ? "around" : "bounds");
@@ -3626,15 +3633,8 @@ static LuaPlotSide _plotSide(const LuaPlotCut& cut, double y)
 
 static void _plotAdd(LuaPlotCut& cut, double x, double y, double z)
 {
-    if (cut.count == cut.capacity) {
-        if (cut.capacity >= LUA_POINT_LIMIT) luaL_error(cut.lua, "scene point limit exceeded");
-        auto capacity = std::min(LUA_POINT_LIMIT, cut.capacity + cut.capacity / 2u + 16u);
-        auto points = static_cast<Vec3*>(lua_newuserdatauv(cut.lua, sizeof(Vec3) * capacity, 0));
-        std::memcpy(points, cut.points, sizeof(Vec3) * cut.count);
-        lua_replace(cut.lua, cut.pointSlot);
-        cut.points = points;
-        cut.capacity = capacity;
-    }
+    if (cut.count == LUA_POINT_LIMIT) luaL_error(cut.lua, "scene point limit exceeded");
+    cut.points = _grow(cut.lua, cut.pointSlot, cut.points, cut.count, cut.capacity, LUA_POINT_LIMIT);
     new (cut.points + cut.count++) Vec3{static_cast<float>(x), static_cast<float>(y), static_cast<float>(z)};
 }
 
@@ -3659,14 +3659,7 @@ static void _plotEnd(LuaPlotCut& cut)
         cut.count = cut.start;
         return;
     }
-    if (cut.pieces == cut.endCapacity) {
-        auto capacity = cut.endCapacity * 2u;
-        auto ends = static_cast<uint32_t*>(lua_newuserdatauv(cut.lua, sizeof(uint32_t) * capacity, 0));
-        std::memcpy(ends, cut.ends, sizeof(uint32_t) * cut.pieces);
-        lua_replace(cut.lua, cut.endSlot);
-        cut.ends = ends;
-        cut.endCapacity = capacity;
-    }
+    cut.ends = _grow(cut.lua, cut.endSlot, cut.ends, cut.pieces, cut.endCapacity);
     cut.ends[cut.pieces++] = cut.count;
 }
 
@@ -3841,16 +3834,11 @@ static LuaPlotSample _plotBorder(LuaPlotCut& cut, LuaPlotSample inside, LuaPlotS
 
 static void _plotSampleAdd(LuaPlotCut& cut, Vec3 point)
 {
-    if (cut.samples.count == cut.sampleCapacity) {
-        if (cut.sampleCapacity >= LUA_POINT_LIMIT) luaL_error(cut.lua, "scene point limit exceeded");
-        auto capacity = std::min(LUA_POINT_LIMIT, cut.sampleCapacity + cut.sampleCapacity / 2u + 16u);
-        auto points = static_cast<Vec3*>(lua_newuserdatauv(cut.lua, sizeof(Vec3) * capacity, 0));
-        std::memcpy(points, cut.samples.points, sizeof(Vec3) * cut.samples.count);
-        lua_replace(cut.lua, cut.sampleSlot);
-        cut.samples.points = points;
-        cut.sampleCapacity = capacity;
-    }
-    const_cast<Vec3*>(cut.samples.points)[cut.samples.count++] = point;
+    if (cut.samples.count == LUA_POINT_LIMIT) luaL_error(cut.lua, "scene point limit exceeded");
+    auto points = _grow(cut.lua, cut.sampleSlot, const_cast<Vec3*>(cut.samples.points), cut.samples.count,
+                        cut.sampleCapacity, LUA_POINT_LIMIT);
+    points[cut.samples.count++] = point;
+    cut.samples.points = points;
 }
 
 // Between samples on opposite sides of the band, from left to right, the graph crosses it or
@@ -4000,6 +3988,22 @@ static void _plotStored(LuaPlotCut& cut)
     if (!cut.samples.valid()) luaL_error(lua, "plot samples need an increasing x grid and a finite y_range");
 }
 
+// Cuts a plot into buffers on the stack, made with room for samples points: the points at index,
+// unless it is 0, or else the samples a stored fn holds or fn sampled across range.
+static void _plotCut(LuaPlotCut& cut, int points, const Range& range, uint32_t samples)
+{
+    auto lua = cut.lua;
+    cut.capacity = std::min(LUA_POINT_LIMIT, samples + 16u);
+    cut.points = static_cast<Vec3*>(lua_newuserdatauv(lua, sizeof(Vec3) * cut.capacity, 0));
+    cut.pointSlot = lua_gettop(lua);
+    cut.endCapacity = 16u;
+    cut.ends = static_cast<uint32_t*>(lua_newuserdatauv(lua, sizeof(uint32_t) * cut.endCapacity, 0));
+    cut.endSlot = lua_gettop(lua);
+    if (points) _plotTable(cut, points);
+    else if (lua_istable(lua, cut.fn)) _plotStored(cut);
+    else _plotSampled(cut, range, samples);
+}
+
 // The range field name of the table at index, which what requires.
 static Range _requiredRange(lua_State* lua, int index, const char* name, const char* what)
 {
@@ -4087,25 +4091,6 @@ static void _plotDiscontinuities(lua_State* lua, int index, LuaPlotCut& cut)
     cut.broken = true;
 }
 
-// Pushes the table of what the plots of a scene keep, for the scene or handle at index, made when
-// make is set, or nil.
-static void _plotRecords(lua_State* lua, int index, bool make)
-{
-    _pushScene(lua, index);
-    lua_getfield(lua, LUA_REGISTRYINDEX, PLOT_REGISTRY);
-    lua_pushvalue(lua, -2);
-    lua_rawget(lua, -2);
-    if (lua_isnil(lua, -1) && make) {
-        lua_pop(lua, 1);
-        lua_createtable(lua, 0, 1);
-        lua_pushvalue(lua, -3);
-        lua_pushvalue(lua, -2);
-        lua_rawset(lua, -4);
-    }
-    lua_replace(lua, -3);
-    lua_pop(lua, 1);
-}
-
 // Pushes what cut cuts with as a LuaPlotRecord, with range when fn is sampled over one, for a plot
 // that has held room points and endRoom pieces at most.
 static void _plotKeep(lua_State* lua, const LuaPlotCut& cut, const Range* range, uint32_t room, uint32_t endRoom,
@@ -4134,7 +4119,7 @@ static void _plotKeep(lua_State* lua, const LuaPlotCut& cut, const Range* range,
 static void _plotRemember(lua_State* lua, int index, const LuaPlotCut& cut, const Range* range)
 {
     index = lua_absindex(lua, index);
-    _plotRecords(lua, index, true);
+    _sceneTable(lua, PLOT_REGISTRY, index, true);
     lua_pushlightuserdata(lua, static_cast<LuaObject*>(lua_touserdata(lua, index))->object);
     _plotKeep(lua, cut, range, cut.count, cut.pieces > 1u ? cut.pieces : 0u);
     lua_rawset(lua, -3);
@@ -4172,15 +4157,7 @@ static int _plot(lua_State* lua)
         range = _requiredRange(lua, 2, "x_range", "plot fn");
         samples = _plotSamples(lua, range);
     }
-    cut.capacity = std::min(LUA_POINT_LIMIT, samples + 16u);
-    cut.points = static_cast<Vec3*>(lua_newuserdatauv(lua, sizeof(Vec3) * cut.capacity, 0));
-    cut.pointSlot = lua_gettop(lua);
-    cut.endCapacity = 16u;
-    cut.ends = static_cast<uint32_t*>(lua_newuserdatauv(lua, sizeof(uint32_t) * cut.endCapacity, 0));
-    cut.endSlot = lua_gettop(lua);
-    if (points) _plotTable(cut, 3);
-    else if (lua_istable(lua, cut.fn)) _plotStored(cut);
-    else _plotSampled(cut, range, samples);
+    _plotCut(cut, points ? 3 : 0, range, samples);
     if (!cut.pieces) {
         if (cut.band) return luaL_error(lua, "plot has nothing to draw inside y_range");
         return luaL_error(lua, "plot has nothing to draw: it needs two defined values in a row");
@@ -4443,50 +4420,39 @@ static constexpr uint32_t LUA_FIELD_COLOR_LIMIT = 8;
 // The colors and the layer of a field reach each of its arrows or lines.
 static constexpr const char* FIELD_SHAPE_STYLES[] = {"color", "stroke", "width", "dash", "dash_offset", "layer"};
 
-// The colors a field's magnitudes ramp through, and the magnitude option's low and high, which
-// stay 0 to spread them over the field's own range.
-struct LuaColorMap
+// Unless the options at 2 give a field a color or stroke, the colors its magnitudes ramp through,
+// kept in stops: the colors option, a list of 2 to 8 colors, or the theme's field colors; and the
+// magnitude option, {low, high}, which they spread over instead of the field's own range from
+// zero to its greatest magnitude.
+template<typename Options>
+static void _fieldColors(lua_State* lua, const Theme& theme, Color (&stops)[LUA_FIELD_COLOR_LIMIT], Options& options)
 {
-    Color stops[LUA_FIELD_COLOR_LIMIT];
-    uint32_t count = 0;
-    float low = 0.0f;
-    float high = 0.0f;
-};
-
-// The colors option, a list of 2 to 8 colors, or the theme's field colors.
-static void _colorMap(lua_State* lua, int options, const Theme& theme, LuaColorMap& map)
-{
-    lua_getfield(lua, options, "colors");
+    if (_has(lua, 2, "color") || _has(lua, 2, "stroke")) return;
+    options.colors = stops;
+    lua_getfield(lua, 2, "colors");
     if (lua_isnil(lua, -1)) {
-        for (auto role : FIELD_COLORS) map.stops[map.count++] = theme.color(role);
-        lua_pop(lua, 1);
-        return;
-    }
-    auto count = lua_istable(lua, -1) ? lua_rawlen(lua, -1) : 0u;
-    if (count < 2u || count > LUA_FIELD_COLOR_LIMIT) {
-        luaL_error(lua, "colors must be a list of 2 to %d colors", static_cast<int>(LUA_FIELD_COLOR_LIMIT));
-    }
-    for (auto i = 1u; i <= count; i++) {
-        lua_rawgeti(lua, -1, static_cast<lua_Integer>(i));
-        if (lua_type(lua, -1) != LUA_TSTRING) {
+        for (auto role : FIELD_COLORS) stops[options.colorCount++] = theme.color(role);
+    } else {
+        auto count = lua_istable(lua, -1) ? lua_rawlen(lua, -1) : 0u;
+        if (count < 2u || count > LUA_FIELD_COLOR_LIMIT) {
             luaL_error(lua, "colors must be a list of 2 to %d colors", static_cast<int>(LUA_FIELD_COLOR_LIMIT));
         }
-        map.stops[map.count++] = _color(lua, -1, "colors", &theme);
-        lua_pop(lua, 1);
+        for (auto i = 1u; i <= count; i++) {
+            lua_rawgeti(lua, -1, static_cast<lua_Integer>(i));
+            if (lua_type(lua, -1) != LUA_TSTRING) {
+                luaL_error(lua, "colors must be a list of 2 to %d colors", static_cast<int>(LUA_FIELD_COLOR_LIMIT));
+            }
+            stops[options.colorCount++] = _color(lua, -1, "colors", &theme);
+            lua_pop(lua, 1);
+        }
     }
     lua_pop(lua, 1);
-}
-
-// The magnitude option, {low, high}, which the colors spread over instead of the field's own
-// range from zero to its greatest magnitude.
-static void _magnitudeRange(lua_State* lua, int options, LuaColorMap& map)
-{
-    lua_getfield(lua, options, "magnitude");
+    lua_getfield(lua, 2, "magnitude");
     if (!lua_isnil(lua, -1)) {
         auto range = _vec2(lua, -1, "magnitude");
         if (!(range.x < range.y)) luaL_error(lua, "magnitude must be {low, high} with low below high");
-        map.low = range.x;
-        map.high = range.y;
+        options.low = range.x;
+        options.high = range.y;
     }
     lua_pop(lua, 1);
 }
@@ -4552,7 +4518,7 @@ static void _contourRemember(lua_State* lua, int index, const Range& xRange, con
                              double level, uint32_t room, uint32_t endRoom)
 {
     index = lua_absindex(lua, index);
-    _plotRecords(lua, index, true);
+    _sceneTable(lua, PLOT_REGISTRY, index, true);
     lua_pushlightuserdata(lua, static_cast<LuaObject*>(lua_touserdata(lua, index))->object);
     auto record = new (lua_newuserdatauv(lua, sizeof(LuaPlotRecord), 0)) LuaPlotRecord;
     record->range = xRange;
@@ -4817,20 +4783,27 @@ static void _sampledField(lua_State* lua, const LuaField& field)
     }
 }
 
-// Styles the children of a field's group before it is attached: each takes the colors, the
-// width, the dashes and the layer of the options at 2, and below an id of the group, the id
-// <id>/<column>/<row> of its sample in a grid of columns, or <id>/<seed> without one.
-static void _styleField(lua_State* lua, LuaScene* scene, Group* group, const char* groupId,
-                        const uint32_t* indices, uint32_t columns)
+// Attaches a field's group, whose owner is the handle at handle. The group takes the id, the
+// opacity, the layer and the other group styles of the options at 2; its children, in order,
+// take the colors, the width, the dashes and the layer, and below an id of the group, the id
+// <id>/<column>/<row> of their sample in a grid of columns, or <id>/<seed> without one.
+static int _attachField(lua_State* lua, const LuaSpace& space, LuaObject* owner, int handle, Group* group,
+                        const uint32_t* indices, uint32_t columns, const char* name)
 {
+    auto scene = space.scene->scene;
+    auto groupStyle = _pickOptions(lua, ROW_STYLES);
+    _style(lua, scene, group, groupStyle);
+    auto groupId = _pushId(lua);
     for (auto i = 0u; i < group->childCount(); i++) {
         auto top = lua_gettop(lua);
         auto style = _pickOptions(lua, FIELD_SHAPE_STYLES);
         if (columns) _childId(lua, style, groupId, indices[i] % columns + 1u, indices[i] / columns + 1u);
         else _childId(lua, style, groupId, indices[i] + 1u);
-        _style(lua, scene->scene, group->childAt(i), style);
+        _style(lua, scene, group->childAt(i), style);
         lua_settop(lua, top);
     }
+    lua_pushvalue(lua, handle);
+    return _attach(lua, space, owner, group, groupStyle, name);
 }
 
 // Builds row-major arrows from a field callback or explicit vectors, bottom-left first.
@@ -4840,7 +4813,6 @@ static int _vectorField(lua_State* lua)
     auto space = _factory(lua, {"fn", "values", "x_range", "y_range", "length", "scale", "anchor", "colors",
                                 "magnitude", "tip", "id", "color", "stroke", "width", "dash", "dash_offset", "opacity",
                                 "progress", "layer", "isolate", "mask", "blend", "blur", "shadow"}, false);
-    auto& theme = space.scene->scene->theme();
     auto xRange = _requiredRange(lua, 2, "x_range", "vector_field");
     auto yRange = _requiredRange(lua, 2, "y_range", "vector_field");
     auto columns = _samples(lua, xRange, LUA_GROUP_LIMIT, "x_range");
@@ -4878,15 +4850,8 @@ static int _vectorField(lua_State* lua)
     options.centered = _fieldEnum(lua, 2, "anchor", false, ANCHORS);
     options.tip = _fieldNumber(lua, 2, "tip", 10.0f);
     if (options.tip < 0.0f) return luaL_error(lua, "tip must be zero or more pixels");
-    LuaColorMap map;
-    if (!_has(lua, 2, "color") && !_has(lua, 2, "stroke")) {
-        _colorMap(lua, 2, theme, map);
-        _magnitudeRange(lua, 2, map);
-        options.colors = map.stops;
-        options.colorCount = map.count;
-        options.low = map.low;
-        options.high = map.high;
-    }
+    Color stops[LUA_FIELD_COLOR_LIMIT];
+    _fieldColors(lua, space.scene->scene->theme(), stops, options);
     Vec2* vectors = nullptr;
     if (lua_isnil(lua, fn)) {
         vectors = static_cast<Vec2*>(lua_newuserdatauv(lua, sizeof(Vec2) * count, 0));
@@ -4913,14 +4878,7 @@ static int _vectorField(lua_State* lua)
     owner->object = group;
     _sampledField(lua, field);
     if (status != Result::Success) return luaL_error(lua, "could not create vector field: %s", _explain(status));
-
-    // The group takes the id, opacity, and layer options; its arrows follow it in order.
-    auto groupStyle = _pickOptions(lua, ROW_STYLES);
-    _style(lua, space.scene->scene, group, groupStyle);
-    auto groupId = _pushId(lua);
-    _styleField(lua, space.scene, group, groupId, indices, columns);
-    lua_pushvalue(lua, handle);
-    return _attach(lua, space, owner, group, groupStyle, "vector field");
+    return _attachField(lua, space, owner, handle, group, indices, columns, "vector field");
 }
 
 static constexpr uint32_t LUA_STREAM_STEP_LIMIT = 4096;
@@ -4932,7 +4890,6 @@ static int _streamLines(lua_State* lua)
     auto space = _factory(lua, {"fn", "x_range", "y_range", "seeds", "time", "dt", "direction", "colors", "magnitude",
                                 "id", "color", "stroke", "width", "dash", "dash_offset", "opacity", "progress", "layer",
                                 "isolate", "mask", "blend", "blur", "shadow"}, false);
-    auto& theme = space.scene->scene->theme();
     lua_getfield(lua, 2, "fn");
     if (!lua_isfunction(lua, -1)) return luaL_error(lua, "stream_lines requires fn, a function of x and y");
     auto fn = lua_gettop(lua);
@@ -4976,15 +4933,8 @@ static int _streamLines(lua_State* lua)
                                                               {"backward", StreamDirection::Backward},
                                                               {"both", StreamDirection::Both}};
     options.direction = _fieldEnum(lua, 2, "direction", StreamDirection::Forward, DIRECTIONS);
-    LuaColorMap map;
-    if (!_has(lua, 2, "color") && !_has(lua, 2, "stroke")) {
-        _colorMap(lua, 2, theme, map);
-        _magnitudeRange(lua, 2, map);
-        options.colors = map.stops;
-        options.colorCount = map.count;
-        options.low = map.low;
-        options.high = map.high;
-    }
+    Color stops[LUA_FIELD_COLOR_LIMIT];
+    _fieldColors(lua, space.scene->scene->theme(), stops, options);
     Vec2* points = nullptr;
     if (seeded) {
         points = static_cast<Vec2*>(lua_newuserdatauv(lua, sizeof(Vec2) * count, 0));
@@ -5017,14 +4967,7 @@ static int _streamLines(lua_State* lua)
     _sampledField(lua, field);
     if (status == Result::InsufficientCondition) return luaL_error(lua, "scene point limit exceeded");
     if (status != Result::Success) return luaL_error(lua, "could not create stream lines: %s", _explain(status));
-
-    // The group takes the id, opacity, and layer options; its lines follow it in order.
-    auto groupStyle = _pickOptions(lua, ROW_STYLES);
-    _style(lua, space.scene->scene, group, groupStyle);
-    auto groupId = _pushId(lua);
-    _styleField(lua, space.scene, group, groupId, indices, 0u);
-    lua_pushvalue(lua, handle);
-    return _attach(lua, space, owner, group, groupStyle, "stream lines");
+    return _attachField(lua, space, owner, handle, group, indices, 0u, "stream lines");
 }
 
 // ---------- Routes, paths, curves and surfaces ----------
@@ -6328,29 +6271,18 @@ static int _brace(lua_State* lua)
         frame.across = {-direction.y, direction.x, 0.0f};
         lua_getfield(lua, 2, "around");
         auto list = lua_gettop(lua);
+        if (lua_istable(lua, list) && lua_rawlen(lua, list) > LUA_GROUP_LIMIT) {
+            return luaL_error(lua, "animation group limit exceeded");
+        }
         LuaBraceReach reach;
-        auto add = [&](int item) {
+        _eachHandle(lua, list, "around must be a handle or a list of handles", [&](int item) {
             auto object = _object(lua, scene, item);
             auto model = Mat4::identity();
             auto parent = object->parent();
             for (; parent && parent != space.parent; parent = parent->parent()) model = parent->model * model;
             if (parent != space.parent) luaL_error(lua, "around takes objects below the group the brace joins");
             _braceReach(object, model, frame, reach);
-        };
-        if (lua_type(lua, list) == LUA_TUSERDATA) {
-            add(list);
-        } else if (lua_istable(lua, list) && lua_rawlen(lua, list) > 0) {
-            auto count = lua_rawlen(lua, list);
-            if (count > LUA_GROUP_LIMIT) return luaL_error(lua, "animation group limit exceeded");
-            for (auto i = 1u; i <= count; i++) {
-                lua_rawgeti(lua, list, static_cast<lua_Integer>(i));
-                if (lua_type(lua, -1) != LUA_TUSERDATA) return luaL_error(lua, "around must be a handle or a list of handles");
-                add(-1);
-                lua_pop(lua, 1);
-            }
-        } else {
-            return luaL_error(lua, "around must be a handle or a list of handles");
-        }
+        });
         lua_pop(lua, 1);
         if (!reach.defined) return luaL_error(lua, "around needs objects with bounds, such as texts set with measure = true");
         frame.width = reach.high - reach.low;
@@ -6619,7 +6551,7 @@ static bool _replot(lua_State* lua, LuaScene* box, int index, const Plot* plot, 
     auto broken = _has(lua, index, "discontinuities");
     // What the plot keeps of its cut, which stays on the stack while fn runs.
     lua_getfield(lua, index, "target");
-    _plotRecords(lua, -1, false);
+    _sceneTable(lua, PLOT_REGISTRY, -1, false);
     lua_remove(lua, -2);
     if (lua_istable(lua, -1)) {
         lua_pushlightuserdata(lua, const_cast<Plot*>(plot));
@@ -6676,15 +6608,7 @@ static bool _replot(lua_State* lua, LuaScene* box, int index, const Plot* plot, 
         if (size > UINT32_MAX || size > LUA_MEMORY_LIMIT / sizeof(Vec3)) luaL_error(lua, "points array is too large");
         samples = static_cast<uint32_t>(size);
     }
-    cut.capacity = std::min(LUA_POINT_LIMIT, samples + 16u);
-    cut.points = static_cast<Vec3*>(lua_newuserdatauv(lua, sizeof(Vec3) * cut.capacity, 0));
-    cut.pointSlot = lua_gettop(lua);
-    cut.endCapacity = 16u;
-    cut.ends = static_cast<uint32_t*>(lua_newuserdatauv(lua, sizeof(uint32_t) * cut.endCapacity, 0));
-    cut.endSlot = lua_gettop(lua);
-    if (points) _plotTable(cut, top + 1);
-    else if (lua_istable(lua, cut.fn)) _plotStored(cut);
-    else _plotSampled(cut, range, samples);
+    _plotCut(cut, points ? top + 1 : 0, range, samples);
     for (auto slot : {cut.pointSlot, cut.endSlot}) {
         lua_pushvalue(lua, slot);
         lua_rawseti(lua, anchor, static_cast<lua_Integer>(lua_rawlen(lua, anchor)) + 1);
@@ -6714,7 +6638,7 @@ static bool _replot(lua_State* lua, LuaScene* box, int index, const Plot* plot, 
         if (cut.pieces > 1u && cut.pieces > endRoom) *strings += sizeof(uint32_t) * (cut.pieces - endRoom);
     }
     lua_getfield(lua, index, "target");
-    _plotRecords(lua, -1, true);
+    _sceneTable(lua, PLOT_REGISTRY, -1, true);
     lua_pushlightuserdata(lua, const_cast<Plot*>(plot));
     _plotKeep(lua, cut, function ? &range : kept && kept->sampled ? &kept->range : nullptr,
               std::max(room, cut.count), std::max(endRoom, cut.pieces > 1u ? cut.pieces : 0u),
@@ -7065,10 +6989,7 @@ static int _playTargets(lua_State* lua)
     auto single = _has(lua, 2, "target");
     auto size = single ? size_t{1} : lua_rawlen(lua, 2);
     if (!size) return luaL_error(lua, "animation descriptor array cannot be empty");
-    if (size > UINT32_MAX || size > LUA_MEMORY_LIMIT / sizeof(AnimationTarget)
-        || size > LUA_MEMORY_LIMIT / sizeof(Object*)) {
-        return luaL_error(lua, "animation descriptor array is too large");
-    }
+    if (size > LUA_GROUP_LIMIT) return luaL_error(lua, "animation group limit exceeded");
     auto targets = static_cast<AnimationTarget*>(lua_newuserdatauv(lua, sizeof(AnimationTarget) * size, 0));
     auto objects = static_cast<Object**>(lua_newuserdatauv(lua, sizeof(Object*) * size, 0));
     lua_newtable(lua);
@@ -7692,7 +7613,7 @@ static int _warp(lua_State* lua)
     lua_settop(lua, 6);
     auto scene = box->scene;
     uint32_t count;
-    auto animations = _motionTargets(lua, scene, 2, count);
+    auto targets = _handles(lua, scene, 2, count, true);
     LuaWarpSamples samples;
     auto sampled = lua_istable(lua, 3);
     if (!sampled && !lua_isfunction(lua, 3)) {
@@ -7707,9 +7628,6 @@ static int _warp(lua_State* lua)
         if (!(step > 0.0f)) return luaL_error(lua, "warp step must be a positive length");
     }
     if (sampled) _warpSamples(lua, 3, samples);
-    auto targets = static_cast<Object**>(lua_newuserdatauv(lua, sizeof(Object*) * count, 0));
-    for (auto i = 0u; i < count; i++)
-        targets[i] = animations[i].target;
     // Each point keeps where it starts and its image.
     auto perPoint = 2u * sizeof(Vec3);
     auto room = _room(box);
@@ -7761,37 +7679,23 @@ static int _fade(lua_State* lua)
     });
 }
 
-struct LuaFadeOptions
-{
-    Vec3 shift;
-    float scale = 1.0f;
-    float duration = 1.0f;
-    AnimCurve curve = AnimCurve::preset(AnimCurvePreset::Smooth);
-};
-
-static LuaFadeOptions _fadeOptions(lua_State* lua, int index)
-{
-    LuaFadeOptions options;
-    if (lua_isnoneornil(lua, index)) return options;
-    luaL_checktype(lua, index, LUA_TTABLE);
-    index = lua_absindex(lua, index);
-    _options(lua, index, {"shift", "scale", "duration", "curve"}, false);
-    options.shift = _fieldWorld(lua, index, "shift", {});
-    options.scale = _fieldNumber(lua, index, "scale", options.scale);
-    if (options.scale <= 0.0f) luaL_error(lua, "scale must be positive");
-    options.duration = _fieldDuration(lua, index, "duration", options.duration);
-    options.curve = _fieldCurve(lua, index);
-    return options;
-}
-
 static int _fadeEffect(lua_State* lua, bool fadeIn)
 {
     auto box = _scene(lua);
     auto object = _object(lua, box->scene, 2);
-    auto options = _fadeOptions(lua, 3);
-    auto animation = fadeIn ? Animation::fadeIn(object, options.shift, options.scale)
-                            : Animation::fadeOut(object, options.shift, options.scale);
-    return _play(lua, box, &animation, 1, options.duration, options.curve);
+    Vec3 shift;
+    auto scale = 1.0f;
+    auto duration = 1.0f;
+    auto curve = AnimCurve::preset(AnimCurvePreset::Smooth);
+    if (_optionTable(lua, 3, {"shift", "scale", "duration", "curve"})) {
+        shift = _fieldWorld(lua, 3, "shift", {});
+        scale = _fieldNumber(lua, 3, "scale", scale);
+        if (scale <= 0.0f) return luaL_error(lua, "scale must be positive");
+        duration = _fieldDuration(lua, 3, "duration", duration);
+        curve = _fieldCurve(lua, 3);
+    }
+    auto animation = fadeIn ? Animation::fadeIn(object, shift, scale) : Animation::fadeOut(object, shift, scale);
+    return _play(lua, box, &animation, 1, duration, curve);
 }
 
 static int _fadeIn(lua_State* lua)
@@ -8055,35 +7959,26 @@ static int _morph(lua_State* lua)
         lag = _number(lua, 6, "lag");
     }
     _lag(lua, lag);
-    LuaCharge copies;
 
-    if (!sourceArray) {
-        auto source = _object(lua, box->scene, 2);
-        auto target = _object(lua, box->scene, 3);
-        auto animation = Animation::morph(source, target);
-        _morphColors(lua, box, animation);
-        animation.copy = copy;
-        animation.pairs = pairs;
-        animation.pairCount = pairCount;
-        if (copy && !_treeCharge(source, copies)) return luaL_error(lua, "the copy is too deep or large");
-        return _play(lua, box, &animation, 1, duration, curve, lag, copies);
-    }
-
-    auto size = lua_rawlen(lua, 2);
-    if (!size || size != lua_rawlen(lua, 3)) {
+    // Two handles morph as a pair, and two arrays pair by pair.
+    auto size = sourceArray ? lua_rawlen(lua, 2) : size_t{1};
+    if (!size || (sourceArray && size != lua_rawlen(lua, 3))) {
         return luaL_error(lua, "morph arrays must be non-empty and equally sized");
     }
-    if (size > UINT32_MAX || size > LUA_MEMORY_LIMIT / sizeof(Animation)) {
-        return luaL_error(lua, "morph arrays are too large");
-    }
+    if (size > LUA_GROUP_LIMIT) return luaL_error(lua, "animation group limit exceeded");
+    LuaCharge copies;
     auto animations = static_cast<Animation*>(lua_newuserdatauv(lua, sizeof(Animation) * size, 0));
     for (auto i = 0u; i < size; i++) {
-        lua_rawgeti(lua, 2, i + 1u);
-        auto source = _object(lua, box->scene, -1);
-        lua_pop(lua, 1);
-        lua_rawgeti(lua, 3, i + 1u);
+        if (sourceArray) {
+            lua_rawgeti(lua, 2, i + 1u);
+            lua_rawgeti(lua, 3, i + 1u);
+        } else {
+            lua_pushvalue(lua, 2);
+            lua_pushvalue(lua, 3);
+        }
+        auto source = _object(lua, box->scene, -2);
         auto target = _object(lua, box->scene, -1);
-        lua_pop(lua, 1);
+        lua_pop(lua, 2);
         auto animation = Animation::morph(source, target);
         animation.copy = copy;
         animation.pairs = pairs;
@@ -9006,7 +8901,7 @@ static void _cloneMap(lua_State* lua, int map, Object* source, const Object* cop
 // do. The copy has room for only the points and pieces it shows (see Scene::clone()).
 static void _plotCopies(lua_State* lua, int map, const LuaScene* box)
 {
-    _plotRecords(lua, 1, false);
+    _sceneTable(lua, PLOT_REGISTRY, 1, false);
     if (!lua_istable(lua, -1)) {
         lua_pop(lua, 1);
         return;

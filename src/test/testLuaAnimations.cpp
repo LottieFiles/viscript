@@ -691,6 +691,13 @@ return s
     fails("{pairs={{3,1}}}", "morph pairs need distinct piece indices within each outline");
     fails("{pairs={{1,1},{1,2}}}", "morph pairs need distinct piece indices within each outline");
     fails("{pairs={{1,1},{2,1}}}", "morph pairs need distinct piece indices within each outline");
+    // Morph and play refuse more pairs or descriptors than a group holds before they read any, as
+    // set does.
+    _scriptError("local s=vis.scene{}; local l={}; for i=1,1025 do l[i]=5 end; s:morph(l, l); return s",
+                 "animation group limit exceeded");
+    _scriptError("local s=vis.scene{}; local c=s:circle{}; local l={}; "
+                 "for i=1,1025 do l[i]={target=c, opacity=0.5} end; s:play(l); return s",
+                 "animation group limit exceeded");
 }
 
 void _surfaceMorph(Renderer* renderer)
