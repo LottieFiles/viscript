@@ -813,6 +813,10 @@ struct Scene::Impl
     RuntimeModifier runtimeModifiers[Scene::RuntimeLimit];
     uint32_t runtimeModifierCnt = 0;
     char* themeFonts[5] = {};
+    // The names Scene::missingFonts() gave last, one after another, each ending in a NUL.
+    char* missingFonts = nullptr;
+    uint32_t missingFontSize = 0;
+    uint32_t missingFontCap = 0;
 
     ~Impl();
     bool assign(const Theme& theme) noexcept;

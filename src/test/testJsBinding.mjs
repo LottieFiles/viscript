@@ -3700,7 +3700,7 @@ try {
     const coded = inspectScript("coded.lua", codedLua, fontOptions);
     // Without its font, code is set in the default font, and the CLI says so.
     const missingCodeFont = cli(["inspect", coded.path, "--font", font]);
-    assert.match(missingCodeFont.stderr, /the font 'JetBrainsMono' is not loaded, so its text is drawn in the default font/);
+    assert.match(missingCodeFont.stderr, /the font 'JetBrainsMono' is not loaded, so other fonts stand in for it/);
     assert.doesNotMatch(missingCodeFont.stderr, /'Pretendard'/);
     const codedObjects = coded.scene.objects;
     assert.equal(codedObjects.filter((object) => object.type === "text").length, 16);
@@ -4277,7 +4277,7 @@ return root
     const unfonted = cli(["render", textPath, "-o", textPng]);
     assert.ok(existsSync(textPng));
     assert.match(unfonted.stderr, /the font 'Pretendard' is not loaded/);
-    assert.match(unfonted.stderr, /the font 'Missing Family' is not loaded, so its text is drawn in the default font; pass its file, such as Missing Family\.ttf, with --font/);
+    assert.match(unfonted.stderr, /the font 'Missing Family' is not loaded, so other fonts stand in for it; pass its file, such as Missing Family\.ttf, with --font/);
     const misnamed = cli(["layout", textPath, "--font", font]);
     assert.match(misnamed.stderr, /the font 'Missing Family' is not loaded/);
     assert.doesNotMatch(misnamed.stderr, /'Pretendard'/);

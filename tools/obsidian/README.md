@@ -89,11 +89,11 @@ on a computer, a phone or a tablet. A scene can also name another font, as
   from Fontsource and saved in the font folder (`Fonts` if none is set, which then becomes the
   font folder), so the next scene, and the vault on your other devices, find it there.
 
-Each text is drawn in one font, and letters the font lacks are left out, such as Korean in
-JetBrains Mono. TrueType and OpenType fonts both work (`.ttf`, `.otf`, and the collections
-`.ttc` and `.otc`). The settings show how many fonts were found and a preview of text and code as
-scenes draw them. A changed font setting, or a font added to the folder, loads the scenes again
-with their fonts.
+Letters a text's font lacks are drawn from the runtime's built-in fonts when they have them, and
+are otherwise left out, such as Korean in JetBrains Mono. TrueType and OpenType fonts both work
+(`.ttf`, `.otf`, and the collections `.ttc` and `.otc`). The settings show how many fonts were
+found and a preview of text and code as scenes draw them. A changed font setting, or a font
+added to the folder, loads the scenes again with their fonts.
 
 ## JavaScript scenes
 

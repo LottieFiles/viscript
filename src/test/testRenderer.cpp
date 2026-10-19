@@ -52,9 +52,22 @@ static void _fontDiagnostics()
     // The default font is Latin, Greek and signs; Hangul is left out, as a font without it leaves it.
     CHECK(scene->measure(named, "θ ≤ π 한", extent) == Result::Success);
     CHECK(extent.fallback && extent.missing == 1u && std::strcmp(extent.firstMissing, "한") == 0);
-    const char* fonts[2] = {};
+    const char* fonts[3] = {};
     CHECK(scene->missingFonts(fonts, 2u) == 1u && std::strcmp(fonts[0], "Missing Family") == 0);
     CHECK(scene->missingFonts(fonts, 0u) == 0u && scene->missingFonts(nullptr, 2u) == 0u);
+    // A list sets a text in its first loaded font, here the default one, as the text that names a
+    // font that is not loaded. The scene asks for the first font of the list, which is not loaded,
+    // and for the last one only once a character has no glyph in the loaded font before it.
+    auto listed = Text::gen("named", {1.0f, 0.0f, 0.0f});
+    CHECK(listed && listed->font(" Missing First ,default,, Missing Last") == Result::Success);
+    CHECK(listed && scene->add(listed) == Result::Success);
+    TextExtent alone;
+    CHECK(scene->measure(named, alone) == Result::Success);
+    CHECK(scene->measure(listed, extent) == Result::Success && extent.fallback && extent.width == alone.width);
+    CHECK(scene->missingFonts(fonts, 3u) == 2u && std::strcmp(fonts[1], "Missing First") == 0);
+    CHECK(listed && listed->text("named \xed\x95\x9c") == Result::Success);
+    CHECK(scene->missingFonts(fonts, 3u) == 3u && std::strcmp(fonts[0], "Missing Family") == 0
+          && std::strcmp(fonts[1], "Missing First") == 0 && std::strcmp(fonts[2], "Missing Last") == 0);
     CHECK(renderer->render(scene, -1.0f, surface) == Result::InvalidArguments);
     CHECK(renderer->diagnostic() == nullptr);
 
@@ -63,6 +76,14 @@ static void _fontDiagnostics()
     static const uint8_t junk[] = {1, 2, 3, 4};
     CHECK(renderer->font("Junk", junk, sizeof(junk)) != Result::Success);
     CHECK(_says(renderer, "could not load the font 'Junk'"));
+    // A comma separates the fonts of a list, so no font takes a name with one; a folder's name is
+    // no part of the font's.
+    CHECK(renderer->font("/nonexistent/vis,missing.ttf") == Result::InvalidArguments);
+    CHECK(_says(renderer, "the font file name 'vis,missing.ttf' has a comma"));
+    CHECK(renderer->font("Junk, Sans", junk, sizeof(junk)) == Result::InvalidArguments);
+    CHECK(_says(renderer, "the font name 'Junk, Sans' has a comma"));
+    CHECK(renderer->font("/nonexistent,folder/vis-missing-font.ttf") == Result::NonSupport);
+    CHECK(_says(renderer, "could not load the font file '/nonexistent,folder/vis-missing-font.ttf'"));
     delete scene;
     delete renderer;
 }

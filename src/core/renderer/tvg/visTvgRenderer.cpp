@@ -1,5 +1,6 @@
-// Builds ThorVG paints from a display list for both engines: paths, circles, text with font
-// fallback and math glyphs, numbers, pictures and effects, reusing the retained paint tree.
+// Builds ThorVG paints from a display list for both engines: paths, circles, text that falls
+// back glyph by glyph through a chain of fonts, numbers, pictures and effects, reusing the
+// retained paint tree.
 #include <cmath>
 #include <cstddef>
 #include <cstdio>
@@ -11,7 +12,7 @@
 #include <thorvg.h>
 
 #include "visDefaultFont.h"
-#include "visMathGlyphs.h"
+#include "visMathFont.h"
 
 #include "vis.h"
 #include "visDisplayColor.h"
@@ -20,6 +21,7 @@
 #include "visTvgRenderer.h"
 #include "visScene.h"
 #include "../../common/visGrow.h"
+#include "../../common/visJson.h"
 #include "../../common/visString.h"
 
 namespace vis
@@ -50,15 +52,6 @@ static thread_local char _reason[256];
 static void _missingFont()
 {
     std::snprintf(_reason, sizeof(_reason), "text needs a font, and none is loaded; load a .ttf or .otf file first");
-}
-
-// Sets text in the font it names or, when that font is not loaded, in any loaded font, which is
-// the default one unless it failed to load: ThorVG's Lottie loader falls back the same way.
-static bool _font(tvg::Text* text, const char* font, bool* fallback = nullptr)
-{
-    if (font && _success(text->font(font))) return true;
-    if (fallback) *fallback = true;
-    return _success(text->font(nullptr));
 }
 
 static void _extent(const DrawCommand& command, Vec2& min, Vec2& max)
@@ -313,8 +306,8 @@ static tvg::Shape* _circle(const DrawCommand& command)
 }
 
 // Places a text paint by its transform, or at its center when it has none, leaning by its
-// slant about the first baseline, which the font sets at the paint's size.
-static tvg::Matrix _textMatrix(const DrawCommand& command, tvg::Text* text)
+// slant about its first baseline, at y = baseline in the paint's own space.
+static tvg::Matrix _textMatrix(const DrawCommand& command, float baseline)
 {
     auto& source = command.transform.e;
     tvg::Matrix matrix = {1.0f, 0.0f, command.center.x, 0.0f, 1.0f, command.center.y, 0.0f, 0.0f, 1.0f};
@@ -323,18 +316,24 @@ static tvg::Matrix _textMatrix(const DrawCommand& command, tvg::Text* text)
                   source[3], source[4], source[5],
                   source[6], source[7], source[8]};
     }
-    tvg::TextMetrics metrics;
-    if (command.slant == 0.0f || !_success(text->metrics(metrics))) return matrix;
-    auto lines = 1.0f;
-    for (auto at = text->text(); at && *at; at++) {
-        if (*at == '\n') lines++;
-    }
-    auto baseline = metrics.ascent - command.align.y * (metrics.advance * lines - metrics.linegap);
+    if (command.slant == 0.0f) return matrix;
     // In the paint's own space, y down: x' = x - slant * (y - baseline), then the placement.
     auto shear = -command.slant;
     return {matrix.e11, matrix.e12 + shear * matrix.e11, matrix.e13 - shear * baseline * matrix.e11,
             matrix.e21, matrix.e22 + shear * matrix.e21, matrix.e23 - shear * baseline * matrix.e21,
             matrix.e31, matrix.e32 + shear * matrix.e31, matrix.e33 - shear * baseline * matrix.e31};
+}
+
+// The first baseline of a text, which its font sets on lines at its size, aligned by align.
+static float _baseline(tvg::Text* text, float align)
+{
+    tvg::TextMetrics metrics;
+    if (!_success(text->metrics(metrics))) return 0.0f;
+    auto lines = 1.0f;
+    for (auto at = text->text(); at && *at; at++) {
+        if (*at == '\n') lines++;
+    }
+    return metrics.ascent - align * (metrics.advance * lines - metrics.linegap);
 }
 
 static tvg::Matrix _pictureMatrix(const DrawCommand& command)
@@ -348,41 +347,48 @@ static tvg::Matrix _pictureMatrix(const DrawCommand& command)
             0.0f, 0.0f, 1.0f};
 }
 
-// Only symbols absent from the selected font use the bundled math outlines.
-static const MathGlyph* _mathGlyph(const char* character)
+// Bytes in the UTF-8 sequence that lead starts; a stray byte counts as one character.
+static uint32_t _sequence(uint8_t lead)
 {
-    for (auto& glyph : MATH_GLYPHS) {
-        if (std::strcmp(glyph.text, character) == 0) return &glyph;
-    }
-    return nullptr;
+    if (lead >= 0xf0u && lead < 0xf8u) return 4u;
+    if (lead >= 0xe0u) return lead < 0xf0u ? 3u : 1u;
+    if (lead >= 0xc0u) return 2u;
+    return 1u;
 }
 
-static uint32_t _character(const char*& at, char (&character)[5])
+// Whether a character holds one whole UTF-8 sequence of length bytes with no overlong form,
+// surrogate, or codepoint past U+10FFFF.
+static bool _wellFormed(const char* character, uint32_t length)
 {
-    auto lead = static_cast<uint8_t>(*at);
-    auto length = lead < 0x80 ? 1u : lead < 0xe0 ? 2u : lead < 0xf0 ? 3u : 4u;
-    auto read = 0u;
-    while (read < length && *at) character[read++] = *at++;
-    return read;
+    auto bytes = reinterpret_cast<const uint8_t*>(character);
+    return length == 1u ? bytes[0] < 0x80u : utf8Sequence(bytes, length) == length;
 }
 
-static const MathGlyph* _fallback(tvg::Text* text, const char* character)
+// The codepoint of a well-formed UTF-8 sequence of length bytes.
+static uint32_t _codepoint(const char* character, uint32_t length)
 {
-    auto math = _mathGlyph(character);
-    if (!math) return nullptr;
-    tvg::GlyphMetrics glyph;
-    if (_success(text->metrics(character, glyph)) && glyph.advance > 0.0f) return nullptr;
-    return math;
+    static constexpr uint8_t LEAD_MASK[] = {0x7fu, 0x1fu, 0x0fu, 0x07u};
+    auto code = static_cast<uint32_t>(static_cast<uint8_t>(character[0]) & LEAD_MASK[length - 1u]);
+    for (auto i = 1u; i < length; i++) code = (code << 6u) | (static_cast<uint8_t>(character[i]) & 0x3fu);
+    return code;
 }
 
-static bool _needsMath(tvg::Text* text, const char* value)
+// Whether a character is drawn as nothing by design: a format character, a joiner, or a
+// variation selector.
+static bool _invisible(uint32_t code)
 {
-    for (auto at = value; *at;) {
-        char character[5] = {};
-        _character(at, character);
-        if (_fallback(text, character)) return true;
-    }
-    return false;
+    return code == 0x00adu || code == 0x034fu || code == 0x061cu || code == 0x180eu
+           || (code >= 0x200bu && code <= 0x200fu) || (code >= 0x202au && code <= 0x202eu)
+           || (code >= 0x2060u && code <= 0x206fu) || (code >= 0xfe00u && code <= 0xfe0fu) || code == 0xfeffu
+           || (code >= 0xe0000u && code <= 0xe01efu);
+}
+
+// Whether a character is a control or invisible one, which no font needs a glyph for.
+static bool _control(const char* character, uint32_t length)
+{
+    if (!_wellFormed(character, length)) return false;
+    auto code = _codepoint(character, length);
+    return code < 0x20u || (code >= 0x7fu && code <= 0x9fu) || _invisible(code);
 }
 
 static float _digitAdvance(tvg::Text* text)
@@ -401,82 +407,250 @@ static bool _tabular(const char* character)
     return (character[0] >= '0' && character[0] <= '9') || character[0] == '-' || character[0] == ' ';
 }
 
-static tvg::Paint* _mathText(const DrawCommand& command, tvg::Text* text)
+// The fonts a text is set in glyph by glyph, each character in the first of them that has a
+// glyph for it: those its font list names, the first loaded one of which is the text's own font
+// and sets its lines, or else the default one; then the math font and the default one. Each
+// font but the text's own is a text at the same size, made when a character first reaches it.
+// Tabular figures take the cell of the widest digit of the text's own font.
+struct Chain
 {
-    tvg::TextMetrics metrics;
-    if (!_success(text->metrics(metrics))) return nullptr;
-    auto scale = command.size * (4.0f / 3.0f);
-    auto cell = command.tabular ? _digitAdvance(text) : 0.0f;
-    auto width = 0.0f; auto pen = 0.0f; auto lines = 1u;
-    for (auto at = command.text; *at;) {
-        char character[5] = {};
-        _character(at, character);
-        if (character[0] == '\n') { width = std::fmax(width, pen); pen = 0.0f; lines++; continue; }
-        auto math = _fallback(text, character);
-        tvg::GlyphMetrics glyph;
-        if (math) pen += math->advance * scale;
-        else if (_success(text->metrics(character, glyph))) pen += command.tabular && _tabular(character) ? cell : glyph.advance;
-    }
-    width = std::fmax(width, pen);
-    auto height = metrics.advance * lines - metrics.linegap;
-    auto left = -command.align.x * width;
-    auto baseline = metrics.ascent - command.align.y * height;
-    auto scene = tvg::Scene::gen();
-    if (!scene) return nullptr;
-    pen = 0.0f; auto row = 0u;
-    for (auto at = command.text; *at;) {
-        char character[5] = {};
-        _character(at, character);
-        if (character[0] == '\n') { pen = 0.0f; row++; continue; }
-        auto math = _fallback(text, character);
-        auto y = baseline + row * metrics.advance;
-        auto x = left + pen;
-        tvg::GlyphMetrics extent;
-        auto found = _success(text->metrics(character, extent));
-        auto tabular = command.tabular && _tabular(character);
-        if (tabular && found) x += (cell - extent.advance) * 0.5f;
-        tvg::Paint* paint = nullptr;
-        if (math) {
-            auto shape = tvg::Shape::gen();
-            if (shape && _success(shape->appendPath(math->commands, math->commandCount, math->points, math->pointCount))
-                && _success(shape->fill(command.style.fill.r, command.style.fill.g, command.style.fill.b))
-                && _success(shape->transform({scale, 0.0f, x, 0.0f, -scale, y, 0.0f, 0.0f, 1.0f}))) paint = shape;
-            else if (shape) _release(shape);
-            pen += math->advance * scale;
-        } else {
-            auto glyph = tvg::Text::gen();
-            if (glyph && _font(glyph, command.font) && _success(glyph->size(command.size))
-                && _success(glyph->text(character)) && _success(glyph->align(0.0f, 0.0f))
-                && _success(glyph->fill(command.style.fill.r, command.style.fill.g, command.style.fill.b))
-                && _success(glyph->translate(x, y - metrics.ascent))) paint = glyph;
-            else if (glyph) _release(glyph);
-            if (found) pen += tabular ? cell : extent.advance;
+    static constexpr uint32_t Names = 8u;  // a font list's names past these are left out
+    char* list = nullptr;                  // a copy of the font list, cut into the names
+    const char* names[Names + 3u] = {};
+    tvg::Text* fonts[Names + 3u] = {};
+    uint32_t count = 0u;
+    uint32_t listed = 0u;  // the names of the list, which come first
+    uint32_t first = 0u;   // the text's own font
+    uint32_t made = 0u;    // a bit for each font made, or found not loaded
+    float size = 0.0f;
+    float cell = 0.0f;
+    bool tabular = false;
+
+    Chain() = default;
+    Chain(const Chain&) = delete;
+    Chain& operator=(const Chain&) = delete;
+
+    ~Chain()
+    {
+        for (auto i = first + 1u; i < count; i++) {
+            if (fonts[i]) _release(fonts[i]);
         }
-        if (!_add(scene, paint)) { _release(scene); return nullptr; }
+        delete[] list;
     }
-    if (!_success(scene->opacity(command.style.fill.a)) || !_success(scene->transform(_textMatrix(command, text)))) {
-        _release(scene); return nullptr;
+};
+
+// Sets text at size in the first loaded font of the list font or, when none is loaded, in any
+// loaded font, which is the default one unless it failed to load, as ThorVG's Lottie loader
+// falls back; then makes chain of the fonts the list names and those after them.
+// InsufficientCondition: no font is loaded at all.
+static Result _chain(Chain& chain, tvg::Text* text, const char* font, float size, bool tabular)
+{
+    if (font) {
+        chain.list = _duplicate(font);
+        if (!chain.list) return Result::OutOfMemory;
+        const char* name;
+        uint32_t length;
+        for (const char* at = chain.list; chain.listed < Chain::Names && renderer::fontName(at, name, length);) {
+            chain.list[name - chain.list + length] = '\0';
+            chain.names[chain.listed++] = name;
+        }
     }
-    return scene;
+    chain.count = chain.listed;
+    while (chain.first < chain.count && !_success(text->font(chain.names[chain.first]))) chain.first++;
+    if (chain.first == chain.count) {
+        if (!_success(text->font(nullptr))) return Result::InsufficientCondition;
+        chain.names[chain.count++] = nullptr;
+    }
+    chain.names[chain.count++] = MATH_FONT_NAME;
+    chain.names[chain.count++] = DEFAULT_FONT_NAME;
+    chain.fonts[chain.first] = text;
+    chain.made = (2u << chain.first) - 1u;  // the fonts before the text's own are not loaded
+    chain.size = size;
+    chain.tabular = tabular;
+    if (!_success(text->size(size))) return Result::Unknown;
+    chain.cell = tabular ? _digitAdvance(text) : 0.0f;
+    return Result::Success;
 }
 
-static tvg::Paint* _text(const DrawCommand& command)
+// The text in font index of chain, made the first time it is asked for; null when that font
+// is not loaded.
+static tvg::Text* _link(Chain& chain, uint32_t index)
+{
+    if (chain.made & (1u << index)) return chain.fonts[index];
+    chain.made |= 1u << index;
+    auto text = tvg::Text::gen();
+    if (text && _success(text->font(chain.names[index])) && _success(text->size(chain.size))) {
+        return chain.fonts[index] = text;
+    }
+    if (text) _release(text);
+    return nullptr;
+}
+
+// Which font of chain sets a character that follows a run in font current, with its glyph's
+// metrics there: the first font that has a glyph for it, or current for a control or
+// invisible character, and for one no font has, which is missing and takes no room. The font
+// loader keeps a codepoint it could not find as an empty glyph, so after the first miss the
+// lookup succeeds with no advance, bearing or outline.
+static uint32_t _pick(Chain& chain, const char* character, uint32_t length, uint32_t current,
+                      tvg::GlyphMetrics& glyph, bool& missing)
+{
+    static constexpr tvg::GlyphMetrics empty = {};
+    missing = false;
+    if (_control(character, length)) {
+        if (!_success(chain.fonts[current]->metrics(character, glyph))) glyph = {};
+        return current;
+    }
+    for (auto i = chain.first; i < chain.count; i++) {
+        auto font = _link(chain, i);
+        if (font && _success(font->metrics(character, glyph)) && std::memcmp(&glyph, &empty, sizeof(glyph)) != 0) {
+            return i;
+        }
+    }
+    glyph = {};
+    missing = true;
+    return current;
+}
+
+// A character of a line as _line() sets it. It may start a run: the longest stretch of the
+// line in one font, or a tabular figure alone.
+struct Glyph
+{
+    char character[5] = {};
+    uint32_t length = 0u;
+    const char* at = nullptr;        // where it starts in the text
+    uint32_t font = 0u;              // the font of the chain that sets it
+    tvg::GlyphMetrics metrics = {};  // its glyph in that font, or zeros
+    float x = 0.0f;                  // its pen from the start of the line
+    bool missing = false;            // no font has it
+    bool fixed = false;              // a tabular figure, centered in the first font's digit cell
+    bool start = false;
+};
+
+// Walks the line of a text that starts at at, up to the line feed or end it leaves at on, and
+// hands each character to visit as the font loader would lay out a run of them: in the font
+// _pick() finds, with the pen adding advances without kerning. Returns the line's width.
+template<typename Visit>
+static float _line(Chain& chain, const char*& at, Visit&& visit)
+{
+    auto pen = 0.0f;
+    auto font = chain.first;
+    auto alone = true;
+    while (*at && *at != '\n') {
+        Glyph glyph;
+        glyph.at = at;
+        auto length = _sequence(static_cast<uint8_t>(*at));
+        while (glyph.length < length && *at) glyph.character[glyph.length++] = *at++;
+        glyph.font = _pick(chain, glyph.character, glyph.length, font, glyph.metrics, glyph.missing);
+        glyph.fixed = chain.tabular && !glyph.missing && _tabular(glyph.character);
+        glyph.x = glyph.fixed ? pen + (chain.cell - glyph.metrics.advance) * 0.5f : pen;
+        glyph.start = alone || glyph.fixed || glyph.font != font;
+        pen += glyph.fixed ? chain.cell : glyph.metrics.advance;
+        font = glyph.font;
+        alone = glyph.fixed;
+        visit(glyph);
+    }
+    return pen;
+}
+
+// How many runs a text falls into, or none when every character stays in the chain's first
+// font and no figure is set apart, so that the text is drawn as one.
+static uint32_t _split(Chain& chain, const char* text)
+{
+    auto runs = 0u;
+    auto single = true;
+    for (auto at = text;; at++) {
+        _line(chain, at, [&](const Glyph& glyph) {
+            if (glyph.start) runs++;
+            if (glyph.font != chain.first || glyph.fixed) single = false;
+        });
+        if (!*at) return single ? 0u : runs;
+    }
+}
+
+// The texts a paint of several runs holds, which the retained tree recolors in place, and the
+// first baseline it leans about.
+struct TextRuns
+{
+    tvg::Text** texts = nullptr;
+    uint32_t count = 0u;
+    float baseline = 0.0f;
+
+    TextRuns() = default;
+    TextRuns(const TextRuns&) = delete;
+    TextRuns& operator=(const TextRuns&) = delete;
+
+    ~TextRuns()
+    {
+        delete[] texts;
+    }
+};
+
+// Sets a text of count runs as a scene of one text each, where the font loader would set the
+// glyphs if one font had them all: on the lines of the text's own font, each aligned by its own
+// width, and on their baselines. The scene carries the opacity and transform, and runs, when
+// given, the runs.
+static tvg::Paint* _runs(const DrawCommand& command, Chain& chain, uint32_t count, TextRuns* runs)
+{
+    TextRuns local;
+    if (!runs) runs = &local;
+    auto& fill = command.style.fill;
+    delete[] runs->texts;
+    runs->texts = new (std::nothrow) tvg::Text*[count];
+    runs->count = 0u;
+    runs->baseline = _baseline(chain.fonts[chain.first], command.align.y);
+    auto starts = new (std::nothrow) Glyph[count];
+    auto copy = _duplicate(command.text);
+    auto scene = tvg::Scene::gen();
+    tvg::TextMetrics metrics;
+    auto ok = runs->texts && starts && copy && scene && _success(chain.fonts[chain.first]->metrics(metrics));
+    auto row = 0u;
+    for (auto at = command.text; ok; at++, row++) {
+        // A line's runs start where its font changes and at each tabular figure; each ends where
+        // the next one starts, or with the line, and is cut out of the copy while a text takes it.
+        auto from = runs->count;
+        auto to = from;
+        auto left = -command.align.x * _line(chain, at, [&](const Glyph& glyph) {
+            if (glyph.start && to < count) starts[to++] = glyph;
+        });
+        auto y = runs->baseline + metrics.advance * static_cast<float>(row);
+        for (auto i = from; ok && i < to; i++) {
+            auto& run = starts[i];
+            auto& stop = copy[(i + 1u < to ? starts[i + 1u].at : at) - command.text];
+            auto kept = stop;
+            stop = '\0';
+            tvg::TextMetrics own;
+            auto text = tvg::Text::gen();
+            ok = _add(scene, text) && _success(chain.fonts[run.font]->metrics(own))
+                 && _success(text->font(chain.names[run.font])) && _success(text->size(command.size))
+                 && _success(text->text(copy + (run.at - command.text))) && _success(text->fill(fill.r, fill.g, fill.b))
+                 && _success(text->translate(left + run.x, y - own.ascent));
+            stop = kept;
+            if (ok) runs->texts[runs->count++] = text;
+        }
+        if (!*at) break;
+    }
+    ok = ok && _success(scene->opacity(fill.a)) && _success(scene->transform(_textMatrix(command, runs->baseline)));
+    delete[] starts;
+    delete[] copy;
+    if (ok) return scene;
+    runs->count = 0u;
+    if (scene) _release(scene);
+    return nullptr;
+}
+
+static tvg::Paint* _text(const DrawCommand& command, TextRuns* runs = nullptr)
 {
     auto text = tvg::Text::gen();
     if (!text) return nullptr;
-    if (!_font(text, command.font)) {
-        _missingFont();
+    Chain chain;
+    auto result = _chain(chain, text, command.font, command.size, command.tabular);
+    if (result == Result::InsufficientCondition) _missingFont();
+    if (result != Result::Success || !_success(text->text(command.text))) {
         _release(text);
         return nullptr;
     }
-    if (!_success(text->size(command.size)) || !_success(text->text(command.text))) {
-        _release(text);
-        return nullptr;
-    }
-    if (command.tabular || _needsMath(text, command.text)) {
-        // The matrix uses the native line metrics and the same aligned baseline as measurement.
-        text->align(command.align.x, command.align.y);
-        auto paint = _mathText(command, text);
+    if (auto count = _split(chain, command.text)) {
+        auto paint = _runs(command, chain, count, runs);
         _release(text);
         return paint;
     }
@@ -485,7 +659,7 @@ static tvg::Paint* _text(const DrawCommand& command)
         return nullptr;
     }
     if (command.transformed || command.slant != 0.0f) {
-        if (!_success(text->transform(_textMatrix(command, text)))) {
+        if (!_success(text->transform(_textMatrix(command, _baseline(text, command.align.y))))) {
             _release(text);
             return nullptr;
         }
@@ -493,6 +667,7 @@ static tvg::Paint* _text(const DrawCommand& command)
         _release(text);
         return nullptr;
     }
+    if (runs) runs->count = 0u;
     return text;
 }
 
@@ -559,14 +734,14 @@ static bool _numberText(const DrawCommand& command, char (&value)[64])
     return _shortest(command.number, value, sizeof(value));
 }
 
-static tvg::Paint* _number(const DrawCommand& command)
+static tvg::Paint* _number(const DrawCommand& command, TextRuns* runs)
 {
     char value[64];
     if (!_numberText(command, value)) return nullptr;
     auto copy = command;
     copy.text = value;
     copy.font = nullptr;
-    return _text(copy);
+    return _text(copy, runs);
 }
 
 static tvg::Picture* _picture(const DrawCommand& command)
@@ -591,13 +766,14 @@ static tvg::Picture* _picture(const DrawCommand& command)
     return picture;
 }
 
-static tvg::Paint* _paint(const DrawCommand& command)
+// A text's runs, when it has several, go in runs.
+static tvg::Paint* _paint(const DrawCommand& command, TextRuns* runs = nullptr)
 {
     switch (command.type) {
         case CommandType::Path: return _path(command);
         case CommandType::Circle: return _circle(command);
-        case CommandType::Text: return _text(command);
-        case CommandType::Number: return _number(command);
+        case CommandType::Text: return _text(command, runs);
+        case CommandType::Number: return _number(command, runs);
         case CommandType::Picture: return _picture(command);
     }
     return nullptr;
@@ -703,13 +879,14 @@ struct Slot
     // Shape (circle) and Text (translation)
     Vec2 center;
     // Text and Number
-    bool mathText = false;
+    TextRuns runs;
     char* text = nullptr;
     char* font = nullptr;
     float size = 0.0f;
     float slant = 0.0f;
     Vec2 align;
     bool transformed = false;
+    bool tabular = false;
     // Text and Picture
     tvg::Matrix matrix = {};
     uint8_t opacity = 255;
@@ -824,10 +1001,13 @@ static bool _capture(Slot& slot, const DrawCommand& command)
             slot.fill = style.fill;
             slot.transformed = command.transformed;
             slot.slant = command.slant;
+            slot.tabular = command.tabular;
             slot.center = command.center;
-            slot.mathText = slot.paint->type() == tvg::Type::Scene;
-            if (!slot.mathText && (command.transformed || command.slant != 0.0f)) {
-                slot.matrix = _textMatrix(command, static_cast<tvg::Text*>(slot.paint));
+            if (slot.runs.count) {
+                slot.matrix = _textMatrix(command, slot.runs.baseline);
+            } else if (command.transformed || command.slant != 0.0f) {
+                auto paint = static_cast<tvg::Text*>(slot.paint);
+                slot.matrix = _textMatrix(command, _baseline(paint, command.align.y));
             }
             return true;
         }
@@ -948,15 +1128,42 @@ static bool _updateText(Slot& slot, const DrawCommand& command, bool& replace)
         text = value;
         font = nullptr;
     }
+    // Runs are set again when their string, font or layout changes, and one text when its new
+    // string falls into runs.
+    auto& runs = slot.runs;
     if (slot.transformed != command.transformed || !_same(slot.slant, command.slant)
-        || !_sameText(slot.font, font)) {
+        || !_sameText(slot.font, font) || slot.tabular != command.tabular
+        || (runs.count && (!_sameText(slot.text, text) || !_same(slot.size, command.size)
+                           || !_same(slot.align, command.align)))) {
         replace = true;
         return false;
     }
-    if (slot.mathText || command.tabular) { replace = true; return false; }
-    auto paint = static_cast<tvg::Text*>(slot.paint);
-    if (_needsMath(paint, text)) { replace = true; return false; }
     auto& fill = command.style.fill;
+    if (runs.count) {
+        if (slot.fill.r != fill.r || slot.fill.g != fill.g || slot.fill.b != fill.b) {
+            for (auto i = 0u; i < runs.count; i++) {
+                if (!_success(runs.texts[i]->fill(fill.r, fill.g, fill.b))) return false;
+            }
+        }
+        if (slot.fill.a != fill.a && !_success(slot.paint->opacity(fill.a))) return false;
+        slot.fill = fill;
+        auto matrix = _textMatrix(command, runs.baseline);
+        if (!_same(slot.matrix, matrix)) {
+            if (!_success(slot.paint->transform(matrix))) return false;
+            slot.matrix = matrix;
+        }
+        return true;
+    }
+    auto paint = static_cast<tvg::Text*>(slot.paint);
+    if (!_sameText(slot.text, text)) {
+        // The chain sets the paint in the font it is in already, and at the size the string set
+        // below lays it out at; a string that falls into runs needs a paint of its own.
+        Chain chain;
+        if (_chain(chain, paint, font, command.size, command.tabular) != Result::Success || _split(chain, text)) {
+            replace = true;
+            return false;
+        }
+    }
     // ThorVG lays glyphs out lazily and only text() reliably invalidates that layout (align()
     // and size() alone do not re-run it), so any layout input change resets the string too.
     auto relayout = false;
@@ -979,7 +1186,7 @@ static bool _updateText(Slot& slot, const DrawCommand& command, bool& replace)
     if (slot.fill.a != fill.a && !_success(paint->opacity(fill.a))) return false;
     slot.fill = fill;
     if (command.transformed || command.slant != 0.0f) {
-        auto matrix = _textMatrix(command, paint);
+        auto matrix = _textMatrix(command, _baseline(paint, command.align.y));
         if (!_same(slot.matrix, matrix)) {
             if (!_success(paint->transform(matrix))) return false;
             slot.matrix = matrix;
@@ -1536,7 +1743,7 @@ static Result _local(RetainedNode* node, const Config& config, const DisplayList
             auto replace = false;
             if (!_update(*slot, command, replace)) {
                 if (!replace) return Result::Unknown;
-                auto paint = _paint(command);
+                auto paint = _paint(command, &slot->runs);
                 if (!paint) return Result::NonSupport;
                 paint->ref();
                 if (!_push(node->dead, node->deadCnt, node->deadCap, slot->paint)) {
@@ -1551,7 +1758,7 @@ static Result _local(RetainedNode* node, const Config& config, const DisplayList
             slot = new (std::nothrow) Slot;
             if (!slot) return Result::OutOfMemory;
             slot->key = key;
-            slot->paint = _paint(command);
+            slot->paint = _paint(command, &slot->runs);
             if (!slot->paint) {
                 delete slot;
                 return Result::NonSupport;
@@ -2237,8 +2444,9 @@ struct RetainedTree
 };
 
 // ThorVG counts its users the same way, unguarded, and drops every font when the last one
-// terminates it; the default font goes in again for the next first user. It is registered
-// under its name before any other font, so it is also the one any loaded font finds.
+// terminates it; the default and math fonts go in again for the next first user. The default
+// one is registered under its name before any other font, so it is also the one any loaded
+// font finds.
 static uint32_t _users = 0u;
 
 static bool _init()
@@ -2246,6 +2454,7 @@ static bool _init()
     if (!_success(tvg::Initializer::init(0))) return false;
     if (_users++ == 0u) {
         tvg::Text::load(DEFAULT_FONT_NAME, reinterpret_cast<const char*>(DEFAULT_FONT), sizeof(DEFAULT_FONT), "ttf", false);
+        tvg::Text::load(MATH_FONT_NAME, reinterpret_cast<const char*>(MATH_FONT), sizeof(MATH_FONT), "ttf", false);
     }
     return true;
 }
@@ -2279,6 +2488,18 @@ Result tvgFont(TvgDiagnostic& diagnostic, const char* path) noexcept
 {
     diagnostic.message[0] = '\0';
     if (!path) return Result::InvalidArguments;
+    // The font takes the file's name, without the extension, which a font list cannot name
+    // when it has a comma.
+    auto name = path;
+    for (auto at = path; *at; at++) {
+        if (*at == '/' || *at == '\\') name = at + 1;
+    }
+    if (std::strchr(name, ',')) {
+        std::snprintf(diagnostic.message, sizeof(diagnostic.message),
+                      "the font file name '%s' has a comma, which separates the fonts of a list; rename the file",
+                      name);
+        return Result::InvalidArguments;
+    }
     if (_success(tvg::Text::load(path))) return Result::Success;
     std::snprintf(diagnostic.message, sizeof(diagnostic.message),
                   "could not load the font file '%s'; it is missing, unreadable or not a .ttf, "
@@ -2291,6 +2512,11 @@ Result tvgFont(TvgDiagnostic& diagnostic, const char* name, const void* data, ui
 {
     diagnostic.message[0] = '\0';
     if (!name || !name[0] || !data || !size || !mime || !mime[0]) return Result::InvalidArguments;
+    if (std::strchr(name, ',')) {
+        std::snprintf(diagnostic.message, sizeof(diagnostic.message),
+                      "the font name '%s' has a comma, which separates the fonts of a list", name);
+        return Result::InvalidArguments;
+    }
     if (_success(tvg::Text::load(name, static_cast<const char*>(data), size, mime, true))) {
         return Result::Success;
     }
@@ -2347,172 +2573,68 @@ Result tvgRetainedSync(RetainedTree* tree, tvg::Canvas* canvas, const Scene* sce
     return tree->sync(canvas, scene, time, scale);
 }
 
-// Bytes in the UTF-8 sequence that lead starts; a stray byte counts as one character.
-static uint32_t _sequence(uint8_t lead)
-{
-    if (lead >= 0xf0u && lead < 0xf8u) return 4u;
-    if (lead >= 0xe0u) return lead < 0xf0u ? 3u : 1u;
-    if (lead >= 0xc0u) return 2u;
-    return 1u;
-}
-
-// Whether a character holds one whole UTF-8 sequence of length bytes with no overlong form,
-// surrogate, or codepoint past U+10FFFF.
-static bool _wellFormed(const char* character, uint32_t length)
-{
-    auto lead = static_cast<uint8_t>(character[0]);
-    if (length != _sequence(lead)) return false;
-    if (length == 1u) return lead < 0x80u;
-    if (lead < 0xc2u || lead > 0xf4u) return false;
-    for (auto i = 1u; i < length; i++) {
-        if ((static_cast<uint8_t>(character[i]) & 0xc0u) != 0x80u) return false;
-    }
-    auto second = static_cast<uint8_t>(character[1]);
-    if (lead == 0xe0u) return second >= 0xa0u;
-    if (lead == 0xedu) return second < 0xa0u;
-    if (lead == 0xf0u) return second >= 0x90u;
-    if (lead == 0xf4u) return second < 0x90u;
-    return true;
-}
-
-// The codepoint of a well-formed UTF-8 sequence of length bytes.
-static uint32_t _codepoint(const char* character, uint32_t length)
-{
-    static constexpr uint8_t LEAD_MASK[] = {0x7fu, 0x1fu, 0x0fu, 0x07u};
-    auto code = static_cast<uint32_t>(static_cast<uint8_t>(character[0]) & LEAD_MASK[length - 1u]);
-    for (auto i = 1u; i < length; i++) code = (code << 6u) | (static_cast<uint8_t>(character[i]) & 0x3fu);
-    return code;
-}
-
-// Whether a character is drawn as nothing by design: a format character, a joiner, or a
-// variation selector.
-static bool _invisible(uint32_t code)
-{
-    return code == 0x00adu || code == 0x034fu || code == 0x061cu || code == 0x180eu
-           || (code >= 0x200bu && code <= 0x200fu) || (code >= 0x202au && code <= 0x202eu)
-           || (code >= 0x2060u && code <= 0x206fu) || (code >= 0xfe00u && code <= 0xfe0fu) || code == 0xfeffu
-           || (code >= 0xe0000u && code <= 0xe01efu);
-}
-
-// Whether the font has no glyph for a character, whose lookup found glyph or not. The font
-// loader keeps a codepoint it could not find as an empty glyph, so after the first miss the
-// lookup succeeds with no advance, bearing or outline. Control and invisible characters do
-// not count.
-static bool _missing(bool found, const tvg::GlyphMetrics& glyph, const char* character, uint32_t length)
-{
-    if (_wellFormed(character, length)) {
-        auto code = _codepoint(character, length);
-        if (code < 0x20u || (code >= 0x7fu && code <= 0x9fu) || _invisible(code)) return false;
-    }
-    if (!found) return true;
-    return glyph.advance == 0.0f && glyph.bearing == 0.0f && glyph.min.x == 0.0f && glyph.min.y == 0.0f
-           && glyph.max.x == 0.0f && glyph.max.y == 0.0f;
-}
-
-// Adds up the glyph advances of every line the way the font loader lays them out, gathers the
-// box their outlines cover, leaning by slant, and counts the characters the font has no glyph
-// for, which the loader skips. A font that is not loaded is measured as the default one that
-// draws it.
+// Measures a text as _text() sets it: the advances of every line, the box the outlines cover,
+// leaning by slant, and the characters no font of the chain has, which take no room. A font
+// that is not loaded is measured as the default one that draws it.
 static Result _measure(tvg::Text* text, const char* font, float size, const char* value, float slant, bool tabular,
                        TextExtent& output)
 {
-    if (!_font(text, font, &output.fallback)) return Result::InsufficientCondition;
+    Chain chain;
+    auto result = _chain(chain, text, font, size, tabular);
+    if (result != Result::Success) return result;
+    output.fallback = chain.first > 0u || !chain.listed;
     tvg::TextMetrics metrics;
-    if (!_success(text->size(size)) || !_success(text->metrics(metrics))) return Result::Unknown;
-    auto cell = tabular ? _digitAdvance(text) : 0.0f;
-    auto lines = 1u;
-    auto width = 0.0f;
-    auto line = 0.0f;
+    if (!_success(text->metrics(metrics))) return Result::Unknown;
     auto inked = false;
-    for (auto at = value; *at;) {
-        if (*at == '\n') {
-            if (line > width) width = line;
-            line = 0.0f;
-            lines++;
-            at++;
-            continue;
-        }
-        char character[5] = {};
-        auto length = _sequence(static_cast<uint8_t>(*at));
-        auto read = 0u;
-        while (read < length && *at) character[read++] = *at++;
-        tvg::GlyphMetrics glyph;
-        auto found = _success(text->metrics(character, glyph));
-        if (_missing(found, glyph, character, read)) {
-            if (auto math = _mathGlyph(character)) {
-                auto scale = size * (4.0f / 3.0f);
-                glyph.advance = math->advance * scale;
-                glyph.bearing = math->min.x * scale;
-                glyph.min = {math->min.x * scale, math->min.y * scale};
-                glyph.max = {math->max.x * scale, math->max.y * scale};
-                found = true;
-            }
-        }
-        auto fixed = tabular && _tabular(character);
-        auto offset = fixed && found ? (cell - glyph.advance) * 0.5f : 0.0f;
+    for (auto at = value;; at++) {
         // Glyph boxes are y up from the pen on the baseline; each line sits one advance lower.
-        if (found && (glyph.max.x > glyph.min.x || glyph.max.y > glyph.min.y)) {
-            auto baseline = -metrics.advance * static_cast<float>(lines - 1u);
-            auto left = line + offset + glyph.min.x;
-            auto right = line + offset + glyph.max.x;
-            auto top = baseline + glyph.max.y;
-            auto bottom = baseline + glyph.min.y;
-            output.left = inked ? std::fmin(output.left, left) : left;
-            output.right = inked ? std::fmax(output.right, right) : right;
-            output.top = inked ? std::fmax(output.top, top) : top;
-            output.bottom = inked ? std::fmin(output.bottom, bottom) : bottom;
-            inked = true;
-        }
-        if (found) line += fixed ? cell : glyph.advance;
-        if (_missing(found, glyph, character, read)) {
-            if (!output.missing && _wellFormed(character, read)) std::memcpy(output.firstMissing, character, sizeof(character));
-            output.missing++;
-        }
+        auto baseline = -metrics.advance * static_cast<float>(output.lines);
+        auto width = _line(chain, at, [&](const Glyph& glyph) {
+            auto& box = glyph.metrics;
+            if (box.max.x > box.min.x || box.max.y > box.min.y) {
+                auto left = glyph.x + box.min.x;
+                auto right = glyph.x + box.max.x;
+                auto top = baseline + box.max.y;
+                auto bottom = baseline + box.min.y;
+                output.left = inked ? std::fmin(output.left, left) : left;
+                output.right = inked ? std::fmax(output.right, right) : right;
+                output.top = inked ? std::fmax(output.top, top) : top;
+                output.bottom = inked ? std::fmin(output.bottom, bottom) : bottom;
+                inked = true;
+            }
+            if (glyph.missing) {
+                if (!output.missing && _wellFormed(glyph.character, glyph.length)) {
+                    std::memcpy(output.firstMissing, glyph.character, sizeof(glyph.character));
+                }
+                output.missing++;
+            }
+        });
+        if (width > output.width) output.width = width;
+        output.lines++;
+        if (!*at) break;
     }
-    if (line > width) width = line;
-    output.width = width;
-    output.height = metrics.advance * static_cast<float>(lines) - metrics.linegap;
+    output.height = metrics.advance * static_cast<float>(output.lines) - metrics.linegap;
     output.ascent = metrics.ascent;
     output.descent = -metrics.descent;
-    output.lines = lines;
     if (!inked || slant == 0.0f) return Result::Success;
-    if (tabular) {
-        DrawCommand command;
-        command.text = value;
-        command.font = font;
-        command.size = size;
-        command.slant = slant;
-        command.tabular = true;
-        auto paint = _mathText(command, text);
-        if (!paint) return Result::OutOfMemory;
-        float x, y, w, h;
-        auto result = paint->bounds(&x, &y, &w, &h);
-        _release(paint);
-        if (!_success(result)) return Result::Unknown;
-        output.left = x;
-        output.right = x + w;
-        return Result::Success;
-    }
-    if (_needsMath(text, value)) {
-        auto a = slant * output.top;
-        auto b = slant * output.bottom;
-        output.left += std::fmin(a, b);
-        output.right += std::fmax(a, b);
-        return Result::Success;
-    }
     // Leaning outlines reach as far as the shear carries their own points, which the glyph boxes
-    // cannot tell: the top of a b leans past its bowl. Shear the set text about its first
-    // baseline, as the renderer draws it, and read left and right from its outlines; heights stay.
+    // cannot tell: the top of a b leans past its bowl. Read left and right from the outlines as
+    // the renderer draws them, sheared about the first baseline; heights stay.
+    DrawCommand command;
+    command.text = value;
+    command.font = font;
+    command.size = size;
+    command.slant = slant;
+    command.tabular = tabular;
+    auto paint = _text(command);
+    if (!paint) return Result::OutOfMemory;
     float x;
     float y;
     float w;
     float h;
-    auto baseline = metrics.ascent;
-    if (!_success(text->text(value)) || !_success(text->align(0.0f, 0.0f))
-        || !_success(text->transform({1.0f, -slant, slant * baseline, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f}))
-        || !_success(text->bounds(&x, &y, &w, &h)) || !std::isfinite(x) || !std::isfinite(w)) {
-        return Result::Unknown;
-    }
+    auto bounded = _success(paint->bounds(&x, &y, &w, &h));
+    _release(paint);
+    if (!bounded || !std::isfinite(x) || !std::isfinite(w)) return Result::Unknown;
     output.left = x;
     output.right = x + w;
     return Result::Success;
@@ -2531,6 +2653,34 @@ Result measureText(const char* font, float size, const char* value, float slant,
     _term();
     if (result != Result::Success) output = {};
     return result;
+}
+
+uint32_t missingFonts(const char* font, const char* value) noexcept
+{
+    if (!font || !value || !_init()) return 0u;
+    auto missing = 0u;
+    if (auto text = tvg::Text::gen()) {
+        Chain chain;
+        if (_chain(chain, text, font, 1.0f, false) == Result::Success) {
+            missing = chain.first > 0u ? 1u : 0u;
+            for (auto at = value;; at++) {
+                // A listed font that is not loaded may set a character that no loaded font before
+                // it has. _pick() has tried every font before the one that sets the character, or
+                // all of them when none does, so those not loaded are null.
+                _line(chain, at, [&](const Glyph& glyph) {
+                    if (_control(glyph.character, glyph.length)) return;
+                    auto tried = glyph.missing || glyph.font > chain.listed ? chain.listed : glyph.font;
+                    for (auto i = 0u; i < tried; i++) {
+                        if (!chain.fonts[i]) missing |= 1u << i;
+                    }
+                });
+                if (!*at) break;
+            }
+        }
+        _release(text);
+    }
+    _term();
+    return missing;
 }
 
 bool tvgInit() noexcept

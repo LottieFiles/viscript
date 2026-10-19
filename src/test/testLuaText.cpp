@@ -119,7 +119,7 @@ return s
         CHECK(loose->font("Pretendard") == Result::Success);
         CHECK(loose->measure(loose->text(), extent) == Result::Success && extent.width > 0.0f && !extent.fallback);
         CHECK(extent.missing == 0u && extent.firstMissing[0] == '\0');
-        // The font has no glyph for the intersection sign, so the text leaves it out.
+        // No font has a glyph for the intersection sign, so the text leaves it out.
         auto width = extent.width;
         CHECK(loose->text("loo\xe2\x88\xa9se\xe2\x88\xaa\n") == Result::Success);
         CHECK(loose->measure(loose->text(), extent) == Result::Success && extent.missing == 2u);
@@ -136,8 +136,42 @@ return s
               && extent.firstMissing[0] == '\0');
         CHECK(loose->text("lo\xc2\x85se") == Result::Success);
         CHECK(loose->measure(loose->text(), extent) == Result::Success && extent.missing == 0u);
+        // A list sets each character in the first loaded font that has it: the intersection sign
+        // in JetBrains Mono, past a font that is not loaded, on the lines of Pretendard.
+        auto height = extent.height;
+        CHECK(loose->font("Pretendard, Missing, JetBrainsMono") == Result::Success);
+        CHECK(loose->text("loo\xe2\x88\xa9se") == Result::Success);
+        CHECK(loose->measure(loose->text(), extent) == Result::Success && extent.missing == 0u && !extent.fallback);
+        CHECK(extent.width > width + 1.0f && extent.height == height);
     }
     delete loose;
+
+    // A theme role takes a font list too, and sets its texts in the first loaded font of it. The
+    // scene asks for the first font of a list when it is not loaded, and for a later one only
+    // when the loaded fonts before it lack a character: Pretendard lacks the intersection sign,
+    // while JetBrains Mono has the letters of plain.
+    static constexpr auto listed = R"lua(
+local s = vis.scene {width = 640, height = 360,
+    theme = {text = {text = {font = "Missing Serif, JetBrainsMono, Missing Sans"}}}}
+s:text {text = "plain", id = "plain"}
+s:text {text = "plain \u{2229}", point = {0, -1}, font = "Pretendard, Missing Symbols"}
+s:text {text = "plain", point = {0, 1}, font = "JetBrainsMono", id = "alone"}
+return s
+)lua";
+    scene = _loaded(listed, "listed.lua");
+    if (scene) {
+        const char* fonts[3] = {};
+        CHECK(scene->missingFonts(fonts, 3u) == 2u && std::strcmp(fonts[0], "Missing Serif") == 0
+              && std::strcmp(fonts[1], "Missing Symbols") == 0);
+        auto plain = static_cast<Text*>(scene->object("plain"));
+        auto alone = static_cast<Text*>(scene->object("alone"));
+        TextExtent first;
+        TextExtent second;
+        CHECK(plain && plain->measure(plain->text(), first) == Result::Success && first.fallback);
+        CHECK(alone && alone->measure(alone->text(), second) == Result::Success && !second.fallback);
+        CHECK(first.width == second.width && first.height == second.height);
+    }
+    delete scene;
     _scriptLoads("local s=vis.scene{}; s:text{text='a', font='Missing'}:measure(); return s");
     _scriptError("local s=vis.scene{}; s:circle{radius=1}:measure(); return s", "measure requires a text");
 }

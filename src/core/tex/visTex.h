@@ -217,7 +217,7 @@ struct Glyph
     // right for an upright glyph. The layout keeps to the upright box.
     float inkLeft = 0.0f;
     float inkRight = 0.0f;
-    // The font has no glyph for some of the text, which the renderer leaves out.
+    // No font has a glyph for some of the text, which the renderer leaves out.
     bool missing = false;
     // The font lacks the letters of the variant asked for, so the text is set in its own
     // letters, leaning by slant where the variant is italic.

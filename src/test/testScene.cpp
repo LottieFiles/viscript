@@ -2204,7 +2204,7 @@ int main()
         sceneThemes(renderer);
         groupStyles(renderer);
         arcsAndAngles(renderer);
-        mathSymbolFallback(renderer);
+        glyphFallback(renderer);
         shapeProperties(renderer);
         trimmedSegments(renderer);
         zeroLengthArrows(renderer);

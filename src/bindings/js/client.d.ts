@@ -278,10 +278,14 @@ export interface VisScene {
     /**
      * Registers a TrueType or OpenType font under `name` for every engine in the instance; the first font a name gets
      * stays. Register before loading the scene that measures text in it: text in a font that is not registered is
-     * measured and drawn in the default font the runtime holds, `"default"`.
+     * measured and drawn in the next registered font its comma list names, or else in the default font the runtime
+     * holds, `"default"`. Since a comma separates the fonts of a list, `name` cannot hold one.
      */
     font(name: string, data: Uint8Array | ArrayBuffer, mime?: "ttf" | "otf" | string): void;
-    /** Fonts the loaded scene's text names that are not registered, so are drawn in the default font. */
+    /**
+     * Fonts the loaded scene's text needs that are not registered: the first font a text names, and a later one of its
+     * list when the fonts before it lack some of its characters.
+     */
     missingFonts(): string[];
     /**
      * Register before loading an asset-dependent scene. WASM resolves bytes through the host, not a filesystem.

@@ -470,8 +470,8 @@ extern "C" VIS_KEEPALIVE VisResult vis_load_font(VisEngine handle, const char* n
     return static_cast<VisResult>(result);
 }
 
-// The fonts the loaded scene's texts name that are not loaded, one per line: they are drawn in
-// the default font until the host loads fonts under those names and loads the scene again.
+// The fonts the loaded scene's texts need that are not loaded, one per line: other fonts stand
+// in for them until the host loads fonts under those names and loads the scene again.
 extern "C" VIS_KEEPALIVE const char* vis_missing_fonts(VisEngine handle)
 {
     auto engine = _engine(handle);

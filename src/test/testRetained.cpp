@@ -134,9 +134,48 @@ static void _sequence()
     delete reused;
 }
 
+// Texts set in several fonts, as runs that the tree recolors, fades and moves in place and sets
+// again when their strings change, and texts that change between one font and several, one of
+// them in a font list.
+static void _fallback()
+{
+    static const char source[] = R"(
+local s = vis.scene {width = 320, height = 200, camera = {view = "2d", target = {0, 0}, height = 200}}
+local angle = s:text {text = "\u{2220}APB = 35\u{b0}", point = {-60, 60}, size = 18, font = "Pretendard"}
+local mono = s:text {text = "a\u{2090} \u{2220}x", point = {60, 60}, size = 18, font = "JetBrainsMono", slant = 0.2}
+local figures = s:text {text = "12 \u{2220} 3", point = {0, 0}, size = 18, font = "Pretendard", tabular = true}
+local lines = s:text {text = "\u{2220}AB\n\u{22a5}CD", point = {0, -60}, size = 16, font = "Pretendard"}
+local listed = s:text {text = "mono", point = {100, -60}, size = 16, font = "Missing, JetBrainsMono, Pretendard"}
+s:play({target = angle, fill = "#ffd166", shift = {20, 0}}, 1, "smooth")
+s:play({target = mono, text = "b\u{2091} \u{2245}y"}, 1)
+s:fade(figures, 0.3, 1)
+s:play({target = lines, text = "plain"}, 1)
+s:play({target = lines, text = "\u{2220}AB again"}, 1)
+s:play({target = listed, text = "mono \u{d55c}", fill = "#06d6a0"}, 1)
+return s
+)";
+    char error[1024] = {};
+    Scene* scene = nullptr;
+    auto status = Lua::load(source, sizeof(source) - 1u, "fallback.lua", &scene, error, sizeof(error));
+    if (status != Result::Success) std::fprintf(stderr, "load fallback.lua: %s\n", error);
+    CHECK(status == Result::Success && scene);
+    auto reused = _renderer();
+    Surface surface;
+    if (scene) {
+        auto duration = scene->duration();
+        for (auto k = 0u; k <= 24u; k++)
+            _frame(reused, surface, scene, duration * static_cast<float>(k) / 24.0f, "fallback");
+        for (auto k = 24u; k > 0u; k -= 4u)
+            _frame(reused, surface, scene, duration * static_cast<float>(k - 1u) / 24.0f, "fallback");
+    }
+    delete scene;
+    delete reused;
+}
+
 int main()
 {
     _sequence();
+    _fallback();
     if (!failures) std::printf("retained renderer: %d frames match a fresh renderer\n", frames);
     return report();
 }

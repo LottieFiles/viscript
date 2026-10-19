@@ -41,6 +41,11 @@ Uncolored shapes take successive colors from `objects`. Explicit colors and
 semantic roles keep their assigned color. `indicate` uses `focus` and restores the
 incoming color afterward.
 
+A role's font, like a text's, can be a comma list such as
+`"Source Serif 4, IBM Plex Sans KR"`: each character is set in the first loaded font
+of the list that has it, then in the runtime's math or default font, and the first
+loaded font sets the line height.
+
 Text resolves font, size, and color independently from its role. A Group's stroke,
 fill, and width supply defaults to descendant shapes; a nearer Group takes
 precedence. In a `typeset` Group, its fill also colors text that has no explicit

@@ -247,7 +247,7 @@ struct Issue
     bool hasOverflow = false;
     bool hasSeparation = false;
     bool hasScale = false;
-    // MissingGlyphs: how many characters the font lacks, and the first of them in UTF-8.
+    // MissingGlyphs: how many characters no font has, and the first of them in UTF-8.
     uint32_t missing = 0u;
     char firstMissing[5] = {};
     // PlaneTextSize: the em in world units, and the world height the camera shows at its target.
@@ -1136,7 +1136,7 @@ static bool _inventory(const Scene* scene, const char* path, Options& options, I
                     return false;
                 }
             }
-            // A character the font has no glyph for vanishes from the frame without an error.
+            // A character no font has a glyph for vanishes from the frame without an error.
             // A text whose string changes shows only characters of the strings it changes
             // between, so they all count.
             auto text = static_cast<const Text*>(object);

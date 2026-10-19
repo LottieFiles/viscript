@@ -65,8 +65,9 @@ VIS_API void vis_destroy(VisEngine engine);
 VIS_API VisResult vis_load_lua(VisEngine engine, const char* source, uint32_t size, const char* name);
 VIS_API VisResult vis_load_font(VisEngine engine, const char* name, const uint8_t* data, uint32_t size,
                                       const char* mime);
-/* Fonts the loaded scene's text is set in that are not loaded, one per line; the default font
-   draws that text. Engine-owned; valid until the next call or the engine is destroyed. */
+/* Fonts the loaded scene's text needs that are not loaded, one per line: the first font a text
+   names, and a later one of its comma list when the fonts before it lack some of its characters.
+   Engine-owned; valid until the next call or the engine is destroyed. */
 VIS_API const char* vis_missing_fonts(VisEngine engine);
 VIS_API VisResult vis_load_asset(VisEngine engine, const char* name, const uint8_t* data, uint32_t size,
                                        const char* mime);

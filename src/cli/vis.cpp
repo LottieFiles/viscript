@@ -40,7 +40,8 @@ static void _usage()
                  "load before the script runs, so a script can measure text in them.\n"
                  "Default themes use Pretendard.ttf and JetBrainsMono.ttf (code);\n"
                  "pass both with --font when a script uses both text roles. Text in a font\n"
-                 "that is not loaded is drawn in the engine's default font, with a warning.\n"
+                 "that is not loaded is drawn in the next loaded font of its comma list, or in\n"
+                 "the engine's default font, with a warning.\n"
                  "--audio plays a sound file, such as a narration, from time 0 in an .mp4.\n"
     );
 }

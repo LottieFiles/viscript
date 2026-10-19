@@ -134,15 +134,15 @@ static inline const char* _describe(vis::Result status)
     }
 }
 
-// Text in a font that is not loaded is drawn in the default font, which may lack its letters
-// and differs in shape and width; names those fonts.
+// Other fonts stand in for a font that is not loaded, the next loaded one of a text's list or
+// the default font, which may lack its letters and differ in shape and width; names those fonts.
 static inline void _missingFonts(const vis::Scene* scene)
 {
     const char* fonts[16];
     auto count = scene->missingFonts(fonts, 16u);
     for (auto i = 0u; i < count; i++) {
-        std::fprintf(stderr, "viscript: the font '%s' is not loaded, so its text is drawn in the default "
-                     "font; pass its file, such as %s.ttf, with --font\n", fonts[i], fonts[i]);
+        std::fprintf(stderr, "viscript: the font '%s' is not loaded, so other fonts stand in for it; pass its "
+                     "file, such as %s.ttf, with --font\n", fonts[i], fonts[i]);
     }
 }
 

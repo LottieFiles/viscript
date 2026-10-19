@@ -593,6 +593,7 @@ struct Style
 
 struct TextTheme
 {
+    // A font name, or a comma list of them, as Text::font() takes.
     const char* font = "Pretendard";
     float size = 17.0f;
     Color color = {219, 231, 243, 255};
@@ -1454,11 +1455,14 @@ struct TextExtent
     float top = 0.0f;
     float bottom = 0.0f;
     uint32_t lines = 0;
-    // Counts missing glyphs and records the first as UTF-8. Excludes controls and invisible
-    // formatting characters such as joiners and variation selectors.
+    // Counts the characters no font has a glyph for, neither the fonts the text names nor the
+    // math and default fonts the engine falls back to, and records the first as UTF-8; they
+    // take no room. Excludes controls and invisible formatting characters such as joiners and
+    // variation selectors.
     uint32_t missing = 0;
     char firstMissing[5] = {};
-    // The text's font is not loaded, so it was measured in the default font, which draws it.
+    // The first font the text names is not loaded: the text was measured, as it is drawn, in
+    // the next loaded one it names, or else in the default font.
     bool fallback = false;
 };
 
@@ -1502,12 +1506,17 @@ struct Text final : Object
     const char* text() const noexcept;
     // Direct text edits require unsealed authoring; failed scene refresh restores the string.
     Result text(const char* value) noexcept;
+    // The font the text is set in: a name a renderer loaded a font under, or a comma list of
+    // them, such as "Source Serif 4, IBM Plex Sans KR", the spaces around each name aside.
+    // Each character goes in the first loaded font of the list that has a glyph for it, or
+    // else in the engine's math font or its default one, "default"; the first loaded font, or
+    // "default" when none is, sets the lines. Names past the eighth are left out.
     const char* font() const noexcept;
     Result font(const char* value) noexcept;
-    // Measures value as rendered lines in the text's font and size, without legacy font kerning;
-    // text() gives the text's own string. Fonts registered by Renderer::font are process-wide; a
-    // renderer that registered the font must remain alive. A font that is not loaded is measured,
-    // and drawn, as the default font the engine registers, "default", and output.fallback says so.
+    // Measures value as rendered lines in the text's fonts (see font()) and size, without legacy
+    // font kerning; text() gives the text's own string. Fonts registered by Renderer::font are
+    // process-wide; a renderer that registered the font must remain alive. output.fallback says
+    // when the first font the text names is not loaded.
     // InsufficientCondition: no font loaded at all.
     // InvalidArguments: null value, unset font or size.
     Result measure(const char* value, TextExtent& output) const noexcept;
@@ -2312,9 +2321,10 @@ struct Scene
     Object* objectAt(uint32_t index) const noexcept;
     Object* object(const char* tag) const noexcept;
     // Names the fonts that this scene's texts, and those of the scenes it shows in viewports
-    // and transitions, are set in but that are not loaded, each once and at most capacity of
-    // them; the default font draws those texts. The names live as long as the texts. Returns
-    // how many it names.
+    // and transitions, need but that are not loaded, each once and at most capacity of them:
+    // the first font a text names, and a later one of its list when some character of its
+    // strings has a glyph in no loaded font named before it. The names live until the next
+    // call or until the scene is deleted. Returns how many it names.
     uint32_t missingFonts(const char** output, uint32_t capacity) const noexcept;
     uint32_t viewportCount() const noexcept;
     Scene* sceneAt(uint32_t index) const noexcept;
@@ -2374,6 +2384,9 @@ struct Renderer
     Renderer& operator=(const Renderer&) = delete;
 
     static Renderer* gen() noexcept;
+    // Loads a font file, which text names by its file name without the extension, or font
+    // data under name. InvalidArguments for a name with a comma, which separates the fonts of
+    // a list.
     Result font(const char* path) noexcept;
     Result font(const char* name, const void* data, uint32_t size, const char* mime = "ttf") noexcept;
     // Why the most recent font, bounds, intersects, layout, sample or render call failed, in

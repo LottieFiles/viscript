@@ -131,7 +131,9 @@ void arcsAndAngles(Renderer* renderer)
     delete scene;
 }
 
-void mathSymbolFallback(Renderer* renderer)
+// Characters the font lacks are set in the bundled math or default font; one neither has is
+// missing and takes no room.
+void glyphFallback(Renderer* renderer)
 {
     Config config; config.width = 400; config.height = 100; config.camera.orthoHeight = 100.0f;
     auto scene = Scene::gen(config);
@@ -150,6 +152,18 @@ void mathSymbolFallback(Renderer* renderer)
     CHECK(scene->play(AnimationTarget::from(text).text("APB = 35\xc2\xb0"), 1.0f) == Result::Success);
     CHECK(renderer->render(scene, 1.0f, surface) == Result::Success && checksum(surface) != first);
     CHECK(renderer->render(scene, 0.0f, surface) == Result::Success && checksum(surface) == first);
+#ifdef VIS_TEST_MONO_FONT
+    CHECK(renderer->font(VIS_TEST_MONO_FONT) == Result::Success);
+    auto mono = Text::gen("a\xe2\x82\x90", {});
+    mono->size = 21.0f;
+    CHECK(mono->font("JetBrainsMono") == Result::Success);
+    CHECK(scene->add(mono) == Result::Success);
+    TextExtent subscript; TextExtent letter; TextExtent hangul;
+    CHECK(scene->measure(mono, subscript) == Result::Success && subscript.missing == 0u && !subscript.fallback);
+    CHECK(scene->measure(mono, "a", letter) == Result::Success && subscript.width > letter.width + 5.0f);
+    CHECK(scene->measure(mono, "a\xed\x95\x9c", hangul) == Result::Success && hangul.missing == 1u
+          && std::strcmp(hangul.firstMissing, "\xed\x95\x9c") == 0 && hangul.width == letter.width);
+#endif
     delete scene;
 }
 

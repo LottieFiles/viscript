@@ -2422,6 +2422,7 @@ Scene::Impl::~Impl()
     delete[] geometries;
     for (auto font : themeFonts)
         delete[] font;
+    delete[] missingFonts;
 }
 
 bool Scene::Impl::assign(const Theme& theme) noexcept
@@ -8739,32 +8740,63 @@ Object* Scene::object(const char* tag) const noexcept
     return nullptr;
 }
 
-// Adds to output the fonts that the texts of scene, and of the scenes it shows, are set in but
-// that are not loaded, after the count names it holds, each once; returns the new count.
-static uint32_t _missingFonts(const Scene* scene, const char** output, uint32_t capacity, uint32_t count)
+// Whether names, size bytes of names that each end in a NUL, holds the name of length bytes.
+static bool _holds(const char* names, uint32_t size, const char* name, uint32_t length)
 {
-    for (auto i = 0u; i < scene->count() && count < capacity; i++) {
+    for (auto at = names; at < names + size; at += std::strlen(at) + 1u) {
+        if (std::strncmp(at, name, length) == 0 && !at[length]) return true;
+    }
+    return false;
+}
+
+// Adds to names, size bytes of names that each end in a NUL, the fonts that the texts of scene,
+// and of the scenes it shows, need but that are not loaded, each once; false when memory runs
+// out.
+static bool _missingFonts(const Scene* scene, char*& names, uint32_t& size, uint32_t& capacity)
+{
+    for (auto i = 0u; i < scene->count(); i++) {
         auto object = scene->objectAt(i);
         if (object->type() != Type::Text) continue;
-        auto font = static_cast<const Text*>(object)->font();
+        auto text = static_cast<const Text*>(object);
+        auto font = text->font();
         if (!font || !font[0]) continue;
-        auto named = false;
-        for (auto j = 0u; j < count && !named; j++) named = std::strcmp(output[j], font) == 0;
-        if (named) continue;
-        // A font that is not loaded is measured as the default font, and the extent says so.
-        TextExtent extent;
-        if (renderer::measureText(font, 1.0f, "x", 0.0f, false, extent) == Result::Success && extent.fallback) {
-            output[count++] = font;
+        // A text shows the strings it changes between, so what any of them needs counts.
+        auto count = text->texts(nullptr, 0u);
+        auto strings = new (std::nothrow) const char*[count];
+        if (!strings) return false;
+        text->texts(strings, count);
+        auto missing = 0u;
+        for (auto s = 0u; s < count; s++) missing |= renderer::missingFonts(font, strings[s]);
+        delete[] strings;
+        const char* name;
+        uint32_t length;
+        for (auto at = font; missing && renderer::fontName(at, name, length); missing >>= 1u) {
+            if (!(missing & 1u) || _holds(names, size, name, length)) continue;
+            if (!grow(names, size, capacity, length + 1u, 64u)) return false;
+            std::memcpy(names + size, name, length);
+            names[size + length] = '\0';
+            size += length + 1u;
         }
     }
-    for (auto i = 0u; i < scene->viewportCount(); i++) count = _missingFonts(scene->sceneAt(i), output, capacity, count);
-    for (auto i = 0u; i < scene->transitionCount(); i++) count = _missingFonts(scene->transitionAt(i), output, capacity, count);
-    return count;
+    for (auto i = 0u; i < scene->viewportCount(); i++) {
+        if (!_missingFonts(scene->sceneAt(i), names, size, capacity)) return false;
+    }
+    for (auto i = 0u; i < scene->transitionCount(); i++) {
+        if (!_missingFonts(scene->transitionAt(i), names, size, capacity)) return false;
+    }
+    return true;
 }
 
 uint32_t Scene::missingFonts(const char** output, uint32_t capacity) const noexcept
 {
-    return output ? _missingFonts(this, output, capacity, 0u) : 0u;
+    if (!output) return 0u;
+    auto& names = pImpl->missingFonts;
+    auto& size = pImpl->missingFontSize;
+    size = 0u;
+    _missingFonts(this, names, size, pImpl->missingFontCap);
+    auto count = 0u;
+    for (auto at = names; count < capacity && at < names + size; at += std::strlen(at) + 1u) output[count++] = at;
+    return count;
 }
 
 uint32_t Scene::viewportCount() const noexcept

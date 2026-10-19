@@ -307,7 +307,7 @@ void cameraOrbit(Renderer* renderer);
 void intentMotion(Renderer* renderer);
 void timelineDiagnostics();
 void arcsAndAngles(Renderer* renderer);
-void mathSymbolFallback(Renderer* renderer);
+void glyphFallback(Renderer* renderer);
 void shapeProperties(Renderer* renderer);
 void trimmedSegments(Renderer* renderer);
 void zeroLengthArrows(Renderer* renderer);

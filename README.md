@@ -316,7 +316,7 @@ viscript is released under the [MIT License](LICENSE).
 | [ThorVG](https://github.com/thorvg/thorvg) | MIT | Renderer |
 | [Lua 5.4](https://www.lua.org) | MIT | Scene scripting |
 | [miniaudio](https://github.com/mackron/miniaudio) | Public Domain / MIT-0 | Audio module |
-| [Noto Sans Math](https://github.com/notofonts/math) | OFL 1.1 | Embedded TeX glyph outlines |
+| [Noto Sans Math](https://github.com/notofonts/math) | OFL 1.1 | A subset is embedded in the runtime for the math symbols other fonts lack |
 | [Pretendard](https://github.com/orioncactus/pretendard) | OFL 1.1 | Bundled font; a subset of Pretendard Std is the runtime's default font, and the docs site ships Pretendard Std |
 | [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) | OFL 1.1 | Bundled font |
 | [IBM Plex Sans KR](https://github.com/IBM/plex) | OFL 1.1 | Bundled font (runtime bundles and the Obsidian plugin) |

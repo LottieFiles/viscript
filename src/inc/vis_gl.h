@@ -31,6 +31,7 @@ struct Renderer
 
     // nullptr when ThorVG's GL engine is not available in this process.
     static Renderer* gen() noexcept;
+    // Loads fonts as vis::Renderer::font() does.
     Result font(const char* path) noexcept;
     Result font(const char* name, const void* data, uint32_t size, const char* mime = "ttf") noexcept;
     // Why the most recent font or render call failed, in plain words; nullptr when the
