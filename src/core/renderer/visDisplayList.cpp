@@ -78,6 +78,31 @@ static bool _spatial(const Config& config)
     return config.cameraView == CameraView::ThreeD;
 }
 
+// Projects count points, which at(i) gives in the space of model, into pixels. depths, unless it
+// is null, takes the depth of each point as DrawCommand::depths keeps it, and depth their mean
+// depth; false when a point does not project.
+template<typename At>
+static bool _project(uint32_t count, At at, const Mat4& model, const Config& config, Vec2* pixels, float* depths,
+                     float& depth)
+{
+    auto sum = 0.0;
+    for (auto i = 0u; i < count; i++) {
+        auto pointDepth = 0.0f;
+        if (!_point(at(i), model, config, pixels[i], pointDepth)) return false;
+        if (depths) depths[i] = _screenDepth(pointDepth, config);
+        sum += pointDepth;
+    }
+    depth = count ? static_cast<float>(sum / count) : 0.0f;
+    return true;
+}
+
+// The same for count points in an array.
+static bool _project(const Vec3* points, uint32_t count, const Mat4& model, const Config& config, Vec2* pixels,
+                     float* depths, float& depth)
+{
+    return _project(count, [points](uint32_t i) { return points[i]; }, model, config, pixels, depths, depth);
+}
+
 // ends: where the depths of the two ends go, as DrawCommand::depths keeps them, or nullptr.
 static bool _lineWorld(Vec3 from, Vec3 to, const Mat4& model, const Config& config, Vec2& a, Vec2& b, float& depth,
                        float* ends = nullptr)
@@ -198,26 +223,68 @@ static PathCap _cap(const Object* object)
     return flat ? PathCap::Butt : PathCap::Round;
 }
 
-// ends: the depths of from and to, as DrawCommand::depths keeps them, or nullptr.
-static Result _line(DisplayList& list, const Vec2& from, const Vec2& to, float progress,
-                    DrawDirection direction, const Style& style, int32_t layer,
-                    float depth = 0.0f, const float* ends = nullptr)
+// What a stroke draws with: the share of it that shows, the end it starts from, its style, and
+// the layer and mean depth of its commands. depths: the depth of each point it passes, as
+// DrawCommand::depths keeps them, or nullptr. traceFill: a closed outline fills as it draws on,
+// in _path and _contours. cap: how the open strokes of _path and _pieces end; the other strokes
+// choose their own.
+struct Pen
 {
-    auto value = _clamp(progress);
+    float progress;
+    DrawDirection direction;
+    Style style;
+    int32_t layer;
+    float depth = 0.0f;
+    const float* depths = nullptr;
+    bool traceFill = false;
+    PathCap cap = PathCap::Round;
+};
+
+// The styles of an outline on its way: fill, its fill without a stroke, which a pen that traces
+// its fill draws first; stroke, its stroke without the fill, in the color of the fill when such
+// a pen has no stroke color.
+static void _traceStyles(const Pen& pen, Style& fill, Style& stroke)
+{
+    fill = pen.style;
+    fill.stroke.a = 0;
+    fill.width = 0.0f;
+    stroke = pen.style;
+    stroke.fill.a = 0;
+    if (pen.traceFill && !stroke.stroke.a && pen.style.fill.a) {
+        stroke.stroke = pen.style.fill;
+        if (stroke.width <= 0.0f) stroke.width = 2.0f;
+    }
+}
+
+// The style of a mark on a stroke, a route's head or a plot's endpoint: filled in the color of
+// the stroke, with no stroke of its own.
+static Style _markerStyle(const Style& style)
+{
+    auto marker = style;
+    marker.fill = style.stroke;
+    marker.stroke.a = 0u;
+    marker.width = 0.0f;
+    return marker;
+}
+
+// pen.depths: the depths of from and to, or nullptr.
+static Result _line(DisplayList& list, const Vec2& from, const Vec2& to, const Pen& pen)
+{
+    auto value = _clamp(pen.progress);
     if (value <= 0.0f) return Result::Success;
-    auto reverse = _reverse(direction);
+    auto reverse = _reverse(pen.direction);
     auto start = reverse ? to : from;
     auto end = reverse ? from : to;
     Vec2 points[2] = {start, start + (end - start) * value};
     float depths[2] = {};
-    if (ends) {
-        auto first = reverse ? ends[1] : ends[0];
-        auto last = reverse ? ends[0] : ends[1];
+    if (pen.depths) {
+        auto first = reverse ? pen.depths[1] : pen.depths[0];
+        auto last = reverse ? pen.depths[0] : pen.depths[1];
         depths[0] = first;
         depths[1] = first + (last - first) * value;
     }
-    return list.path(points, 2, false, style, layer, depth, PathCap::Round, nullptr, 0u,
-                     ends ? depths : nullptr);
+    return list.path(points, 2, false, pen.style, pen.layer, pen.depth, PathCap::Round, nullptr, 0u,
+                     pen.depths ? depths : nullptr);
 }
 
 static float _arrowHalfWidth(float length, const Style& style)
@@ -237,10 +304,8 @@ static Result _routeMarker(DisplayList& list, const Vec2& point, const Vec2& dir
     auto base = start ? point + direction * length : point - direction * length;
     auto half = _arrowHalfWidth(length, style);
     Vec2 points[] = {point, base + normal * half, base - normal * half};
-    auto marker = style;
-    marker.fill = style.stroke;
-    marker.stroke.a = 0u;
-    marker.width = 0.0f;
+    // A head keeps the gradient of its stroke but not its dashes.
+    auto marker = _markerStyle(style);
     marker.dashCount = 0u;
     marker.dashOffset = 0.0f;
     float depths[3] = {};
@@ -301,15 +366,15 @@ static uint32_t _trimRoute(Vec2* points, uint32_t count, float start, float end,
     return count;
 }
 
-// depths: the depth of each point, as DrawCommand::depths keeps them, or nullptr.
-static Result _route(DisplayList& list, const Vec2* points, uint32_t count, float progress,
-                     DrawDirection drawDirection, float tail, float tip, const Style& style,
-                     int32_t layer, float depth = 0.0f, const float* depths = nullptr)
+// pen.depths: the depth of each point, or nullptr. tail and tip: the lengths in pixels of the
+// heads at its start and end.
+static Result _route(DisplayList& list, const Vec2* points, uint32_t count, float tail, float tip, const Pen& pen)
 {
     if (!points || count < 2u) return Result::InvalidArguments;
-    auto value = _clamp(progress);
+    auto value = _clamp(pen.progress);
     if (value <= 0.0f) return Result::Success;
-    auto reverse = value < 1.0f - 1e-6f && _reverse(drawDirection, points, count, false);
+    auto reverse = value < 1.0f - 1e-6f && _reverse(pen.direction, points, count, false);
+    auto depths = pen.depths;
     auto point = [&](uint32_t index) {
         return reverse ? points[count - 1u - index] : points[index];
     };
@@ -321,13 +386,9 @@ static Result _route(DisplayList& list, const Vec2* points, uint32_t count, floa
     if (!std::isfinite(total) || total <= 1e-6f) return Result::Success;
 
     auto remaining = total * value;
-    auto output = new (std::nothrow) Vec2[count];
-    auto outputDepths = depths ? new (std::nothrow) float[count] : nullptr;
-    if (!output || (depths && !outputDepths)) {
-        delete[] output;
-        delete[] outputDepths;
-        return Result::OutOfMemory;
-    }
+    auto output = std::unique_ptr<Vec2[]>(new (std::nothrow) Vec2[count]);
+    auto outputDepths = depths ? std::unique_ptr<float[]>(new (std::nothrow) float[count]) : nullptr;
+    if (!output || (depths && !outputDepths)) return Result::OutOfMemory;
     auto outputCount = 1u;
     output[0] = point(0u);
     if (depths) outputDepths[0] = measure(0u);
@@ -336,11 +397,7 @@ static Result _route(DisplayList& list, const Vec2* points, uint32_t count, floa
         auto to = point(i);
         auto segment = to - from;
         auto length = segment.length();
-        if (!std::isfinite(length)) {
-            delete[] output;
-            delete[] outputDepths;
-            return Result::InvalidArguments;
-        }
+        if (!std::isfinite(length)) return Result::InvalidArguments;
         if (length <= 1e-6f) continue;
         if (remaining >= length) {
             if (depths) outputDepths[outputCount] = measure(i);
@@ -354,21 +411,13 @@ static Result _route(DisplayList& list, const Vec2* points, uint32_t count, floa
             remaining = 0.0f;
         }
     }
-    if (outputCount < 2u) {
-        delete[] output;
-        delete[] outputDepths;
-        return Result::Success;
-    }
+    if (outputCount < 2u) return Result::Success;
 
     auto firstDelta = output[1u] - output[0u];
     auto firstLength = firstDelta.length();
     auto lastDelta = output[outputCount - 1u] - output[outputCount - 2u];
     auto lastLength = lastDelta.length();
-    if (firstLength <= 1e-6f || lastLength <= 1e-6f) {
-        delete[] output;
-        delete[] outputDepths;
-        return Result::Success;
-    }
+    if (firstLength <= 1e-6f || lastLength <= 1e-6f) return Result::Success;
     auto firstDirection = firstDelta * (1.0f / firstLength);
     auto lastDirection = lastDelta * (1.0f / lastLength);
     auto visibleLength = total * value;
@@ -384,41 +433,35 @@ static Result _route(DisplayList& list, const Vec2* points, uint32_t count, floa
         startEnds[0] = outputDepths[0u];
         endEnds[0] = outputDepths[outputCount - 1u];
     }
-    auto shaftCount = _trimRoute(output, outputCount, startMarker, endMarker, outputDepths);
+    auto shaftCount = _trimRoute(output.get(), outputCount, startMarker, endMarker, outputDepths.get());
     if (depths) {
         auto middle = (startEnds[0] + endEnds[0]) * 0.5f;
         startEnds[1] = shaftCount >= 2u ? outputDepths[0u] : middle;
         endEnds[1] = shaftCount >= 2u ? outputDepths[shaftCount - 1u] : middle;
     }
 
-    auto shaft = style;
+    auto shaft = pen.style;
     shaft.fill.a = 0u;
     auto result = shaftCount >= 2u
-                ? list.path(output, shaftCount, false, shaft, layer, depth, PathCap::Butt, nullptr, 0u,
-                            outputDepths)
+                ? list.path(output.get(), shaftCount, false, shaft, pen.layer, pen.depth, PathCap::Butt, nullptr,
+                            0u, outputDepths.get())
                 : Result::Success;
     if (result == Result::Success) {
-        result = _routeMarker(list, startPoint, firstDirection, startMarker, true, style,
-                              layer, depth, depths ? startEnds : nullptr);
+        result = _routeMarker(list, startPoint, firstDirection, startMarker, true, pen.style,
+                              pen.layer, pen.depth, depths ? startEnds : nullptr);
     }
     if (result == Result::Success) {
         result = _routeMarker(list, endPoint, lastDirection, endMarker,
-                              false, style, layer, depth, depths ? endEnds : nullptr);
+                              false, pen.style, pen.layer, pen.depth, depths ? endEnds : nullptr);
     }
-    delete[] output;
-    delete[] outputDepths;
     return result;
 }
 
-// depths: the depth of each point, as DrawCommand::depths keeps them, or nullptr; the stroke
-// keeps them when it draws no fill.
-static Result _path(DisplayList& list, const Vec2* points, uint32_t count, bool closed,
-                    float progress, DrawDirection direction, const Style& style,
-                    int32_t layer, float depth = 0.0f, bool traceFill = false,
-                    const float* depths = nullptr, PathCap cap = PathCap::Round)
+// pen.depths: the depth of each point, or nullptr; the stroke keeps them when it draws no fill.
+static Result _path(DisplayList& list, const Vec2* points, uint32_t count, bool closed, const Pen& pen)
 {
     if (!points || count < 2) return Result::InvalidArguments;
-    auto value = _clamp(progress);
+    auto value = _clamp(pen.progress);
     if (value <= 0.0f) return Result::Success;
     auto segments = closed ? count : count - 1;
     auto scaled = value * static_cast<float>(segments);
@@ -429,6 +472,7 @@ static Result _path(DisplayList& list, const Vec2* points, uint32_t count, bool 
     auto partial = scaled - static_cast<float>(complete);
     if (complete < segments && partial > 1e-6f) outputCnt++;
 
+    auto depths = pen.depths;
     auto output = new (std::nothrow) Vec2[outputCnt];
     auto outputDepths = depths ? new (std::nothrow) float[outputCnt] : nullptr;
     if (!output || (depths && !outputDepths)) {
@@ -436,7 +480,7 @@ static Result _path(DisplayList& list, const Vec2* points, uint32_t count, bool 
         delete[] outputDepths;
         return Result::OutOfMemory;
     }
-    auto reverse = _reverse(direction, points, count, closed);
+    auto reverse = _reverse(pen.direction, points, count, closed);
     auto at = [&](uint32_t index) {
         if (!reverse) return index % count;
         if (closed) return (count - index % count) % count;
@@ -456,24 +500,17 @@ static Result _path(DisplayList& list, const Vec2* points, uint32_t count, bool 
         }
     }
     auto finished = value >= 1.0f - 1e-6f;
+    Style fill;
+    Style stroke;
+    _traceStyles(pen, fill, stroke);
     auto result = Result::Success;
-    if (traceFill && closed && !finished && outputCnt >= 3u && style.fill.a) {
-        auto fillStyle = style;
-        fillStyle.stroke.a = 0;
-        fillStyle.width = 0.0f;
-        result = list.path(output, outputCnt, true, fillStyle, layer, depth);
+    if (pen.traceFill && closed && !finished && outputCnt >= 3u && pen.style.fill.a) {
+        result = list.path(output, outputCnt, true, fill, pen.layer, pen.depth);
     }
     if (result == Result::Success) {
-        auto strokeStyle = style;
-        if (!finished) {
-            strokeStyle.fill.a = 0;
-            if (traceFill && !strokeStyle.stroke.a && style.fill.a) {
-                strokeStyle.stroke = style.fill;
-                if (strokeStyle.width <= 0.0f) strokeStyle.width = 2.0f;
-            }
-        }
-        result = list.path(output, outputCnt, closed && finished, strokeStyle, layer, depth, cap,
-                           nullptr, 0u, strokeStyle.fill.a ? nullptr : outputDepths);
+        auto& style = finished ? pen.style : stroke;
+        result = list.path(output, outputCnt, closed && finished, style, pen.layer, pen.depth, pen.cap,
+                           nullptr, 0u, style.fill.a ? nullptr : outputDepths);
     }
     delete[] output;
     delete[] outputDepths;
@@ -505,15 +542,15 @@ static Result _strokes(DisplayList& list, const Vec2* points, const float* depth
 
 // Draw progress traverses piece segments, skipping gaps; reversed progress starts at
 // the last piece. Unfilled strokes retain optional per-point depths.
-static Result _pieces(DisplayList& list, const Vec2* points, const uint32_t* ends, uint32_t contours,
-                      float progress, DrawDirection direction, const Style& style, int32_t layer,
-                      float depth, PathCap cap, const float* depths = nullptr)
+static Result _pieces(DisplayList& list, const Vec2* points, const uint32_t* ends, uint32_t contours, const Pen& pen)
 {
-    auto value = _clamp(progress);
+    auto value = _clamp(pen.progress);
     if (value <= 0.0f) return Result::Success;
     auto count = ends[contours - 1u];
+    auto depths = pen.depths;
     if (value >= 1.0f - 1e-6f) {
-        return _strokes(list, points, style.fill.a ? nullptr : depths, ends, contours, style, layer, depth, cap);
+        return _strokes(list, points, pen.style.fill.a ? nullptr : depths, ends, contours, pen.style, pen.layer,
+                        pen.depth, pen.cap);
     }
     auto segments = 0u;
     auto start = 0u;
@@ -532,7 +569,7 @@ static Result _pieces(DisplayList& list, const Vec2* points, const uint32_t* end
         delete[] shown;
         return Result::OutOfMemory;
     }
-    auto reverse = _reverse(direction);
+    auto reverse = _reverse(pen.direction);
     auto total = 0u;
     auto kept = 0u;
     for (auto step = 0u; step < contours && remaining > 1e-6f; step++) {
@@ -564,9 +601,9 @@ static Result _pieces(DisplayList& list, const Vec2* points, const uint32_t* end
     }
     auto result = Result::Success;
     if (kept) {
-        auto strokeStyle = style;
+        auto strokeStyle = pen.style;
         strokeStyle.fill.a = 0;
-        result = _strokes(list, output, outputDepths, shown, kept, strokeStyle, layer, depth, cap);
+        result = _strokes(list, output, outputDepths, shown, kept, strokeStyle, pen.layer, pen.depth, pen.cap);
     }
     delete[] output;
     delete[] outputDepths;
@@ -575,14 +612,12 @@ static Result _pieces(DisplayList& list, const Vec2* points, const uint32_t* end
 }
 
 // The active vertex uses the same segment progress as a plot's stroke, skipping piece gaps.
-static Result _plotEndpoint(DisplayList& list, const Vec2* points, uint32_t count,
-                            const uint32_t* ends, uint32_t pieces, float progress,
-                            DrawDirection direction, float radius, const Style& style,
-                            int32_t layer, float depth, const float* depths)
+static Result _plotEndpoint(DisplayList& list, const Vec2* points, uint32_t count, const uint32_t* ends,
+                            uint32_t pieces, float radius, const Pen& pen)
 {
     if (!count || !pieces || radius <= 0.0f) return Result::Success;
-    auto reverse = _reverse(direction);
-    auto remaining = _clamp(progress) * static_cast<float>(count - pieces);
+    auto reverse = _reverse(pen.direction);
+    auto remaining = _clamp(pen.progress) * static_cast<float>(count - pieces);
     auto index = reverse ? count - 1u : 0u;
     auto next = index;
     auto partial = 0.0f;
@@ -602,13 +637,12 @@ static Result _plotEndpoint(DisplayList& list, const Vec2* points, uint32_t coun
         remaining -= static_cast<float>(segments);
     }
     auto center = points[index] + (points[next] - points[index]) * partial;
-    auto marker = style;
-    marker.fill = style.stroke;
+    // The endpoint is solid, whatever gradient the plot has.
+    auto marker = _markerStyle(pen.style);
     marker.gradient = {};
-    marker.stroke.a = 0;
-    marker.width = 0.0f;
+    auto depths = pen.depths;
     auto anchor = depths ? depths[index] + (depths[next] - depths[index]) * partial : 0.0f;
-    return list.circle(center, radius, marker, layer, depth, depths ? &anchor : nullptr);
+    return list.circle(center, radius, marker, pen.layer, pen.depth, depths ? &anchor : nullptr);
 }
 
 // The stroke of an open polyline from the share start of its length to the share end, as a
@@ -645,16 +679,16 @@ static Result _window(DisplayList& list, const Vec2* points, uint32_t count, flo
 }
 
 // A path of several contours, ends and contours as in DrawCommand. Finished, it draws at once
-// with its holes; while it draws, every contour shows the same share of its own outline.
-static Result _contours(DisplayList& list, const Vec2* points, const uint32_t* ends, uint32_t contours,
-                        bool closed, float progress, DrawDirection direction, const Style& style,
-                        int32_t layer, float depth, bool traceFill)
+// with its holes; while it draws, every contour shows the same share of its own outline. Its
+// strokes end round and keep no depths.
+static Result _contours(DisplayList& list, const Vec2* points, const uint32_t* ends, uint32_t contours, bool closed,
+                        const Pen& pen)
 {
-    auto value = _clamp(progress);
+    auto value = _clamp(pen.progress);
     if (value <= 0.0f) return Result::Success;
     auto count = ends[contours - 1u];
     if (value >= 1.0f - 1e-6f) {
-        return list.path(points, count, closed, style, layer, depth, PathCap::Round, ends, contours);
+        return list.path(points, count, closed, pen.style, pen.layer, pen.depth, PathCap::Round, ends, contours);
     }
     auto output = new (std::nothrow) Vec2[count + contours];
     auto shown = new (std::nothrow) uint32_t[contours];
@@ -677,7 +711,7 @@ static Result _contours(DisplayList& list, const Vec2* points, const uint32_t* e
         auto complete = static_cast<uint32_t>(scaled);
         if (complete > segments) complete = segments;
         auto partial = scaled - static_cast<float>(complete);
-        auto reverse = _reverse(direction, part, size, closed);
+        auto reverse = _reverse(pen.direction, part, size, closed);
         auto point = [&](uint32_t index) {
             if (!reverse) return part[index % size];
             if (closed) return part[(size - index % size) % size];
@@ -692,20 +726,14 @@ static Result _contours(DisplayList& list, const Vec2* points, const uint32_t* e
     }
     auto result = Result::Success;
     auto many = kept > 1u ? shown : nullptr;
-    if (kept && traceFill && closed && style.fill.a) {
-        auto fillStyle = style;
-        fillStyle.stroke.a = 0;
-        fillStyle.width = 0.0f;
-        result = list.path(output, total, true, fillStyle, layer, depth, PathCap::Round, many, kept);
+    Style fill;
+    Style stroke;
+    _traceStyles(pen, fill, stroke);
+    if (kept && pen.traceFill && closed && pen.style.fill.a) {
+        result = list.path(output, total, true, fill, pen.layer, pen.depth, PathCap::Round, many, kept);
     }
     if (kept && result == Result::Success) {
-        auto strokeStyle = style;
-        strokeStyle.fill.a = 0;
-        if (traceFill && !strokeStyle.stroke.a && style.fill.a) {
-            strokeStyle.stroke = style.fill;
-            if (strokeStyle.width <= 0.0f) strokeStyle.width = 2.0f;
-        }
-        result = list.path(output, total, false, strokeStyle, layer, depth, PathCap::Round, many, kept);
+        result = list.path(output, total, false, stroke, pen.layer, pen.depth, PathCap::Round, many, kept);
     }
     delete[] output;
     delete[] shown;
@@ -720,7 +748,7 @@ static Result _gridLine(DisplayList& list, const Vec3& from, const Vec3& to, con
     float ends[2];
     auto spatial = _spatial(config);
     if (!_lineWorld(from, to, state.model, config, a, b, depth, spatial ? ends : nullptr)) return Result::Success;
-    return _line(list, a, b, state.progress, state.direction, style, layer, depth, spatial ? ends : nullptr);
+    return _line(list, a, b, Pen{state.progress, state.direction, style, layer, depth, spatial ? ends : nullptr});
 }
 
 static float _basisLength(const Mat4& model, uint8_t axis)
@@ -743,7 +771,7 @@ static Result _tick(DisplayList& list, const Vec2& pixel, const Vec2& ahead, flo
     auto norm = run.length();
     if (!(length > 0.0f) || !(norm > 1.0e-6f) || !std::isfinite(norm)) return Result::Success;
     auto half = Vec2{-run.y, run.x} * (0.5f * length / norm);
-    return _line(list, pixel - half, pixel + half, state.progress, state.direction, style, layer, depth, ends);
+    return _line(list, pixel - half, pixel + half, Pen{state.progress, state.direction, style, layer, depth, ends});
 }
 
 // The ticks of a space across its axes (see Space::ticks), in the colors of the axes. In 3D
@@ -829,60 +857,49 @@ static Result _spaceNumbers(DisplayList& list, const Space* space, const VisualS
 static bool _warpPoints(const WarpShape& warp, uint32_t begin, uint32_t end, const VisualState& state,
                         const Config& config, Vec2* output, float& depth)
 {
-    auto sum = 0.0;
-    for (auto i = begin; i < end; i++) {
-        auto pointDepth = 0.0f;
-        if (!_point(warp.at(i, state.warpProgress), state.model, config, output[i - begin], pointDepth)) return false;
-        sum += pointDepth;
-    }
-    depth = end > begin ? static_cast<float>(sum / (end - begin)) : 0.0f;
-    return true;
+    auto at = [&](uint32_t i) { return warp.at(begin + i, state.warpProgress); };
+    return _project(end - begin, at, state.model, config, output, nullptr, depth);
 }
 
 // The shape of an object a warp bends, from the points its warp has reached: its outline, the
 // contours of a path, or the shaft of an arrow, a vector or a route, whose tips keep their size
 // in pixels and point along the bent ends. A bent line draws no fill.
 static Result _warped(DisplayList& list, const Object* object, const VisualState& state, const Config& config,
-                      Style style, float progress, bool windowed, bool endpoint)
+                      const Style& style, float progress, bool windowed, bool endpoint)
 {
     auto& warp = *state.warp;
     if (warp.count < 2u) return Result::Success;
+    auto runs = warp.runCount;
     auto projected = new (std::nothrow) Vec2[warp.count];
-    auto ends = warp.runCount > 1u ? new (std::nothrow) uint32_t[warp.runCount] : nullptr;
-    if (!projected || (warp.runCount > 1u && !ends)) {
+    auto ends = runs > 1u ? new (std::nothrow) uint32_t[runs] : nullptr;
+    if (!projected || (runs > 1u && !ends)) {
         delete[] projected;
         delete[] ends;
         return Result::OutOfMemory;
     }
-    auto depth = 0.0f;
+    for (auto i = 0u; ends && i < runs; i++)
+        ends[i] = warp.runs[i].end;
+    auto pen = Pen{progress, state.direction, style, state.layer, 0.0f, nullptr, state.traceFill, _cap(object)};
     auto result = Result::Success;
-    auto visible = _warpPoints(warp, 0u, warp.count, state, config, projected, depth);
+    auto visible = _warpPoints(warp, 0u, warp.count, state, config, projected, pen.depth);
     if (visible) {
         auto type = object->type();
         if (type == Type::Arrow || type == Type::Vector || type == Type::Route) {
-            result = _route(list, projected, warp.count, progress, state.direction,
-                            state.markerTail * state.pixelScale, state.markerTip * state.pixelScale,
-                            style, state.layer, depth);
+            result = _route(list, projected, warp.count, state.markerTail * state.pixelScale,
+                            state.markerTip * state.pixelScale, pen);
         } else if (ends) {
-            for (auto i = 0u; i < warp.runCount; i++)
-                ends[i] = warp.runs[i].end;
-            result = type == Type::Plot
-                ? _pieces(list, projected, ends, warp.runCount, progress, state.direction, style, state.layer,
-                          depth, _cap(object))
-                : _contours(list, projected, ends, warp.runCount, warp.closed, progress, state.direction,
-                            style, state.layer, depth, state.traceFill);
+            result = type == Type::Plot ? _pieces(list, projected, ends, runs, pen)
+                                        : _contours(list, projected, ends, runs, warp.closed, pen);
         } else if (windowed) {
-            result = _window(list, projected, warp.count, state.start, progress, style, object->layer, depth);
+            result = _window(list, projected, warp.count, state.start, progress, style, object->layer, pen.depth);
         } else {
-            if (type == Type::Line) style.fill.a = 0;
-            result = _path(list, projected, warp.count, warp.closed, progress, state.direction, style,
-                           state.layer, depth, state.traceFill, nullptr, _cap(object));
+            if (type == Type::Line) pen.style.fill.a = 0;
+            result = _path(list, projected, warp.count, warp.closed, pen);
         }
     }
     if (result == Result::Success && visible && endpoint && !windowed) {
-        result = _plotEndpoint(list, projected, warp.count, ends, warp.runCount, progress,
-            state.direction, static_cast<const Plot*>(object)->endpointRadius * state.pixelScale,
-            style, state.layer, depth, nullptr);
+        result = _plotEndpoint(list, projected, warp.count, ends, runs,
+                               static_cast<const Plot*>(object)->endpointRadius * state.pixelScale, pen);
     }
     delete[] projected;
     delete[] ends;
@@ -927,8 +944,8 @@ static Result _warpedSpace(DisplayList& list, const Space* space, const VisualSt
             case WarpPart::Grid:
             case WarpPart::DepthGrid:
                 if (count >= 2u) {
-                    result = _path(list, projected, count, false, state.progress, state.direction, lineStyle,
-                                   state.layer, depth);
+                    result = _path(list, projected, count, false,
+                                   Pen{state.progress, state.direction, lineStyle, state.layer, depth});
                 }
                 break;
             case WarpPart::AxisX:
@@ -937,8 +954,8 @@ static Result _warpedSpace(DisplayList& list, const Space* space, const VisualSt
                 auto color = part == WarpPart::AxisX ? space->axisX : part == WarpPart::AxisY ? space->axisY : space->axisZ;
                 axisStyle.stroke = _opacity(color, state.opacity);
                 if (count >= 2u) {
-                    result = _path(list, projected, count, false, state.progress, state.direction, axisStyle,
-                                   axisLayer, depth);
+                    result = _path(list, projected, count, false,
+                                   Pen{state.progress, state.direction, axisStyle, axisLayer, depth});
                 }
                 break;
             }
@@ -1700,9 +1717,9 @@ Result DisplayList::sort() noexcept
 
 static Result _labelledPieces(DisplayList& list, const Vec3* local, const Vec2* projected,
                               const uint32_t* ends, uint32_t pieces, const ContourPlacement* labels,
-                              uint32_t labelCount, float progress, DrawDirection direction,
-                              const Style& style, int32_t layer, float depth, const float* depths)
+                              uint32_t labelCount, const Pen& pen)
 {
+    auto depths = pen.depths;
     auto vertices = ends[pieces - 1u];
     auto room = vertices + 4u * labelCount + 2u * pieces;
     auto output = std::unique_ptr<Vec2[]>(new (std::nothrow) Vec2[room]);
@@ -1715,8 +1732,8 @@ static Result _labelledPieces(DisplayList& list, const Vec3* local, const Vec2* 
         else used = start;
         start = used;
     };
-    auto remaining = _clamp(progress) * (vertices - pieces);
-    auto reverse = _reverse(direction);
+    auto remaining = _clamp(pen.progress) * (vertices - pieces);
+    auto reverse = _reverse(pen.direction);
     for (auto step = 0u; step < pieces && remaining > 1.0e-6f; step++) {
         auto piece = reverse ? pieces - 1u - step : step;
         auto first = piece ? ends[piece - 1u] : 0u;
@@ -1766,7 +1783,41 @@ static Result _labelledPieces(DisplayList& list, const Vec3* local, const Vec2* 
         finish();
     }
     return runs ? _strokes(list, output.get(), outputDepths.get(), outputEnds.get(), runs,
-                           style, layer, depth, PathCap::Butt) : Result::Success;
+                           pen.style, pen.layer, pen.depth, PathCap::Butt) : Result::Success;
+}
+
+// Whether object, whose entry is entry, can be placed in state, as it samples there: the object is
+// valid and as the scene authored it, the model affine, and the styles, opacity, progress and
+// scale finite, with no width, radius or scale below zero.
+static bool _placeable(const Object* object, const ObjectEntry& entry, const VisualState& state)
+{
+    return valid(object) && entry.fingerprint == fingerprint(object) && _affine(state.model)
+           && std::isfinite(state.width) && state.width >= 0.0f
+           && std::isfinite(state.radius) && state.radius >= 0.0f
+           && std::isfinite(state.dashOffset)
+           && std::isfinite(state.opacity) && std::isfinite(state.progress)
+           && std::isfinite(state.fillProgress)
+           && std::isfinite(state.pixelScale) && state.pixelScale >= 0.0f;
+}
+
+// Runs the count runtime modifiers that move objects over the model, opacity and progress object
+// has in state at time; the model must stay affine, the opacity and progress within [0, 1].
+static Result _modify(const RuntimeModifier* modifiers, uint32_t count, const Object* object, float time,
+                      VisualState& state)
+{
+    for (auto i = 0u; i < count; i++) {
+        auto& modifier = modifiers[i];
+        if (!modifier.object) continue;
+        auto result = modifier.object(object, time, state.model, state.opacity, state.progress, modifier.data);
+        if (result != Result::Success) return result;
+        if (!_affine(state.model) || !std::isfinite(state.opacity)
+            || state.opacity < 0.0f || state.opacity > 1.0f
+            || !std::isfinite(state.progress) || state.progress < 0.0f
+            || state.progress > 1.0f) {
+            return Result::InvalidArguments;
+        }
+    }
+    return Result::Success;
 }
 
 Result Scene::Impl::world(const Object* object, float time, VisualState& state, bool& visible,
@@ -1777,15 +1828,7 @@ Result Scene::Impl::world(const Object* object, float time, VisualState& state, 
     if (!item) return Result::InvalidArguments;
     if (!sample(*item, time, state)) return Result::Success;
     state.inheritedProgressEmpty = false;
-    if (!valid(object) || item->fingerprint != fingerprint(object) || !_affine(state.model)
-        || !std::isfinite(state.width) || state.width < 0.0f
-        || !std::isfinite(state.radius) || state.radius < 0.0f
-        || !std::isfinite(state.dashOffset)
-        || !std::isfinite(state.opacity) || !std::isfinite(state.progress)
-        || !std::isfinite(state.fillProgress)
-        || !std::isfinite(state.pixelScale) || state.pixelScale < 0.0f) {
-        return Result::InvalidArguments;
-    }
+    if (!_placeable(object, *item, state)) return Result::InvalidArguments;
     if (state.morph) {
         auto morphEntry = entry(state.morph);
         if (!morphEntry || !valid(state.morph)
@@ -1793,19 +1836,8 @@ Result Scene::Impl::world(const Object* object, float time, VisualState& state, 
             return Result::InvalidArguments;
         }
     }
-    for (auto i = 0u; i < runtimeModifierCnt; i++) {
-        auto& modifier = runtimeModifiers[i];
-        if (!modifier.object) continue;
-        auto result = modifier.object(object, time, state.model, state.opacity,
-                                      state.progress, modifier.data);
-        if (result != Result::Success) return result;
-        if (!_affine(state.model) || !std::isfinite(state.opacity)
-            || state.opacity < 0.0f || state.opacity > 1.0f
-            || !std::isfinite(state.progress) || state.progress < 0.0f
-            || state.progress > 1.0f) {
-            return Result::InvalidArguments;
-        }
-    }
+    auto modified = _modify(runtimeModifiers, runtimeModifierCnt, object, time, state);
+    if (modified != Result::Success) return modified;
     for (auto i = 0u; i < runtimeModifierCnt; i++) {
         auto& modifier = runtimeModifiers[i];
         if (!modifier.fill) continue;
@@ -1832,30 +1864,9 @@ Result Scene::Impl::world(const Object* object, float time, VisualState& state, 
         auto parent = entry(parentObject);
         VisualState parentState;
         if (!parent || !sample(*parent, time, parentState)) return Result::Success;
-        if (!valid(parentObject) || parent->fingerprint != fingerprint(parentObject)
-            || !_affine(parentState.model) || !std::isfinite(parentState.width)
-            || parentState.width < 0.0f || !std::isfinite(parentState.radius)
-            || parentState.radius < 0.0f || !std::isfinite(parentState.dashOffset)
-            || !std::isfinite(parentState.opacity)
-            || !std::isfinite(parentState.progress) || !std::isfinite(parentState.fillProgress)
-            || !std::isfinite(parentState.pixelScale)
-            || parentState.pixelScale < 0.0f) {
-            return Result::InvalidArguments;
-        }
-        for (auto i = 0u; i < runtimeModifierCnt; i++) {
-            auto& modifier = runtimeModifiers[i];
-            if (!modifier.object) continue;
-            auto result = modifier.object(parentObject, time, parentState.model,
-                                          parentState.opacity, parentState.progress,
-                                          modifier.data);
-            if (result != Result::Success) return result;
-            if (!_affine(parentState.model) || !std::isfinite(parentState.opacity)
-                || parentState.opacity < 0.0f || parentState.opacity > 1.0f
-                || !std::isfinite(parentState.progress) || parentState.progress < 0.0f
-                || parentState.progress > 1.0f) {
-                return Result::InvalidArguments;
-            }
-        }
+        if (!_placeable(parentObject, *parent, parentState)) return Result::InvalidArguments;
+        modified = _modify(runtimeModifiers, runtimeModifierCnt, parentObject, time, parentState);
+        if (modified != Result::Success) return modified;
         if (parentObject->type() == Type::Angle) {
             auto point = angleLabelPoint(static_cast<const Angle*>(parentObject), &parentState);
             state.model = Mat4::translate(point) * state.model;
@@ -2002,49 +2013,34 @@ static Result _morph(DisplayList& list, const Object* object, const VisualState&
         delete[] depths;
         return Result::OutOfMemory;
     }
-    auto depth = 0.0;
-    auto visible = true;
-    for (auto i = 0u; i < count; i++) {
-        auto local = from[i] + (to[i] - from[i]) * state.morphProgress;
-        auto pointDepth = 0.0f;
-        if (!_point(local, state.model, config, projected[i], pointDepth)) {
-            visible = false;
-            break;
-        }
-        if (depths) depths[i] = _screenDepth(pointDepth, config);
-        depth += pointDepth;
-    }
+    auto at = [&](uint32_t i) { return from[i] + (to[i] - from[i]) * state.morphProgress; };
+    auto pen = Pen{state.progress, state.direction, style, state.layer, 0.0f, depths, state.traceFill, _cap(object)};
     auto result = Result::Success;
-    if (visible) {
-        auto mean = static_cast<float>(depth / count);
+    if (_project(count, at, state.model, config, projected, depths, pen.depth)) {
         if (shape->ends) {
             auto closedCount = shape->closedPieces;
             if (style.fill.a) {
-                auto fill = style;
-                fill.stroke.a = 0;
-                result = _contours(list, projected, shape->ends, shape->pieces,
-                                   closedCount == shape->pieces, state.progress, state.direction,
-                                   fill, state.layer, mean, state.traceFill);
+                auto fill = pen;
+                fill.style.stroke.a = 0;
+                result = _contours(list, projected, shape->ends, shape->pieces, closedCount == shape->pieces, fill);
             }
             auto begin = 0u;
             for (auto i = 0u; i < shape->pieces && result == Result::Success; i++) {
                 auto end = shape->ends[i];
-                auto stroke = style;
-                stroke.fill.a = 0;
+                auto stroke = pen;
+                stroke.style.fill.a = 0;
                 auto growth = shape->growth[i];
                 auto scale = growth > 0 ? state.morphProgress : growth < 0 ? 1.0f - state.morphProgress : 1.0f;
-                stroke.width *= scale;
-                if (scale <= 0.0f) stroke.stroke.a = 0;
-                if (stroke.stroke.a && stroke.width > 0.0f) {
-                    result = _path(list, projected + begin, end - begin, i < closedCount, state.progress,
-                                   state.direction, stroke, state.layer, mean, state.traceFill,
-                                   depths ? depths + begin : nullptr, _cap(object));
+                stroke.style.width *= scale;
+                if (scale <= 0.0f) stroke.style.stroke.a = 0;
+                stroke.depths = depths ? depths + begin : nullptr;
+                if (stroke.style.stroke.a && stroke.style.width > 0.0f) {
+                    result = _path(list, projected + begin, end - begin, i < closedCount, stroke);
                 }
                 begin = end;
             }
         } else {
-            result = _path(list, projected, count, closed, state.progress, state.direction,
-                           style, state.layer, mean, state.traceFill, depths, _cap(object));
+            result = _path(list, projected, count, closed, pen);
         }
     }
     delete[] projected;
@@ -2475,34 +2471,37 @@ Result Scene::Impl::build(float time, DisplayList& list, bool sort, const ViewFr
         // In 3D, the depths of the points of what the object draws, for split().
         auto spatial = _spatial(config);
         float ends[2];
+        // What the strokes of the object draw with; each drawing below sets the depths.
+        auto pen = Pen{progress, state.direction, style, state.layer, 0.0f, nullptr, state.traceFill, _cap(object)};
         switch (object->type()) {
-            case Type::Line: {
+            // The trimmed ends of a line, an arrow or a vector, in the object's space, or the ends
+            // a connector joins, in the world. Arrows and vectors draw as routes with their heads,
+            // and so does a connector that has a head.
+            case Type::Line:
+            case Type::Arrow:
+            case Type::Vector:
+            case Type::Connector: {
+                auto type = object->type();
                 Vec3 endpoints[2];
-                if (!segment(object, &state, endpoints)) break;
-                Vec2 fromPixel;
-                Vec2 toPixel;
-                float depth;
-                if (_lineWorld(endpoints[0], endpoints[1], state.model, config, fromPixel, toPixel, depth,
-                               spatial ? ends : nullptr)) {
-                    result = _line(list, fromPixel, toPixel, progress, state.direction,
-                                   style, state.layer, depth, spatial ? ends : nullptr);
+                if (type == Type::Connector) {
+                    auto defined = false;
+                    result = this->ends(static_cast<Connector*>(object), time, endpoints[0], endpoints[1], defined);
+                    if (result != Result::Success) return result;
+                    if (!defined) break;
+                } else if (!segment(object, &state, endpoints)) {
+                    break;
                 }
-                break;
-            }
-            case Type::Arrow: {
-                Vec3 endpoints[2];
-                if (!segment(object, &state, endpoints)) break;
-                Vec2 fromPixel;
-                Vec2 toPixel;
-                float depth;
-                if (_lineWorld(endpoints[0], endpoints[1], state.model, config, fromPixel, toPixel, depth,
-                               spatial ? ends : nullptr)) {
-                    Vec2 points[] = {fromPixel, toPixel};
-                    result = _route(list, points, 2u, progress, state.direction,
-                                    state.markerTail * state.pixelScale,
-                                    state.markerTip * state.pixelScale, style, state.layer,
-                                    depth, spatial ? ends : nullptr);
+                Vec2 pixels[2];
+                if (!_lineWorld(endpoints[0], endpoints[1], type == Type::Connector ? Mat4::identity() : state.model,
+                                config, pixels[0], pixels[1], pen.depth, spatial ? ends : nullptr)) {
+                    break;
                 }
+                pen.depths = spatial ? ends : nullptr;
+                auto heads = type == Type::Arrow || type == Type::Vector
+                             || (type == Type::Connector && (state.markerTip > 0.0f || state.markerTail > 0.0f));
+                result = heads ? _route(list, pixels, 2u, state.markerTail * state.pixelScale,
+                                        state.markerTip * state.pixelScale, pen)
+                               : _line(list, pixels[0], pixels[1], pen);
                 break;
             }
             case Type::Point: {
@@ -2597,22 +2596,6 @@ Result Scene::Impl::build(float time, DisplayList& list, bool sort, const ViewFr
                 delete[] written;
                 break;
             }
-            case Type::Vector: {
-                Vec3 endpoints[2];
-                if (!segment(object, &state, endpoints)) break;
-                Vec2 fromPixel;
-                Vec2 toPixel;
-                float depth;
-                if (_lineWorld(endpoints[0], endpoints[1], state.model, config, fromPixel, toPixel, depth,
-                               spatial ? ends : nullptr)) {
-                    Vec2 points[] = {fromPixel, toPixel};
-                    result = _route(list, points, 2u, progress, state.direction,
-                                    state.markerTail * state.pixelScale,
-                                    state.markerTip * state.pixelScale, style, state.layer,
-                                    depth, spatial ? ends : nullptr);
-                }
-                break;
-            }
             case Type::Space: {
                 auto space = static_cast<Space*>(object);
                 {
@@ -2688,38 +2671,26 @@ Result Scene::Impl::build(float time, DisplayList& list, bool sort, const ViewFr
                 auto arc = arcGeometry(object, &state);
                 Vec3 local[514]; Vec2 points[514]; float depths[514];
                 auto count = arcOutline(arc, local, 514u);
-                auto depth = 0.0; auto visible = count > 1u;
-                for (auto j = 0u; j < count; j++) {
-                    auto pointDepth = 0.0f;
-                    if (!_point(local[j], state.model, config, points[j], pointDepth)) { visible = false; break; }
-                    depths[j] = _screenDepth(pointDepth, config); depth += pointDepth;
+                if (count > 1u
+                    && _project(local, count, state.model, config, points, spatial ? depths : nullptr, pen.depth)) {
+                    pen.depths = spatial ? depths : nullptr;
+                    result = _path(list, points, count, arc.sector, pen);
                 }
-                if (visible) result = _path(list, points, count, arc.sector, progress, state.direction,
-                                           style, state.layer, static_cast<float>(depth / count),
-                                           state.traceFill, spatial ? depths : nullptr);
                 break;
             }
             case Type::Circle: {
                 auto circle = static_cast<Circle*>(object);
                 constexpr auto count = 64u;
+                auto at = [&](uint32_t j) {
+                    auto angle = TWO_PI * static_cast<float>(j) / static_cast<float>(count);
+                    return circle->center + Vec3{std::cos(angle) * state.size.x, std::sin(angle) * state.size.x, 0.0f};
+                };
                 Vec2 points[count];
                 float depths[count];
-                auto depth = 0.0;
-                auto visible = true;
-                for (auto j = 0u; j < count; j++) {
-                    auto angle = TWO_PI * static_cast<float>(j) / static_cast<float>(count);
-                    auto point = circle->center + Vec3{std::cos(angle) * state.size.x, std::sin(angle) * state.size.x, 0.0f};
-                    auto pointDepth = 0.0f;
-                    if (!_point(point, state.model, config, points[j], pointDepth)) {
-                        visible = false;
-                        break;
-                    }
-                    depths[j] = _screenDepth(pointDepth, config);
-                    depth += pointDepth;
+                if (_project(count, at, state.model, config, points, spatial ? depths : nullptr, pen.depth)) {
+                    pen.depths = spatial ? depths : nullptr;
+                    result = _path(list, points, count, true, pen);
                 }
-                if (visible) result = _path(list, points, count, true, progress, state.direction,
-                                            style, state.layer, static_cast<float>(depth / count),
-                                            state.traceFill, spatial ? depths : nullptr);
                 break;
             }
             case Type::Polygon:
@@ -2766,17 +2737,8 @@ Result Scene::Impl::build(float time, DisplayList& list, bool sort, const ViewFr
                 }
                 // Without memory for the depths the drawing stays whole in split().
                 auto depths = spatial ? new (std::nothrow) float[count] : nullptr;
-                auto depth = 0.0;
-                auto visible = true;
-                for (auto j = 0u; j < count; j++) {
-                    auto pointDepth = 0.0f;
-                    if (!_point(points[j], state.model, config, projected[j], pointDepth)) {
-                        visible = false;
-                        break;
-                    }
-                    if (depths) depths[j] = _screenDepth(pointDepth, config);
-                    depth += pointDepth;
-                }
+                auto visible = _project(points, count, state.model, config, projected, depths, pen.depth);
+                pen.depths = depths;
                 auto path = object->type() == Type::Path ? static_cast<Path*>(object) : nullptr;
                 auto plot = object->type() == Type::Plot ? static_cast<Plot*>(object) : nullptr;
                 auto shown = plot ? state.geometry : nullptr;
@@ -2792,12 +2754,10 @@ Result Scene::Impl::build(float time, DisplayList& list, bool sort, const ViewFr
                         uint32_t labelCount;
                         result = contourPlacements(plot, time, labels.get(), plot->childCount(), labelCount);
                         if (result == Result::Success) result = _labelledPieces(list, points, projected, ends.get(), contours,
-                            labels.get(), labelCount, progress, state.direction, style, state.layer,
-                            static_cast<float>(depth / count), depths);
+                            labels.get(), labelCount, pen);
                         if (result == Result::Success && endpoint) {
-                            result = _plotEndpoint(list, projected, count, ends.get(), contours, progress,
-                                state.direction, plot->endpointRadius * state.pixelScale, style,
-                                state.layer, static_cast<float>(depth / count), depths);
+                            result = _plotEndpoint(list, projected, count, ends.get(), contours,
+                                                   plot->endpointRadius * state.pixelScale, pen);
                         }
                         endpoint = false;
                     }
@@ -2812,30 +2772,22 @@ Result Scene::Impl::build(float time, DisplayList& list, bool sort, const ViewFr
                     if (shown) plotAt(state, nullptr, ends);
                     else for (auto j = 0u; j < contours; j++)
                         ends[j] = path ? path->contourEnd(j) : plot->contourEnd(j);
-                    result = path
-                        ? _contours(list, projected, ends, contours, closed, progress, state.direction,
-                                    style, state.layer, static_cast<float>(depth / count), state.traceFill)
-                        : _pieces(list, projected, ends, contours, progress, state.direction, style,
-                                  state.layer, static_cast<float>(depth / count), _cap(object), depths);
+                    result = path ? _contours(list, projected, ends, contours, closed, pen)
+                                  : _pieces(list, projected, ends, contours, pen);
                     if (result == Result::Success && endpoint) {
-                        result = _plotEndpoint(list, projected, count, ends, contours, progress,
-                            state.direction, plot->endpointRadius * state.pixelScale, style,
-                            state.layer, static_cast<float>(depth / count), depths);
+                        result = _plotEndpoint(list, projected, count, ends, contours,
+                                               plot->endpointRadius * state.pixelScale, pen);
                     }
                     delete[] ends;
                     endpoint = false;
                 } else if (visible && objects[i].windowed) {
-                    result = _window(list, projected, count, state.start, progress, style, object->layer,
-                                     static_cast<float>(depth / count));
+                    result = _window(list, projected, count, state.start, progress, style, object->layer, pen.depth);
                 } else if (visible) {
-                    result = _path(list, projected, count, closed, progress, state.direction,
-                                   style, state.layer, static_cast<float>(depth / count),
-                                   state.traceFill, depths, _cap(object));
+                    result = _path(list, projected, count, closed, pen);
                 }
                 if (result == Result::Success && visible && endpoint) {
-                    result = _plotEndpoint(list, projected, count, nullptr, 1u, progress,
-                        state.direction, plot->endpointRadius * state.pixelScale, style,
-                        state.layer, static_cast<float>(depth / count), depths);
+                    result = _plotEndpoint(list, projected, count, nullptr, 1u,
+                                           plot->endpointRadius * state.pixelScale, pen);
                 }
                 delete[] projected;
                 delete[] depths;
@@ -2859,23 +2811,10 @@ Result Scene::Impl::build(float time, DisplayList& list, bool sort, const ViewFr
                     return Result::OutOfMemory;
                 }
                 auto depths = spatial ? new (std::nothrow) float[count] : nullptr;
-                auto depth = 0.0;
-                auto visible = true;
-                for (auto j = 0u; j < count; j++) {
-                    auto pointDepth = 0.0f;
-                    if (!_point(points[j], state.model, config, projected[j],
-                                pointDepth)) {
-                        visible = false;
-                        break;
-                    }
-                    if (depths) depths[j] = _screenDepth(pointDepth, config);
-                    depth += pointDepth;
-                }
-                if (visible) {
-                    result = _route(list, projected, count, progress, state.direction,
-                                    state.markerTail * state.pixelScale,
-                                    state.markerTip * state.pixelScale, style, state.layer,
-                                    static_cast<float>(depth / count), depths);
+                if (_project(points, count, state.model, config, projected, depths, pen.depth)) {
+                    pen.depths = depths;
+                    result = _route(list, projected, count, state.markerTail * state.pixelScale,
+                                    state.markerTip * state.pixelScale, pen);
                 }
                 delete[] projected;
                 delete[] depths;
@@ -2891,16 +2830,8 @@ Result Scene::Impl::build(float time, DisplayList& list, bool sort, const ViewFr
                     center + Vec3{image->width * 0.5f, height * 0.5f, 0.0f},
                     center + Vec3{-image->width * 0.5f, -height * 0.5f, 0.0f}};
                 Vec2 corners[3];
-                auto depth = 0.0;
-                auto visible = true;
-                for (auto i = 0u; i < 3u; i++) {
-                    auto pointDepth = 0.0f;
-                    if (!_point(local[i], state.model, config, corners[i], pointDepth)) {
-                        visible = false;
-                        break;
-                    }
-                    depth += pointDepth;
-                }
+                auto depth = 0.0f;
+                auto visible = _project(local, 3u, state.model, config, corners, nullptr, depth);
                 auto opacity = static_cast<uint8_t>(_clamp(state.opacity * progress) * 255.0f + 0.5f);
                 if (visible && opacity) {
                     PictureSource source;
@@ -2910,8 +2841,7 @@ Result Scene::Impl::build(float time, DisplayList& list, bool sort, const ViewFr
                     source.pixels = image->pixels();
                     source.width = image->pixelWidth();
                     source.height = image->pixelHeight();
-                    result = list.picture(corners, source, image->filter, opacity, state.layer,
-                                        static_cast<float>(depth / 3.0));
+                    result = list.picture(corners, source, image->filter, opacity, state.layer, depth);
                 }
                 break;
             }
@@ -2957,23 +2887,13 @@ Result Scene::Impl::build(float time, DisplayList& list, bool sort, const ViewFr
                             origin + Vec3{1.0f - padding, 1.0f - padding, 0.0f},
                             origin + Vec3{padding, 1.0f - padding, 0.0f}};
                         Vec2 points[4];
-                        auto depth = 0.0;
-                        auto projected = true;
-                        for (auto j = 0u; j < 4u; j++) {
-                            auto pointDepth = 0.0f;
-                            if (!_point(local[j], state.model, config, points[j], pointDepth)) {
-                                projected = false;
-                                break;
-                            }
-                            depth += pointDepth;
-                        }
-                        if (projected) {
+                        auto depth = 0.0f;
+                        if (_project(local, 4u, state.model, config, points, nullptr, depth)) {
                             Style cellStyle;
                             cellStyle.stroke.a = 0;
                             cellStyle.fill = _opacity(color, state.opacity);
                             cellStyle.width = 0.0f;
-                            result = list.path(points, 4, true, cellStyle, state.layer,
-                                               static_cast<float>(depth / 4.0));
+                            result = list.path(points, 4, true, cellStyle, state.layer, depth);
                         }
                     }
                     if (result != Result::Success) return result;
@@ -3020,46 +2940,9 @@ Result Scene::Impl::build(float time, DisplayList& list, bool sort, const ViewFr
                 }
                 Vec2 points[segments * 4u];
                 float depths[segments * 4u];
-                auto depth = 0.0;
-                auto projected = true;
-                for (auto j = 0u; j < count; j++) {
-                    auto pointDepth = 0.0f;
-                    if (!_point(local[j], state.model, config, points[j], pointDepth)) {
-                        projected = false;
-                        break;
-                    }
-                    depths[j] = _screenDepth(pointDepth, config);
-                    depth += pointDepth;
-                }
-                if (projected) result = _path(list, points, count, true, progress, state.direction,
-                                              style, state.layer, static_cast<float>(depth / count),
-                                              state.traceFill, spatial ? depths : nullptr);
-                break;
-            }
-            case Type::Connector: {
-                auto connector = static_cast<Connector*>(object);
-                Vec3 from;
-                Vec3 to;
-                auto defined = false;
-                result = this->ends(connector, time, from, to, defined);
-                if (result != Result::Success) return result;
-                if (!defined) break;
-                Vec2 fromPixel;
-                Vec2 toPixel;
-                float depth;
-                if (!_lineWorld(from, to, Mat4::identity(), config, fromPixel, toPixel, depth,
-                                spatial ? ends : nullptr)) {
-                    break;
-                }
-                if (state.markerTip > 0.0f || state.markerTail > 0.0f) {
-                    Vec2 points[] = {fromPixel, toPixel};
-                    result = _route(list, points, 2u, progress, state.direction,
-                                    state.markerTail * state.pixelScale,
-                                    state.markerTip * state.pixelScale, style, state.layer,
-                                    depth, spatial ? ends : nullptr);
-                } else {
-                    result = _line(list, fromPixel, toPixel, progress, state.direction,
-                                   style, state.layer, depth, spatial ? ends : nullptr);
+                if (_project(local, count, state.model, config, points, spatial ? depths : nullptr, pen.depth)) {
+                    pen.depths = spatial ? depths : nullptr;
+                    result = _path(list, points, count, true, pen);
                 }
                 break;
             }
