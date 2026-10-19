@@ -86,10 +86,13 @@ cpp_tests += [
     },
     {'name': 'composite', 'exe': 'testComposite', 'when': native},
     {'name': 'timing-options', 'exe': 'testTimingOptions', 'when': native},
-    {'name': 'ui', 'exe': 'testUi', 'when': ui_enabled, 'deps': ui_deps},
+    {
+        'name': 'ui', 'exe': 'testUi', 'when': ui_enabled, 'deps': ui_deps, 'args': ui_args,
+        'inc': [lua_inc],
+    },
     {
         'name': 'input', 'exe': 'testInput', 'when': input_enabled,
-        'deps': input_deps + ui_deps, 'args': ui_args,
+        'deps': input_deps + ui_deps, 'args': input_args + ui_args, 'inc': [lua_inc],
     },
 ]
 if states_enabled
@@ -102,9 +105,8 @@ cpp_tests += {
 if audio_enabled
     cpp_tests += {
         'name': 'audio', 'exe': 'testAudio', 'when': true,
-        'deps': [vis_audio_dep] + runtime_deps,
-        'args': lua_runtime_enabled ? ['-DVIS_AUDIO', '-DVIS_LUA_RUNTIME'] : [],
-        'inc': lua_runtime_enabled ? [lua_inc] : [],
+        'deps': [vis_audio_dep] + runtime_deps, 'args': ['-DVIS_AUDIO'] + runtime_args,
+        'inc': [lua_inc],
     }
 endif
 # The GL module's tests make an offscreen CGL context, so they run on macOS only.
@@ -147,7 +149,7 @@ cpp_tests += [
     },
     {
         'name': 'lua-scene', 'exe': 'testLua', 'src': lua_test_sources,
-        'when': native, 'args': font_args,
+        'when': native, 'args': font_args, 'inc': [lua_inc],
     },
     {'name': 'c-api', 'exe': 'testCapi', 'when': native},
     {

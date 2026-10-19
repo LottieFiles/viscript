@@ -1027,9 +1027,12 @@ extern "C" VIS_KEEPALIVE uint32_t vis_input(VisEngine handle, uint32_t type,
 #endif
     constexpr uint32_t Failed = 32u;
     uint32_t flags = 0u;
-#if !defined(VIS_INPUT)
-    (void) key;
+    // Input tells a held key from a new press by its own key state.
     (void) repeat;
+#if !defined(VIS_INPUT)
+    (void) buttons;
+    (void) modifiers;
+    (void) key;
 #endif
 #if defined(VIS_UI)
     if (engine->panel && type <= 5u
@@ -1044,8 +1047,6 @@ extern "C" VIS_KEEPALIVE uint32_t vis_input(VisEngine handle, uint32_t type,
         event.delta = {dx, dy};
         event.wheel = {wheelX, wheelY};
         event.button = button;
-        event.buttons = buttons;
-        event.modifiers = modifiers;
         event.time = time;
         auto input = engine->panel->input(event);
         if (input.handled) flags |= Handled;
@@ -1079,7 +1080,6 @@ extern "C" VIS_KEEPALIVE uint32_t vis_input(VisEngine handle, uint32_t type,
         event.buttons = buttons;
         event.modifiers = modifiers;
         event.time = time;
-        event.repeat = repeat != 0u;
         auto input = engine->input->input(event);
         if (input.handled) flags |= Handled;
         if (input.redraw) flags |= Redraw;

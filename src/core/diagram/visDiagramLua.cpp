@@ -629,18 +629,6 @@ static int _open(lua_State* lua, void*)
 
 }  // namespace
 
-Result Lua::load(const char* source, uint32_t size, const char* name, Scene** scene,
-                 char* error, uint32_t errorSize, vis::Lua::AssetResolver resolver,
-                 void* resolverData, const Theme* adaptiveTheme,
-                 bool* adaptiveThemeUsed) noexcept
-{
-    auto hook = lua_extension::luaHooks();
-    detail::LuaHookSpan hooks = {&hook, 1u};
-    return detail::luaLoad(source, size, name, scene, error, errorSize, resolver,
-                           resolverData, nullptr, 0u, adaptiveTheme,
-                           adaptiveThemeUsed, hooks);
-}
-
 vis::detail::LuaHooks lua_extension::luaHooks() noexcept
 {
     return {_open, nullptr, nullptr};

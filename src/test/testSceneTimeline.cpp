@@ -24,10 +24,11 @@ void timelineTracks(Renderer* renderer)
     CHECK(near(scene->cursor(), 0.0f));
 
     // A shift and a fade of one object overlap because they write different channels.
-    CHECK(scene->play(Animation::shift(box, {2.0f, 0.0f, 0.0f}), 2.0f, Easing::Linear) == Result::Success);
+    CHECK(scene->play(Animation::shift(box, {2.0f, 0.0f, 0.0f}), 2.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
     CHECK(near(scene->cursor(), 2.0f));
     CHECK(scene->seek(0.0f) == Result::Success);
-    CHECK(scene->play(Animation::fade(box, 0.5f), 1.0f, Easing::Linear) == Result::Success);
+    CHECK(scene->play(Animation::fade(box, 0.5f), 1.0f, AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
     CHECK(near(scene->cursor(), 1.0f));
     CHECK(near(scene->duration(), 2.0f));
     Surface surface;
@@ -152,7 +153,9 @@ void clipLists(Renderer* renderer)
         }
         CHECK(scene->seek(0.1f * static_cast<float>(step * 10u + 9u)) == Result::Success);
         auto value = static_cast<float>((step + 1u) * 10u);
-        CHECK(scene->play(AnimationTarget::from(counter).value(value), 0.05f, Easing::Linear) == Result::Success);
+        CHECK(scene->play(AnimationTarget::from(counter).value(value), 0.05f,
+                          AnimCurve::preset(AnimCurvePreset::Linear))
+              == Result::Success);
     }
     CHECK(scene->clipCount() == Count + Count / 10u);
     char shown[16];
@@ -211,28 +214,37 @@ void sampleWork()
     CHECK(scene->sampleWork() == 0u);
     // A move of the group is read for it and the four objects below it, a turn of the inner
     // group for it and its two circles.
-    CHECK(scene->play(Animation::shift(group, {1.0f, 0.0f, 0.0f}), 1.0f, Easing::Linear) == Result::Success);
+    CHECK(scene->play(Animation::shift(group, {1.0f, 0.0f, 0.0f}), 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
     CHECK(scene->sampleWork() == 5u);
-    CHECK(scene->play(Animation::rotate(inner, 1.0f), 1.0f, Easing::Linear) == Result::Success);
-    CHECK(scene->play(Animation::fade(apart, 0.5f), 1.0f, Easing::Linear) == Result::Success);
+    CHECK(scene->play(Animation::rotate(inner, 1.0f), 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
+    CHECK(scene->play(Animation::fade(apart, 0.5f), 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
     CHECK(scene->clipCount() == 3u && scene->sampleWork() == 9u);
     // A circle that joins the inner group later is read for the clip of each group above it.
     CHECK(inner->add(later) == Result::Success);
     CHECK(scene->sampleWork() == 11u);
-    CHECK(scene->play(Animation::shift(later, {0.0f, 1.0f, 0.0f}), 1.0f, Easing::Linear) == Result::Success);
-    CHECK(scene->play(Animation::shift(group, {-1.0f, 0.0f, 0.0f}), 1.0f, Easing::Linear) == Result::Success);
+    CHECK(scene->play(Animation::shift(later, {0.0f, 1.0f, 0.0f}), 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
+    CHECK(scene->play(Animation::shift(group, {-1.0f, 0.0f, 0.0f}), 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
     CHECK(scene->clipCount() == 5u && scene->sampleWork() == 18u);
     CHECK(inset->add(shown) == Result::Success);
-    CHECK(inset->play(Animation::fade(shown, 0.5f), 1.0f, Easing::Linear) == Result::Success);
+    CHECK(inset->play(Animation::fade(shown, 0.5f), 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
     CHECK(scene->viewport(inset, {0.5f, 0.0f, 0.5f, 1.0f}) == Result::Success);
     CHECK(scene->sampleWork() == 19u);
     CHECK(from->add(leaving) == Result::Success);
-    CHECK(from->play(Animation::fade(leaving, 0.5f), 1.0f, Easing::Linear) == Result::Success);
+    CHECK(from->play(Animation::fade(leaving, 0.5f), 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
     CHECK(to->add(coming) == Result::Success);
-    CHECK(to->play(Animation::shift(coming, {1.0f, 0.0f, 0.0f}), 1.0f, Easing::Linear) == Result::Success);
-    CHECK(to->play(Animation::fade(coming, 0.5f), 1.0f, Easing::Linear) == Result::Success);
+    CHECK(to->play(Animation::shift(coming, {1.0f, 0.0f, 0.0f}), 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
+    CHECK(to->play(Animation::fade(coming, 0.5f), 1.0f, AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
     Scene* stages[] = {from, to};
-    CHECK(staged->transition(stages, 2u, {}, 1.0f, 0.0f, Easing::Linear) == Result::Success);
+    CHECK(staged->transition(stages, 2u, {}, 1.0f, 0.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
     CHECK(staged->sampleWork() == 3u);
     delete scene;
     delete staged;
@@ -253,14 +265,16 @@ void sampleWork()
     }
     CHECK(holder->add(source) == Result::Success && copying->add(holder) == Result::Success);
     CHECK(copying->add(stale) == Result::Success);
-    CHECK(copying->play(Animation::shift(holder, {1.0f, 0.0f, 0.0f}), 1.0f, Easing::Linear) == Result::Success);
+    CHECK(copying->play(Animation::shift(holder, {1.0f, 0.0f, 0.0f}), 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
     CHECK(copying->sampleWork() == 2u);
     auto held = copying->count();
     auto morph = Animation::morph(source, stale);
     morph.copy = true;
     CHECK(copying->play(morph, 1.0f) != Result::Success);
     CHECK(copying->count() == held && copying->sampleWork() == 2u);
-    CHECK(copying->play(Animation::shift(holder, {-1.0f, 0.0f, 0.0f}), 1.0f, Easing::Linear) == Result::Success);
+    CHECK(copying->play(Animation::shift(holder, {-1.0f, 0.0f, 0.0f}), 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
     CHECK(copying->sampleWork() == 4u);
     delete copying;
 }
@@ -288,7 +302,8 @@ void cameraOrbit(Renderer* renderer)
     dot->stroke({255, 0, 0, 255}).fill({255, 0, 0, 255});
     dot->style.radius = 3.0f;
     CHECK(scene->add(dot) == Result::Success);
-    CHECK(scene->orbit(2.0f * PI, {0.0f, 1.0f, 0.0f}, 4.0f, Easing::Linear) == Result::Success);
+    CHECK(scene->orbit(2.0f * PI, {0.0f, 1.0f, 0.0f}, 4.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
     CHECK(near(scene->duration(), 4.0f));
     Surface surface;
     auto start = -1.0f;
@@ -309,7 +324,7 @@ void cameraOrbit(Renderer* renderer)
     CHECK(scene->seek(3.0f) == Result::Success);
     auto lens = scene->config().camera;
     lens.fov = 0.5f;
-    CHECK(scene->look(lens, CameraView::ThreeD, 1.0f, Easing::Linear) == Result::Success);
+    CHECK(scene->look(lens, CameraView::ThreeD, 1.0f, AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
     auto column = [](float x, float depth, float fov) { return 31.5f + 32.0f * x / (depth * std::tan(0.5f * fov)); };
     // At 3.5 s the eye is an eighth turn short of +z, which puts the dot sqrt(2) right of the
     // view and sqrt(2) beyond the target.
@@ -320,7 +335,7 @@ void cameraOrbit(Renderer* renderer)
     CHECK(std::fabs(_redColumn(surface) - column(2.0f, 10.0f, 0.5f)) < 1.0f);
     CHECK(scene->seek(4.0f) == Result::Success);
     // Over the pole: the up direction turns with the eye, so the pose stays valid.
-    CHECK(scene->orbit(PI, {1.0f, 0.0f, 0.0f}, 1.0f, Easing::Linear) == Result::Success);
+    CHECK(scene->orbit(PI, {1.0f, 0.0f, 0.0f}, 1.0f, AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
     if (renderer->render(scene, 4.5f, surface) == Result::Success) CHECK(_redColumn(surface) > 36.0f);
     if (renderer->render(scene, 5.0f, surface) == Result::Success) CHECK(_redColumn(surface) > 36.0f);
     CHECK(near(scene->config().camera.eye.z, -10.0f, 1.0e-3f) && near(scene->config().camera.up.y, -1.0f, 1.0e-4f));
@@ -409,7 +424,7 @@ void intentMotion(Renderer* renderer)
     group[4].to = 0.5f;
     group[5].related = sun;
     group[6].arc = PI * 0.5f;
-    CHECK(scene->play(group, 8u, 1.0f, Easing::Linear) == Result::Success);
+    CHECK(scene->play(group, 8u, 1.0f, AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
 
     BBox bounds;
     CHECK(renderer->bounds(scene, pivoted, 0.5f, bounds) == Result::Success);
@@ -446,7 +461,8 @@ void intentMotion(Renderer* renderer)
     CHECK(near(bounds.center().x, 10.0f, 0.6f) && near(bounds.center().y, 60.0f, 0.6f));
 
     // The outline is copied when played: moving the path afterwards keeps the old route.
-    CHECK(scene->play(Animation::moveAlong(back, ring), 1.0f, Easing::Linear) == Result::Success);
+    CHECK(scene->play(Animation::moveAlong(back, ring), 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
     CHECK(scene->play(Animation::shift(ring, {0.0f, 1.0f, 0.0f}), 1.0f) == Result::Success);
     CHECK(renderer->bounds(scene, back, 1.5f, bounds) == Result::Success);
     CHECK(near(bounds.center().x, 60.0f, 0.6f) && near(bounds.center().y, 40.0f, 0.6f));
@@ -460,7 +476,7 @@ void intentMotion(Renderer* renderer)
     // Several followers share one path and the path may animate in the same group.
     Animation shared[] = {Animation::moveAlong(arcing, ring), Animation::moveAlong(car, ring, true),
                           Animation::fade(ring, 0.5f)};
-    CHECK(scene->play(shared, 3u, 1.0f, Easing::Linear, 0.2f) == Result::Success);
+    CHECK(scene->play(shared, 3u, 1.0f, AnimCurve::preset(AnimCurvePreset::Linear), 0.2f) == Result::Success);
 
     auto connector = Connector::gen(sun, planet);
     CHECK(connector && scene->add(connector) == Result::Success);

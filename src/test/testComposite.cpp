@@ -145,7 +145,8 @@ static void nestedAndAnimatedLayers()
     CHECK(outer->add(plain) == Result::Success);
     CHECK(outer->add(_square(1.5f, 0.0f, 1.0f, Red)) == Result::Success);
     CHECK(scene->add(outer) == Result::Success);
-    CHECK(scene->play(AnimationTarget::from(outer).opacity(0.0f), 1.0f, Easing::Linear) == Result::Success);
+    CHECK(scene->play(AnimationTarget::from(outer).opacity(0.0f), 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
 
     Surface surface;
     if (_render(scene, 0.0f, surface)) {
@@ -215,10 +216,11 @@ static void retainedLayers()
     CHECK(group->add(_square(0.5f, 0.0f, 2.0f, Blue)) == Result::Success);
     CHECK(later->add(_square(2.0f, 1.0f, 1.0f, Green)) == Result::Success);
     CHECK(scene->add(group) == Result::Success);
-    CHECK(scene->play(AnimationTarget::from(group).shift({0.5f, 0.0f, 0.0f}), 1.0f, Easing::Linear)
+    CHECK(scene->play(AnimationTarget::from(group).shift({0.5f, 0.0f, 0.0f}), 1.0f,
+                      AnimCurve::preset(AnimCurvePreset::Linear))
           == Result::Success);
     CHECK(scene->add(later) == Result::Success);
-    CHECK(scene->play(AnimationTarget::from(later).opacity(0.25f), 1.0f, Easing::Linear)
+    CHECK(scene->play(AnimationTarget::from(later).opacity(0.25f), 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
           == Result::Success);
     CHECK(scene->remove(later) == Result::Success);
 
@@ -359,9 +361,11 @@ static void maskTimeline()
     Spotlight spot;
     if (!spot.scene) return;
     CHECK(spot.square->mask(spot.hole) == Result::Success);
-    CHECK(spot.scene->play(AnimationTarget::from(spot.hole).shift({-3.0f, 0.0f, 0.0f}), 1.0f, Easing::Linear)
+    CHECK(spot.scene->play(AnimationTarget::from(spot.hole).shift({-3.0f, 0.0f, 0.0f}), 1.0f,
+                           AnimCurve::preset(AnimCurvePreset::Linear))
           == Result::Success);
-    CHECK(spot.scene->play(AnimationTarget::from(spot.hole).opacity(0.5f), 1.0f, Easing::Linear)
+    CHECK(spot.scene->play(AnimationTarget::from(spot.hole).opacity(0.5f), 1.0f,
+                           AnimCurve::preset(AnimCurvePreset::Linear))
           == Result::Success);
     CHECK(spot.scene->remove(spot.hole) == Result::Success);
     spot.expect(0.0f, Black, Red, Black, "start");
@@ -435,7 +439,8 @@ static void maskGroups()
         CHECK(card->add(hole) == Result::Success);
         CHECK(scene->add(card) == Result::Success);
         CHECK(card->mask(hole) == Result::Success);
-        CHECK(scene->play(AnimationTarget::from(card).shift({-1.0f, 0.0f, 0.0f}), 1.0f, Easing::Linear)
+        CHECK(scene->play(AnimationTarget::from(card).shift({-1.0f, 0.0f, 0.0f}), 1.0f,
+                          AnimCurve::preset(AnimCurvePreset::Linear))
               == Result::Success);
         Surface surface;
         if (_render(scene, 1.0f, surface)) {
@@ -674,8 +679,10 @@ static void effects()
         if (!scene) return;
         auto square = _square(0.0f, 0.0f, 2.0f, Red);
         CHECK(scene->add(square) == Result::Success);
-        CHECK(scene->play(AnimationTarget::from(square).blur(6.0f), 1.0f, Easing::Linear) == Result::Success);
-        CHECK(scene->play(AnimationTarget::from(square).shadow({Blue, {10.0f, 0.0f}, 2.0f}), 1.0f, Easing::Linear)
+        CHECK(scene->play(AnimationTarget::from(square).blur(6.0f), 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+              == Result::Success);
+        CHECK(scene->play(AnimationTarget::from(square).shadow({Blue, {10.0f, 0.0f}, 2.0f}), 1.0f,
+                          AnimCurve::preset(AnimCurvePreset::Linear))
               == Result::Success);
         CHECK(square->blur == 6.0f);
         Surface surface;

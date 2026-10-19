@@ -23,7 +23,7 @@ static void _clocks(Renderer* renderer)
     }
     CHECK(scene->add(object) == Result::Success);
     CHECK(scene->play(Animation::shift(object, {0.0f, 1.0f, 0.0f}), 1.0f,
-                      Easing::Linear)
+                      AnimCurve::preset(AnimCurvePreset::Linear))
           == Result::Success);
     auto controller = Controller::gen(scene);
     CHECK(controller != nullptr);
@@ -34,7 +34,7 @@ static void _clocks(Renderer* renderer)
     State focused;
     focused.shift = {2.0f, 0.0f, 0.0f};
     CHECK(controller->define(object, "focused", focused) == Result::Success);
-    CHECK(controller->transition(object, "focused", 1.0f, Easing::Linear)
+    CHECK(controller->transition(object, "focused", 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
           == Result::Success);
     CHECK(controller->advance(0.5f) == Result::Success);
     BBox begin;
@@ -109,7 +109,7 @@ static void _pivot(Renderer* renderer)
         * Mat4::rotateZ(0.4f)
         * Mat4::scale({1.2f, 0.8f, 1.0f})
         * object->model;
-    CHECK(scene->play(Animation::transform(object, target), 1.0f, Easing::Linear)
+    CHECK(scene->play(Animation::transform(object, target), 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
           == Result::Success);
     auto controller = Controller::gen(scene);
     CHECK(controller != nullptr);

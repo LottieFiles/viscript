@@ -21,22 +21,6 @@ static float _narrow(double value) noexcept
     return value != 0.0 && output == 0.0f ? std::numeric_limits<float>::quiet_NaN() : output;
 }
 
-static Vec2 _narrow(double x, double y) noexcept
-{
-    auto limit = static_cast<double>(std::numeric_limits<float>::max());
-    if (!std::isfinite(x) || !std::isfinite(y) || std::fabs(x) > limit || std::fabs(y) > limit) {
-        auto invalid = std::numeric_limits<float>::quiet_NaN();
-        return {invalid, invalid};
-    }
-    auto narrowedX = static_cast<float>(x);
-    auto narrowedY = static_cast<float>(y);
-    if ((x != 0.0 && narrowedX == 0.0f) || (y != 0.0 && narrowedY == 0.0f)) {
-        auto invalid = std::numeric_limits<float>::quiet_NaN();
-        return {invalid, invalid};
-    }
-    return {narrowedX, narrowedY};
-}
-
 static bool _narrow(double x, double y, double z, Vec3& output) noexcept
 {
     auto limit = static_cast<double>(std::numeric_limits<float>::max());
@@ -141,17 +125,6 @@ float Vec2::length() const noexcept
     return std::hypot(x, y);
 }
 
-Vec2 Vec2::normalized() const noexcept
-{
-    if (!_finite(*this)) return {};
-    auto scale = std::fmax(std::fabs(x), std::fabs(y));
-    if (scale == 0.0f) return {};
-    auto sx = x / scale;
-    auto sy = y / scale;
-    auto len = std::sqrt(sx * sx + sy * sy);
-    return {sx / len, sy / len};
-}
-
 Vec3 Vec3::operator+(const Vec3& v) const noexcept
 {
     return {x + v.x, y + v.y, z + v.z};
@@ -197,95 +170,6 @@ Vec3 Vec3::normalized() const noexcept
     auto sz = z / scale;
     auto len = std::sqrt(sx * sx + sy * sy + sz * sz);
     return {sx / len, sy / len, sz / len};
-}
-
-Mat3 Mat3::identity() noexcept
-{
-    return {{1.0f, 0.0f, 0.0f,
-             0.0f, 1.0f, 0.0f,
-             0.0f, 0.0f, 1.0f}};
-}
-
-Mat3 Mat3::translate(const Vec2& v) noexcept
-{
-    return {{1.0f, 0.0f, v.x,
-             0.0f, 1.0f, v.y,
-             0.0f, 0.0f, 1.0f}};
-}
-
-Mat3 Mat3::scale(const Vec2& v) noexcept
-{
-    return {{v.x, 0.0f, 0.0f,
-             0.0f, v.y, 0.0f,
-             0.0f, 0.0f, 1.0f}};
-}
-
-Mat3 Mat3::rotate(float radians) noexcept
-{
-    auto c = std::cos(radians);
-    auto s = std::sin(radians);
-    return {{c, -s, 0.0f,
-             s, c, 0.0f,
-             0.0f, 0.0f, 1.0f}};
-}
-
-Mat3 Mat3::operator*(const Mat3& m) const noexcept
-{
-    auto out = Mat3{};
-    for (auto row = 0; row < 3; row++) {
-        for (auto col = 0; col < 3; col++) {
-            auto value = 0.0;
-            for (auto k = 0; k < 3; k++)
-                value += static_cast<double>(e[row * 3 + k]) * m.e[k * 3 + col];
-            out.e[row * 3 + col] = _narrow(value);
-        }
-    }
-    return out;
-}
-
-Vec2 Mat3::operator*(const Vec2& v) const noexcept
-{
-    auto x = static_cast<double>(e[0]) * v.x + static_cast<double>(e[1]) * v.y + e[2];
-    auto y = static_cast<double>(e[3]) * v.x + static_cast<double>(e[4]) * v.y + e[5];
-    auto w = static_cast<double>(e[6]) * v.x + static_cast<double>(e[7]) * v.y + e[8];
-    if (!std::isfinite(w) || w == 0.0) {
-        auto invalid = std::numeric_limits<float>::quiet_NaN();
-        return {invalid, invalid};
-    }
-    x /= w;
-    y /= w;
-    return _narrow(x, y);
-}
-
-bool Mat3::inverse(Mat3& out) const noexcept
-{
-    for (auto value : e) {
-        if (!std::isfinite(value)) return false;
-    }
-    auto det = static_cast<double>(e[0]) * (static_cast<double>(e[4]) * e[8] - static_cast<double>(e[5]) * e[7]) - static_cast<double>(e[1]) * (static_cast<double>(e[3]) * e[8] - static_cast<double>(e[5]) * e[6]) + static_cast<double>(e[2]) * (static_cast<double>(e[3]) * e[7] - static_cast<double>(e[4]) * e[6]);
-    auto scale = std::hypot(static_cast<double>(e[0]), e[1], e[2]) * std::hypot(static_cast<double>(e[3]), e[4], e[5]) * std::hypot(static_cast<double>(e[6]), e[7], e[8]);
-    if (!std::isfinite(det) || !std::isfinite(scale) || scale == 0.0 || std::fabs(det) <= std::numeric_limits<float>::epsilon() * scale) {
-        return false;
-    }
-
-    auto inv = 1.0 / det;
-    double values[9] = {
-        (static_cast<double>(e[4]) * e[8] - static_cast<double>(e[5]) * e[7]) * inv,
-        (static_cast<double>(e[2]) * e[7] - static_cast<double>(e[1]) * e[8]) * inv,
-        (static_cast<double>(e[1]) * e[5] - static_cast<double>(e[2]) * e[4]) * inv,
-        (static_cast<double>(e[5]) * e[6] - static_cast<double>(e[3]) * e[8]) * inv,
-        (static_cast<double>(e[0]) * e[8] - static_cast<double>(e[2]) * e[6]) * inv,
-        (static_cast<double>(e[2]) * e[3] - static_cast<double>(e[0]) * e[5]) * inv,
-        (static_cast<double>(e[3]) * e[7] - static_cast<double>(e[4]) * e[6]) * inv,
-        (static_cast<double>(e[1]) * e[6] - static_cast<double>(e[0]) * e[7]) * inv,
-        (static_cast<double>(e[0]) * e[4] - static_cast<double>(e[1]) * e[3]) * inv};
-    Mat3 candidate;
-    for (auto i = 0u; i < 9; i++) {
-        if (!std::isfinite(values[i]) || std::fabs(values[i]) > std::numeric_limits<float>::max()) return false;
-        candidate.e[i] = static_cast<float>(values[i]);
-    }
-    out = candidate;
-    return true;
 }
 
 Mat4 Mat4::identity() noexcept
@@ -342,14 +226,6 @@ Mat4 Mat4::rotateZ(float radians) noexcept
              0.0f, 0.0f, 0.0f, 1.0f}};
 }
 
-Mat4 Mat4::from(const Mat3& m) noexcept
-{
-    return {{m.e[0], m.e[1], 0.0f, m.e[2],
-             m.e[3], m.e[4], 0.0f, m.e[5],
-             0.0f, 0.0f, 1.0f, 0.0f,
-             m.e[6], m.e[7], 0.0f, m.e[8]}};
-}
-
 Mat4 Mat4::operator*(const Mat4& m) const noexcept
 {
     auto out = Mat4{};
@@ -383,11 +259,6 @@ Vec3 Mat4::operator*(const Vec3& v) const noexcept
         return {invalid, invalid, invalid};
     }
     return output;
-}
-
-Color Color::hex(const char* value) noexcept
-{
-    return hex(value, {});
 }
 
 Color Color::hex(const char* value, Color fallback) noexcept
@@ -482,45 +353,6 @@ bool Camera::segment(Vec3& from, Vec3& to) const noexcept
     return _narrowPoint(ax + dx * t0, ay + dy * t0, az + dz * t0, from) && _narrowPoint(ax + dx * t1, ay + dy * t1, az + dz * t1, to);
 }
 
-Ray3 Camera::ray(const Vec2& ndc, float aspect) const noexcept
-{
-    auto ray = Ray3{eye, {}};
-    if (!_finite(ndc) || !std::isfinite(aspect) || aspect <= 0.0f) return ray;
-    if (!std::isfinite(near) || !std::isfinite(far) || far <= near) return ray;
-    if (projection != Projection::Perspective && projection != Projection::Orthographic) return ray;
-
-    Vec3 forward;
-    Vec3 right;
-    Vec3 correctedUp;
-    if (!_basis(*this, forward, right, correctedUp)) return ray;
-
-    if (projection == Projection::Perspective) {
-        if (near <= 0.0f || !std::isfinite(fov) || fov <= 0.0f || fov >= PI) return ray;
-        auto halfHeight = std::tan(static_cast<double>(fov) * 0.5);
-        auto horizontal = static_cast<double>(ndc.x) * halfHeight * aspect;
-        auto vertical = static_cast<double>(ndc.y) * halfHeight;
-        _normalized(forward.x + right.x * horizontal + correctedUp.x * vertical,
-                    forward.y + right.y * horizontal + correctedUp.y * vertical,
-                    forward.z + right.z * horizontal + correctedUp.z * vertical, ray.direction);
-        return ray;
-    }
-
-    if (!std::isfinite(orthoHeight) || orthoHeight <= 0.0f) return ray;
-    auto halfHeight = static_cast<double>(orthoHeight) * 0.5;
-    auto horizontal = static_cast<double>(ndc.x) * halfHeight * aspect;
-    auto vertical = static_cast<double>(ndc.y) * halfHeight;
-    auto origin = Vec3{};
-    if (!_narrow(static_cast<double>(eye.x) + forward.x * near + right.x * horizontal + correctedUp.x * vertical,
-                 static_cast<double>(eye.y) + forward.y * near + right.y * horizontal + correctedUp.y * vertical,
-                 static_cast<double>(eye.z) + forward.z * near + right.z * horizontal + correctedUp.z * vertical,
-                 origin)) {
-        return ray;
-    }
-    ray.origin = origin;
-    ray.direction = forward;
-    return ray;
-}
-
 AnimCurve AnimCurve::preset(AnimCurvePreset preset, float strength) noexcept
 {
     AnimCurve curve;
@@ -537,13 +369,6 @@ AnimCurve AnimCurve::cubicBezier(const Vec2& control1, const Vec2& control2,
     curve.control1 = control1;
     curve.control2 = control2;
     curve.strength = strength;
-    return curve;
-}
-
-AnimCurve AnimCurve::reversed() const noexcept
-{
-    auto curve = *this;
-    curve.reverse = !reverse;
     return curve;
 }
 
@@ -645,19 +470,6 @@ float ease(const AnimCurve& curve, float progress) noexcept
     }
     value = sample + (value - sample) * curve.strength;
     return static_cast<float>(curve.reverse ? 1.0 - value : value);
-}
-
-float ease(Easing easing, float progress) noexcept
-{
-    auto preset = AnimCurvePreset::Linear;
-    switch (easing) {
-        case Easing::Smooth: preset = AnimCurvePreset::Smooth; break;
-        case Easing::EaseIn: preset = AnimCurvePreset::EaseIn; break;
-        case Easing::EaseOut: preset = AnimCurvePreset::EaseOut; break;
-        case Easing::EaseInOut: preset = AnimCurvePreset::EaseInOut; break;
-        default: break;
-    }
-    return ease(AnimCurve::preset(preset), progress);
 }
 
 double springResponse(double seconds, double mass, double stiffness, double damping,

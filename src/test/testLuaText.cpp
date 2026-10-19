@@ -24,7 +24,7 @@ return s
         auto box = static_cast<Rectangle*>(scene->object("box"));
         auto planeBox = static_cast<Rectangle*>(scene->object("plane-box"));
         TextExtent extent;
-        CHECK(label && label->measure(extent) == Result::Success);
+        CHECK(label && label->measure(label->text(), extent) == Result::Success);
         CHECK(extent.lines == 1u && extent.ascent > 0.0f && extent.descent > 0.0f);
         CHECK(std::fabs(extent.height - extent.ascent - extent.descent) < 0.01f);
         // Billboard text is measured in pixels; the script sees world units at its camera.
@@ -72,7 +72,7 @@ return s
         auto narrow = static_cast<Text*>(scene->object("narrow"));
         auto corner = static_cast<Text*>(scene->object("corner"));
         TextExtent extent;
-        CHECK(wide && wide->measure(extent) == Result::Success);
+        CHECK(wide && wide->measure(wide->text(), extent) == Result::Success);
         CHECK(wide && std::fabs(wide->box.x - extent.width * pixelWorld) < 1.0e-4f);
         CHECK(wide && std::fabs(wide->box.y - extent.height * pixelWorld) < 1.0e-4f);
         Bounds first;
@@ -111,29 +111,31 @@ return s
     // A text measures only once it has a font and a size, which attaching gives it.
     auto loose = Text::gen("loose");
     TextExtent extent;
-    CHECK(loose && loose->measure(extent) == Result::InvalidArguments);
+    CHECK(loose && loose->measure(loose->text(), extent) == Result::InvalidArguments);
     if (loose) {
         CHECK(loose->font("Missing") == Result::Success);
         loose->size = 20.0f;
-        CHECK(loose->measure(extent) == Result::Success && extent.fallback);
+        CHECK(loose->measure(loose->text(), extent) == Result::Success && extent.fallback);
         CHECK(loose->font("Pretendard") == Result::Success);
-        CHECK(loose->measure(extent) == Result::Success && extent.width > 0.0f && !extent.fallback);
+        CHECK(loose->measure(loose->text(), extent) == Result::Success && extent.width > 0.0f && !extent.fallback);
         CHECK(extent.missing == 0u && extent.firstMissing[0] == '\0');
         // The font has no glyph for the intersection sign, so the text leaves it out.
         auto width = extent.width;
         CHECK(loose->text("loo\xe2\x88\xa9se\xe2\x88\xaa\n") == Result::Success);
-        CHECK(loose->measure(extent) == Result::Success && extent.missing == 2u);
+        CHECK(loose->measure(loose->text(), extent) == Result::Success && extent.missing == 2u);
         CHECK(std::strcmp(extent.firstMissing, "\xe2\x88\xa9") == 0 && std::fabs(extent.width - width) < 1.0e-3f);
         // A second look finds it missing too, and a joiner, drawn as nothing by design, is not.
         CHECK(loose->text("\xe2\x88\xa9\xe2\x80\x8d") == Result::Success);
-        CHECK(loose->measure(extent) == Result::Success && extent.missing == 1u);
+        CHECK(loose->measure(loose->text(), extent) == Result::Success && extent.missing == 1u);
         CHECK(loose->text("lo\xa9se") == Result::Success);
-        CHECK(loose->measure(extent) == Result::Success && extent.missing == 1u && extent.firstMissing[0] == '\0');
+        CHECK(loose->measure(loose->text(), extent) == Result::Success && extent.missing == 1u
+              && extent.firstMissing[0] == '\0');
         // A sequence cut short is malformed too, and a C1 control, like a line feed, draws nothing.
         CHECK(loose->text("lo\xe2\x88") == Result::Success);
-        CHECK(loose->measure(extent) == Result::Success && extent.missing == 1u && extent.firstMissing[0] == '\0');
+        CHECK(loose->measure(loose->text(), extent) == Result::Success && extent.missing == 1u
+              && extent.firstMissing[0] == '\0');
         CHECK(loose->text("lo\xc2\x85se") == Result::Success);
-        CHECK(loose->measure(extent) == Result::Success && extent.missing == 0u);
+        CHECK(loose->measure(loose->text(), extent) == Result::Success && extent.missing == 0u);
     }
     delete loose;
     _scriptLoads("local s=vis.scene{}; s:text{text='a', font='Missing'}:measure(); return s");
@@ -244,9 +246,9 @@ return s
     auto uprightText = static_cast<Text*>(scene->object("upright"));
     auto leaningText = static_cast<Text*>(scene->object("leaning"));
     auto linesText = static_cast<Text*>(scene->object("lines"));
-    CHECK(uprightText && uprightText->measure(standing) == Result::Success);
-    CHECK(leaningText && leaningText->measure(leaned) == Result::Success);
-    CHECK(linesText && linesText->measure(two) == Result::Success);
+    CHECK(uprightText && uprightText->measure(uprightText->text(), standing) == Result::Success);
+    CHECK(leaningText && leaningText->measure(leaningText->text(), leaned) == Result::Success);
+    CHECK(linesText && linesText->measure(linesText->text(), two) == Result::Success);
     CHECK(std::fabs(leaned.left - standing.left) < 0.5f);
     CHECK(std::fabs(leaned.right - standing.right - 0.25f * standing.top) < 0.5f);
     CHECK(leaned.width == standing.width && leaned.height == standing.height && leaned.top == standing.top
@@ -259,7 +261,7 @@ return s
     TextExtent standingBowl;
     BBox painted;
     auto bowlText = static_cast<Text*>(scene->object("bowl"));
-    CHECK(bowlText && bowlText->measure(bowl) == Result::Success);
+    CHECK(bowlText && bowlText->measure(bowlText->text(), bowl) == Result::Success);
     CHECK(uprightText && uprightText->measure("b", standingBowl) == Result::Success);
     CHECK(renderer->bounds(scene, bowlText, 0.0f, painted) == Result::Success);
     CHECK(std::fabs(bowl.right - bowl.left - painted.width) < 1.0f);
@@ -927,7 +929,7 @@ return s
             CHECK(_near(static_cast<Text*>(reserved->object("u/1/1"))->box.x, sample.width));
             auto t = static_cast<Text*>(reserved->object("t"));
             CHECK(reserved->measure(t, "long text", sample) == Result::Success && _near(t->box.x, sample.width));
-            CHECK(n->measure(sample) == Result::Success && sample.width > n->box.x);
+            CHECK(n->measure(n->text(), sample) == Result::Success && sample.width > n->box.x);
             delete reserved;
         }
         _scriptError("local s=vis.scene{}; s:number{reserve=false}; return s", "reserve must be a string");

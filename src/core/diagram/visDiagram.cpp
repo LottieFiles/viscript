@@ -865,21 +865,6 @@ Result Diagram::add(const ZoneSpec& spec, Zone& output) noexcept
     return Result::Success;
 }
 
-uint32_t Diagram::nodeCount() const noexcept
-{
-    return pImpl->nodeCount;
-}
-
-uint32_t Diagram::edgeCount() const noexcept
-{
-    return pImpl->edgeCount;
-}
-
-uint32_t Diagram::zoneCount() const noexcept
-{
-    return pImpl->zoneCount;
-}
-
 Result Diagram::build(const Theme& theme, Built*& output) const noexcept
 {
     if (output || !pImpl->nodeCount) return Result::InvalidArguments;

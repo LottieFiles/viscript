@@ -1043,37 +1043,6 @@ static Result _loaded(lua_State*, Scene* scene, void* data) noexcept
 
 }  // namespace
 
-Result Lua::load(const char* source, uint32_t size, const char* name,
-                 Scene** scene, Runtime** runtime, char* error,
-                 uint32_t errorSize, vis::Lua::AssetResolver resolver,
-                 void* resolverData, const Theme* adaptiveTheme,
-                 bool* adaptiveThemeUsed) noexcept
-{
-    if (!scene || !runtime) return Result::InvalidArguments;
-    *runtime = nullptr;
-    lua_extension::LuaContext context;
-    auto hook = lua_extension::luaHooks(context);
-    vis::detail::LuaHookSpan hooks = {&hook, 1u};
-    lua_State* retained = nullptr;
-    auto result = vis::detail::luaLoad(
-        source, size, name, scene, error, errorSize, resolver, resolverData,
-        nullptr, 0u, adaptiveTheme, adaptiveThemeUsed, hooks, &retained);
-    if (result != Result::Success) return result;
-    if (!context.runtime) {
-        vis::detail::luaClose(retained);
-        return result;
-    }
-    result = lua_extension::retain(context, retained);
-    if (result == Result::Success) {
-        if (runtime) *runtime = context.runtime;
-        return result;
-    }
-    vis::detail::luaClose(retained);
-    delete *scene;
-    *scene = nullptr;
-    return result;
-}
-
 vis::detail::LuaHooks lua_extension::luaHooks(LuaContext& context) noexcept
 {
     return {_open, _loaded, &context};

@@ -7,9 +7,8 @@
 #include "vis_audio.h"
 #if defined(VIS_LUA_RUNTIME)
 #include "vis_lua_runtime.h"
-#include "visLuaHost.h"
 #endif
-#include "testCheck.h"
+#include "testLuaLoad.h"
 
 using namespace vis;
 using namespace vis::audio;
@@ -111,7 +110,7 @@ static void soundscape()
     float value = 0.0f;
     CHECK(soundscape->sample(musicCue, 0.0f, value) == Result::Success);
     CHECK(near(value, 0.8f));
-    CHECK(soundscape->gain(musicCue, 0.4f, 1.0f, 2.0f, Easing::Linear)
+    CHECK(soundscape->gain(musicCue, 0.4f, 1.0f, 2.0f, AnimCurve::preset(AnimCurvePreset::Linear))
           == Result::Success);
     CHECK(soundscape->sample(musicCue, 1.0f, value) == Result::Success);
     CHECK(near(value, 0.8f));
@@ -120,17 +119,17 @@ static void soundscape()
     CHECK(soundscape->sample(musicCue, 3.0f, value) == Result::Success);
     CHECK(near(value, 0.4f));
 
-    CHECK(soundscape->gain(musicCue, 0.7f, 2.0f, 1.0f, Easing::Linear)
+    CHECK(soundscape->gain(musicCue, 0.7f, 2.0f, 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
           == Result::InvalidArguments);
-    CHECK(soundscape->gain({}, 0.7f, 3.0f, 1.0f, Easing::Linear)
+    CHECK(soundscape->gain({}, 0.7f, 3.0f, 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
           == Result::InvalidArguments);
-    CHECK(soundscape->gain(musicCue, 4.1f, 3.0f, 1.0f, Easing::Linear)
+    CHECK(soundscape->gain(musicCue, 4.1f, 3.0f, 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
           == Result::InvalidArguments);
-    CHECK(soundscape->gain(musicCue, 0.7f, 3.0f, 0.0f, Easing::Linear)
+    CHECK(soundscape->gain(musicCue, 0.7f, 3.0f, 0.0f, AnimCurve::preset(AnimCurvePreset::Linear))
           == Result::InvalidArguments);
     CHECK(soundscape->gain(musicCue, 0.7f,
                            std::numeric_limits<float>::quiet_NaN(), 1.0f,
-                           Easing::Linear)
+                           AnimCurve::preset(AnimCurvePreset::Linear))
           == Result::InvalidArguments);
 
     auto curve = AnimCurve::preset(AnimCurvePreset::Smooth);
@@ -373,7 +372,8 @@ static void mixing()
 
     // A gain clip fades the single cue out between 0.075 s and 0.1 s. Gains are joined
     // linearly every 32 frames, so they are exact outside the fade and close inside it.
-    CHECK(soundscape->gain(onceCue, 0.0f, 0.075f, 0.025f, Easing::Linear) == Result::Success);
+    CHECK(soundscape->gain(onceCue, 0.0f, 0.075f, 0.025f, AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
     CHECK(player->gain(2.0f) == Result::Success);
     CHECK(player->mix(SampleRate, 0u, whole, Frames) == Result::Success);
     CHECK(_stereo(whole, 576u, 1.0f * _level(176u)));
@@ -437,14 +437,10 @@ local music = vis.audio.cue(scene, {
 music:gain(0.2, 1, {duration = 1, curve = "linear"})
 return scene
 )";
-    Scene* scene = nullptr;
-    Soundscape* soundscape = nullptr;
-    char error[512] = {};
-    auto result = audio::Lua::load(source, static_cast<uint32_t>(std::strlen(source)),
-                                   "audio.lua", &scene, &soundscape,
-                                   error, sizeof(error));
-    CHECK(result == Result::Success);
-    CHECK(scene && soundscape && soundscape->scene() == scene);
+    detail::LuaHostContext context;
+    auto scene = _loaded(source, "audio.lua", context);
+    auto soundscape = scene ? context.audio.soundscape : nullptr;
+    CHECK(soundscape && soundscape->scene() == scene);
     if (soundscape) {
         CHECK(soundscape->count() == 1u);
         CueConfig cue;
@@ -461,13 +457,7 @@ local scene = vis.scene {}
 vis.audio.cue(scene, {asset = "bad.wav", bus = "voice"})
 return scene
 )";
-    scene = nullptr;
-    soundscape = nullptr;
-    result = audio::Lua::load(invalid, static_cast<uint32_t>(std::strlen(invalid)),
-                              "invalid-audio.lua", &scene, &soundscape,
-                              error, sizeof(error));
-    CHECK(result == Result::ScriptError && !scene && !soundscape);
-    CHECK(std::strstr(error, "audio bus") != nullptr);
+    _scriptError(invalid, "invalid-audio.lua", "audio bus");
 }
 
 // An asset name out of range stops the script with the limit, at the line of the cue.
@@ -478,15 +468,8 @@ local scene = vis.scene {}
 vis.audio.cue(scene, {asset = ""})
 return scene
 )";
-    Scene* scene = nullptr;
-    Soundscape* soundscape = nullptr;
-    char error[512] = {};
-    auto result = audio::Lua::load(source, static_cast<uint32_t>(std::strlen(source)),
-                                   "audio-asset.lua", &scene, &soundscape,
-                                   error, sizeof(error));
-    CHECK(result == Result::ScriptError && !scene && !soundscape);
-    CHECK(std::strstr(error, "audio-asset.lua:3: audio asset must be 1 to 255 bytes "
-                             "without zero bytes") != nullptr);
+    _scriptError(source, "audio-asset.lua",
+                 "audio-asset.lua:3: audio asset must be 1 to 255 bytes without zero bytes");
 }
 
 #if defined(VIS_LUA_RUNTIME)
@@ -503,17 +486,11 @@ vis.runtime(scene, {
 })
 return scene
 )";
-    Scene* scene = nullptr;
-    char error[512] = {};
     detail::LuaHostContext context;
-    auto result = detail::luaHostLoad(
-        source, static_cast<uint32_t>(std::strlen(source)), "audio-runtime.lua",
-        &scene, error, sizeof(error), nullptr, nullptr, nullptr, nullptr, context);
-    CHECK(result == Result::Success && scene);
+    auto scene = _loaded(source, "audio-runtime.lua", context);
     CHECK(context.audio.soundscape && context.runtime.runtime);
-    if (context.runtime.runtime) {
-        result = context.runtime.runtime->advance(0.11f);
-        CHECK(result == Result::ScriptError);
+    if (scene && context.runtime.runtime) {
+        CHECK(context.runtime.runtime->advance(0.11f) == Result::ScriptError);
         CHECK(context.runtime.runtime->failed());
         CHECK(std::strstr(context.runtime.runtime->error(),
                           "audio authoring is unavailable after loading") != nullptr);

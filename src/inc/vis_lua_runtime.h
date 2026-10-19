@@ -105,15 +105,6 @@ private:
     friend struct detail::RuntimeAccess;
 };
 
-struct Lua
-{
-    static Result load(const char* source, uint32_t size, const char* name,
-                       Scene** scene, Runtime** runtime, char* error,
-                       uint32_t errorSize, vis::Lua::AssetResolver resolver = nullptr,
-                       void* resolverData = nullptr, const Theme* adaptiveTheme = nullptr,
-                       bool* adaptiveThemeUsed = nullptr) noexcept;
-};
-
 }  // namespace vis::lua_runtime
 
 #endif

@@ -5,7 +5,7 @@
 #include <type_traits>
 
 #include "vis_ui.h"
-#include "testCheck.h"
+#include "testLuaLoad.h"
 
 using namespace vis;
 using namespace vis::ui;
@@ -307,7 +307,7 @@ static void objectBindings(Renderer* renderer)
     }
     box->fill(Color::hex("#ffffff"));
     CHECK(scene->add(box) == Result::Success);
-    CHECK(scene->play(Animation::shift(box, {1.0f, 0.0f, 0.0f}), 1.0f, Easing::Linear)
+    CHECK(scene->play(Animation::shift(box, {1.0f, 0.0f, 0.0f}), 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
           == Result::Success);
     auto authoredModel = box->model;
     auto panel = Panel::gen(scene);
@@ -802,7 +802,7 @@ static void cameraBindings(Renderer* renderer)
     auto camera = config.camera;
     camera.eye.x = 1.0f;
     camera.target.x = 1.0f;
-    CHECK(scene->look(camera, CameraView::TwoD, 1.0f, Easing::Linear) == Result::Success);
+    CHECK(scene->look(camera, CameraView::TwoD, 1.0f, AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
     auto panel = Panel::gen(scene);
     auto view = Button::gen(nullptr, {0.0f, 0.0f, 20.0f, 20.0f});
     auto reset = Button::gen(nullptr, {30.0f, 0.0f, 20.0f, 20.0f});
@@ -942,13 +942,10 @@ panel:sample_area {
 }
 return scene
     )";
-    Scene* scene = nullptr;
-    Panel* panel = nullptr;
-    char error[512] = {};
-    auto result = vis::ui::Lua::load(source, sizeof(source) - 1u, "ui-test.lua",
-                                        &scene, &panel, error, sizeof(error));
-    CHECK(result == Result::Success);
-    CHECK(scene && panel && panel->scene() == scene && panel->count() == 5u);
+    detail::LuaHostContext context;
+    auto scene = _loaded(source, "ui-test.lua", context);
+    auto panel = scene ? context.ui.panel : nullptr;
+    CHECK(panel && panel->scene() == scene && panel->count() == 5u);
     if (scene && panel) {
         auto button = static_cast<Button*>(panel->controlAt(0u));
         auto toggle = static_cast<Button*>(panel->controlAt(2u));
@@ -966,8 +963,6 @@ return scene
         panel->input(pointer(InputKind::PointerDown, 75.0f, 35.0f, 2u));
         panel->input(pointer(InputKind::PointerUp, 75.0f, 35.0f, 2u));
         CHECK(slider && _near(slider->value(), 0.75f));
-    } else if (error[0]) {
-        std::fprintf(stderr, "Lua UI load error: %s\n", error);
     }
     delete scene;
 
@@ -980,12 +975,11 @@ for index = 1, 50000 do
 end
 return vis.scene { width = 32, height = 32 }
     )";
-    scene = nullptr;
-    panel = nullptr;
-    result = vis::ui::Lua::load(mismatchedSource, sizeof(mismatchedSource) - 1u,
-                                   "ui-mismatched-scene.lua", &scene, &panel, error,
-                                   sizeof(error));
-    CHECK(result == Result::InvalidArguments && !scene && !panel);
+    char error[512] = {};
+    context = {};
+    CHECK(_load(mismatchedSource, "ui-mismatched-scene.lua", scene, error, sizeof(error), context)
+              == Result::InvalidArguments
+          && !scene);
 
     static constexpr const char samplingSource[] = R"(
 local scene = vis.scene { width = 32, height = 32 }
@@ -996,11 +990,7 @@ space:cell(function()
 end)
 return scene
     )";
-    result = vis::ui::Lua::load(samplingSource, sizeof(samplingSource) - 1u,
-                                   "ui-sampling.lua", &scene, &panel, error,
-                                   sizeof(error));
-    CHECK(result == Result::ScriptError && !scene && !panel);
-    CHECK(std::strstr(error, "sampling callback") != nullptr);
+    _scriptError(samplingSource, "ui-sampling.lua", "sampling callback");
 
     static constexpr const char limitSource[] = R"(
 local scene = vis.scene { width = 32, height = 32 }
@@ -1015,10 +1005,7 @@ for index = 1, 257 do
 end
 return scene
     )";
-    result = vis::ui::Lua::load(limitSource, sizeof(limitSource) - 1u,
-                                   "ui-limit.lua", &scene, &panel, error, sizeof(error));
-    CHECK(result == Result::ScriptError && !scene && !panel);
-    CHECK(std::strstr(error, "InsufficientCondition") != nullptr);
+    _scriptError(limitSource, "ui-limit.lua", "InsufficientCondition");
 
     static constexpr const char typoSource[] = R"(
 local scene = vis.scene { width = 32, height = 32 }
@@ -1032,10 +1019,7 @@ panel:button {
 }
 return scene
     )";
-    result = vis::ui::Lua::load(typoSource, sizeof(typoSource) - 1u,
-                                   "ui-typo.lua", &scene, &panel, error, sizeof(error));
-    CHECK(result == Result::ScriptError && !scene && !panel);
-    CHECK(std::strstr(error, "unknown UI config field 'tranform'") != nullptr);
+    _scriptError(typoSource, "ui-typo.lua", "unknown UI config field 'tranform'");
 
     static constexpr const char mixedSliderSource[] = R"(
 local scene = vis.scene { width = 32, height = 32 }
@@ -1050,12 +1034,8 @@ panel:slider {
 }
 return scene
     )";
-    result = vis::ui::Lua::load(mixedSliderSource, sizeof(mixedSliderSource) - 1u,
-                                   "ui-mixed-slider.lua", &scene, &panel, error,
-                                   sizeof(error));
-    CHECK(result == Result::ScriptError && !scene && !panel);
-    CHECK(std::strstr(error, "slider target/from/to cannot be combined with bindings")
-          != nullptr);
+    _scriptError(mixedSliderSource, "ui-mixed-slider.lua",
+                 "slider target/from/to cannot be combined with bindings");
 
     static constexpr const char toggleTypeSource[] = R"(
 local scene = vis.scene { width = 32, height = 32 }
@@ -1072,11 +1052,7 @@ panel:toggle_button {
 }
 return scene
     )";
-    result = vis::ui::Lua::load(toggleTypeSource, sizeof(toggleTypeSource) - 1u,
-                                   "ui-toggle-type.lua", &scene, &panel, error,
-                                   sizeof(error));
-    CHECK(result == Result::ScriptError && !scene && !panel);
-    CHECK(std::strstr(error, "value must be a boolean") != nullptr);
+    _scriptError(toggleTypeSource, "ui-toggle-type.lua", "value must be a boolean");
 
     static constexpr const char duplicateStateSource[] = R"(
 local scene = vis.scene { width = 32, height = 32 }
@@ -1090,11 +1066,7 @@ panel:button {
 }
 return scene
     )";
-    result = vis::ui::Lua::load(duplicateStateSource, sizeof(duplicateStateSource) - 1u,
-                                   "ui-duplicate-state.lua", &scene, &panel, error,
-                                   sizeof(error));
-    CHECK(result == Result::ScriptError && !scene && !panel);
-    CHECK(std::strstr(error, "InvalidArguments") != nullptr);
+    _scriptError(duplicateStateSource, "ui-duplicate-state.lua", "InvalidArguments");
 }
 
 // A list of slider bindings or sample targets out of range stops the script with its limit,
@@ -1108,15 +1080,8 @@ local panel = vis.ui.panel(scene)
 panel:slider { visual = visual, region = { 0, 0, 20, 10 }, bindings = {} }
 return scene
     )";
-    Scene* scene = nullptr;
-    Panel* panel = nullptr;
-    char error[512] = {};
-    auto result = vis::ui::Lua::load(sliderSource, sizeof(sliderSource) - 1u,
-                                     "ui-slider-bindings.lua", &scene, &panel, error,
-                                     sizeof(error));
-    CHECK(result == Result::ScriptError && !scene && !panel);
-    CHECK(std::strstr(error, "ui-slider-bindings.lua:5: slider bindings must contain "
-                             "between 1 and 256 items") != nullptr);
+    _scriptError(sliderSource, "ui-slider-bindings.lua",
+                 "ui-slider-bindings.lua:5: slider bindings must contain between 1 and 256 items");
 
     static constexpr const char sampleSource[] = R"(
 local scene = vis.scene { width = 32, height = 32 }
@@ -1124,12 +1089,8 @@ local panel = vis.ui.panel(scene)
 panel:sample_area { region = { 0, 0, 20, 10 }, targets = {} }
 return scene
     )";
-    result = vis::ui::Lua::load(sampleSource, sizeof(sampleSource) - 1u,
-                                "ui-sample-targets.lua", &scene, &panel, error,
-                                sizeof(error));
-    CHECK(result == Result::ScriptError && !scene && !panel);
-    CHECK(std::strstr(error, "ui-sample-targets.lua:4: sample_area targets must contain "
-                             "between 1 and 64 objects") != nullptr);
+    _scriptError(sampleSource, "ui-sample-targets.lua",
+                 "ui-sample-targets.lua:4: sample_area targets must contain between 1 and 64 objects");
 }
 
 int main()

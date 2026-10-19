@@ -222,7 +222,7 @@ static void _boundaries()
     CHECK(controller->transition(object, longest, -0.1f)
           == Result::InvalidArguments);
     CHECK(controller->transition(object, longest, 0.1f,
-                                 static_cast<Easing>(UINT8_MAX))
+                                 AnimCurve::preset(static_cast<AnimCurvePreset>(UINT8_MAX)))
           == Result::InvalidArguments);
     auto invalidCurve = AnimCurve::preset(AnimCurvePreset::Linear);
     invalidCurve.kind = AnimCurvePreset::Custom;

@@ -7,7 +7,7 @@
 #if defined(VIS_UI)
 #include "vis_ui.h"
 #endif
-#include "testCheck.h"
+#include "testLuaLoad.h"
 
 using namespace vis;
 using namespace vis::input;
@@ -47,19 +47,6 @@ static InputEvent key(InputKind kind, Key value, float time)
     return event;
 }
 
-struct KeyLog
-{
-    KeySignal signals[4];
-    uint32_t count = 0u;
-};
-
-static void keySignal(const KeySignal& signal, void* data)
-{
-    auto log = static_cast<KeyLog*>(data);
-    if (!log || log->count >= 4u) return;
-    log->signals[log->count++] = signal;
-}
-
 static void rawState()
 {
     auto state = State::gen();
@@ -79,11 +66,11 @@ static void rawState()
     CHECK(!digital.previous && digital.down && digital.pressed && !digital.released);
     CHECK(precise(digital.begin, 1.01f) && precise(digital.end, 1.01f));
 
-    event.repeat = true;
+    // A key-down repeated while the key is held keeps the press where it began.
     event.time = 1.02f;
     CHECK(state->input(event) == Result::Success);
     CHECK(state->key(Key::A, digital) == Result::Success);
-    CHECK(digital.down && digital.pressed && !digital.released);
+    CHECK(digital.down && digital.pressed && !digital.released && precise(digital.begin, 1.01f));
 
     event = {};
     event.kind = InputKind::PointerDown;
@@ -479,9 +466,8 @@ static void keyboard(Renderer* renderer)
     CHECK(middle.center().x > initial.center().x && middle.center().x < end.center().x);
     CHECK(_near(end.center().x - initial.center().x, 25.0f));
 
-    auto repeat = key(InputKind::KeyDown, Key::ArrowRight, 1.25f);
-    repeat.repeat = true;
-    result = controller->input(repeat);
+    // A key-down repeated while the key is held is no new press: the move goes on as it was.
+    result = controller->input(key(InputKind::KeyDown, Key::ArrowRight, 1.25f));
     CHECK(result.handled && !result.redraw);
     BBox held;
     CHECK(renderer->bounds(scene, target, 1.4f, held) == Result::Success);
@@ -505,39 +491,16 @@ static void keyboard(Renderer* renderer)
     CHECK(renderer->bounds(scene, target, 2.2f, end) == Result::Success);
     CHECK(_near(end.center().x - initial.center().x, 25.0f));
 
-    KeyLog log;
-    KeyTriggerBinding trigger;
-    trigger.key = Key::B;
-    trigger.callback = keySignal;
-    trigger.data = &log;
-    trigger.trigger = KeyTrigger::Down;
-    CHECK(controller->keyTrigger(trigger) == Result::Success);
-    trigger.trigger = KeyTrigger::Up;
-    CHECK(controller->keyTrigger(trigger) == Result::Success);
-    trigger.trigger = KeyTrigger::Tap;
-    CHECK(controller->keyTrigger(trigger) == Result::Success);
-    auto invalidTrigger = trigger;
-    invalidTrigger.callback = nullptr;
-    CHECK(controller->keyTrigger(invalidTrigger) == Result::InvalidArguments);
-
+    // A key with no binding is left to the host, and the controller's state still holds it.
     result = controller->input(key(InputKind::KeyDown, Key::B, 2.2f));
-    CHECK(result.handled && !result.redraw);
-    KeyState state;
-    CHECK(controller->keyState(Key::B, state) == Result::Success);
+    CHECK(!result.handled && !result.redraw && result.status == Result::Success);
+    DigitalState state;
+    CHECK(controller->state()->key(Key::B, state) == Result::Success);
     CHECK(state.down && _near(state.begin, 2.2f) && _near(state.end, 2.2f));
-    repeat = key(InputKind::KeyDown, Key::B, 2.3f);
-    repeat.repeat = true;
-    CHECK(controller->input(repeat).handled);
-    CHECK(log.count == 1u);
-    CHECK(controller->input(key(InputKind::KeyUp, Key::B, 2.6f)).handled);
-    CHECK(controller->keyState(Key::B, state) == Result::Success);
+    result = controller->input(key(InputKind::KeyUp, Key::B, 2.6f));
+    CHECK(!result.handled && result.status == Result::Success);
+    CHECK(controller->state()->key(Key::B, state) == Result::Success);
     CHECK(!state.down && _near(state.begin, 2.2f) && _near(state.end, 2.6f));
-    CHECK(log.count == 3u);
-    CHECK(log.signals[0].trigger == KeyTrigger::Down);
-    CHECK(log.signals[1].trigger == KeyTrigger::Up);
-    CHECK(log.signals[2].trigger == KeyTrigger::Tap);
-    CHECK(_near(log.signals[2].begin, 2.2f) && _near(log.signals[2].end, 2.6f));
-    CHECK(controller->keyState(Key::Unknown, state) == Result::InvalidArguments);
 
     CHECK(controller->input(key(InputKind::KeyDown, Key::ArrowRight, 2.8f)).handled);
     BBox beforeWrap;
@@ -591,13 +554,10 @@ input:key_move {target = key_target, key = "ArrowRight", shift = {1, 0, 0}, peri
 scene:wait(3)
 return scene
 )lua";
-    Scene* scene = nullptr;
-    Controller* controller = nullptr;
-    char error[1024] = {};
-    auto result = input::Lua::load(source, static_cast<uint32_t>(std::strlen(source)),
-                                   "input.lua", &scene, &controller, error, sizeof(error));
-    CHECK(result == Result::Success && scene && controller);
-    if (result != Result::Success) std::fprintf(stderr, "input Lua: %s\n", error);
+    detail::LuaHostContext context;
+    auto scene = _loaded(source, "input.lua", context);
+    auto controller = scene ? context.input.controller : nullptr;
+    CHECK(controller != nullptr);
     if (controller) {
         CHECK(controller->input(pointer(150.0f, 25.0f, 0.0f)).handled);
         CHECK(controller->input(key(InputKind::KeyDown, Key::ArrowRight, 0.0f)).handled);

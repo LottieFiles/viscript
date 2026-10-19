@@ -1,18 +1,16 @@
 #include <cmath>
 #include <cstdio>
-#include <cstring>
 
-#include "visLuaHost.h"
 #include "vis_states.h"
 #if defined(VIS_LUA_RUNTIME)
 #include "vis_lua_runtime.h"
 #endif
 #include "testLuaCollector.h"
-#include "testCheck.h"
+#include "testLuaLoad.h"
 
 using namespace vis;
 
-static void _standalone()
+static void _controller()
 {
     static constexpr char source[] = R"lua(
 if not vis.states then error("states module missing") end
@@ -38,14 +36,10 @@ if event.transaction ~= "1" or event.curve.preset ~= "linear" then
 end
 return scene
 )lua";
-    Scene* scene = nullptr;
-    states::Controller* controller = nullptr;
-    char error[1024] = {};
-    auto result = states::Lua::load(source, static_cast<uint32_t>(std::strlen(source)),
-                                    "states.lua", &scene, &controller, error, sizeof(error));
-    CHECK(result == Result::Success);
-    CHECK(scene && controller && controller->scene() == scene);
-    if (result != Result::Success) std::fprintf(stderr, "standalone states: %s\n", error);
+    detail::LuaHostContext context;
+    auto scene = _loaded(source, "states.lua", context);
+    auto controller = scene ? context.states.controller : nullptr;
+    CHECK(controller && controller->scene() == scene);
     if (scene && controller) {
         states::State state;
         auto object = scene->object("target");
@@ -66,15 +60,7 @@ local states = vis.states(scene)
 states:define(target, "idle", {unknown = true})
 return scene
 )lua";
-    Scene* scene = nullptr;
-    states::Controller* controller = nullptr;
-    char error[1024] = {};
-    auto result =
-        states::Lua::load(unknownField, static_cast<uint32_t>(std::strlen(unknownField)),
-                          "invalid-states.lua", &scene, &controller, error, sizeof(error));
-    CHECK(result == Result::ScriptError);
-    CHECK(scene == nullptr && controller == nullptr);
-    CHECK(std::strstr(error, "unknown state field") != nullptr);
+    _scriptError(unknownField, "invalid-states.lua", "unknown state field");
 
     static constexpr char duplicate[] = R"lua(
 local scene = vis.scene {}
@@ -82,11 +68,7 @@ vis.states(scene)
 vis.states(scene)
 return scene
 )lua";
-    result = states::Lua::load(duplicate, static_cast<uint32_t>(std::strlen(duplicate)),
-                               "duplicate-states.lua", &scene, &controller, error, sizeof(error));
-    CHECK(result == Result::ScriptError);
-    CHECK(scene == nullptr && controller == nullptr);
-    CHECK(std::strstr(error, "only one states controller") != nullptr);
+    _scriptError(duplicate, "duplicate-states.lua", "only one states controller");
 
     static constexpr char aborted[] = R"lua(
 local scene = vis.scene {}
@@ -94,11 +76,10 @@ vis.states(scene)
 error("abort after states creation")
 return scene
 )lua";
+    Scene* scene = nullptr;
+    char error[1024] = {};
     detail::LuaHostContext context;
-    result = detail::luaHostLoad(aborted, static_cast<uint32_t>(std::strlen(aborted)),
-                                 "aborted-states.lua", &scene, error, sizeof(error), nullptr,
-                                 nullptr, nullptr, nullptr, context);
-    CHECK(result == Result::ScriptError);
+    CHECK(_load(aborted, "aborted-states.lua", scene, error, sizeof(error), context) == Result::ScriptError);
     CHECK(scene == nullptr);
     CHECK(context.states.controller == nullptr && context.states.scene == nullptr);
 
@@ -124,12 +105,7 @@ states:define(b, 'idle', {})
 %s
 return scene
 )lua", batch.source);
-        result = states::Lua::load(source, static_cast<uint32_t>(std::strlen(source)),
-                                  "invalid-batch.lua", &scene, &controller, error, sizeof(error));
-        CHECK(result == Result::ScriptError);
-        CHECK(scene == nullptr && controller == nullptr);
-        CHECK(std::strstr(error, batch.error) != nullptr);
-        if (!std::strstr(error, batch.error)) std::fprintf(stderr, "batch: %s\n", error);
+        _scriptError(source, "invalid-batch.lua", batch.error);
     }
 }
 
@@ -216,16 +192,10 @@ vis.runtime(scene, {
 })
 return scene
 )lua";
-    Scene* scene = nullptr;
-    char error[1024] = {};
     detail::LuaHostContext context;
-    auto result = detail::luaHostLoad(source, static_cast<uint32_t>(std::strlen(source)),
-                                      "states-runtime.lua", &scene, error, sizeof(error), nullptr,
-                                      nullptr, nullptr, nullptr, context);
-    CHECK(result == Result::Success);
-    CHECK(scene && context.states.controller && context.runtime.runtime);
-    if (result != Result::Success) std::fprintf(stderr, "retained states: %s\n", error);
-    if (result == Result::Success) {
+    auto scene = _loaded(source, "states-runtime.lua", context);
+    CHECK(context.states.controller && context.runtime.runtime);
+    if (scene && context.states.controller && context.runtime.runtime) {
         CHECK(context.runtime.runtime->advance(0.5f) == Result::Success);
         states::State state;
         auto object = scene->object("target");
@@ -244,7 +214,7 @@ return scene
 
 int main()
 {
-    _standalone();
+    _controller();
     _failures();
     _numericStates();
 #if defined(VIS_LUA_RUNTIME)

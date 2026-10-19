@@ -35,19 +35,6 @@ static bool _gain(float value) noexcept
     return std::isfinite(value) && value >= 0.0f && value <= 4.0f;
 }
 
-static AnimCurve _curve(Easing easing) noexcept
-{
-    auto preset = AnimCurvePreset::Linear;
-    switch (easing) {
-        case Easing::Smooth: preset = AnimCurvePreset::Smooth; break;
-        case Easing::EaseIn: preset = AnimCurvePreset::EaseIn; break;
-        case Easing::EaseOut: preset = AnimCurvePreset::EaseOut; break;
-        case Easing::EaseInOut: preset = AnimCurvePreset::EaseInOut; break;
-        default: break;
-    }
-    return AnimCurve::preset(preset);
-}
-
 }  // namespace
 
 struct Soundscape::Impl
@@ -119,15 +106,6 @@ Result Soundscape::cue(const CueConfig& config, Cue& output) noexcept
     pImpl->cues[index].asset = asset;
     output.index = index;
     return Result::Success;
-}
-
-Result Soundscape::gain(Cue cue, float value, float begin, float duration,
-                        Easing easing) noexcept
-{
-    if (static_cast<uint8_t>(easing) > static_cast<uint8_t>(Easing::EaseInOut)) {
-        return Result::InvalidArguments;
-    }
-    return gain(cue, value, begin, duration, _curve(easing));
 }
 
 Result Soundscape::gain(Cue cue, float value, float begin, float duration,

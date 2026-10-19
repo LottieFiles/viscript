@@ -46,21 +46,9 @@ struct Controller final : Group
     // atomically and emit one event/target with a common nonzero transaction.
     // A full undrained journal rejects the whole batch.
     Result transition(Object* object, const char* state, float duration = 0.2f,
-                      Easing easing = Easing::Smooth) noexcept;
-    Result transition(Object* object, const char* state, float duration,
-                      const AnimCurve& curve) noexcept;
-    Result transition(Object* object, const char* state, const TimingOptions& timing) noexcept
-    {
-        return transition(object, state, timing.duration, timing.curve);
-    }
+                      const AnimCurve& curve = {}) noexcept;
     Result transition(const Target* targets, uint32_t count, float duration = 0.2f,
-                      Easing easing = Easing::Smooth) noexcept;
-    Result transition(const Target* targets, uint32_t count, float duration,
-                      const AnimCurve& curve) noexcept;
-    Result transition(const Target* targets, uint32_t count, const TimingOptions& timing) noexcept
-    {
-        return transition(targets, count, timing.duration, timing.curve);
-    }
+                      const AnimCurve& curve = {}) noexcept;
     // Only advance changes the interaction clock; scene sampling and built-in savers do not.
     Result advance(float elapsed) noexcept;
     Result sample(const Object* object, State& state) const noexcept;
@@ -93,17 +81,6 @@ struct Event
     uint32_t object = 0u;
     uint64_t transaction = 0u;
     char state[Controller::StateNameLimit + 1u] = {};
-};
-
-struct Lua
-{
-    static Result load(const char* source, uint32_t size, const char* name,
-                       Scene** scene, Controller** controller, char* error,
-                       uint32_t errorSize,
-                       vis::Lua::AssetResolver resolver = nullptr,
-                       void* resolverData = nullptr,
-                       const Theme* adaptiveTheme = nullptr,
-                       bool* adaptiveThemeUsed = nullptr) noexcept;
 };
 
 }  // namespace vis::states

@@ -7,62 +7,13 @@
 #include <initializer_list>
 
 #include "vis.h"
-#include "testCheck.h"
+#include "testLuaLoad.h"
 
 using namespace vis;
 
 static inline bool _near(float lhs, float rhs)
 {
     return std::fabs(lhs - rhs) < 1.0e-4f;
-}
-
-// The scene a script makes. A script that does not load fails the check and says why.
-static inline Scene* _loaded(const char* source, const char* name, Lua::AssetResolver resolver = nullptr,
-                             void* resolverData = nullptr)
-{
-    char error[1024] = {};
-    Scene* scene = nullptr;
-    auto status = Lua::load(source, static_cast<uint32_t>(std::strlen(source)), name, &scene, error, sizeof(error),
-                            resolver, resolverData);
-    CHECK(status == Result::Success && scene);
-    if (status != Result::Success) std::fprintf(stderr, "%s: %s\n", name, error);
-    return scene;
-}
-
-static inline void _error(const char* source, const char* name, Lua::AssetResolver resolver = nullptr,
-                   void* resolverData = nullptr)
-{
-    char error[512] = {};
-    Scene* scene = nullptr;
-    auto status = Lua::load(source, static_cast<uint32_t>(std::strlen(source)), name, &scene, error,
-                            sizeof(error), resolver, resolverData);
-    CHECK(status == Result::ScriptError);
-    CHECK(scene == nullptr);
-    CHECK(error[0] != '\0');
-    auto location = std::strstr(error, name);
-    CHECK(location != nullptr);
-    if (!location) std::fprintf(stderr, "  %s does not name its script: %s\n", name, error);
-    if (location) CHECK(location[std::strlen(name)] == ':');
-    delete scene;
-}
-
-// The script must fail and the message must explain why.
-static inline void _scriptError(const char* source, const char* expected)
-{
-    char error[512] = {};
-    Scene* scene = nullptr;
-    auto status = Lua::load(source, static_cast<uint32_t>(std::strlen(source)), "diagnostic.lua", &scene,
-                            error, sizeof(error));
-    CHECK(status == Result::ScriptError);
-    CHECK(std::strstr(error, expected) != nullptr);
-    if (!std::strstr(error, expected)) std::fprintf(stderr, "  expected '%s', got: %s\n", expected, error);
-    delete scene;
-}
-
-// The script must load.
-static inline void _scriptLoads(const char* source)
-{
-    delete _loaded(source, "loads.lua");
 }
 
 // The texts of a spans group, in order.

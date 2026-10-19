@@ -15,45 +15,6 @@ static void _sameFrames(Renderer* renderer, Scene* first, Scene* second)
     }
 }
 
-static void _native(Renderer* renderer)
-{
-    Config config;
-    config.width = 96;
-    config.height = 64;
-    auto first = Scene::gen(config);
-    auto second = Scene::gen(config);
-    AnimationOptions timing;
-    timing.duration = 0.4f;
-    timing.curve = AnimCurve::preset(AnimCurvePreset::Linear);
-    timing.lag = 0.25f;
-    auto build = [&](Scene* scene, bool named) {
-        Object* targets[] = {Rectangle::gen({-1, 0, 0}, {1, 1}), Rectangle::gen({1, 0, 0}, {1, 1})};
-        CHECK(scene && targets[0] && targets[1]);
-        for (auto target : targets) CHECK(scene->add(target) == Result::Success);
-        Animation animations[] = {Animation::shift(targets[0], {0, 1, 0}), Animation::fade(targets[1], 0.3f)};
-        CHECK(scene->save(targets, 2) == Result::Success);
-        CHECK((named ? scene->play(animations, 2, timing)
-                     : scene->play(animations, 2, timing.duration, timing.curve, timing.lag)) == Result::Success);
-        CHECK((named ? scene->restore(targets, 2, timing)
-                     : scene->restore(targets, 2, timing.duration, timing.curve, timing.lag)) == Result::Success);
-        TimingOptions single;
-        single.duration = 0.2f;
-        single.curve = timing.curve;
-        CHECK((named ? scene->play(Animation::shift(targets[0], {1, 0, 0}), single)
-                     : scene->play(Animation::shift(targets[0], {1, 0, 0}), single.duration, single.curve)) == Result::Success);
-        auto cursor = scene->cursor();
-        auto clips = scene->clipCount();
-        single.duration = -1;
-        CHECK(scene->play(Animation::fade(targets[0], 0.5f), single) == Result::InvalidArguments);
-        CHECK(near(scene->cursor(), cursor) && scene->clipCount() == clips);
-    };
-    build(first, false);
-    build(second, true);
-    _sameFrames(renderer, first, second);
-    delete first;
-    delete second;
-}
-
 static void _lua(Renderer* renderer)
 {
     static constexpr auto prefix =
@@ -133,7 +94,6 @@ int main()
     auto renderer = Renderer::gen();
     CHECK(renderer);
     if (renderer) {
-        _native(renderer);
         _lua(renderer);
     }
     delete renderer;

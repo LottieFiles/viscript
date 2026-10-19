@@ -2,22 +2,12 @@
 
 #include "vis.h"
 #include "vis_lua_runtime.h"
-#include "visLuaHost.h"
-#include "testCheck.h"
+#include "testLuaLoad.h"
 #if defined(VIS_INPUT)
 #include "vis_input.h"
 #endif
 
 using namespace vis;
-
-static Result load(const char* source, Scene*& scene,
-                   detail::LuaHostContext& context, char* error,
-                   uint32_t errorSize)
-{
-    return detail::luaHostLoad(
-        source, static_cast<uint32_t>(std::strlen(source)), "runtime.lua",
-        &scene, error, errorSize, nullptr, nullptr, nullptr, nullptr, context);
-}
 
 static void fixedStep()
 {
@@ -45,14 +35,10 @@ vis.runtime(scene, {
 scene:wait(1)
 return scene
 )lua";
-    Scene* scene = nullptr;
-    char error[1024] = {};
     detail::LuaHostContext context;
-    auto result = load(source, scene, context, error, sizeof(error));
-    CHECK(result == Result::Success);
-    CHECK(scene != nullptr);
+    auto scene = _loaded(source, "runtime.lua", context);
     auto runtime = context.runtime.runtime;
-    CHECK(runtime != nullptr);
+    CHECK(runtime && runtime->scene() == scene);
     CHECK(runtime && near(runtime->fixedStep(), 0.1));
     CHECK(runtime && runtime->advance(0.05f) == Result::Success);
     CHECK(runtime && runtime->steps() == 0u && runtime->tick() == 0u);
@@ -136,11 +122,8 @@ vis.runtime(scene, {
 })
 return scene
 )lua";
-    Scene* scene = nullptr;
-    char error[1024] = {};
     detail::LuaHostContext context;
-    auto result = load(source, scene, context, error, sizeof(error));
-    CHECK(result == Result::Success && scene);
+    auto scene = _loaded(source, "runtime.lua", context);
     auto runtime = context.runtime.runtime;
     CHECK(runtime && runtime->soundCount() == 0u);
     CHECK(runtime && runtime->advance(0.2f) == Result::Success);
@@ -170,10 +153,8 @@ vis.runtime(scene, {
 })
 return scene
 )lua";
-    scene = nullptr;
     context = {};
-    result = load(limitSource, scene, context, error, sizeof(error));
-    CHECK(result == Result::Success && scene);
+    scene = _loaded(limitSource, "runtime.lua", context);
     runtime = context.runtime.runtime;
     CHECK(runtime && runtime->advance(0.1f) == Result::Success);
     CHECK(runtime && runtime->soundCount() == lua_runtime::Runtime::SoundEventLimit);
@@ -196,11 +177,8 @@ vis.runtime(scene, {
 })
 return scene
 )lua";
-    Scene* scene = nullptr;
-    char error[1024] = {};
     detail::LuaHostContext context;
-    auto result = load(source, scene, context, error, sizeof(error));
-    CHECK(result == Result::Success && scene);
+    auto scene = _loaded(source, "runtime.lua", context);
     auto runtime = context.runtime.runtime;
     CHECK(runtime && runtime->advance(0.1f) == Result::ScriptError);
     CHECK(runtime && std::strstr(runtime->error(),
@@ -265,11 +243,8 @@ vis.runtime(scene, {
 })
 return scene
 )lua";
-    Scene* scene = nullptr;
-    char error[1024] = {};
     detail::LuaHostContext context;
-    auto result = load(source, scene, context, error, sizeof(error));
-    CHECK(result == Result::Success && scene);
+    auto scene = _loaded(source, "runtime.lua", context);
     auto runtime = context.runtime.runtime;
     auto renderer = Renderer::gen();
     auto box = scene ? scene->object("box") : nullptr;
@@ -292,41 +267,9 @@ local scene = vis.scene {width = 320, height = 180}
 scene:circle {radius = 1}
 return scene
 )lua";
-    Scene* scene = nullptr;
-    char error[1024] = {};
     detail::LuaHostContext context;
-    auto result = load(source, scene, context, error, sizeof(error));
-    CHECK(result == Result::Success && scene);
+    auto scene = _loaded(source, "runtime.lua", context);
     CHECK(context.runtime.runtime == nullptr);
-    delete scene;
-}
-
-static void publicLoader()
-{
-    static constexpr char source[] = R"lua(
-local scene = vis.scene {width = 64, height = 36}
-local subject = scene:circle {center = {0, 0}, radius = 1, id = "subject"}
-vis.runtime(scene, {
-    fixed_step = 0.1,
-    update = function(ctx, dt, time, tick)
-        ctx:update(subject, {shift = {tick, 0, 0}})
-    end,
-})
-return scene
-)lua";
-    Scene* scene = nullptr;
-    lua_runtime::Runtime* runtime = nullptr;
-    char error[1024] = {};
-    CHECK(lua_runtime::Lua::load(
-              source, static_cast<uint32_t>(std::strlen(source)),
-              "public-runtime.lua", &scene, nullptr, error, sizeof(error))
-          == Result::InvalidArguments);
-    auto result = lua_runtime::Lua::load(
-        source, static_cast<uint32_t>(std::strlen(source)), "public-runtime.lua",
-        &scene, &runtime, error, sizeof(error));
-    CHECK(result == Result::Success && scene && runtime);
-    CHECK(runtime && runtime->scene() == scene);
-    CHECK(runtime && runtime->advance(0.1f) == Result::Success);
     delete scene;
 }
 
@@ -344,11 +287,8 @@ vis.runtime(scene, {
 })
 return scene
 )lua";
-    Scene* scene = nullptr;
-    char error[1024] = {};
     detail::LuaHostContext context;
-    auto result = load(source, scene, context, error, sizeof(error));
-    CHECK(result == Result::Success && scene);
+    auto scene = _loaded(source, "runtime.lua", context);
     auto runtime = context.runtime.runtime;
     auto renderer = Renderer::gen();
     auto subject = scene ? scene->object("subject") : nullptr;
@@ -373,9 +313,8 @@ local subject = scene:rectangle {center = {0, 0}, size = {2, 2}}
 vis.runtime(scene, {fixed_step = 0.1, update = function() subject:move_to({1, 0}) end})
 return scene
 )lua";
-    scene = nullptr;
     detail::LuaHostContext movingContext;
-    CHECK(load(moving, scene, movingContext, error, sizeof(error)) == Result::Success && scene);
+    scene = _loaded(moving, "runtime.lua", movingContext);
     runtime = movingContext.runtime.runtime;
     CHECK(runtime && runtime->advance(0.1f) == Result::ScriptError);
     CHECK(runtime && std::strstr(runtime->error(), "object authoring is unavailable after loading"));
@@ -417,11 +356,8 @@ runtime:bind_key("Switch", "Tab")
 runtime:bind_pointer("Place", 0)
 return scene
 )lua";
-    Scene* scene = nullptr;
-    char error[1024] = {};
     detail::LuaHostContext context;
-    auto result = load(source, scene, context, error, sizeof(error));
-    CHECK(result == Result::Success && scene);
+    auto scene = _loaded(source, "runtime.lua", context);
     auto runtime = context.runtime.runtime;
     auto controller = context.input.controller;
     CHECK(runtime && controller);
@@ -471,11 +407,8 @@ vis.runtime(scene, {
 })
 return scene
 )lua";
-    Scene* scene = nullptr;
-    char error[1024] = {};
     detail::LuaHostContext context;
-    auto result = load(source, scene, context, error, sizeof(error));
-    CHECK(result == Result::Success && scene);
+    auto scene = _loaded(source, "runtime.lua", context);
     auto runtime = context.runtime.runtime;
     auto renderer = Renderer::gen();
     auto flat = scene ? scene->object("flat") : nullptr;
@@ -503,7 +436,6 @@ int main()
     groupFill();
     callbackFailure();
     optionalRuntime();
-    publicLoader();
     authoringLock();
 #if defined(VIS_INPUT)
     inputActions();

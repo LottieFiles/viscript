@@ -262,7 +262,8 @@ void surfaceMorph(Renderer* renderer)
             colormap(target);
             CHECK(scene->add(source) == Result::Success);
             CHECK(scene->add(target) == Result::Success);
-            CHECK(scene->play(Animation::morph(source, target), 1.0f, Easing::Linear) == Result::Success);
+            CHECK(scene->play(Animation::morph(source, target), 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+                  == Result::Success);
             Surface frame;
             Color colors[3];
             auto drawn = 0u;
@@ -317,7 +318,7 @@ void surfaceMorph(Renderer* renderer)
             animation.colorSteps = 2u;
             animation.colorCount = 12u;
             configure(animation);
-            result = scene->play(animation, 1.0f, Easing::Linear);
+            result = scene->play(animation, 1.0f, AnimCurve::preset(AnimCurvePreset::Linear));
             Surface frame;
             if (result == Result::Success && middle) {
                 if (renderer->render(scene, 0.25f, frame) == Result::Success && frame.data()) {
@@ -359,7 +360,7 @@ void surfaceMorph(Renderer* renderer)
                 animation.colorSteps = 2u;
                 animation.colorCount = 12u;
             }
-            result = scene->play(animation, 1.0f, Easing::Linear);
+            result = scene->play(animation, 1.0f, AnimCurve::preset(AnimCurvePreset::Linear));
         } else {
             delete source;
             delete target;
@@ -404,7 +405,8 @@ void surfaceLight(Renderer* renderer)
             surface->fill(Color::hex("#c86432"));
             configure(surface);
             CHECK(scene->add(surface) == Result::Success);
-            CHECK(scene->orbit(PI / 2.0f, {0.0f, 0.0f, 1.0f}, 1.0f, Easing::Linear) == Result::Success);
+            CHECK(scene->orbit(PI / 2.0f, {0.0f, 0.0f, 1.0f}, 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+                  == Result::Success);
             Surface frame;
             if (renderer->render(scene, 0.0f, frame) == Result::Success && frame.data()) {
                 start = framePixel(frame, 60u, 60u);
@@ -476,7 +478,10 @@ static bool depthRender(Renderer* renderer, const Config& config, Object* const*
     auto drawn = false;
     if (complete) {
         for (auto i = 0u; i < count; i++) CHECK(scene->add(objects[i]) == Result::Success);
-        if (angle != 0.0f) CHECK(scene->orbit(angle, {0.0f, 0.0f, 1.0f}, 1.0f, Easing::Linear) == Result::Success);
+        if (angle != 0.0f) {
+            CHECK(scene->orbit(angle, {0.0f, 0.0f, 1.0f}, 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+                  == Result::Success);
+        }
         drawn = renderer->render(scene, time, frame) == Result::Success && frame.data();
     } else {
         for (auto i = 0u; i < count; i++) delete objects[i];
@@ -959,9 +964,9 @@ void surfacePlaneTextAndWrite(Renderer* renderer)
         text->fill(Color::hex("#172033"));
         CHECK(scene->add(surface) == Result::Success);
         CHECK(scene->add(text) == Result::Success);
-        CHECK(scene->play(Animation::create(surface), 0.6f, Easing::Linear)
+        CHECK(scene->play(Animation::create(surface), 0.6f, AnimCurve::preset(AnimCurvePreset::Linear))
               == Result::Success);
-        CHECK(scene->play(Animation::fadeIn(text), 0.2f, Easing::Linear)
+        CHECK(scene->play(Animation::fadeIn(text), 0.2f, AnimCurve::preset(AnimCurvePreset::Linear))
               == Result::Success);
         Surface frame;
         CHECK(renderer->render(scene, scene->duration(), frame) == Result::Success);
@@ -994,7 +999,7 @@ void surfacePlaneTextAndWrite(Renderer* renderer)
         auto fill = Color::hex("#ef6461");
         path->stroke(Color::hex("#ef6461"), 3.0f).fill(fill);
         CHECK(scene->add(path) == Result::Success);
-        CHECK(scene->play(Animation::write(path), 1.0f, Easing::Linear)
+        CHECK(scene->play(Animation::write(path), 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
               == Result::Success);
         Surface frame;
         auto center = static_cast<size_t>(60u) * 120u + 60u;

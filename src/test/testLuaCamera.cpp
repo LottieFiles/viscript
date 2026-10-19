@@ -25,7 +25,7 @@ static Scene* _cameraScene(const char* source, const char* name, CameraSample& s
     RuntimeModifier hook;
     hook.camera = _takeCamera;
     hook.data = &sample;
-    CHECK(scene->runtime(&hook) == Result::Success);
+    CHECK(scene->runtimeAdd(&hook) == Result::Success);
     return scene;
 }
 

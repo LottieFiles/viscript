@@ -346,41 +346,6 @@ Object& Object::shift(const Vec3& by) noexcept
     return *this;
 }
 
-Object& Object::scale(const Vec3& by) noexcept
-{
-    if (owned()) return *this;
-    model = Mat4::scale(by) * model;
-    return *this;
-}
-
-Object& Object::rotateX(float radians) noexcept
-{
-    if (owned()) return *this;
-    model = Mat4::rotateX(radians) * model;
-    return *this;
-}
-
-Object& Object::rotateY(float radians) noexcept
-{
-    if (owned()) return *this;
-    model = Mat4::rotateY(radians) * model;
-    return *this;
-}
-
-Object& Object::rotateZ(float radians) noexcept
-{
-    if (owned()) return *this;
-    model = Mat4::rotateZ(radians) * model;
-    return *this;
-}
-
-Object& Object::transform(const Mat4& by) noexcept
-{
-    if (owned()) return *this;
-    model = by * model;
-    return *this;
-}
-
 static constexpr auto COMPOSITE_MOUNTED =
     "the scene is shown inside another scene and can no longer change";
 
@@ -533,11 +498,6 @@ Text* Text::gen(const char* text, const Vec3& point) noexcept
 const char* Text::text() const noexcept
 {
     return objText;
-}
-
-Result Text::measure(TextExtent& output) const noexcept
-{
-    return measure(objText, output);
 }
 
 Result Text::measure(const char* value, TextExtent& output) const noexcept

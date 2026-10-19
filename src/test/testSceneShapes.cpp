@@ -76,9 +76,10 @@ void arcsAndAngles(Renderer* renderer)
         CHECK(renderer->bounds(scene, copy->childAt(0), 1.0f, labelBounds) == Result::Success);
         CHECK(near(labelBounds.x + labelBounds.width * 0.5f, 90.0f, 0.001f));
     }
-    CHECK(scene->save(arc) == Result::Success);
+    Object* arcs[] = {arc};
+    CHECK(scene->save(arcs, 1u) == Result::Success);
     CHECK(scene->play(AnimationTarget::from(arc).radius(2.0f).start(0.0f).angle(pi * 0.5f), 0.5f) == Result::Success);
-    CHECK(scene->restore(arc, 0.5f) == Result::Success);
+    CHECK(scene->restore(arcs, 1u, 0.5f) == Result::Success);
     CHECK(near(arc->radius, 4.0f) && near(arc->start, pi * 0.5f) && near(arc->angle, pi));
     delete scene;
 
@@ -116,8 +117,9 @@ void arcsAndAngles(Renderer* renderer)
     arc = Arc::gen({}, 1.0f, 0.0f, pi); arc->sector = true; arc->fill(Color::hex("#ffffff"));
     auto follower = Point::gen({});
     CHECK(scene->add(arc) == Result::Success && scene->add(follower) == Result::Success);
-    CHECK(scene->play(Animation::create(arc), 0.5f, Easing::Linear) == Result::Success);
-    CHECK(scene->play(Animation::moveAlong(follower, arc), 1.0f, Easing::Linear) == Result::Success);
+    CHECK(scene->play(Animation::create(arc), 0.5f, AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
+    CHECK(scene->play(Animation::moveAlong(follower, arc), 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
     CHECK(renderer->layout(scene, 1.5f, report) == Result::Success);
     path = anglePath(report, arc);
     CHECK(path && path->closed && path->filled);
@@ -195,7 +197,7 @@ void shapeProperties(Renderer* renderer)
         AnimationTarget::from(line).strokeWidth(10.0f),
         AnimationTarget::from(dot).radius(9.0f),
     };
-    CHECK(scene->play(targets, 4u, 1.0f, Easing::Linear) == Result::Success);
+    CHECK(scene->play(targets, 4u, 1.0f, AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
     CHECK(near(circle->radius, 1.5f) && near(dot->style.radius, 9.0f) && near(line->style.width, 10.0f));
     CHECK(near(box->size.x, 3.0f) && near(box->size.y, 2.0f) && near(box->corner, 0.5f));
 
@@ -256,7 +258,8 @@ void shapeProperties(Renderer* renderer)
         CHECK(linked->add(source) == Result::Success);
         CHECK(linked->add(sink) == Result::Success);
         CHECK(linked->add(link) == Result::Success);
-        CHECK(linked->play(AnimationTarget::from(source).radius(1.5f), 1.0f, Easing::Linear) == Result::Success);
+        CHECK(linked->play(AnimationTarget::from(source).radius(1.5f), 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+              == Result::Success);
         CHECK(renderer->render(linked, 0.0f, surface) == Result::Success);
         CHECK(_pixelAt(surface, 60u, 40u) == pixel(white));
         CHECK(renderer->render(linked, 1.0f, surface) == Result::Success);
@@ -312,7 +315,7 @@ void shapeProperties(Renderer* renderer)
         AnimationTarget::from(group).strokeWidth(8.0f),
         AnimationTarget::from(label).size(60.0f),
     };
-    CHECK(styled->play(looks, 4u, 1.0f, Easing::Linear) == Result::Success);
+    CHECK(styled->play(looks, 4u, 1.0f, AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
     CHECK(styled->diagnostic() == nullptr);
     CHECK(same(bar->style.gradient.stops[1].color, yellow) && same(ramp->style.gradientEnd, Color::hex("#00ff00")));
     CHECK(near(heir->style.width, 8.0f) && near(own->style.width, 1.0f) && near(label->size, 60.0f));
@@ -380,11 +383,16 @@ void trimmedSegments(Renderer* renderer)
         object->strokeWidth(2.0f);
         CHECK(scene->add(object) == Result::Success);
     }
-    CHECK(scene->save(line) == Result::Success);
+    Object* lines[] = {line};
+    CHECK(scene->save(lines, 1u) == Result::Success);
     Vec3 raised[] = {{-4.0f, 0.0f, 0.0f}, {4.0f, 6.0f, 0.0f}};
-    CHECK(scene->play(AnimationTarget::from(line).geometry(raised, 2u), 1.0f, Easing::Linear) == Result::Success);
+    CHECK(scene->play(AnimationTarget::from(line).geometry(raised, 2u), 1.0f,
+                      AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
     CHECK(scene->seek(0.0f) == Result::Success);
-    CHECK(scene->play(AnimationTarget::from(line).trimDistance(Vec2{2.0f, 1.0f}), 1.0f, Easing::Linear) == Result::Success);
+    CHECK(scene->play(AnimationTarget::from(line).trimDistance(Vec2{2.0f, 1.0f}), 1.0f,
+                      AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
     BBox box;
     CHECK(renderer->bounds(scene, line, 0.5f, box) == Result::Success);
     auto length = std::sqrt(73.0f);
@@ -400,10 +408,10 @@ void trimmedSegments(Renderer* renderer)
         CHECK(near(twin->to.y, 3.0f));
     }
     CHECK(scene->seek(1.0f) == Result::Success);
-    CHECK(scene->restore(line, 1.0f, AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
+    CHECK(scene->restore(lines, 1u, 1.0f, AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
     CHECK(near(line->trimDistance.x, 1.0f) && near(line->trimDistance.y, 2.0f));
-    CHECK(scene->update(AnimationTarget::from(line).trimDistance(-1.0f)) == Result::InvalidArguments);
-    CHECK(scene->update(AnimationTarget::from(line).trimDistance(20.0f)) == Result::Success);
+    CHECK(scene->update(AnimationTarget::from(line).trimDistance(Vec2{-1.0f, -1.0f})) == Result::InvalidArguments);
+    CHECK(scene->update(AnimationTarget::from(line).trimDistance(Vec2{20.0f, 20.0f})) == Result::Success);
     CHECK(!line->bounds(own));
     CHECK(renderer->bounds(scene, line, 2.0f, box) == Result::InsufficientCondition);
     delete scene;
@@ -417,7 +425,8 @@ void trimmedSegments(Renderer* renderer)
         CHECK(empty && object);
         if (!empty || !object) { delete empty; delete object; continue; }
         CHECK(empty->add(object) == Result::Success);
-        CHECK(empty->update(AnimationTarget::from(object).trimDistance(kind == 0 ? 1.0f : 3.0f)) == Result::Success);
+        auto trim = kind == 0 ? 1.0f : 3.0f;
+        CHECK(empty->update(AnimationTarget::from(object).trimDistance(Vec2{trim, trim})) == Result::Success);
         Surface surface;
         CHECK(renderer->render(empty, 0.0f, surface) == Result::Success);
         auto black = pixel(config.background);
@@ -444,8 +453,10 @@ void zeroLengthArrows(Renderer* renderer)
             if (!scene || !object) { delete scene; delete object; continue; }
             object->stroke(Color::hex("#ffffff"), 4.0f);
             CHECK(scene->add(object) == Result::Success);
-            if (degenerate >= 2)
-                CHECK(scene->update(AnimationTarget::from(object).trimDistance(degenerate == 2 ? 1.0f : 2.0f)) == Result::Success);
+            if (degenerate >= 2) {
+                auto trim = degenerate == 2 ? 1.0f : 2.0f;
+                CHECK(scene->update(AnimationTarget::from(object).trimDistance(Vec2{trim, trim})) == Result::Success);
+            }
             Surface surface;
             CHECK(renderer->render(scene, 0.0f, surface) == Result::Success);
             CHECK(changed(surface, config.background) == 0u);
@@ -520,7 +531,9 @@ void zeroLengthArrows(Renderer* renderer)
     CHECK(vector->label(label) == Result::Success);
     CHECK(scene->add(vector) == Result::Success);
     const Vec3 reversed[] = {{-1.999992f, -1, 0}, {0, 0, 0}};
-    CHECK(scene->play(AnimationTarget::from(vector).geometry(reversed, 2u), 2.0f, Easing::Linear) == Result::Success);
+    CHECK(scene->play(AnimationTarget::from(vector).geometry(reversed, 2u), 2.0f,
+                      AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
     for (auto time : {0.99f, 1.0f, 1.01f}) {
         LayoutReport report;
         CHECK(renderer->layout(scene, time, report) == Result::Success);
@@ -603,7 +616,7 @@ void geometryClips(Renderer* renderer)
         AnimationTarget::from(curve).geometry(bent, 4u),
         AnimationTarget::from(vector).geometry(turned, 2u),
     };
-    CHECK(scene->play(targets, 3u, 1.0f, Easing::Linear) == Result::Success);
+    CHECK(scene->play(targets, 3u, 1.0f, AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
     CHECK(scene->diagnostic() == nullptr);
     // The objects hold the geometry their clips end at.
     CHECK(near(line->from.y, 0.5f) && near(line->to.y, 0.5f));
@@ -636,9 +649,12 @@ void geometryClips(Renderer* renderer)
     // A second change of the same geometry waits for the first, but a move may run with it.
     auto mark = scene->cursor();
     const Vec3 flat[] = {{-3.0f, 0.0f, 0.0f}, {-1.0f, 0.0f, 0.0f}};
-    CHECK(scene->play(AnimationTarget::from(line).geometry(flat, 2u), 1.0f, Easing::Linear) == Result::Success);
+    CHECK(scene->play(AnimationTarget::from(line).geometry(flat, 2u), 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
     CHECK(scene->seek(mark) == Result::Success);
-    CHECK(scene->play(AnimationTarget::from(line).shift({0.0f, -0.5f, 0.0f}), 1.0f, Easing::Linear) == Result::Success);
+    CHECK(scene->play(AnimationTarget::from(line).shift({0.0f, -0.5f, 0.0f}), 1.0f,
+                      AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
     CHECK(scene->seek(mark + 0.5f) == Result::Success);
     CHECK(scene->play(AnimationTarget::from(line).geometry(raised, 2u), 1.0f) == Result::InsufficientCondition);
     CHECK(_says(scene, "already animates its geometry until 3.00 s"));
@@ -660,11 +676,12 @@ void geometryClips(Renderer* renderer)
     CHECK(_pixelAt(surface, 25u, 50u) == pixel(yellow));
 
     // A restore carries the geometry back to the one the save kept.
-    CHECK(scene->save(curve) == Result::Success);
+    Object* curves[] = {curve};
+    CHECK(scene->save(curves, 1u) == Result::Success);
     const Vec3 dipped[] = {{0.0f, 0.0f, 0.0f}, {1.0f, -2.0f, 0.0f}, {2.0f, -2.0f, 0.0f}, {3.0f, 0.0f, 0.0f}};
     CHECK(scene->play(AnimationTarget::from(curve).geometry(dipped, 4u), 1.0f) == Result::Success);
     CHECK(near(curve->points()[15].y, -1.5f));
-    CHECK(scene->restore(curve, 1.0f, AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
+    CHECK(scene->restore(curves, 1u, 1.0f, AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
     CHECK(near(curve->points()[15].y, 1.5f) && near(curve->controls()[1].y, 2.0f));
     auto end = scene->cursor();
     CHECK(renderer->render(scene, end - 1.0f, surface) == Result::Success);
@@ -722,7 +739,7 @@ void geometryClips(Renderer* renderer)
     const Vec3 slope[] = {{-2.0f, 0.5f, -5.0f}, {0.0f, 0.5f, -1.0f}, {2.0f, 0.5f, 3.0f}};
     AnimationTarget tilts[] = {AnimationTarget::from(beam).geometry(slant, 2u),
                                AnimationTarget::from(trace).geometry(slope, 3u)};
-    CHECK(tilted->play(tilts, 2u, 1.0f, Easing::Linear) == Result::Success);
+    CHECK(tilted->play(tilts, 2u, 1.0f, AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
     // 40 pixels per unit with the origin at pixel (100, 100): the line on row 100, the plot on 80.
     const uint32_t rows[] = {100u, 80u};
     Surface frame;
@@ -909,9 +926,10 @@ void plotReplot(Renderer* renderer)
         // through them.
         auto triangle = Polygon::gen(corners, 3u);
         CHECK(triangle && scene->add(triangle) == Result::Success);
-        CHECK(scene->save(plot) == Result::Success);
+        Object* plots[] = {plot};
+        CHECK(scene->save(plots, 1u) == Result::Success);
         CHECK(scene->play(AnimationTarget::from(plot).geometry(low, 5u, nullptr, 1u), 1.0f, linear) == Result::Success);
-        CHECK(scene->restore(plot, 1.0f, linear) == Result::Success);
+        CHECK(scene->restore(plots, 1u, 1.0f, linear) == Result::Success);
         CHECK(plot->count() == 6u && plot->contours() == 2u && plot->contourEnd(0) == 3u);
         CHECK(near(shown(1.25f, 0.0f, -1.0f), 1.0f, 0.05f));
         CHECK(near(shown(1.75f, 0.0f, -1.0f), 0.0f, 0.02f) && near(shown(1.75f, -3.0f, 1.0f), 1.0f, 0.05f));

@@ -350,7 +350,9 @@ void matchedBillboard(Renderer* renderer)
             source->size = target->size = 40.0f;
             CHECK(source->font("Pretendard") == Result::Success && target->font("Pretendard") == Result::Success);
             CHECK(scene->add(source) == Result::Success && scene->wait(0.1f) == Result::Success);
-            CHECK(scene->play(Animation::rescale(source, {0.2f, 0.2f, 0.2f}), 0.2f, Easing::Linear) == Result::Success);
+            CHECK(scene->play(Animation::rescale(source, {0.2f, 0.2f, 0.2f}), 0.2f,
+                              AnimCurve::preset(AnimCurvePreset::Linear))
+                  == Result::Success);
             CHECK(scene->wait(0.2f) == Result::Success && scene->add(target) == Result::Success);
             BBox before; BBox destination; BBox after;
             CHECK(renderer->bounds(scene, source, 0.499f, before) == Result::Success);
@@ -834,7 +836,8 @@ void geometryCopies(Renderer* renderer)
     CHECK(_placed(renderer, scene, level, 0.5f, -3.0f, 0.0f) && _placed(renderer, scene, line, 0.5f, -3.0f, 0.0f));
     CHECK(_placed(renderer, scene, level, 1.0f, -3.0f, 0.0f) && _placed(renderer, scene, line, 1.0f, -3.0f, 2.0f));
     CHECK(_placed(renderer, scene, arch, 1.0f, 2.5f, -1.25f) && _placed(renderer, scene, curve, 1.0f, 2.5f, -0.5f));
-    CHECK(scene->save(level) == Result::Success);
+    Object* levels[] = {level};
+    CHECK(scene->save(levels, 1u) == Result::Success);
     // A copy changes its points from those it was given: the level line sinks to y = -4.
     CHECK(scene->seek(1.0f) == Result::Success);
     const Vec3 sunk[] = {{-4.0f, -4.0f, 0.0f}, {-2.0f, -4.0f, 0.0f}};
@@ -882,9 +885,8 @@ void geometryCopies(Renderer* renderer)
 
     // A restore leaves the images of a warp, as for other shapes: the level line, saved at y = 0,
     // stays where the warp takes it.
-    Object* sinking[] = {level};
-    CHECK(scene->warp(sinking, 1u, _moved, &up, 1.0f, linear) == Result::Success);
-    CHECK(scene->restore(level, 1.0f, linear) == Result::Success);
+    CHECK(scene->warp(levels, 1u, _moved, &up, 1.0f, linear) == Result::Success);
+    CHECK(scene->restore(levels, 1u, 1.0f, linear) == Result::Success);
     CHECK(_placed(renderer, scene, level, 6.0f, -3.0f, -3.0f) && _placed(renderer, scene, level, 7.0f, -3.0f, -3.0f));
     delete scene;
 
@@ -1136,51 +1138,53 @@ void saveRestore(Renderer* renderer)
     CHECK(near(dot->opacity, 1.0f) && std::strcmp(title->text(), "cat") == 0 && near(total->value(), 5.0f));
 
     // A restore takes the save, so a second one has nothing to bring back.
-    CHECK(scene->restore(card) == Result::InsufficientCondition);
+    Object* cards[] = {card};
+    Object* dots[] = {dot};
+    CHECK(scene->restore(cards, 1u) == Result::InsufficientCondition);
     CHECK(_says(scene, "'card' has no saved state; save it before restoring"));
-    CHECK(scene->restore(dot, 1.0f) == Result::InsufficientCondition);
+    CHECK(scene->restore(dots, 1u, 1.0f) == Result::InsufficientCondition);
     CHECK(_says(scene, "the object has no saved state"));
 
     // Saves nest, and each restore takes the newest state of its target.
-    CHECK(scene->save(card) == Result::Success);
+    CHECK(scene->save(cards, 1u) == Result::Success);
     CHECK(scene->play(AnimationTarget::from(card).fill(blue), 1.0f) == Result::Success);
-    CHECK(scene->save(card) == Result::Success);
+    CHECK(scene->save(cards, 1u) == Result::Success);
     CHECK(scene->play(AnimationTarget::from(card).shift({0.0f, 1.0f, 0.0f}).opacity(0.5f), 1.0f) == Result::Success);
     auto clips = scene->clipCount();
     // Without a duration the values switch at the cursor.
-    CHECK(scene->restore(card) == Result::Success);
+    CHECK(scene->restore(cards, 1u) == Result::Success);
     CHECK(near(scene->cursor(), 5.0f) && scene->clipCount() == clips + 1u);
     center = _centerAt(renderer, scene, card, 4.99f);
     CHECK(near(center.y, 20.0f, 1.0f));
     CHECK(renderer->render(scene, 5.0f, surface) == Result::Success);
     CHECK(_pixelAt(surface, 40u, 40u) == pixel(blue));
-    CHECK(scene->restore(card, 1.0f, linear) == Result::Success);
+    CHECK(scene->restore(cards, 1u, 1.0f, linear) == Result::Success);
     CHECK(renderer->render(scene, 6.0f, surface) == Result::Success);
     CHECK(_pixelAt(surface, 40u, 40u) == pixel(red));
-    CHECK(scene->restore(card) == Result::InsufficientCondition);
+    CHECK(scene->restore(cards, 1u) == Result::InsufficientCondition);
     // When nothing differs, a restore waits for its duration.
-    CHECK(scene->save(card) == Result::Success);
+    CHECK(scene->save(cards, 1u) == Result::Success);
     clips = scene->clipCount();
-    CHECK(scene->restore(card, 0.5f) == Result::Success);
+    CHECK(scene->restore(cards, 1u, 0.5f) == Result::Success);
     CHECK(scene->clipCount() == clips && near(scene->cursor(), 6.5f));
 
     // A change of place alone adds to a motion that still runs, as a shift does.
-    CHECK(scene->save(card) == Result::Success);
+    CHECK(scene->save(cards, 1u) == Result::Success);
     CHECK(scene->play(AnimationTarget::from(card).shift({2.0f, 0.0f, 0.0f}), 2.0f, linear) == Result::Success);
     CHECK(scene->seek(7.5f) == Result::Success);
-    CHECK(scene->restore(card, 1.0f, linear) == Result::Success);
+    CHECK(scene->restore(cards, 1u, 1.0f, linear) == Result::Success);
     CHECK(near(_centerAt(renderer, scene, card, 7.5f).x, 60.0f, 1.0f));
     CHECK(near(_centerAt(renderer, scene, card, 8.0f).x, 50.0f, 1.0f));
     CHECK(near(_centerAt(renderer, scene, card, 8.5f).x, 40.0f, 1.0f));
     CHECK(near(card->model.e[3], 0.0f));
     // A turn must end first, and a failed restore keeps the save.
-    CHECK(scene->save(card) == Result::Success);
+    CHECK(scene->save(cards, 1u) == Result::Success);
     CHECK(scene->play(Animation::rotate(card, 1.0f), 1.0f) == Result::Success);
     CHECK(scene->seek(9.0f) == Result::Success);
-    CHECK(scene->restore(card, 0.25f) == Result::InsufficientCondition);
+    CHECK(scene->restore(cards, 1u, 0.25f) == Result::InsufficientCondition);
     CHECK(_says(scene, "'card' already animates its transform until 9.50 s; begin at that time or later"));
     CHECK(scene->seek(9.5f) == Result::Success);
-    CHECK(scene->restore(card, 0.5f) == Result::Success);
+    CHECK(scene->restore(cards, 1u, 0.5f) == Result::Success);
     CHECK(near(card->model.e[0], 1.0f) && near(card->model.e[1], 0.0f));
 
     // Later targets begin later by the lag, as in play().
@@ -1196,10 +1200,11 @@ void saveRestore(Renderer* renderer)
     CHECK(near(_centerAt(renderer, scene, dot, 12.5f).y, 40.0f, 1.0f));
 
     // Errors name the problem and change nothing.
-    CHECK(scene->save(card) == Result::Success);
-    CHECK(scene->restore(card, -1.0f) == Result::InvalidArguments);
+    CHECK(scene->save(cards, 1u) == Result::Success);
+    CHECK(scene->restore(cards, 1u, -1.0f) == Result::InvalidArguments);
     CHECK(_says(scene, "zero or a positive number of seconds"));
-    CHECK(scene->restore(nullptr) == Result::InvalidArguments);
+    Object* nulls[] = {nullptr};
+    CHECK(scene->restore(nulls, 1u) == Result::InvalidArguments);
     CHECK(_says(scene, "not part of this scene"));
     CHECK(scene->restore(objects, 0u) == Result::InvalidArguments);
     CHECK(_says(scene, "nothing to restore"));
@@ -1207,22 +1212,23 @@ void saveRestore(Renderer* renderer)
     CHECK(scene->save(twice, 2u) == Result::InvalidArguments);
     CHECK(_says(scene, "only once in one call"));
     CHECK(scene->restore(twice, 2u) == Result::InvalidArguments);
-    CHECK(scene->save(nullptr) == Result::InvalidArguments);
+    CHECK(scene->save(nulls, 1u) == Result::InvalidArguments);
     CHECK(scene->remove(dot) == Result::Success);
-    CHECK(scene->save(dot) == Result::InvalidArguments);
+    CHECK(scene->save(dots, 1u) == Result::InvalidArguments);
     CHECK(_says(scene, "removed earlier"));
-    CHECK(scene->restore(card) == Result::Success);
+    CHECK(scene->restore(cards, 1u) == Result::Success);
 
     // A string saved on the timeline is one the text keeps, so a restore makes no copy of it,
     // even after more changes than a text looks back through for a string that reads the same.
-    CHECK(scene->save(title) == Result::Success);
+    Object* titles[] = {title};
+    CHECK(scene->save(titles, 1u) == Result::Success);
     char word[8];
     for (auto i = 0u; i < 17u; i++) {
         std::snprintf(word, sizeof(word), "w%u", i);
         CHECK(scene->play(AnimationTarget::from(title).text(word), 0.1f) == Result::Success);
     }
     auto strings = title->texts(nullptr, 0u);
-    CHECK(scene->restore(title) == Result::Success);
+    CHECK(scene->restore(titles, 1u) == Result::Success);
     CHECK(title->texts(nullptr, 0u) == strings && std::strcmp(title->text(), "cat") == 0);
     CHECK(std::strcmp(_shown(scene, title, scene->cursor()), "cat") == 0);
     delete scene;
@@ -1254,7 +1260,8 @@ void saveRestore(Renderer* renderer)
     CHECK(group->add(inner) == Result::Success && group->add(gone) == Result::Success);
     CHECK(other->add(group) == Result::Success && other->add(under) == Result::Success
           && other->add(cover) == Result::Success);
-    CHECK(other->save(group) == Result::Success);
+    Object* groups[] = {group};
+    CHECK(other->save(groups, 1u) == Result::Success);
     // Objects added below the group since the save stay as they are.
     CHECK(group->add(late) == Result::Success);
     // Before the timeline the group's new layer moves the starting layers below it.
@@ -1267,7 +1274,7 @@ void saveRestore(Renderer* renderer)
     CHECK(_pixelAt(surface, 130u, 40u) != pixel(white));
     // Objects removed since the save stay removed.
     CHECK(other->remove(gone) == Result::Success);
-    CHECK(other->restore(group, 1.0f) == Result::Success);
+    CHECK(other->restore(groups, 1u, 1.0f) == Result::Success);
     // The higher layer holds until the restore ends, then the saved order is back.
     CHECK(_reportedLayer(renderer, other, inner, 1.5f) == 4);
     CHECK(_reportedLayer(renderer, other, inner, 2.0f) == 0);
@@ -1280,12 +1287,12 @@ void saveRestore(Renderer* renderer)
     CHECK(same(late->style.fill, blue));
 
     // An object below the target edited directly must be updated first.
-    CHECK(other->save(group) == Result::Success);
+    CHECK(other->save(groups, 1u) == Result::Success);
     inner->opacity = 0.25f;
-    CHECK(other->restore(group) == Result::InvalidArguments);
+    CHECK(other->restore(groups, 1u) == Result::InvalidArguments);
     CHECK(_says(other, "below the target was edited directly"));
-    CHECK(other->save(group) == Result::InvalidArguments);
+    CHECK(other->save(groups, 1u) == Result::InvalidArguments);
     inner->opacity = 1.0f;
-    CHECK(other->restore(group) == Result::Success);
+    CHECK(other->restore(groups, 1u) == Result::Success);
     delete other;
 }

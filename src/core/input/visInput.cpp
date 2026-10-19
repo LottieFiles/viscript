@@ -1,5 +1,5 @@
-// The input module's controller: pointer follows, key moves and triggers, and camera actions,
-// applied to a scene through runtime modifiers.
+// The input module's controller: pointer follows, key moves and camera actions, applied to a
+// scene through runtime modifiers.
 #include <cmath>
 #include <new>
 
@@ -73,7 +73,6 @@ struct Controller::Impl
     State* states = nullptr;
     PointerBinding* pointers = nullptr;
     KeyBinding* keys = nullptr;
-    KeyTriggerBinding* triggers = nullptr;
     vis::input::State* inputState = nullptr;
     uint32_t stateCount = 0u;
     uint32_t stateCapacity = 0u;
@@ -81,8 +80,6 @@ struct Controller::Impl
     uint32_t pointerCapacity = 0u;
     uint32_t keyCount = 0u;
     uint32_t keyCapacity = 0u;
-    uint32_t triggerCount = 0u;
-    uint32_t triggerCapacity = 0u;
     CameraDrive camera;
 
     ~Impl()
@@ -90,7 +87,6 @@ struct Controller::Impl
         delete[] states;
         delete[] pointers;
         delete[] keys;
-        delete[] triggers;
         delete inputState;
     }
 
@@ -110,7 +106,7 @@ struct Controller::Impl
             || scene->object(target->id()) != target || family(target, controller)) {
             return Result::InvalidArguments;
         }
-        if (pointerCount + keyCount + triggerCount >= BindingLimit) {
+        if (pointerCount + keyCount >= BindingLimit) {
             return Result::InsufficientCondition;
         }
         for (auto i = 0u; i < pointerCount; i++) {
@@ -196,24 +192,6 @@ struct Controller::Impl
             if (keys[i].config.key == key) return true;
         }
         return false;
-    }
-
-    bool hasTrigger(Key key) const noexcept
-    {
-        for (auto i = 0u; i < triggerCount; i++) {
-            if (triggers[i].key == key) return true;
-        }
-        return false;
-    }
-
-    void emit(Key key, KeyTrigger trigger, float begin, float end) noexcept
-    {
-        auto count = triggerCount;
-        for (auto i = 0u; i < count; i++) {
-            auto binding = triggers[i];
-            if (binding.key != key || binding.trigger != trigger) continue;
-            binding.callback({key, trigger, begin, end}, binding.data);
-        }
     }
 
     void transition(State& state, float time, const Vec3& shift, const Vec3& rotation,
@@ -314,35 +292,6 @@ Result Controller::keyMove(const KeyMove& binding) noexcept
     return Result::Success;
 }
 
-Result Controller::keyTrigger(const KeyTriggerBinding& binding) noexcept
-{
-    if (!pImpl || !pImpl->scene || !validKey(binding.key)
-        || static_cast<uint8_t>(binding.trigger) > static_cast<uint8_t>(KeyTrigger::Up)
-        || !binding.callback) {
-        return Result::InvalidArguments;
-    }
-    if (pImpl->pointerCount + pImpl->keyCount + pImpl->triggerCount >= BindingLimit) {
-        return Result::InsufficientCondition;
-    }
-    if (!grow(pImpl->triggers, pImpl->triggerCount, pImpl->triggerCapacity, 1u, 8u)) {
-        return Result::OutOfMemory;
-    }
-    pImpl->triggers[pImpl->triggerCount++] = binding;
-    return Result::Success;
-}
-
-Result Controller::keyState(Key key, KeyState& state) const noexcept
-{
-    if (!pImpl || !validKey(key)) return Result::InvalidArguments;
-    DigitalState input;
-    auto result = pImpl->inputState->key(key, input);
-    if (result != Result::Success) return result;
-    state.begin = input.begin;
-    state.end = input.end;
-    state.down = input.down;
-    return result;
-}
-
 InputResult Controller::input(const InputEvent& event) noexcept
 {
     if (!pImpl || !validEvent(event)) return {false, false, Result::InvalidArguments};
@@ -396,9 +345,8 @@ InputResult Controller::input(const InputEvent& event) noexcept
         }
     } else if (keyEvent) {
         auto moved = pImpl->hasMove(event.key);
-        auto triggered = pImpl->hasTrigger(event.key);
         if (event.kind == InputKind::KeyDown) {
-            result.handled = moved || triggered;
+            result.handled = moved;
             if (previous.down) {
                 result.status = pImpl->inputState->input(event);
                 return result;
@@ -412,14 +360,13 @@ InputResult Controller::input(const InputEvent& event) noexcept
             }
             result.status = pImpl->inputState->input(event);
             if (result.status != Result::Success) return result;
-            pImpl->emit(event.key, KeyTrigger::Down, event.time, event.time);
             result.redraw = moved;
         } else {
             if (!previous.down) {
                 result.status = pImpl->inputState->input(event);
                 return result;
             }
-            result.handled = moved || triggered;
+            result.handled = moved;
             for (auto i = 0u; i < pImpl->keyCount; i++) {
                 auto& binding = pImpl->keys[i];
                 if (binding.config.key != event.key) continue;
@@ -427,8 +374,6 @@ InputResult Controller::input(const InputEvent& event) noexcept
             }
             result.status = pImpl->inputState->input(event);
             if (result.status != Result::Success) return result;
-            pImpl->emit(event.key, KeyTrigger::Up, previous.begin, event.time);
-            pImpl->emit(event.key, KeyTrigger::Tap, previous.begin, event.time);
             result.redraw = moved;
         }
     }

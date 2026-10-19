@@ -93,15 +93,6 @@ private:
 uint32_t pair(const Formula& source, const Formula& target, Object** pairs,
               uint32_t capacity) noexcept;
 
-struct Lua
-{
-    // Runs a Lua scene script with the tex module's factories, as vis::Lua::load() does.
-    static Result load(const char* source, uint32_t size, const char* name, Scene** scene,
-                       char* error, uint32_t errorSize, vis::Lua::AssetResolver resolver = nullptr,
-                       void* resolverData = nullptr, const Theme* adaptiveTheme = nullptr,
-                       bool* adaptiveThemeUsed = nullptr) noexcept;
-};
-
 }  // namespace vis::tex
 
 #endif

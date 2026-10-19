@@ -10,6 +10,18 @@ namespace vis
 
 static constexpr uint32_t DISPLAY_COMMAND_LIMIT = 65536;
 
+// Where a text command draws, in pixels: a 3x3 matrix in row-major order, e[row * 3 + column],
+// applied to column vectors.
+struct Mat3
+{
+    float e[9];
+
+    static Mat3 identity() noexcept
+    {
+        return {{1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f}};
+    }
+};
+
 enum struct CommandType : uint8_t
 {
     Path,

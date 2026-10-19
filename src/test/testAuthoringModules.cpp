@@ -6,22 +6,13 @@
 #if defined(VIS_DIAGRAM)
 #include "vis_diagram.h"
 #endif
-#include "visLuaHost.h"
 #if defined(VIS_UI)
 #include "vis_ui.h"
 #endif
 #include "testLuaCollector.h"
-#include "testCheck.h"
+#include "testLuaLoad.h"
 
 using namespace vis;
-
-static Result load(const char* source, Scene*& scene, char* error,
-                   uint32_t errorSize, detail::LuaHostContext& context)
-{
-    return detail::luaHostLoad(source, static_cast<uint32_t>(std::strlen(source)),
-                               "authoring-modules.lua", &scene, error, errorSize,
-                               nullptr, nullptr, nullptr, nullptr, context);
-}
 
 #if defined(VIS_DIAGRAM)
 static void combinedModules()
@@ -55,13 +46,8 @@ if vis.ui then
 end
 return scene
 )lua";
-    Scene* scene = nullptr;
-    char error[1024] = {};
     detail::LuaHostContext context;
-    auto result = load(source, scene, error, sizeof(error), context);
-    CHECK(result == Result::Success);
-    CHECK(scene != nullptr);
-    if (result != Result::Success) std::fprintf(stderr, "combined modules: %s\n", error);
+    auto scene = _loaded(source, "authoring-modules.lua", context);
     if (scene) {
         CHECK(scene->object("pipeline:root") != nullptr);
         CHECK(scene->object("pipeline:node:parser") != nullptr);
@@ -88,12 +74,7 @@ d:build()
 d:node {id = "b"}
 return scene
 )lua";
-    Scene* scene = nullptr;
-    char error[1024] = {};
-    detail::LuaHostContext context;
-    auto result = load(mutation, scene, error, sizeof(error), context);
-    CHECK(result == Result::ScriptError && scene == nullptr);
-    CHECK(std::strstr(error, "already built") != nullptr);
+    _scriptError(mutation, "authoring-modules.lua", "already built");
 
     static constexpr char foreign[] = R"lua(
 local scene = vis.scene {}
@@ -104,10 +85,7 @@ local b = right:node {id = "b"}
 left:connect {id = "bad", from = a, to = b}
 return scene
 )lua";
-    context = {};
-    result = load(foreign, scene, error, sizeof(error), context);
-    CHECK(result == Result::ScriptError && scene == nullptr);
-    CHECK(std::strstr(error, "another diagram") != nullptr);
+    _scriptError(foreign, "authoring-modules.lua", "another diagram");
 
     // Lua formats only %d, not %u, so these limits must reach the message as numbers.
     static constexpr char waypoints[] = R"lua(
@@ -117,25 +95,20 @@ local a, b = d:node {id = "a"}, d:node {id = "b"}
 d:connect {id = "e", from = a, to = b, waypoints = {}}
 return scene
 )lua";
-    context = {};
-    result = load(waypoints, scene, error, sizeof(error), context);
-    CHECK(result == Result::ScriptError && scene == nullptr);
-    CHECK(std::strstr(error, "between 1 and 16 points") != nullptr);
+    _scriptError(waypoints, "authoring-modules.lua", "between 1 and 16 points");
 
     static constexpr char members[] = R"lua(
 local scene = vis.scene {}
 vis.diagram(scene, {id = "limits"}):zone {id = "z", members = {}}
 return scene
 )lua";
-    context = {};
-    result = load(members, scene, error, sizeof(error), context);
-    CHECK(result == Result::ScriptError && scene == nullptr);
-    CHECK(std::strstr(error, "between 1 and 256 members") != nullptr);
+    _scriptError(members, "authoring-modules.lua", "between 1 and 256 members");
 }
 #endif
 
 #if defined(VIS_DIAGRAM)
-static void standaloneDiagramLoader()
+// What a script builds is in the receipt of the diagram's root.
+static void luaReceipt()
 {
     static constexpr char diagramSource[] = R"lua(
 local scene = vis.scene {}
@@ -157,13 +130,7 @@ diagram:zone {
 diagram:build()
 return scene
 )lua";
-    Scene* scene = nullptr;
-    char error[1024] = {};
-    auto result = diagram::Lua::load(
-        diagramSource, static_cast<uint32_t>(std::strlen(diagramSource)),
-        "standalone-diagram.lua", &scene, error, sizeof(error));
-    CHECK(result == Result::Success && scene);
-    if (result != Result::Success) std::fprintf(stderr, "standalone diagram: %s\n", error);
+    auto scene = _loaded(diagramSource, "standalone-diagram.lua");
     auto root = scene ? scene->object("standalone-diagram:root") : nullptr;
     auto receipt = diagram::ir(root);
     CHECK(root != nullptr);
@@ -323,12 +290,7 @@ diagram:zone {id = "scope", members = {a, b}}
 diagram:build()
 return scene
 )lua", item.scene, item.corner);
-        Scene* scene = nullptr;
-        char error[1024] = {};
-        auto result = diagram::Lua::load(source, static_cast<uint32_t>(std::strlen(source)),
-                                         "diagram-theme-corners.lua", &scene, error, sizeof(error));
-        CHECK(result == Result::Success && scene);
-        if (result != Result::Success) std::fprintf(stderr, "diagram theme corners: %s\n", error);
+        auto scene = _loaded(source, "diagram-theme-corners.lua");
         auto corner = [scene](const char* id) {
             auto object = scene ? scene->object(id) : nullptr;
             return object && object->type() == Type::Rectangle
@@ -349,7 +311,7 @@ int main()
 #if defined(VIS_DIAGRAM)
     combinedModules();
     diagramScriptFailures();
-    standaloneDiagramLoader();
+    luaReceipt();
     numericDiagramText();
     diagramThemeCorners();
 #endif

@@ -419,7 +419,7 @@ static void layoutOcclusion(Renderer* renderer)
         CHECK(from->viewport(cover, {}) == Result::Success);
         Scene* stages[] = {from, to};
         CHECK(transitionRoot->transition(stages, 2u, {}, 0.6f, 0.2f,
-                                         Easing::Linear) == Result::Success);
+                                         AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
         LayoutReport report;
         CHECK(renderer->layout(transitionRoot, 0.1f, report) == Result::Success);
         auto rootVisual = _layoutVisual(report, transitionRootBox);
@@ -469,7 +469,7 @@ static void layoutOcclusion(Renderer* renderer)
         CHECK(targetViewport->add(targetBox) == Result::Success);
         Scene* nestedStages[] = {sequenceFirst, sequenceTop};
         CHECK(painterFrom->transition(nestedStages, 2u, {}, 0.1f, 0.0f,
-                                      Easing::Linear) == Result::Success);
+                                      AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
         CHECK(painterTo->viewport(targetViewport, {}) == Result::Success);
         Scene* stages[] = {painterFrom, painterTo};
         CHECK(painterRoot->transition(stages, 2u, {}, 1.0f, 0.0f,
@@ -782,11 +782,11 @@ static void scene2D(Renderer* renderer)
     vector->stroke(Color::hex("#ffd166"), 4.0f);
     circle->stroke(Color::hex("#4cc9f0"), 3.0f).fill(Color::hex("#4cc9f044"));
     CHECK(scene->add(space) == Result::Success);
-    CHECK(scene->play(Animation::create(space), 0.5f, Easing::Linear) == Result::Success);
+    CHECK(scene->play(Animation::create(space), 0.5f, AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
     CHECK(space->add(vector) == Result::Success);
     CHECK(space->add(circle) == Result::Success);
     Animation create[] = {Animation::create(vector), Animation::create(circle)};
-    CHECK(scene->play(create, 2, 1.0f, Easing::Smooth) == Result::Success);
+    CHECK(scene->play(create, 2, 1.0f, AnimCurve::preset(AnimCurvePreset::Smooth)) == Result::Success);
     CHECK(scene->play(Animation::transform(vector, Mat4::rotateZ(0.65f) * vector->model), 0.75f) == Result::Success);
     CHECK(scene->wait(0.25f) == Result::Success);
     CHECK(scene->duration() == 2.5f);
@@ -1039,7 +1039,8 @@ static void boundaries(Renderer* renderer)
         CHECK(first->add(sharedSpace) == Result::Success);
         CHECK(second->add(sharedSpace) == Result::InvalidArguments);
         auto animation = Animation::create(shared);
-        CHECK(first->play(animation, 1.0f, static_cast<Easing>(255)) == Result::InvalidArguments);
+        CHECK(first->play(animation, 1.0f, AnimCurve::preset(static_cast<AnimCurvePreset>(255)))
+              == Result::InvalidArguments);
         auto custom = AnimCurve::cubicBezier({0.2f, 0.8f}, {0.3f, 1.0f}, 0.9f);
         CHECK(first->play(Animation::shift(shared, {1.0f, 0.0f}), 1.0f, custom)
               == Result::Success);
@@ -1137,7 +1138,8 @@ static void boundaries(Renderer* renderer)
         CHECK(interpolationSpace->add(line) == Result::Success);
         CHECK(interpolation->add(interpolationSpace) == Result::Success);
         auto target = Mat4::translate({std::numeric_limits<float>::max(), 0.0f, 0.0f});
-        CHECK(interpolation->play(Animation::transform(line, target), 1.0f, Easing::Linear) == Result::Success);
+        CHECK(interpolation->play(Animation::transform(line, target), 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+              == Result::Success);
         Surface surface;
         CHECK(renderer->render(interpolation, 0.5f, surface) == Result::Success);
     }
@@ -1393,7 +1395,7 @@ static void scene3D(Renderer* renderer)
     CHECK(space->add(z) == Result::Success);
     CHECK(scene->add(space) == Result::Success);
     Animation create[] = {Animation::create(space), Animation::create(x), Animation::create(y), Animation::create(z)};
-    CHECK(scene->play(create, 4, 1.2f, Easing::Smooth, 0.08f) == Result::Success);
+    CHECK(scene->play(create, 4, 1.2f, AnimCurve::preset(AnimCurvePreset::Smooth), 0.08f) == Result::Success);
 
     Surface surface;
     CHECK(renderer->render(scene, scene->duration(), surface) == Result::Success);
@@ -1592,13 +1594,15 @@ static void dimensionTransition(Renderer* renderer)
     auto spatialCamera = planarCamera;
     spatialCamera.eye = {6.0f, 4.0f, 7.0f};
     spatialCamera.projection = Projection::Perspective;
-    CHECK(scene->look(spatialCamera, CameraView::ThreeD, 1.0f, Easing::Smooth) == Result::Success);
+    CHECK(scene->look(spatialCamera, CameraView::ThreeD, 1.0f, AnimCurve::preset(AnimCurvePreset::Smooth))
+          == Result::Success);
     CHECK(scene->view(0.0f) == CameraView::TwoD);
     CHECK(scene->view(0.5f) == CameraView::ThreeD);
     CHECK(renderer->render(scene, 0.5f, surface) == Result::Success);
     CHECK(changed(surface, config.background) > 1000);
     CHECK(checksum(surface) != planar);
-    CHECK(scene->look(planarCamera, CameraView::TwoD, 1.0f, Easing::Smooth) == Result::Success);
+    CHECK(scene->look(planarCamera, CameraView::TwoD, 1.0f, AnimCurve::preset(AnimCurvePreset::Smooth))
+          == Result::Success);
     CHECK(scene->view(scene->duration()) == CameraView::TwoD);
     CHECK(renderer->render(scene, scene->duration(), surface) == Result::Success);
     CHECK(changed(surface, config.background) > 1000);
@@ -1615,13 +1619,15 @@ static void dimensionTransition(Renderer* renderer)
     if (cameraPath) {
         auto opposite = cameraPathConfig.camera;
         opposite.eye = {0.0f, 0.0f, -10.0f};
-        CHECK(cameraPath->look(opposite, CameraView::ThreeD, 1.0f, Easing::Linear) == Result::Success);
+        CHECK(cameraPath->look(opposite, CameraView::ThreeD, 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+              == Result::Success);
         Surface pathSurface;
         CHECK(renderer->render(cameraPath, 0.5f, pathSurface) == Result::Success);
 
         auto rolled = opposite;
         rolled.up = {0.0f, -1.0f, 0.0f};
-        CHECK(cameraPath->look(rolled, CameraView::ThreeD, 1.0f, Easing::Linear) == Result::Success);
+        CHECK(cameraPath->look(rolled, CameraView::ThreeD, 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+              == Result::Success);
         CHECK(renderer->render(cameraPath, 1.5f, pathSurface) == Result::Success);
     }
     delete cameraPath;
@@ -1639,14 +1645,14 @@ static void dimensionTransition(Renderer* renderer)
     if (extremeCamera) {
         auto ordinary = Camera{};
         ordinary.projection = Projection::Perspective;
-        CHECK(extremeCamera->look(ordinary, CameraView::ThreeD, 1.0f, Easing::Linear)
+        CHECK(extremeCamera->look(ordinary, CameraView::ThreeD, 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
               == Result::InvalidArguments);
         CHECK(near(extremeCamera->duration(), 0.0f));
         Surface extremeSurface;
         CHECK(renderer->render(extremeCamera, 0.0f, extremeSurface) == Result::Success);
         auto extremeLens = extremeCameraConfig.camera;
         extremeLens.fov = 0.9f;
-        CHECK(extremeCamera->look(extremeLens, CameraView::ThreeD, 1.0f, Easing::Linear)
+        CHECK(extremeCamera->look(extremeLens, CameraView::ThreeD, 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
               == Result::Success);
         CHECK(renderer->render(extremeCamera, 0.5f, extremeSurface) == Result::Success);
     }
@@ -1666,7 +1672,7 @@ static void dimensionTransition(Renderer* renderer)
     if (boundaryCamera) {
         auto boundaryTarget = boundaryCameraConfig.camera;
         boundaryTarget.target.x = std::nextafter(boundaryCameraConfig.camera.target.x, 0.0f);
-        CHECK(boundaryCamera->look(boundaryTarget, CameraView::ThreeD, 1.0f, Easing::Linear)
+        CHECK(boundaryCamera->look(boundaryTarget, CameraView::ThreeD, 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
               == Result::Success);
         Surface boundarySurface;
         CHECK(renderer->render(boundaryCamera, 0.5f, boundarySurface) == Result::Success);
@@ -1684,7 +1690,7 @@ static void dimensionTransition(Renderer* renderer)
         auto clipPlaneTarget = clipPlaneConfig.camera;
         clipPlaneTarget.near = std::nextafter(2.0f, 0.0f);
         clipPlaneTarget.far = 2.0f;
-        CHECK(clipPlaneScene->look(clipPlaneTarget, CameraView::TwoD, 1.0f, Easing::Linear)
+        CHECK(clipPlaneScene->look(clipPlaneTarget, CameraView::TwoD, 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
               == Result::InvalidArguments);
         CHECK(near(clipPlaneScene->duration(), 0.0f));
         Surface clipPlaneSurface;
@@ -1706,12 +1712,12 @@ static void dimensionTransition(Renderer* renderer)
         auto collapsed = precisionCameraConfig.camera;
         collapsed.target = {0.0f, 1073741824.0f, 0.0f};
         collapsed.eye = {1.0f, 1073741824.0f, 0.0f};
-        CHECK(precisionCamera->look(collapsed, CameraView::ThreeD, 1.0f, Easing::Linear)
+        CHECK(precisionCamera->look(collapsed, CameraView::ThreeD, 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
               == Result::InvalidArguments);
         CHECK(near(precisionCamera->duration(), 0.0f));
         auto fixedPose = precisionCameraConfig.camera;
         fixedPose.fov = 0.9f;
-        CHECK(precisionCamera->look(fixedPose, CameraView::ThreeD, 1.0f, Easing::Linear)
+        CHECK(precisionCamera->look(fixedPose, CameraView::ThreeD, 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
               == Result::Success);
         Surface precisionSurface;
         CHECK(renderer->render(precisionCamera, 0.5f, precisionSurface) == Result::Success);
@@ -1722,7 +1728,7 @@ static void dimensionTransition(Renderer* renderer)
     CHECK(invalidCurrentCamera != nullptr);
     if (invalidCurrentCamera) {
         invalidCurrentCamera->config().camera.near = -1.0f;
-        CHECK(invalidCurrentCamera->look(Camera{}, CameraView::TwoD, 1.0f, Easing::Linear)
+        CHECK(invalidCurrentCamera->look(Camera{}, CameraView::TwoD, 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
               == Result::InvalidArguments);
         CHECK(near(invalidCurrentCamera->duration(), 0.0f));
     }
@@ -1747,7 +1753,7 @@ static void dimensionTransition(Renderer* renderer)
             auto authoredFrame = checksum(authoredSurface);
             auto wider = authoredCamera->config().camera;
             wider.orthoHeight = 8.0f;
-            CHECK(authoredCamera->look(wider, CameraView::TwoD, 1.0f, Easing::Linear)
+            CHECK(authoredCamera->look(wider, CameraView::TwoD, 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
                   == Result::Success);
             CHECK(renderer->render(authoredCamera, 0.5f, authoredSurface) == Result::Success);
             CHECK(checksum(authoredSurface) == authoredFrame);
@@ -1771,7 +1777,7 @@ static void dimensionTransition(Renderer* renderer)
         CHECK(authoredView->view(0.0f) == CameraView::ThreeD);
         auto lens = authoredView->config().camera;
         lens.fov = 0.9f;
-        CHECK(authoredView->look(lens, CameraView::ThreeD, 1.0f, Easing::Linear)
+        CHECK(authoredView->look(lens, CameraView::ThreeD, 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
               == Result::Success);
         CHECK(authoredView->view(0.0f) == CameraView::ThreeD);
     }
@@ -1828,7 +1834,7 @@ static void pathAndCurveShapes(Renderer* renderer)
         CHECK(pathResult == Result::Success && curveResult == Result::Success);
         if (pathResult == Result::Success && curveResult == Result::Success) {
             Animation create[] = {Animation::create(path), Animation::create(curve)};
-            CHECK(scene->play(create, 2u, 0.8f, Easing::Linear, 0.1f) == Result::Success);
+            CHECK(scene->play(create, 2u, 0.8f, AnimCurve::preset(AnimCurvePreset::Linear), 0.1f) == Result::Success);
             auto curveTarget = Curve::gen({0.9f, 0.7f, 0.0f}, {1.4f, -1.3f, 0.0f},
                                           {2.0f, 1.3f, 0.0f}, {2.5f, -0.7f, 0.0f}, 24u);
             PathCommand targetCommands[] = {
@@ -1847,7 +1853,7 @@ static void pathAndCurveShapes(Renderer* renderer)
                 CHECK(curveTargetResult == Result::Success);
                 if (curveTargetResult == Result::Success) {
                     CHECK(scene->play(Animation::morph(curve, curveTarget), 0.5f,
-                                      Easing::Linear) == Result::Success);
+                                      AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
                 } else {
                     delete curveTarget;
                 }
@@ -1855,7 +1861,7 @@ static void pathAndCurveShapes(Renderer* renderer)
                 CHECK(pathTargetResult == Result::Success);
                 if (pathTargetResult == Result::Success) {
                     CHECK(scene->play(Animation::morph(path, pathTarget), 0.5f,
-                                      Easing::Linear) == Result::Success);
+                                      AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
                 } else {
                     delete pathTarget;
                 }
@@ -1899,7 +1905,7 @@ static void pathFillAnimations(Renderer* renderer)
         auto result = scene->add(path);
         CHECK(result == Result::Success);
         if (result == Result::Success) {
-            CHECK(scene->play(Animation::drawBorderThenFill(path), 1.0f, Easing::Linear)
+            CHECK(scene->play(Animation::drawBorderThenFill(path), 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
                   == Result::Success);
             Surface surface;
             auto center = static_cast<size_t>(60u) * 120u + 60u;
@@ -1928,9 +1934,9 @@ static void pathFillAnimations(Renderer* renderer)
         auto result = scene->add(path);
         CHECK(result == Result::Success);
         if (result == Result::Success) {
-            CHECK(scene->play(Animation::create(path), 0.6f, Easing::Linear)
+            CHECK(scene->play(Animation::create(path), 0.6f, AnimCurve::preset(AnimCurvePreset::Linear))
                   == Result::Success);
-            CHECK(scene->play(Animation::fillReveal(path), 0.4f, Easing::Linear)
+            CHECK(scene->play(Animation::fillReveal(path), 0.4f, AnimCurve::preset(AnimCurvePreset::Linear))
                   == Result::Success);
             Surface surface;
             auto center = static_cast<size_t>(60u) * 120u + 60u;
@@ -1966,7 +1972,7 @@ static void runtimeModifiers(Renderer* renderer)
     CHECK(scene && object);
     if (scene && object) {
         CHECK(scene->add(object) == Result::Success);
-        CHECK(scene->runtime(&modifier) == Result::Success);
+        CHECK(scene->runtimeAdd(&modifier) == Result::Success);
         auto invalidAction = CameraInput{static_cast<CameraAction>(255u), {}};
         CHECK(scene->cameraInput(invalidAction) == Result::InvalidArguments);
         CHECK(scene->cameraInput({CameraAction::Pan,
@@ -2009,8 +2015,7 @@ static void runtimeModifiers(Renderer* renderer)
     CHECK(scene && object);
     if (scene && object) {
         CHECK(scene->add(object) == Result::Success);
-        CHECK(scene->runtime(&modifier) == Result::Success);
-        CHECK(scene->runtime(&second) == Result::InsufficientCondition);
+        CHECK(scene->runtimeAdd(&modifier) == Result::Success);
         CHECK(scene->runtimeAdd(&second) == Result::Success);
         CHECK(scene->runtimeAdd(&second) == Result::Success);
         auto conflicting = second;
@@ -2040,7 +2045,7 @@ static void runtimeModifiers(Renderer* renderer)
     CHECK(scene && object);
     if (scene && object) {
         CHECK(scene->add(object) == Result::Success);
-        CHECK(scene->runtime(&modifier) == Result::Success);
+        CHECK(scene->runtimeAdd(&modifier) == Result::Success);
         object->opacity = 2.0f;
         BBox bounds;
         CHECK(renderer->bounds(scene, object, 0.0f, bounds) == Result::InvalidArguments);
@@ -2060,7 +2065,7 @@ static void runtimeModifiers(Renderer* renderer)
     CHECK(scene && object);
     if (scene && object) {
         CHECK(scene->add(object) == Result::Success);
-        CHECK(scene->runtime(&modifier) == Result::Success);
+        CHECK(scene->runtimeAdd(&modifier) == Result::Success);
         BBox bounds;
         CHECK(renderer->bounds(scene, object, 0.0f, bounds) == Result::InvalidArguments);
         CHECK(probe.objects == 1u);

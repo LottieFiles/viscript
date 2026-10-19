@@ -6,37 +6,9 @@
 
 #include "vis.h"
 #include "vis_tex.h"
-#include "visLuaHost.h"
-#include "testCheck.h"
+#include "testLuaLoad.h"
 
 using namespace vis;
-
-static Scene* _load(const char* source, const char* name)
-{
-    char error[1024] = {};
-    Scene* scene = nullptr;
-    auto status = tex::Lua::load(source, static_cast<uint32_t>(std::strlen(source)), name, &scene, error, sizeof(error));
-    CHECK(status == Result::Success && scene);
-    if (status != Result::Success) {
-        std::fprintf(stderr, "%s: %s\n", name, error);
-        delete scene;
-        return nullptr;
-    }
-    return scene;
-}
-
-static void _error(const char* source, const char* name, const char* expected)
-{
-    char error[1024] = {};
-    Scene* scene = nullptr;
-    auto status = tex::Lua::load(source, static_cast<uint32_t>(std::strlen(source)), name, &scene, error, sizeof(error));
-    CHECK(status == Result::ScriptError && !scene);
-    if (!std::strstr(error, expected)) {
-        std::fprintf(stderr, "%s: expected \"%s\", got \"%s\"\n", name, expected, error);
-        failures++;
-    }
-    delete scene;
-}
 
 static const Text* _text(const Scene* scene, const char* id)
 {
@@ -59,7 +31,7 @@ local group = scene:group {id = "holder"}
 group:tex {tex = "x", id = "inner", point = {-2, 0}}
 return scene
 )lua";
-    auto scene = _load(source, "tex-single.lua");
+    auto scene = _loaded(source, "tex-single.lua");
     if (!scene) return;
     auto root = scene->object("eq");
     CHECK(root && root->type() == Type::Group && static_cast<const Group*>(root)->typeset);
@@ -108,7 +80,7 @@ scene:play({target = eq:part("+"), fill = "#0000ff"}, 0.5)
 scene:indicate(eq:part("="), {color = "#ff00ff", duration = 0.5})
 return scene
 )lua";
-    auto scene = _load(source, "tex-parts.lua");
+    auto scene = _loaded(source, "tex-parts.lua");
     if (!scene) return;
     auto root = scene->object("eq");
     CHECK(root && root->childCount() == 5u);
@@ -139,7 +111,7 @@ if not rawequal(f:part("\\frac"), scene:find("f/1")) or not rawequal(f:part("\\s
 end
 return scene
 )lua";
-    auto scene = _load(source, "tex-shapes.lua");
+    auto scene = _loaded(source, "tex-shapes.lua");
     if (!scene) return;
     auto bar = scene->object("f/1");
     auto radical = scene->object("f/3");
@@ -156,33 +128,33 @@ return scene
 
 static void _errors()
 {
-    _error("local scene = vis.scene {} scene:tex {tex = 'a+\\\\foo'} return scene", "tex-command.lua",
+    _scriptError("local scene = vis.scene {} scene:tex {tex = 'a+\\\\foo'} return scene", "tex-command.lua",
            "tex: unknown command '\\foo' at 3");
-    _error("local scene = vis.scene {} scene:tex {tex = {'a', '\\\\frac{'}} return scene", "tex-part.lua",
+    _scriptError("local scene = vis.scene {} scene:tex {tex = {'a', '\\\\frac{'}} return scene", "tex-part.lua",
            "tex: part 2: ");
-    _error("local scene = vis.scene {} scene:tex {tex = 'x', stroke = 'red'} return scene", "tex-stroke.lua",
+    _scriptError("local scene = vis.scene {} scene:tex {tex = 'x', stroke = 'red'} return scene", "tex-stroke.lua",
            "tex draws glyphs and filled shapes, so stroke is unsupported");
-    _error("local scene = vis.scene {} scene:tex {tex = 'x', colour = 'red'} return scene", "tex-option.lua",
+    _scriptError("local scene = vis.scene {} scene:tex {tex = 'x', colour = 'red'} return scene", "tex-option.lua",
            "unknown option 'colour'");
-    _error("local scene = vis.scene {} scene:tex {} return scene", "tex-missing.lua",
+    _scriptError("local scene = vis.scene {} scene:tex {} return scene", "tex-missing.lua",
            "tex needs its TeX: a string, or a list of parts");
-    _error("local scene = vis.scene {} scene:tex {tex = 'x', size = -1} return scene", "tex-size.lua",
+    _scriptError("local scene = vis.scene {} scene:tex {tex = 'x', size = -1} return scene", "tex-size.lua",
            "size must be positive");
-    _error("local scene = vis.scene {} scene:tex {tex = 'x', id = 'x'} scene:tex {tex = 'y', id = 'x'} return scene",
+    _scriptError("local scene = vis.scene {} scene:tex {tex = 'x', id = 'x'} scene:tex {tex = 'y', id = 'x'} return scene",
            "tex-duplicate.lua", "duplicate id 'x'");
-    _error("local scene = vis.scene {} scene:tex {tex = 'a+b'}:part('c') return scene", "tex-absent.lua",
+    _scriptError("local scene = vis.scene {} scene:tex {tex = 'a+b'}:part('c') return scene", "tex-absent.lua",
            "tex draws no 'c'; it draws 'a', '+', 'b'");
-    _error("local scene = vis.scene {} scene:tex {tex = {'a', '+b'}}:part('c') return scene", "tex-absent-part.lua",
+    _scriptError("local scene = vis.scene {} scene:tex {tex = {'a', '+b'}}:part('c') return scene", "tex-absent-part.lua",
            "tex has no part 'c'; its parts are 'a', '+b'");
-    _error("local scene = vis.scene {} scene:tex {tex = 'x^2+y^2'}:part('2', 3) return scene", "tex-nth.lua",
+    _scriptError("local scene = vis.scene {} scene:tex {tex = 'x^2+y^2'}:part('2', 3) return scene", "tex-nth.lua",
            "tex has only 2 of '2'");
-    _error("local scene = vis.scene {} scene:group {}:part('x') return scene", "tex-not-formula.lua",
+    _scriptError("local scene = vis.scene {} scene:group {}:part('x') return scene", "tex-not-formula.lua",
            "part looks in a tex formula or in one of its parts");
 
     // The core's match_transform runs below the module's, and a part attaches below its formula
     // through a call of the module's own; their errors still name the script's line, and the
     // method in a bad argument, as the core's method alone does.
-    _error(R"lua(
+    _scriptError(R"lua(
 local scene = vis.scene {}
 local a = scene:tex {tex = "a+b"}
 scene:wait(1)
@@ -192,10 +164,10 @@ scene:match_transform(a, b, 1)
 return scene
 )lua",
            "tex-match-late.lua", "tex-match-late.lua:7: could not match transform: add the object to match into");
-    _error("local scene = vis.scene {}\nlocal a = scene:circle {}\nscene:match_transform(a, a, 'long')\nreturn scene",
+    _scriptError("local scene = vis.scene {}\nlocal a = scene:circle {}\nscene:match_transform(a, a, 'long')\nreturn scene",
            "tex-match-duration.lua",
            "tex-match-duration.lua:3: bad argument #3 to 'match_transform' (number expected, got string)");
-    _error("local scene = vis.scene {}\nscene:circle {id = 'taken'}\nscene:tex {tex = {'a', {'b', id = 'taken'}}}\n"
+    _scriptError("local scene = vis.scene {}\nscene:circle {id = 'taken'}\nscene:tex {tex = {'a', {'b', id = 'taken'}}}\n"
            "return scene",
            "tex-part-taken.lua", "tex-part-taken.lua:3: duplicate id 'taken'");
 }
@@ -215,7 +187,7 @@ scene:tex {tex = {"\\frac{}{}", "\\sqrt{}"}, point = {0, -1}}
 scene:spans {"a ", {tex = "\\frac{}{} + \\sqrt{}"}, " b", point = {0, -2}}
 return scene
 )lua";
-    auto scene = _load(source, "tex-empty.lua");
+    auto scene = _loaded(source, "tex-empty.lua");
     delete scene;
 }
 
@@ -223,7 +195,7 @@ return scene
 // read.
 static void _partLimit()
 {
-    _error("local scene = vis.scene {}\nlocal parts = {}\nfor i = 1, 16385 do parts[i] = 'x' end\n"
+    _scriptError("local scene = vis.scene {}\nlocal parts = {}\nfor i = 1, 16385 do parts[i] = 'x' end\n"
            "scene:tex {tex = parts}\nreturn scene",
            "tex-part-limit.lua", "tex-part-limit.lua:4: tex: a formula holds at most 16384 bytes");
 }
@@ -255,7 +227,7 @@ local b = scene:tex {tex = "a^2=c^2-b^2", id = "b", point = {0, -1}}
 scene:match_transform(a, b, 1, "smooth", {arc = 0.5})
 return scene
 )lua";
-    auto scene = _load(whole, "tex-match.lua");
+    auto scene = _loaded(whole, "tex-match.lua");
     if (scene) {
         // The 2 of c^2 starts where the 2 of c^2 stood, not where the first free 2 did.
         CHECK(_at(_center(renderer, scene, "b/5", 0.5f), _center(renderer, scene, "a/8", 0.4f)));
@@ -276,7 +248,7 @@ local y = scene:tex {tex = {"y", "+", "z^2"}, id = "y", point = {0, 2}}
 scene:match_transform(x, y, 1, "smooth", {pairs = {{x:part("x^2"), y:part("z^2")}}})
 return scene
 )lua";
-    scene = _load(parts, "tex-match-parts.lua");
+    scene = _loaded(parts, "tex-match-parts.lua");
     if (scene) {
         CHECK(_at(_center(renderer, scene, "b/1/2", 0.5f), _center(renderer, scene, "a/5/2", 0.4f)));
         CHECK(_at(_center(renderer, scene, "b/3/2", 0.5f), _center(renderer, scene, "a/1/2", 0.4f)));
@@ -306,7 +278,7 @@ return s
 )lua";
     char source[1024];
     std::snprintf(source, sizeof(source), "local strings = %s%s", "false", given);
-    auto scene = _load(source, "tex-match-given.lua");
+    auto scene = _loaded(source, "tex-match-given.lua");
     if (scene) {
         // b and c of the discriminant start where those of the formula stand, which stay.
         CHECK(_at(_center(renderer, scene, "delta/3", 0.5f), _center(renderer, scene, "eq/9", 0.4f)));
@@ -319,7 +291,7 @@ return s
     }
     delete scene;
     std::snprintf(source, sizeof(source), "local strings = %s%s", "true", given);
-    scene = _load(source, "tex-match-strings.lua");
+    scene = _loaded(source, "tex-match-strings.lua");
     if (scene) CHECK(_at(_center(renderer, scene, "delta/2", 0.5f), _center(renderer, scene, "eq/2", 0.4f)));
     delete scene;
 
@@ -331,7 +303,7 @@ local y = scene:tex {tex = {"y", "+", "z^2"}, id = "y", point = {0, 2}}
 scene:match_transform(x, y, 1, "smooth", {strings = false, pairs = {{x:part("x^2"), y:part("z^2")}}})
 return scene
 )lua";
-    scene = _load(parts, "tex-match-given-parts.lua");
+    scene = _loaded(parts, "tex-match-given-parts.lua");
     if (scene) {
         CHECK(_at(_center(renderer, scene, "y/3/2", 0.5f), _center(renderer, scene, "x/1/2", 0.4f)));
         CHECK(!_at(_center(renderer, scene, "y/3/1", 1.0f), _center(renderer, scene, "y/3/1", 1.5f)));
@@ -353,7 +325,7 @@ local b = s:bounds(eq:part("b"))
 s:rectangle {id = "under", center = {(b.left + b.right) / 2, b.bottom - 4}, size = {b.width, 2}}
 return s
 )lua";
-    auto scene = _load(source, "tex-framing.lua");
+    auto scene = _loaded(source, "tex-framing.lua");
     if (!scene) return;
     BBox two;
     BBox a;
@@ -394,7 +366,7 @@ for i = 9, 14 do term[#term + 1] = s:find("eq/" .. i) end
 s:brace {around = term, offset = 8, gap = 3, label = "discriminant", id = "brace"}
 return s
 )lua";
-    auto scene = _load(source, "tex-brace.lua");
+    auto scene = _loaded(source, "tex-brace.lua");
     if (!scene) return;
     // b, 2, minus, 4, a and c of b^2 - 4ac, the b and a leaning.
     BBox ink{};
@@ -472,7 +444,7 @@ local target = s:tex {tex = "c^2=a^2+b^2", point = {0, 250}, id = "target"}
 s:match_transform(eq, target, 1)
 return s
 )lua";
-    auto scene = _load(source, "tex-inline.lua");
+    auto scene = _loaded(source, "tex-inline.lua");
     if (!scene) return;
     auto eq = scene->object("eq");
     CHECK(eq && eq->type() == Type::Group && eq->parent() == scene->object("row"));
@@ -531,23 +503,23 @@ return s
     CHECK(std::fabs(scene->duration() - 1.5f) < 1.0e-4f);
     delete scene;
 
-    _error("local s = vis.scene {} s:spans {{tex = 'x', text = 'y'}} return s", "tex-span-text.lua",
+    _scriptError("local s = vis.scene {} s:spans {{tex = 'x', text = 'y'}} return s", "tex-span-text.lua",
            "a spans part sets text or tex, not both");
-    _error("local s = vis.scene {} s:spans {{'y', tex = 'x'}} return s", "tex-span-first.lua",
+    _scriptError("local s = vis.scene {} s:spans {{'y', tex = 'x'}} return s", "tex-span-first.lua",
            "a spans part sets text or tex, not both");
-    _error("local s = vis.scene {} s:spans {{tex = 'x', stroke = 'red'}} return s", "tex-span-stroke.lua",
+    _scriptError("local s = vis.scene {} s:spans {{tex = 'x', stroke = 'red'}} return s", "tex-span-stroke.lua",
            "tex draws glyphs and filled shapes, so stroke is unsupported");
-    _error("local s = vis.scene {} s:spans {{tex = 'x', colour = 'red'}} return s", "tex-span-option.lua",
+    _scriptError("local s = vis.scene {} s:spans {{tex = 'x', colour = 'red'}} return s", "tex-span-option.lua",
            "unknown option 'colour'");
-    _error("local s = vis.scene {} s:spans {{tex = 'x', display = 1}} return s", "tex-span-display.lua",
+    _scriptError("local s = vis.scene {} s:spans {{tex = 'x', display = 1}} return s", "tex-span-display.lua",
            "display must be a boolean");
-    _error("local s = vis.scene {} s:spans {{tex = 'a+\\\\foo'}} return s", "tex-span-command.lua",
+    _scriptError("local s = vis.scene {} s:spans {{tex = 'a+\\\\foo'}} return s", "tex-span-command.lua",
            "tex: unknown command '\\foo' at 3");
-    _error("local s = vis.scene {} s:spans {{tex = 3}} return s", "tex-span-missing.lua",
+    _scriptError("local s = vis.scene {} s:spans {{tex = 3}} return s", "tex-span-missing.lua",
            "tex needs its TeX: a string, or a list of parts");
-    _error("local s = vis.scene {} s:spans {{tex = 'x', size = -1}} return s", "tex-span-size.lua",
+    _scriptError("local s = vis.scene {} s:spans {{tex = 'x', size = -1}} return s", "tex-span-size.lua",
            "size must be positive");
-    _error("local s = vis.scene {} s:spans {'a', {tex = 'x'}, id = 'r'} s:spans {{tex = 'y', id = 'r/2'}} return s",
+    _scriptError("local s = vis.scene {} s:spans {'a', {tex = 'x'}, id = 'r'} s:spans {{tex = 'y', id = 'r/2'}} return s",
            "tex-span-duplicate.lua", "duplicate id 'r/2'");
 }
 
@@ -555,13 +527,13 @@ return s
 // line of the script.
 static void _spanLines()
 {
-    _error("local s = vis.scene {}\ns:spans {'a ', {tex = 'a+\\\\foo'}}\nreturn s", "tex-span-line.lua",
-           "tex-span-line.lua:2: tex: unknown command '\\foo' at 3");
-    _error("local s = vis.scene {}\ns:circle {id = 'taken'}\ns:spans {'a ', {tex = {'x', {'y', id = 'taken'}}}}\n"
-           "return s",
-           "tex-span-place.lua", "tex-span-place.lua:3: duplicate id 'taken'");
-    _error("local s = vis.scene {}\ns:matrix {rows = {{'\\\\frac{'}}}\nreturn s", "tex-matrix-line.lua",
-           "tex-matrix-line.lua:2: tex: missing '}'");
+    _scriptError("local s = vis.scene {}\ns:spans {'a ', {tex = 'a+\\\\foo'}}\nreturn s", "tex-span-line.lua",
+                 "tex-span-line.lua:2: tex: unknown command '\\foo' at 3");
+    _scriptError("local s = vis.scene {}\ns:circle {id = 'taken'}\ns:spans {'a ', {tex = {'x', {'y', id = 'taken'}}}}\n"
+                 "return s",
+                 "tex-span-place.lua", "tex-span-place.lua:3: duplicate id 'taken'");
+    _scriptError("local s = vis.scene {}\ns:matrix {rows = {{'\\\\frac{'}}}\nreturn s", "tex-matrix-line.lua",
+                 "tex-matrix-line.lua:2: tex: missing '}'");
 }
 
 // An inline formula applies its resolved row or part layer to every painted piece.
@@ -584,7 +556,7 @@ s:set {target = highlight, opacity = 1}
 s:wait(1)
 return s
 )lua";
-    auto scene = _load(source, "tex-inline-layers.lua");
+    auto scene = _loaded(source, "tex-inline-layers.lua");
     if (!scene) return;
     auto layers = [&](const char* id, int32_t layer) {
         auto root = scene->object(id);
@@ -645,13 +617,13 @@ return s
     CHECK(white > 100u && lost == 0u);
     delete scene;
 
-    _error("local s = vis.scene {} s:spans {{tex = 'x', layer = 1.5}} return s", "tex-inline-layer.lua",
+    _scriptError("local s = vis.scene {} s:spans {{tex = 'x', layer = 1.5}} return s", "tex-inline-layer.lua",
            "layer must be an integer");
-    _error("local s = vis.scene {} s:spans {{tex = 'x'}, layer = 1 << 40} return s", "tex-inline-layer-range.lua",
+    _scriptError("local s = vis.scene {} s:spans {{tex = 'x'}, layer = 1 << 40} return s", "tex-inline-layer-range.lua",
            "layer is out of range");
-    _error("local s = vis.scene {} s:spans {{tex = {{'x', layer = 1.5}}}} return s", "tex-inline-part-layer.lua",
+    _scriptError("local s = vis.scene {} s:spans {{tex = {{'x', layer = 1.5}}}} return s", "tex-inline-part-layer.lua",
            "layer must be an integer");
-    _error("local s = vis.scene {} s:spans {{tex = {{'x', layer = 1 << 40}}}} return s",
+    _scriptError("local s = vis.scene {} s:spans {{tex = {{'x', layer = 1 << 40}}}} return s",
            "tex-inline-part-layer-range.lua", "layer is out of range");
 }
 
@@ -684,7 +656,7 @@ s:spans {"gg\n", {tex = "\\frac{a}{b}", display = true, id = "frac"}, "\nHH\nx",
          point = {300, 0}, id = "tall"}
 return s
 )lua";
-    auto scene = _load(source, "tex-leading.lua");
+    auto scene = _loaded(source, "tex-leading.lua");
     if (!scene) return;
     auto blank = Text::gen(" ");
     TextExtent space;
@@ -722,7 +694,7 @@ if not rawequal(m:entry(1, 2):part("x"), s:find("m/1/2/1")) then error("part fin
 s:play({target = m:entry(1, 1), value = 7}, 1)
 return s
 )lua";
-    auto scene = _load(source, "tex-matrix.lua");
+    auto scene = _loaded(source, "tex-matrix.lua");
     if (!scene) return;
     auto x = scene->object("m/1/2");
     CHECK(x && x->type() == Type::Group && static_cast<const Group*>(x)->typeset && x->parent() == scene->object("m/1"));
@@ -756,7 +728,7 @@ s:tex {tex = "x", point = {300, 100}, size = 30, align = {1, 1}, id = "boxed"}
 s:spans {"so ", {tex = "y_1", id = "y"}, point = {0, -200}, size = 30, baseline = true, id = "row"}
 return s
 )lua";
-    auto scene = _load(source, "tex-baseline.lua");
+    auto scene = _loaded(source, "tex-baseline.lua");
     if (!scene) return;
     // The fraction's baseline is its math axis less the axis height: its bar lies above the
     // word's baseline, and its numerator and denominator on either side of it.
@@ -772,9 +744,9 @@ return s
     CHECK(_near(_glyphBaseline(scene, "y/1"), -200.0f) && _near(_baseline(scene, "row/1"), -200.0f));
     delete scene;
 
-    _error("local s = vis.scene {} s:tex {tex = 'x', baseline = 1} return s", "tex-baseline-type.lua",
+    _scriptError("local s = vis.scene {} s:tex {tex = 'x', baseline = 1} return s", "tex-baseline-type.lua",
            "baseline must be a boolean");
-    _error("local s = vis.scene {} s:spans {{tex = 'x', baseline = true}} return s", "tex-baseline-part.lua",
+    _scriptError("local s = vis.scene {} s:spans {{tex = 'x', baseline = true}} return s", "tex-baseline-part.lua",
            "unknown option 'baseline'");
 }
 
@@ -793,7 +765,7 @@ if #made ~= 3 or not rawequal(made[1], half) or not rawequal(made[2], minus) the
 end
 return s
 )lua";
-    auto scene = _load(source, "tex-axis.lua");
+    auto scene = _loaded(source, "tex-axis.lua");
     if (!scene) return;
     // 50 pixels to a unit: the side of a label that faces its axis lies 4 + 4 pixels, 0.16, from it.
     auto bounds = [&](const char* id, Bounds& box) {
@@ -810,20 +782,6 @@ return s
     CHECK(bounds("one", one) && std::fabs(one.max.x + 0.16f) < 1.0e-4f && std::fabs(one.center().y - 1.0f) < 1.0e-4f);
     auto formula = scene->object("half");
     CHECK(formula && formula->parent() && formula->parent()->type() == Type::Space);
-    delete scene;
-}
-
-// The host that runs every module enabled sets formulas too.
-static void _host()
-{
-    static constexpr char source[] = "local scene = vis.scene {} scene:tex {tex = 'x', id = 'x'} return scene";
-    char error[1024] = {};
-    Scene* scene = nullptr;
-    detail::LuaHostContext context;
-    auto status = detail::luaHostLoad(source, sizeof(source) - 1u, "tex-host.lua", &scene, error, sizeof(error), nullptr,
-                                      nullptr, nullptr, nullptr, context);
-    CHECK(status == Result::Success && scene && scene->object("x/1"));
-    if (status != Result::Success) std::fprintf(stderr, "tex-host.lua: %s\n", error);
     delete scene;
 }
 
@@ -851,7 +809,6 @@ int main()
         _leading();
         _baselinePinned();
         _axisLabels();
-        _host();
     }
     delete renderer;
     return report();

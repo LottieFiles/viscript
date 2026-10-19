@@ -71,38 +71,6 @@ enum struct Key : uint8_t
     Tab
 };
 
-enum struct KeyTrigger : uint8_t
-{
-    Tap = 0,
-    Down,
-    Up
-};
-
-struct KeyState
-{
-    float begin = 0.0f;
-    float end = 0.0f;
-    bool down = false;
-};
-
-struct KeySignal
-{
-    Key key = Key::Unknown;
-    KeyTrigger trigger = KeyTrigger::Tap;
-    float begin = 0.0f;
-    float end = 0.0f;
-};
-
-using KeyCallback = void (*)(const KeySignal& signal, void* data);
-
-struct KeyTriggerBinding
-{
-    Key key = Key::Unknown;
-    KeyTrigger trigger = KeyTrigger::Tap;
-    KeyCallback callback = nullptr;
-    void* data = nullptr;
-};
-
 // Positions are logical host coordinates; targets need an explicit map.
 // 3D pointing needs a hit plane or intersection; repeated key-down events are ignored.
 struct InputEvent
@@ -117,7 +85,6 @@ struct InputEvent
     uint32_t buttons = 0u;
     uint32_t modifiers = 0u;
     float time = 0.0f;
-    bool repeat = false;
 };
 
 struct InputResult
@@ -250,8 +217,6 @@ struct Controller final : Group
     State* state() const noexcept;
     Result pointerFollow(const PointerFollow& binding) noexcept;
     Result keyMove(const KeyMove& binding) noexcept;
-    Result keyTrigger(const KeyTriggerBinding& binding) noexcept;
-    Result keyState(Key key, KeyState& state) const noexcept;
     InputResult input(const InputEvent& event) noexcept;
     InputResult release(float time) noexcept;
 
@@ -274,15 +239,6 @@ private:
     Result camera(CameraAction action, const Vec2& delta) noexcept;
 
     Impl* pImpl = nullptr;
-};
-
-struct Lua
-{
-    static Result load(const char* source, uint32_t size, const char* name,
-                       Scene** scene, Controller** controller, char* error,
-                       uint32_t errorSize, vis::Lua::AssetResolver resolver = nullptr,
-                       void* resolverData = nullptr, const Theme* adaptiveTheme = nullptr,
-                       bool* adaptiveThemeUsed = nullptr) noexcept;
 };
 
 }  // namespace vis::input

@@ -3331,11 +3331,6 @@ AnimationTarget& AnimationTarget::size(const Vec2& value) noexcept
     return *this;
 }
 
-AnimationTarget& AnimationTarget::trimDistance(float value) noexcept
-{
-    return trimDistance(Vec2{value, value});
-}
-
 AnimationTarget& AnimationTarget::trimDistance(const Vec2& value) noexcept
 {
     targetTrimDistance = value;
@@ -4771,22 +4766,6 @@ Result Scene::remove(Object* object) noexcept
 
 // ---------- Object transitions ----------
 
-static AnimCurve _legacyCurve(Easing easing) noexcept
-{
-    if (static_cast<uint8_t>(easing) > static_cast<uint8_t>(Easing::EaseInOut)) {
-        auto curve = AnimCurve::preset(AnimCurvePreset::Linear);
-        curve.kind = static_cast<AnimCurvePreset>(UINT8_MAX);
-        return curve;
-    }
-    return AnimCurve::preset(static_cast<AnimCurvePreset>(easing));
-}
-
-Result Scene::transition(Scene* const* scenes, uint32_t count, const Viewport& viewport,
-                         float duration, float hold, Easing easing) noexcept
-{
-    return transition(scenes, count, viewport, duration, hold, _legacyCurve(easing));
-}
-
 Result Scene::transition(Scene* const* scenes, uint32_t count, const Viewport& viewport,
                          float duration, float hold, const AnimCurve& curve) noexcept
 {
@@ -5007,11 +4986,6 @@ Result Scene::transition(Scene* const* scenes, uint32_t count, const Viewport& v
     return Result::Success;
 }
 
-Result Scene::play(const Animation& animation, float duration, Easing easing) noexcept
-{
-    return play(animation, duration, _legacyCurve(easing));
-}
-
 Result Scene::play(const Animation& animation, float duration, const AnimCurve& curve) noexcept
 {
     return play(&animation, 1, duration, curve, 0.0f);
@@ -5218,12 +5192,6 @@ static const char* _morphGeometry(const Object* source, const Object* target)
 static bool _hasClip(const ObjectEntry& entry)
 {
     return entry.firstClip != NO_CLIP;
-}
-
-Result Scene::fadeTransform(Object* source, Object* target, float duration,
-                            Easing easing) noexcept
-{
-    return fadeTransform(source, target, duration, _legacyCurve(easing));
 }
 
 Result Scene::fadeTransform(Object* source, Object* target, float duration,
@@ -6936,11 +6904,6 @@ static Result _connectorCycle(const Impl& impl, const Animation* animations, uin
 
 // ---------- Playing animations ----------
 
-Result Scene::play(const Animation* animations, uint32_t count, float duration, Easing easing, float lag) noexcept
-{
-    return play(animations, count, duration, _legacyCurve(easing), lag);
-}
-
 Result Scene::play(const Animation* animations, uint32_t count, float duration,
                    const AnimCurve& curve, float lag) noexcept
 {
@@ -7383,20 +7346,9 @@ Result Scene::play(const Animation* animations, uint32_t count, float duration,
     return Result::Success;
 }
 
-Result Scene::play(const AnimationTarget& target, float duration, Easing easing) noexcept
-{
-    return play(target, duration, _legacyCurve(easing));
-}
-
 Result Scene::play(const AnimationTarget& target, float duration, const AnimCurve& curve) noexcept
 {
     return play(&target, 1u, duration, curve, 0.0f);
-}
-
-Result Scene::play(const AnimationTarget* targets, uint32_t count, float duration,
-                   Easing easing, float lag) noexcept
-{
-    return play(targets, count, duration, _legacyCurve(easing), lag);
 }
 
 // Points state at the geometry its object has now: the scene's copy of it.
@@ -7852,11 +7804,6 @@ static const char* _record(Impl& impl, SavedState& save)
     return nullptr;
 }
 
-Result Scene::save(Object* target) noexcept
-{
-    return save(&target, 1u);
-}
-
 Result Scene::save(Object* const* targets, uint32_t count) noexcept
 {
     pImpl->diagnostic = nullptr;
@@ -7968,11 +7915,6 @@ struct Restoring
     bool layered = false;
     bool added = false;
 };
-
-Result Scene::restore(Object* target, float duration, const AnimCurve& curve) noexcept
-{
-    return restore(&target, 1u, duration, curve, 0.0f);
-}
 
 Result Scene::restore(Object* const* targets, uint32_t count, float duration, const AnimCurve& curve,
                       float lag) noexcept
@@ -8348,28 +8290,6 @@ Result Scene::warp(Object* const* targets, uint32_t count, PointMap map, void* d
 
 // ---------- Runtime modifiers and camera input ----------
 
-Result Scene::runtime(const RuntimeModifier* modifier) noexcept
-{
-    if (!modifier) {
-        for (auto i = 0u; i < pImpl->runtimeModifierCnt; i++) {
-            pImpl->runtimeModifiers[i] = {};
-        }
-        pImpl->runtimeModifierCnt = 0u;
-        return Result::Success;
-    }
-    if (!modifier->object && !modifier->fill && !modifier->camera && !modifier->input) {
-        return Result::InvalidArguments;
-    }
-    if (pImpl->runtimeModifierCnt > 1u
-        || (pImpl->runtimeModifierCnt == 1u
-            && pImpl->runtimeModifiers[0].data != modifier->data)) {
-        return Result::InsufficientCondition;
-    }
-    pImpl->runtimeModifiers[0] = *modifier;
-    pImpl->runtimeModifierCnt = 1u;
-    return Result::Success;
-}
-
 Result Scene::runtimeAdd(const RuntimeModifier* modifier) noexcept
 {
     if (!modifier || !modifier->data
@@ -8436,11 +8356,6 @@ Result Scene::cameraInput(const CameraInput& input) noexcept
 }
 
 // ---------- Cameras and views ----------
-
-Result Scene::look(const Camera& camera, CameraView view, float duration, Easing easing) noexcept
-{
-    return look(camera, view, duration, _legacyCurve(easing));
-}
 
 Result Scene::look(const Camera& camera, CameraView view, float duration,
                    const AnimCurve& curve) noexcept
@@ -8516,11 +8431,6 @@ Result Scene::Impl::look(const CameraTrack& track, const Camera& camera, CameraV
     advance(nextCursor);
     definitionsSealed = true;
     return Result::Success;
-}
-
-Result Scene::orbit(float angle, const Vec3& axis, float duration, Easing easing) noexcept
-{
-    return orbit(angle, axis, duration, _legacyCurve(easing));
 }
 
 Result Scene::orbit(float angle, const Vec3& axis, float duration, const AnimCurve& curve) noexcept

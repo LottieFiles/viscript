@@ -513,7 +513,8 @@ void groupStyles(Renderer* renderer)
 
     // Animating the group's fill animates the shapes that take it, and only those.
     auto clips = scene->clipCount();
-    CHECK(scene->play(AnimationTarget::from(outer).fill(white), 1.0f, Easing::Linear) == Result::Success);
+    CHECK(scene->play(AnimationTarget::from(outer).fill(white), 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
     CHECK(scene->clipCount() == clips + 4u);
     CHECK(same(plain->style.fill, white) && same(own->style.fill, white) && same(deep->style.fill, white));
     CHECK(same(nested->style.fill, blue) && same(plain->style.stroke, green));

@@ -220,7 +220,8 @@ void viewports(Renderer* renderer)
         timedCircle->fill(Color::hex("#ffd166"));
         CHECK(timedSpace->add(timedCircle) == Result::Success);
         CHECK(timedChild->add(timedSpace) == Result::Success);
-        CHECK(timedChild->play(Animation::create(timedCircle), 1.0f, Easing::Linear) == Result::Success);
+        CHECK(timedChild->play(Animation::create(timedCircle), 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+              == Result::Success);
         CHECK(timedRoot->viewport(timedChild, {}) == Result::Success);
         CHECK(timedRoot->duration() == 1.0f);
         Surface surface;
@@ -345,7 +346,7 @@ void liveSceneTransitions(Renderer* renderer)
             dot->fill(Color::hex("#ffffff")).stroke(Color::hex("#00000000"), 0);
             CHECK(stages[i]->add(dot) == Result::Success);
             CHECK(stages[i]->play(Animation::shift(dot, {i ? 1.0f : 4.0f, 0.0f}),
-                                  i ? 0.5f : 4.0f, Easing::Linear) == Result::Success);
+                                  i ? 0.5f : 4.0f, AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
         }
         float holds[] = {2.0f, 1.0f, 1.0f};
         TransitionStyle style;
@@ -402,7 +403,8 @@ void liveSceneTransitions(Renderer* renderer)
     dot->fill(Color::hex("#ffffff"));
     dot->stroke(Color::hex("#00000000"), 0);
     CHECK(stages[0]->add(dot) == Result::Success);
-    CHECK(stages[0]->play(Animation::shift(dot, {2, 0}), 3, Easing::Linear) == Result::Success);
+    CHECK(stages[0]->play(Animation::shift(dot, {2, 0}), 3, AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
     CHECK(root->transition(stages, 2u, {}, 1, 2, AnimCurve::preset(AnimCurvePreset::Linear),
                            nullptr, 0u, false) == Result::Success);
     LayoutReport report;
@@ -440,13 +442,13 @@ void sceneTransitions(Renderer* renderer)
         CHECK(second->add(newLabel) == Result::Success);
         Scene* stages[] = {first, second};
         Scene* duplicate[] = {first, first};
-        CHECK(root->transition(nullptr, 2u, {}, 1.0f, 0.25f, Easing::Linear)
+        CHECK(root->transition(nullptr, 2u, {}, 1.0f, 0.25f, AnimCurve::preset(AnimCurvePreset::Linear))
               == Result::InvalidArguments);
-        CHECK(root->transition(stages, 1u, {}, 1.0f, 0.25f, Easing::Linear)
+        CHECK(root->transition(stages, 1u, {}, 1.0f, 0.25f, AnimCurve::preset(AnimCurvePreset::Linear))
               == Result::InvalidArguments);
-        CHECK(root->transition(duplicate, 2u, {}, 1.0f, 0.25f, Easing::Linear)
+        CHECK(root->transition(duplicate, 2u, {}, 1.0f, 0.25f, AnimCurve::preset(AnimCurvePreset::Linear))
               == Result::InvalidArguments);
-        CHECK(root->transition(stages, 2u, {}, 1.0f, 0.25f, Easing::Linear)
+        CHECK(root->transition(stages, 2u, {}, 1.0f, 0.25f, AnimCurve::preset(AnimCurvePreset::Linear))
               == Result::Success);
         CHECK(near(root->duration(), 1.5f));
         CHECK(root->transitionCount() == 2u);
@@ -565,7 +567,7 @@ void transitionLayoutVisuals(Renderer* renderer)
         CHECK(dissolveTo->add(newText) == Result::Success);
         Scene* stages[] = {dissolveFrom, dissolveTo};
         CHECK(dissolveRoot->transition(stages, 2u, {}, 1.0f, 0.0f,
-                                       Easing::Linear) == Result::Success);
+                                       AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
 
         LayoutReport report;
         CHECK(renderer->layout(dissolveRoot, 0.25f, report) == Result::Success);
@@ -645,7 +647,7 @@ void transitionLayoutVisuals(Renderer* renderer)
         CHECK(fadeTo->add(unmatchedTo) == Result::Success);
         Scene* stages[] = {fadeFrom, fadeTo};
         CHECK(fadeRoot->transition(stages, 2u, {}, 1.0f, 0.0f,
-                                   Easing::Linear) == Result::Success);
+                                   AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
 
         LayoutReport report;
         CHECK(renderer->layout(fadeRoot, 0.5f, report) == Result::Success);
@@ -702,7 +704,7 @@ void transitionLayoutVisuals(Renderer* renderer)
         CHECK(dimensionTo->add(toCircle) == Result::Success);
         Scene* stages[] = {dimensionFrom, dimensionTo};
         CHECK(dimensionRoot->transition(stages, 2u, {}, 1.0f, 0.0f,
-                                        Easing::Linear) == Result::Success);
+                                        AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
 
         LayoutReport report;
         CHECK(renderer->layout(dimensionRoot, 0.5f, report) == Result::Success);
@@ -769,7 +771,7 @@ void transitionLayoutVisuals(Renderer* renderer)
               == Result::Success);
         Scene* stages[] = {nestedFrom, nestedTo};
         CHECK(nestedRoot->transition(stages, 2u, {}, 1.0f, 0.0f,
-                                     Easing::Linear) == Result::Success);
+                                     AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
 
         LayoutReport report;
         CHECK(renderer->layout(nestedRoot, 0.5f, report) == Result::Success);
@@ -862,7 +864,7 @@ void transitionLayoutVisuals(Renderer* renderer)
         CHECK(reparentTo->add(targetChild) == Result::Success);
         Scene* stages[] = {reparentFrom, reparentTo};
         CHECK(reparentRoot->transition(stages, 2u, {}, 1.0f, 0.0f,
-                                       Easing::Linear) == Result::Success);
+                                       AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
 
         LayoutReport report;
         CHECK(renderer->layout(reparentRoot, 0.5f, report) == Result::Success);
@@ -1160,7 +1162,8 @@ void transitionStyles(Renderer* renderer)
                     object->style.stroke = Color::hex("#ff0000");
                     object->style.width = width;
                     CHECK(scene->update(object) == Result::Success);
-                    CHECK(scene->play(Animation::shift(object, {1.0f, 1.0f, 0.0f}), 1.0f, Easing::Linear)
+                    CHECK(scene->play(Animation::shift(object, {1.0f, 1.0f, 0.0f}), 1.0f,
+                                      AnimCurve::preset(AnimCurvePreset::Linear))
                           == Result::Success);
                     auto camera = config.camera;
                     camera.eye.x += 0.5f;
@@ -1168,7 +1171,7 @@ void transitionStyles(Renderer* renderer)
                     camera.eye.y += 0.5f;
                     camera.target.y += 0.5f;
                     camera.orthoHeight = 2.0f;
-                    CHECK(scene->look(camera, CameraView::TwoD, 1.0f, Easing::Linear)
+                    CHECK(scene->look(camera, CameraView::TwoD, 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
                           == Result::Success);
                     if (card) *card = object;
                     return scene;

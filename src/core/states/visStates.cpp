@@ -91,16 +91,6 @@ static Mat4 _matrix(const State& state, const Vec3& origin) noexcept
         * Mat4::translate(origin * -1.0f);
 }
 
-static AnimCurve _curve(Easing easing) noexcept
-{
-    if (static_cast<uint8_t>(easing) > static_cast<uint8_t>(Easing::EaseInOut)) {
-        auto invalid = AnimCurve::preset(AnimCurvePreset::Linear);
-        invalid.kind = static_cast<AnimCurvePreset>(UINT8_MAX);
-        return invalid;
-    }
-    return AnimCurve::preset(static_cast<AnimCurvePreset>(easing));
-}
-
 }  // namespace
 
 struct Controller::Impl
@@ -243,23 +233,10 @@ Result Controller::define(Object* object, const char* name, const State& state) 
 }
 
 Result Controller::transition(Object* object, const char* state, float duration,
-                              Easing easing) noexcept
-{
-    auto target = Target{object, state};
-    return transition(&target, 1u, duration, _curve(easing));
-}
-
-Result Controller::transition(Object* object, const char* state, float duration,
                               const AnimCurve& curve) noexcept
 {
     auto target = Target{object, state};
     return transition(&target, 1u, duration, curve);
-}
-
-Result Controller::transition(const Target* targets, uint32_t count, float duration,
-                              Easing easing) noexcept
-{
-    return transition(targets, count, duration, _curve(easing));
 }
 
 Result Controller::transition(const Target* targets, uint32_t count, float duration,

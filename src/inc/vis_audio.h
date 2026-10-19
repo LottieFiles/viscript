@@ -81,13 +81,7 @@ struct Soundscape final : Group
     Result cue(const CueConfig& config, Cue& output) noexcept;
     // Finite gain is in [0, 4]; gain clips on a cue may not overlap.
     Result gain(Cue cue, float value, float begin, float duration = 1.0f,
-                Easing easing = Easing::Smooth) noexcept;
-    Result gain(Cue cue, float value, float begin, float duration,
-                const AnimCurve& curve) noexcept;
-    Result gain(Cue cue, float value, float begin, const TimingOptions& timing) noexcept
-    {
-        return gain(cue, value, begin, timing.duration, timing.curve);
-    }
+                const AnimCurve& curve = {}) noexcept;
     uint32_t count() const noexcept;
     bool cueAt(uint32_t index, CueConfig& output) const noexcept;
     Result sample(Cue cue, float time, float& output) const noexcept;
@@ -139,17 +133,6 @@ private:
     Impl* pImpl = nullptr;
 
     explicit Player(const PlayerConfig& config) noexcept;
-};
-
-struct Lua
-{
-    static Result load(const char* source, uint32_t size, const char* name,
-                       Scene** scene, Soundscape** soundscape,
-                       char* error, uint32_t errorSize,
-                       vis::Lua::AssetResolver resolver = nullptr,
-                       void* resolverData = nullptr,
-                       const Theme* adaptiveTheme = nullptr,
-                       bool* adaptiveThemeUsed = nullptr) noexcept;
 };
 
 }  // namespace vis::audio

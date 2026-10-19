@@ -668,7 +668,7 @@ void sampleTime(Renderer* renderer)
     Group* target = nullptr;
     CHECK(space->cell(_solidCell, target, &blue, CellMode::Full)
           == Result::Success);
-    CHECK(scene->play(Animation::morph(field, target), 1.0f, Easing::Linear)
+    CHECK(scene->play(Animation::morph(field, target), 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
           == Result::NonSupport);
     delete scene;
 

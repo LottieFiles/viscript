@@ -1137,6 +1137,14 @@ Result DisplayList::circle(const Vec2& center, float radius, const Style& style,
     return Result::Success;
 }
 
+static bool _finite(const Mat3& value) noexcept
+{
+    for (auto item : value.e) {
+        if (!std::isfinite(item)) return false;
+    }
+    return true;
+}
+
 Result DisplayList::text(const Vec2& point, const char* value, const char* font, float size,
                          const Vec2& align, const Style& style, int32_t layer, float depth,
                          const Mat3* transform, bool copy, float slant, bool tabular) noexcept

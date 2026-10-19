@@ -52,7 +52,7 @@ correct.shift = {0.0f, 0.12f, 0.0f};
 correct.rotation.z = 0.03f;
 correct.scale = {1.08f, 1.08f, 1.0f};
 controller->define(answer, "answer.correct", correct);
-controller->transition(answer, "answer.correct", 0.18f, Easing::Smooth);
+controller->transition(answer, "answer.correct", 0.18f, AnimCurve::preset(AnimCurvePreset::Smooth));
 controller->advance(1.0f / 60.0f);
 ```
 

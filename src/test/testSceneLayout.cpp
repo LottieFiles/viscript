@@ -290,11 +290,14 @@ void objectIds()
     CHECK(first->object(0u) == nullptr && first->object(5u) == nullptr);
     CHECK(stranger->id() == 1u && first->object(stranger->id()) == group);
     CHECK(second->object(1u) == stranger && second->object(2u) == nullptr);
-    CHECK(first->play(Animation::fade(stranger, 0.5f), 1.0f, Easing::Linear) == Result::InvalidArguments);
+    CHECK(first->play(Animation::fade(stranger, 0.5f), 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::InvalidArguments);
     CHECK(first->diagnostic() && std::strcmp(first->diagnostic(), "the object is not part of this scene") == 0);
     CHECK(first->remove(stranger) != Result::Success);
-    CHECK(first->play(Animation::fade(later, 0.5f), 1.0f, Easing::Linear) == Result::Success);
-    CHECK(second->play(Animation::fade(stranger, 0.25f), 1.0f, Easing::Linear) == Result::Success);
+    CHECK(first->play(Animation::fade(later, 0.5f), 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
+    CHECK(second->play(Animation::fade(stranger, 0.25f), 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
     delete first;
     delete second;
 }
@@ -551,7 +554,8 @@ void sceneUpdate(Renderer* renderer)
             CHECK(renderer->render(historical, 0.0f, surface) == Result::Success);
             auto visible = checksum(surface);
             CHECK(historical->wait(1.0f) == Result::Success);
-            CHECK(historical->play(Animation::create(historicalRectangle), 1.0f, Easing::Linear)
+            CHECK(historical->play(Animation::create(historicalRectangle), 1.0f,
+                                   AnimCurve::preset(AnimCurvePreset::Linear))
                   == Result::Success);
             CHECK(renderer->render(historical, 0.0f, surface) == Result::Success);
             CHECK(changed(surface, config.background) == 0u);
@@ -744,7 +748,9 @@ void connectorOutlines(Renderer* renderer)
     CHECK(corners->add(box) == Result::Success);
     CHECK(corners->add(cornerSink) == Result::Success);
     CHECK(corners->add(cornerEdge) == Result::Success);
-    CHECK(corners->play(AnimationTarget::from(box).size(Vec2{72, 72}).corner(20), 1, Easing::Linear) == Result::Success);
+    CHECK(corners->play(AnimationTarget::from(box).size(Vec2{72, 72}).corner(20), 1,
+                        AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
     const float cornerTimes[] = {0, 0.25f, 0.5f, 1};
     for (auto time : cornerTimes) {
         Vec3 a;
@@ -767,12 +773,14 @@ void connectorOutlines(Renderer* renderer)
     CHECK(scene->add(token) == Result::Success);
     edge->padding = 3;
     CHECK(scene->update(edge) == Result::Success);
-    CHECK(scene->play(AnimationTarget::from(source).radius(36).shift({20, 0, 0}), 1, Easing::Linear) == Result::Success);
+    CHECK(scene->play(AnimationTarget::from(source).radius(36).shift({20, 0, 0}), 1,
+                      AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
     CHECK(scene->seek(0) == Result::Success);
     auto ride = Animation::moveAlong(token, edge, true);
     ride.from = 0.8f;
     ride.to = 0.2f;
-    CHECK(scene->play(ride, 1, Easing::Linear) == Result::Success);
+    CHECK(scene->play(ride, 1, AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
     const float times[] = {0.0f, 0.25f, 0.5f, 0.75f, 1.0f, 0.25f};
     for (auto time : times) {
         Vec3 a;
@@ -795,11 +803,13 @@ void connectorOutlines(Renderer* renderer)
     auto finalPosition = finalStart + (finalEnd - finalStart) * 0.2f;
     CHECK((token->model * token->center - finalPosition).length() < 0.001f);
     BBox held;
-    CHECK(scene->play(Animation::shift(sink, {50, 0, 0}), 1, Easing::Linear) == Result::Success);
+    CHECK(scene->play(Animation::shift(sink, {50, 0, 0}), 1, AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
     CHECK(renderer->bounds(scene, token, 1.5f, held) == Result::Success);
     CHECK(near(held.center().x - 480, finalPosition.x, 0.001f));
     CHECK(near(270 - held.center().y, finalPosition.y, 0.001f));
-    CHECK(scene->play(Animation::shift(token, {5, 0, 0}), 1, Easing::Linear) == Result::Success);
+    CHECK(scene->play(Animation::shift(token, {5, 0, 0}), 1, AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
     CHECK(renderer->bounds(scene, token, 3, held) == Result::Success);
     CHECK(near(held.center().x - 480, finalPosition.x + 5, 0.001f));
     CHECK(near(270 - held.center().y, finalPosition.y, 0.001f));
@@ -822,9 +832,11 @@ void connectorOutlines(Renderer* renderer)
     CHECK(parentScene->add(left) == Result::Success);
     CHECK(parentScene->add(right) == Result::Success);
     CHECK(parentScene->add(parentEdge) == Result::Success);
-    CHECK(parentScene->play(Animation::shift(parent, {20, 0, 0}), 1, Easing::Linear) == Result::Success);
+    CHECK(parentScene->play(Animation::shift(parent, {20, 0, 0}), 1, AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
     CHECK(parentScene->seek(0) == Result::Success);
-    CHECK(parentScene->play(Animation::moveAlong(child, parentEdge), 1, Easing::Linear) == Result::Success);
+    CHECK(parentScene->play(Animation::moveAlong(child, parentEdge), 1, AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
     const float parentTimes[] = {0, 0.25f, 0.5f, 1};
     for (auto time : parentTimes) {
         Vec3 a;
@@ -986,7 +998,7 @@ void connectorAnimation(Renderer* renderer)
                     CHECK(near(scene->duration(), 0.0f));
                     auto target = AnimationTarget::from(destination);
                     target.shift({0.0f, 1.5f, 0.0f});
-                    CHECK(scene->play(target, 1.0f, Easing::Linear) == Result::Success);
+                    CHECK(scene->play(target, 1.0f, AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
                     Surface surface;
                     CHECK(renderer->render(scene, 0.0f, surface) == Result::Success);
                     auto start = extent(surface, config.background);
@@ -1032,7 +1044,7 @@ void connectorAnimation(Renderer* renderer)
         CHECK(graphResult == Result::Success);
         if (graphResult == Result::Success) {
             CHECK(graphScene->play(Animation::shift(graph, {0.5f, 0.0f, 0.0f}), 1.0f,
-                                   Easing::Linear) == Result::Success);
+                                   AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
             Surface surface;
             CHECK(renderer->render(graphScene, 0.5f, surface) == Result::Success);
         } else {
@@ -1062,7 +1074,7 @@ void connectorAnimation(Renderer* renderer)
         CHECK(nodeResult == Result::Success);
         if (nodeResult == Result::Success) {
             CHECK(outgoingScene->play(Animation::shift(node, {0.5f, 0.0f, 0.0f}), 1.0f,
-                                      Easing::Linear) == Result::Success);
+                                      AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
         } else {
             delete node;
         }
@@ -1106,7 +1118,8 @@ void animationTargets(Renderer* renderer)
             auto atomicInvalid = AnimationTarget::from(second);
             atomicInvalid.opacity(std::numeric_limits<float>::quiet_NaN());
             AnimationTarget atomic[] = {atomicValid, atomicInvalid};
-            CHECK(scene->play(atomic, 2, 1.0f, Easing::Linear, 0.25f) == Result::InvalidArguments);
+            CHECK(scene->play(atomic, 2, 1.0f, AnimCurve::preset(AnimCurvePreset::Linear), 0.25f)
+                  == Result::InvalidArguments);
             CHECK(near(scene->duration(), 0.0f));
             CHECK(near(first->model.e[3], firstModel.e[3]));
             CHECK(near(first->opacity, firstOpacity));
@@ -1118,7 +1131,8 @@ void animationTargets(Renderer* renderer)
             auto duplicateOpacity = AnimationTarget::from(first);
             duplicateOpacity.opacity(0.5f);
             AnimationTarget duplicate[] = {duplicateShift, duplicateOpacity};
-            CHECK(scene->play(duplicate, 2, 1.0f, Easing::Linear, 0.0f) == Result::InvalidArguments);
+            CHECK(scene->play(duplicate, 2, 1.0f, AnimCurve::preset(AnimCurvePreset::Linear), 0.0f)
+                  == Result::InvalidArguments);
             CHECK(near(scene->duration(), 0.0f));
             CHECK(near(first->model.e[3], firstModel.e[3]) && near(first->opacity, firstOpacity));
 
@@ -1148,8 +1162,9 @@ void animationTargets(Renderer* renderer)
             invalidMarkerTarget.tip(8.0f);
             CHECK(scene->play(invalidMarkerTarget) == Result::InvalidArguments);
             CHECK(scene->play(static_cast<const AnimationTarget*>(nullptr), 1, 1.0f,
-                              Easing::Linear, 0.0f) == Result::InvalidArguments);
-            CHECK(scene->play(&noProperties, 0, 1.0f, Easing::Linear, 0.0f) == Result::InvalidArguments);
+                              AnimCurve::preset(AnimCurvePreset::Linear), 0.0f) == Result::InvalidArguments);
+            CHECK(scene->play(&noProperties, 0, 1.0f, AnimCurve::preset(AnimCurvePreset::Linear), 0.0f)
+                  == Result::InvalidArguments);
             CHECK(near(scene->duration(), 0.0f));
 
             Surface surface;
@@ -1166,7 +1181,7 @@ void animationTargets(Renderer* renderer)
                 .fill(Color::hex("#b060e8"))
                 .dashOffset(-10.0f);
             AnimationTarget targets[] = {firstTarget, secondTarget};
-            CHECK(scene->play(targets, 2, 2.0f, Easing::Linear, 0.25f) == Result::Success);
+            CHECK(scene->play(targets, 2, 2.0f, AnimCurve::preset(AnimCurvePreset::Linear), 0.25f) == Result::Success);
             CHECK(near(scene->duration(), 2.5f));
             CHECK(near(first->model.e[3], 2.0f) && near(first->model.e[7], 0.0f));
             CHECK(near(first->opacity, 0.4f));

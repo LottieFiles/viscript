@@ -195,8 +195,8 @@ static Scene* fade(float& time)
     rect->fill(Color::hex("#4cc9f0"));
     scene->add(rect);
     scene->add(circle);
-    scene->play(Animation::fadeIn(circle, {1.0f, 0.0f, 0.0f}), 1.0f, Easing::Linear);
-    scene->play(Animation::fade(rect, 0.2f), 1.0f, Easing::Linear);
+    scene->play(Animation::fadeIn(circle, {1.0f, 0.0f, 0.0f}), 1.0f, AnimCurve::preset(AnimCurvePreset::Linear));
+    scene->play(Animation::fade(rect, 0.2f), 1.0f, AnimCurve::preset(AnimCurvePreset::Linear));
     time = 1.5f;  // circle fully in, rect halfway to 0.2 opacity
     return scene;
 }

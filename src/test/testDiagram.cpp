@@ -1945,8 +1945,9 @@ static void invalidGraphs()
     Node unchanged;
     CHECK(diagram->add(nodeSpec("same", "Duplicate"), unchanged)
           == Result::InvalidArguments);
-    CHECK(!unchanged && diagram->nodeCount() == 1u);
-    CHECK(diagram->add(nodeSpec("second", "Second"), second) == Result::Success);
+    CHECK(!unchanged);
+    // The duplicate took no place, so the next node is the second.
+    CHECK(diagram->add(nodeSpec("second", "Second"), second) == Result::Success && second.index == 1u);
     Node duplicated[] = {first, first};
     Zone zone;
     CHECK(diagram->add(zoneSpec("duplicate-zone", nullptr, duplicated, 2u), zone)
@@ -2048,9 +2049,9 @@ static void sampledPhysicalConstraints()
     delete built;
     CHECK(child->add(diagramRoot) == Result::Success);
     CHECK(child->play(Animation::shift(blockerObject, {0.0f, -2.0f, 0.0f}),
-                      1.0f, Easing::Linear) == Result::Success);
+                      1.0f, AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
     CHECK(child->play(Animation::shift(diagramRoot, {10.0f, 0.0f, 0.0f}),
-                      1.0f, Easing::Linear) == Result::Success);
+                      1.0f, AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
     CHECK(root->viewport(child, {0.5f, 0.0f, 0.5f, 1.0f}) == Result::Success);
 
     auto renderer = Renderer::gen();

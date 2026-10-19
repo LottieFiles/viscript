@@ -52,10 +52,10 @@ void cameraLayers(Renderer* renderer)
     auto camera = scene->config().camera;
     camera.target = {4.0f, 0.0f, 0.0f};
     camera.eye = {4.0f, 0.0f, 10.0f};
-    CHECK(scene->look(camera, CameraView::TwoD, 2.0f, Easing::Linear) == Result::Success);
+    CHECK(scene->look(camera, CameraView::TwoD, 2.0f, AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
     CHECK(scene->seek(0.5f) == Result::Success);
     camera.orthoHeight = 2.5f;
-    CHECK(scene->look(camera, CameraView::TwoD, 3.0f, Easing::Linear) == Result::Success);
+    CHECK(scene->look(camera, CameraView::TwoD, 3.0f, AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
     // _placed reads a frame 10 units high around the origin, so the mark's offset and size
     // scale by 10 over the view height.
     auto framed = [&](float time, float target, float height) {
@@ -72,7 +72,7 @@ void cameraLayers(Renderer* renderer)
     camera.eye = {0.0f, 0.0f, 10.0f};
     camera.orthoHeight = 10.0f;
     CHECK(scene->seek(3.5f) == Result::Success);
-    CHECK(scene->look(camera, CameraView::TwoD, 1.0f, Easing::Linear) == Result::Success);
+    CHECK(scene->look(camera, CameraView::TwoD, 1.0f, AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
     CHECK(framed(4.0f, 2.0f, 6.25f));
 
     // Clip planes added to that look ease from the current camera's to their own while it pans
@@ -81,12 +81,12 @@ void cameraLayers(Renderer* renderer)
     RuntimeModifier hook;
     hook.camera = _takeCamera;
     hook.data = &sample;
-    CHECK(scene->runtime(&hook) == Result::Success);
+    CHECK(scene->runtimeAdd(&hook) == Result::Success);
     CHECK(scene->seek(4.0f) == Result::Success);
     auto planes = camera;
     planes.near = 15.0f;
     planes.far = 40.0f;
-    CHECK(scene->look(planes, CameraView::TwoD, 1.0f, Easing::Linear) == Result::Success);
+    CHECK(scene->look(planes, CameraView::TwoD, 1.0f, AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
     CHECK(_cameraAt(scene, 4.25f, sample) && near(sample.camera.near, 0.05f + 14.95f * 0.25f, 1.0e-3f)
           && near(sample.camera.far, 760.0f, 1.0e-2f) && near(sample.camera.target.x, 1.0f, 1.0e-3f));
     CHECK(framed(4.25f, 1.0f, 8.125f));
@@ -114,11 +114,13 @@ void cameraLayers(Renderer* renderer)
     dot->style.radius = 3.0f;
     CHECK(spatial->add(dot) == Result::Success);
     constexpr auto QUARTER = 1.5707963f;
-    CHECK(spatial->orbit(QUARTER, {0.0f, 1.0f, 0.0f}, 2.0f, Easing::Linear) == Result::Success);
+    CHECK(spatial->orbit(QUARTER, {0.0f, 1.0f, 0.0f}, 2.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
     CHECK(spatial->seek(1.0f) == Result::Success);
     auto zoomed = spatial->config().camera;
     zoomed.orthoHeight = 5.0f;
-    CHECK(spatial->look(zoomed, CameraView::ThreeD, 1.0f, Easing::Linear) == Result::Success);
+    CHECK(spatial->look(zoomed, CameraView::ThreeD, 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
     // After a turn of angle about +y the dot sits 2 cos(angle) right of the target.
     CHECK(_placed(renderer, spatial, dot, 1.5f, 2.0f * std::cos(0.75f * QUARTER) * std::sqrt(2.0f), 0.0f));
     CHECK(_placed(renderer, spatial, dot, 2.0f, 0.0f, 0.0f));
@@ -126,9 +128,11 @@ void cameraLayers(Renderer* renderer)
     auto raised = spatial->config().camera;
     raised.target.y += 1.0f;
     raised.eye.y += 1.0f;
-    CHECK(spatial->look(raised, CameraView::ThreeD, 2.0f, Easing::Linear) == Result::Success);
+    CHECK(spatial->look(raised, CameraView::ThreeD, 2.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
     CHECK(spatial->seek(3.0f) == Result::Success);
-    CHECK(spatial->orbit(QUARTER, {0.0f, 1.0f, 0.0f}, 1.0f, Easing::Linear) == Result::Success);
+    CHECK(spatial->orbit(QUARTER, {0.0f, 1.0f, 0.0f}, 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
     CHECK(_placed(renderer, spatial, dot, 3.5f, 4.0f * std::cos(1.5f * QUARTER), -1.5f));
     CHECK(_placed(renderer, spatial, dot, 4.0f, -4.0f, -2.0f));
     auto& last = spatial->config().camera;
@@ -152,11 +156,11 @@ void cameraLayers(Renderer* renderer)
     auto pan = turning->config().camera;
     pan.target.y += 1.0f;
     pan.eye.y += 1.0f;
-    CHECK(turning->look(pan, CameraView::ThreeD, 2.0f, Easing::Linear) == Result::Success);
+    CHECK(turning->look(pan, CameraView::ThreeD, 2.0f, AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
     CHECK(turning->seek(0.5f) == Result::Success);
     auto side = pan;
     side.eye = {10.0f, 1.0f, 0.0f};
-    CHECK(turning->look(side, CameraView::ThreeD, 1.0f, Easing::Linear) == Result::Success);
+    CHECK(turning->look(side, CameraView::ThreeD, 1.0f, AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
     CHECK(_placed(renderer, turning, spot, 1.0f, 2.0f * std::cos(0.5f * QUARTER), -0.5f));
     CHECK(_placed(renderer, turning, spot, 1.5f, 0.0f, -0.75f));
     CHECK(_placed(renderer, turning, spot, 2.0f, 0.0f, -1.0f));
@@ -176,15 +180,17 @@ void cameraLayers(Renderer* renderer)
     square->style.stroke.a = 0;
     square->fill(Color::hex("#ffffff"));
     CHECK(switched->add(square) == Result::Success);
-    CHECK(switched->runtime(&hook) == Result::Success);
+    CHECK(switched->runtimeAdd(&hook) == Result::Success);
     auto panned = switched->config().camera;
     panned.target.x += 1.0f;
     panned.eye.x += 1.0f;
-    CHECK(switched->look(panned, CameraView::ThreeD, 2.0f, Easing::Linear) == Result::Success);
+    CHECK(switched->look(panned, CameraView::ThreeD, 2.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
     CHECK(switched->seek(0.5f) == Result::Success);
     auto perspective = panned;
     perspective.projection = Projection::Perspective;
-    CHECK(switched->look(perspective, CameraView::ThreeD, 1.0f, Easing::Linear) == Result::Success);
+    CHECK(switched->look(perspective, CameraView::ThreeD, 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
     CHECK(_cameraAt(switched, 0.9f, sample) && sample.camera.projection == Projection::Orthographic);
     CHECK(_cameraAt(switched, 1.0f, sample) && sample.camera.projection == Projection::Perspective);
     auto widened = 0.5f / std::tan(0.5f * 0.7853982f);
@@ -208,16 +214,17 @@ void cameraLayers(Renderer* renderer)
     tile->style.stroke.a = 0;
     tile->fill(Color::hex("#ffffff"));
     CHECK(tilted->add(tile) == Result::Success);
-    CHECK(tilted->runtime(&hook) == Result::Success);
+    CHECK(tilted->runtimeAdd(&hook) == Result::Success);
     auto across = tilted->config().camera;
     across.target = {2.0f, 0.0f, 0.0f};
     across.eye = {2.0f, 0.0f, 10.0f};
-    CHECK(tilted->look(across, CameraView::TwoD, 2.0f, Easing::Linear) == Result::Success);
+    CHECK(tilted->look(across, CameraView::TwoD, 2.0f, AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
     CHECK(tilted->seek(0.5f) == Result::Success);
     auto oblique = across;
     oblique.eye = {2.0f, -8.0f, 6.0f};
     oblique.projection = Projection::Perspective;
-    CHECK(tilted->look(oblique, CameraView::ThreeD, 1.0f, Easing::Linear) == Result::Success);
+    CHECK(tilted->look(oblique, CameraView::ThreeD, 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
     CHECK(_cameraAt(tilted, 0.5f, sample) && sample.view == CameraView::TwoD
           && sample.camera.projection == Projection::Orthographic);
     CHECK(_cameraAt(tilted, 0.6f, sample) && sample.view == CameraView::ThreeD
@@ -233,12 +240,13 @@ void cameraLayers(Renderer* renderer)
                          "the camera is in the 2D view at 0.00 s, while this move would turn it or change its "
                          "projection, which only the 3D view allows") == 0);
     CHECK(tilted->seek(1.0f) == Result::Success);
-    CHECK(tilted->look(across, CameraView::TwoD, 0.5f, Easing::Linear) == Result::InsufficientCondition);
+    CHECK(tilted->look(across, CameraView::TwoD, 0.5f, AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::InsufficientCondition);
     CHECK(tilted->diagnostic()
           && std::strcmp(tilted->diagnostic(),
                          "the camera already moves until 2.00 s; a look that returns to the 2D view ends at "
                          "that time or later") == 0);
-    CHECK(tilted->look(across, CameraView::TwoD, 1.0f, Easing::Linear) == Result::Success);
+    CHECK(tilted->look(across, CameraView::TwoD, 1.0f, AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
     CHECK(_cameraAt(tilted, 1.9f, sample) && sample.view == CameraView::ThreeD
           && sample.camera.projection == Projection::Perspective);
     CHECK(_cameraAt(tilted, 2.0f, sample) && sample.view == CameraView::TwoD);
@@ -251,7 +259,7 @@ void cameraLayers(Renderer* renderer)
     auto rising = Scene::gen(config);
     CHECK(rising);
     if (!rising) return;
-    CHECK(rising->runtime(&hook) == Result::Success);
+    CHECK(rising->runtimeAdd(&hook) == Result::Success);
     auto slanted = rising->config().camera;
     slanted.eye = {0.0f, -8.0f, 6.0f};
     CHECK(rising->seek(1.0f) == Result::Success);
@@ -312,64 +320,78 @@ void layeredMotions(Renderer* renderer)
 
     // A scale while the object travels grows it about its moving center, and a turn played
     // after both starts from where they left it.
-    CHECK(scene->play(Animation::shift(grown, {4.0f, 0.0f, 0.0f}), 2.0f, Easing::Linear) == Result::Success);
+    CHECK(scene->play(Animation::shift(grown, {4.0f, 0.0f, 0.0f}), 2.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
     CHECK(scene->seek(0.5f) == Result::Success);
-    CHECK(scene->play(Animation::rescale(grown, {2.0f, 2.0f, 1.0f}), 1.0f, Easing::Linear) == Result::Success);
+    CHECK(scene->play(Animation::rescale(grown, {2.0f, 2.0f, 1.0f}), 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
     CHECK(_placed(renderer, scene, grown, 0.25f, -1.5f, 0.0f, 1.0f));
     CHECK(_placed(renderer, scene, grown, 1.0f, 0.0f, 0.0f, 1.5f));
     CHECK(_placed(renderer, scene, grown, 1.75f, 1.5f, 0.0f, 2.0f));
     CHECK(_placed(renderer, scene, grown, 2.0f, 2.0f, 0.0f, 2.0f));
     CHECK(scene->seek(2.0f) == Result::Success);
-    CHECK(scene->play(Animation::rotate(grown, 1.5707963f), 1.0f, Easing::Linear) == Result::Success);
+    CHECK(scene->play(Animation::rotate(grown, 1.5707963f), 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
     CHECK(_placed(renderer, scene, grown, 2.0f, 2.0f, 0.0f, 2.0f));
     CHECK(_placed(renderer, scene, grown, 2.5f, 2.0f, 0.0f));
     CHECK(_placed(renderer, scene, grown, 3.0f, 2.0f, 0.0f, 2.0f));
 
     // A shift during a turn carries the turning object.
     CHECK(scene->seek(0.0f) == Result::Success);
-    CHECK(scene->play(Animation::rotate(spun, 1.5707963f), 2.0f, Easing::Linear) == Result::Success);
+    CHECK(scene->play(Animation::rotate(spun, 1.5707963f), 2.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
     CHECK(scene->seek(0.5f) == Result::Success);
-    CHECK(scene->play(Animation::shift(spun, {2.0f, 0.0f, 0.0f}), 1.0f, Easing::Linear) == Result::Success);
+    CHECK(scene->play(Animation::shift(spun, {2.0f, 0.0f, 0.0f}), 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
     CHECK(_placed(renderer, scene, spun, 1.0f, -1.0f, 3.0f));
     CHECK(_placed(renderer, scene, spun, 2.0f, 0.0f, 3.0f, 1.0f));
 
     // A pivot outside the object stays where it is while the object travels.
     CHECK(scene->seek(0.0f) == Result::Success);
-    CHECK(scene->play(Animation::shift(orbited, {1.0f, 0.0f, 0.0f}), 2.0f, Easing::Linear) == Result::Success);
+    CHECK(scene->play(Animation::shift(orbited, {1.0f, 0.0f, 0.0f}), 2.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
     CHECK(scene->seek(1.0f) == Result::Success);
     CHECK(scene->play(Animation::rotate(orbited, 3.14159265f, {0.0f, -3.0f, 0.0f}, {0.0f, 0.0f, 1.0f}), 1.0f,
-                      Easing::Linear) == Result::Success);
+                      AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
     CHECK(_placed(renderer, scene, orbited, 1.5f, 0.0f, -4.25f));
     CHECK(_placed(renderer, scene, orbited, 2.0f, 1.0f, -3.0f, 1.0f));
 
     // An indication pulses the moving object about its center and leaves it as it was.
     CHECK(scene->seek(0.0f) == Result::Success);
-    CHECK(scene->play(Animation::shift(pulsed, {4.0f, 0.0f, 0.0f}), 2.0f, Easing::Linear) == Result::Success);
+    CHECK(scene->play(Animation::shift(pulsed, {4.0f, 0.0f, 0.0f}), 2.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
     CHECK(scene->seek(0.5f) == Result::Success);
-    CHECK(scene->play(Animation::indicate(pulsed), 1.0f, Easing::Linear) == Result::Success);
+    CHECK(scene->play(Animation::indicate(pulsed), 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
     CHECK(_placed(renderer, scene, pulsed, 1.0f, 0.0f, -1.5f, 1.2f));
     CHECK(_placed(renderer, scene, pulsed, 2.0f, 2.0f, -1.5f, 1.0f));
     CHECK(near(pulsed->model.e[0], 1.0f) && near(pulsed->model.e[3], 4.0f));
 
     // A travel along a path while the object grows keeps its center on the path.
     CHECK(scene->seek(0.0f) == Result::Success);
-    CHECK(scene->play(Animation::rescale(carried, {2.0f, 2.0f, 1.0f}), 2.0f, Easing::Linear) == Result::Success);
+    CHECK(scene->play(Animation::rescale(carried, {2.0f, 2.0f, 1.0f}), 2.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
     CHECK(scene->seek(0.5f) == Result::Success);
-    CHECK(scene->play(Animation::moveAlong(carried, track), 1.0f, Easing::Linear) == Result::Success);
+    CHECK(scene->play(Animation::moveAlong(carried, track), 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
     CHECK(_placed(renderer, scene, carried, 0.25f, -2.0f, 2.0f, 1.125f));
     CHECK(_placed(renderer, scene, carried, 1.0f, 0.0f, 2.0f, 1.5f));
     CHECK(_placed(renderer, scene, carried, 2.0f, 2.0f, 2.0f, 2.0f));
 
     // Shifts add up, whether made by shift, by a play target, or by a transform that only moves.
     CHECK(scene->seek(0.0f) == Result::Success);
-    CHECK(scene->play(Animation::shift(summed, {2.0f, 0.0f, 0.0f}), 2.0f, Easing::Linear) == Result::Success);
+    CHECK(scene->play(Animation::shift(summed, {2.0f, 0.0f, 0.0f}), 2.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
     CHECK(scene->seek(1.0f) == Result::Success);
-    CHECK(scene->play(Animation::shift(summed, {0.0f, 2.0f, 0.0f}), 2.0f, Easing::Linear) == Result::Success);
+    CHECK(scene->play(Animation::shift(summed, {0.0f, 2.0f, 0.0f}), 2.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
     CHECK(scene->seek(1.5f) == Result::Success);
-    CHECK(scene->play(AnimationTarget::from(summed).shift({1.0f, 0.0f, 0.0f}), 1.0f, Easing::Linear) == Result::Success);
+    CHECK(scene->play(AnimationTarget::from(summed).shift({1.0f, 0.0f, 0.0f}), 1.0f,
+                      AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
     CHECK(scene->seek(2.0f) == Result::Success);
     CHECK(scene->play(Animation::transform(summed, Mat4::translate({0.0f, -1.0f, 0.0f}) * summed->model), 0.5f,
-                      Easing::Linear) == Result::Success);
+                      AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
     CHECK(_placed(renderer, scene, summed, 2.0f, 0.5f, 0.0f, 1.0f));
     CHECK(_placed(renderer, scene, summed, 3.0f, 1.0f, 0.0f, 1.0f));
     CHECK(near(summed->model.e[3], 3.0f) && near(summed->model.e[7], 1.0f));
@@ -466,7 +488,7 @@ void layeredTransforms(Renderer* renderer)
         Animation::shift(jumped, {4.0f, 0.0f, 0.0f}),
         Animation::rescale(flat, {0.0f, 1.0f, 1.0f}),
     };
-    CHECK(scene->play(moves, 5u, 2.0f, Easing::Linear) == Result::Success);
+    CHECK(scene->play(moves, 5u, 2.0f, AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
 
     // A quarter turn during a shift: without an arc it shrinks midway as it would alone, and
     // with an arc equal to the turn it stays rigid, while the shift carries it either way.
@@ -476,7 +498,7 @@ void layeredTransforms(Renderer* renderer)
     Animation turns[] = {Animation::transform(turned, straight), Animation::transform(swung, arced)};
     turns[1].arc = PI * 0.5f;
     CHECK(scene->seek(0.5f) == Result::Success);
-    CHECK(scene->play(turns, 2u, 1.0f, Easing::Linear) == Result::Success);
+    CHECK(scene->play(turns, 2u, 1.0f, AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
     CHECK(_probed(renderer, scene, turned, 0.25f, Mat4::translate({-2.5f, 3.0f, 0.0f})));
     CHECK(_probed(renderer, scene, turned, 1.0f,
                   Mat4::translate({-1.0f, 3.0f, 0.0f}) * _blend(Mat4::identity(), quarter, 0.5f)));
@@ -494,7 +516,9 @@ void layeredTransforms(Renderer* renderer)
     auto skewed = Mat4::translate({-2.5f, -2.5f, 0.0f}) * skew * Mat4::translate({2.5f, 2.5f, 0.0f});
     auto target = skewed * sheared->model;
     CHECK(scene->seek(0.5f) == Result::Success);
-    CHECK(scene->play(AnimationTarget::from(sheared).transform(target), 1.0f, Easing::Linear) == Result::Success);
+    CHECK(scene->play(AnimationTarget::from(sheared).transform(target), 1.0f,
+                      AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
     CHECK(_probed(renderer, scene, sheared, 1.0f,
                   _blend(Mat4::identity(), skewed, 0.5f) * _rotationAbout(PI * 0.25f, {-2.5f, -2.5f, 0.0f}) * start));
     CHECK(_probed(renderer, scene, sheared, 1.5f, skewed * _rotationAbout(PI * 0.375f, {-2.5f, -2.5f, 0.0f}) * start));
@@ -566,12 +590,12 @@ void layeredMorphs(Renderer* renderer)
         Animation::fade(faded, 0.5f),
         Animation::rescale(flat, {0.0f, 1.0f, 1.0f}),
     };
-    CHECK(scene->play(moves, 3u, 2.0f, Easing::Linear) == Result::Success);
+    CHECK(scene->play(moves, 3u, 2.0f, AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
     CHECK(scene->seek(1.0f) == Result::Success);
     Object* targets[] = {bar, barTwin, disc};
     for (auto object : targets) CHECK(scene->add(object) == Result::Success);
     Animation morphs[] = {Animation::morph(square, bar), Animation::morph(twin, barTwin)};
-    CHECK(scene->play(morphs, 2u, 1.0f, Easing::Linear) == Result::Success);
+    CHECK(scene->play(morphs, 2u, 1.0f, AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
 
     // The morph during the shift is the morph at rest, carried back by the part of the shift
     // still to come, and the bar takes over where both end.
@@ -660,7 +684,8 @@ void instantUpdates(Renderer* renderer)
 
     // A change at the cursor must not land inside a running animation of the same property,
     // except a change of the transform, which jumps on top of a running motion.
-    CHECK(scene->play(AnimationTarget::from(circle).shift({0.0f, 1.0f, 0.0f}).opacity(0.5f), 2.0f, Easing::Linear)
+    CHECK(scene->play(AnimationTarget::from(circle).shift({0.0f, 1.0f, 0.0f}).opacity(0.5f), 2.0f,
+                      AnimCurve::preset(AnimCurvePreset::Linear))
           == Result::Success);
     CHECK(scene->seek(2.0f) == Result::Success);
     CHECK(scene->update(AnimationTarget::from(circle).opacity(1.0f)) == Result::InsufficientCondition);

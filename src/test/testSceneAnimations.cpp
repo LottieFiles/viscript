@@ -23,10 +23,10 @@ void textAnimationRegression(Renderer* renderer)
             Animation prepare[] = {
                 Animation::shift(rectangle, {0.25f, 0.0f, 0.0f}),
                 Animation::shift(text, {0.25f, 0.0f, 0.0f})};
-            CHECK(scene->play(prepare, 2u, 0.5f, Easing::Linear) == Result::Success);
+            CHECK(scene->play(prepare, 2u, 0.5f, AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
             CHECK(scene->wait(0.5f) == Result::Success);
             Animation create[] = {Animation::create(rectangle), Animation::create(text)};
-            CHECK(scene->play(create, 2u, 1.0f, Easing::Linear) == Result::Success);
+            CHECK(scene->play(create, 2u, 1.0f, AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
 
             Surface surface;
             CHECK(renderer->render(scene, 0.25f, surface) == Result::Success);
@@ -76,7 +76,7 @@ void textAnimationRegression(Renderer* renderer)
         CHECK(groupResult == Result::Success);
         if (groupResult == Result::Success) {
             CHECK(motion->play(Animation::shift(group, {1.0f, 0.0f, 0.0f}), 1.0f,
-                               Easing::Linear) == Result::Success);
+                               AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
             auto centerX = [](const Surface& surface, Color color) {
                 auto target = pixel(color);
                 auto sum = 0u;
@@ -135,9 +135,11 @@ void repeatedCreateRegression(Renderer* renderer)
         auto addResult = scene->add(rectangle);
         CHECK(addResult == Result::Success);
         if (addResult == Result::Success) {
-            CHECK(scene->play(Animation::create(rectangle), 0.5f, Easing::Linear) == Result::Success);
+            CHECK(scene->play(Animation::create(rectangle), 0.5f, AnimCurve::preset(AnimCurvePreset::Linear))
+                  == Result::Success);
             CHECK(scene->wait(0.5f) == Result::Success);
-            CHECK(scene->play(Animation::create(rectangle), 0.5f, Easing::Linear) == Result::Success);
+            CHECK(scene->play(Animation::create(rectangle), 0.5f, AnimCurve::preset(AnimCurvePreset::Linear))
+                  == Result::Success);
 
             Surface surface;
             CHECK(renderer->render(scene, 0.75f, surface) == Result::Success);
@@ -176,7 +178,7 @@ void drawDirectionAnimations(Renderer* renderer)
             Animation animations[] = {
                 Animation::create(forward, DrawDirection::Forward),
                 Animation::create(clockwise, DrawDirection::Clockwise)};
-            CHECK(circles->play(animations, 2u, 1.0f, Easing::Linear) == Result::Success);
+            CHECK(circles->play(animations, 2u, 1.0f, AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
             Surface surface;
             CHECK(renderer->render(circles, 0.25f, surface) == Result::Success);
             auto background = pixel(config.background);
@@ -217,7 +219,7 @@ void drawDirectionAnimations(Renderer* renderer)
         CHECK(result == Result::Success);
         if (result == Result::Success) {
             CHECK(reverseScene->play(Animation::create(reverse, DrawDirection::Reverse), 1.0f,
-                                     Easing::Linear) == Result::Success);
+                                     AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
             Surface surface;
             CHECK(renderer->render(reverseScene, 0.25f, surface) == Result::Success);
             auto background = pixel(config.background);
@@ -253,7 +255,7 @@ void drawDirectionAnimations(Renderer* renderer)
             delete scene;
             return false;
         }
-        if (scene->play(Animation::create(object, direction), 1.0f, Easing::Linear)
+        if (scene->play(Animation::create(object, direction), 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
             != Result::Success) {
             delete scene;
             return false;
@@ -314,9 +316,12 @@ void drawDirectionAnimations(Renderer* renderer)
         auto result = revealScene->add(line);
         CHECK(result == Result::Success);
         if (result == Result::Success) {
-            CHECK(revealScene->play(Animation::create(line), 1.0f, Easing::Linear) == Result::Success);
-            CHECK(revealScene->play(Animation::uncreate(line), 1.0f, Easing::Linear) == Result::Success);
-            CHECK(revealScene->play(Animation::create(line), 1.0f, Easing::Linear) == Result::Success);
+            CHECK(revealScene->play(Animation::create(line), 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+                  == Result::Success);
+            CHECK(revealScene->play(Animation::uncreate(line), 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+                  == Result::Success);
+            CHECK(revealScene->play(Animation::create(line), 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+                  == Result::Success);
             Surface surface;
             CHECK(renderer->render(revealScene, 0.0f, surface) == Result::Success);
             CHECK(changed(surface, config.background) == 0u);
@@ -358,7 +363,7 @@ void arrowCompositing(Renderer* renderer)
         arrow->tip = 20.0f;
         arrow->stroke(Color::hex("#ff0000"), 8.0f);
         CHECK(scene->add(arrow) == Result::Success);
-        CHECK(scene->play(Animation::fade(arrow, 0.5f), 1.0f, Easing::Linear)
+        CHECK(scene->play(Animation::fade(arrow, 0.5f), 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
               == Result::Success);
         Surface surface;
         CHECK(renderer->render(scene, 1.0f, surface) == Result::Success);
@@ -380,7 +385,7 @@ void arrowCompositing(Renderer* renderer)
         arrow->stroke(Color::hex("#2563eb"), 8.0f);
         CHECK(arrow->dash(pattern, 2u) == Result::Success);
         CHECK(scene->add(arrow) == Result::Success);
-        CHECK(scene->play(Animation::fade(arrow, 0.5f), 1.0f, Easing::Linear)
+        CHECK(scene->play(Animation::fade(arrow, 0.5f), 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
               == Result::Success);
         Surface surface;
         CHECK(renderer->render(scene, 1.0f, surface) == Result::Success);
@@ -415,11 +420,11 @@ void directedRouteRendering(Renderer* renderer)
         arrow->stroke(Color::hex("#2563eb"), 4.0f);
         CHECK(arrow->dash(pattern, 2u) == Result::Success);
         CHECK(scene->add(arrow) == Result::Success);
-        CHECK(scene->play(Animation::create(arrow), 1.0f, Easing::Linear)
+        CHECK(scene->play(Animation::create(arrow), 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
               == Result::Success);
         auto phase = AnimationTarget::from(arrow);
         phase.dashOffset(-8.0f).tail(18.0f).tip(26.0f);
-        CHECK(scene->play(phase, 1.0f, Easing::Linear) == Result::Success);
+        CHECK(scene->play(phase, 1.0f, AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
         CHECK(near(arrow->tail, 18.0f) && near(arrow->tip, 26.0f));
         Surface surface;
         CHECK(renderer->render(scene, 0.0f, surface) == Result::Success);
@@ -455,7 +460,7 @@ void directedRouteRendering(Renderer* renderer)
         route->stroke(Color::hex("#2563eb"), 4.0f);
         CHECK(route->dash(pattern, 2u) == Result::Success);
         CHECK(scene->add(route) == Result::Success);
-        CHECK(scene->play(Animation::create(route), 1.0f, Easing::Linear)
+        CHECK(scene->play(Animation::create(route), 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
               == Result::Success);
         Surface surface;
         CHECK(renderer->render(scene, 0.5f, surface) == Result::Success);
@@ -491,10 +496,10 @@ void fadeAnimations(Renderer* renderer)
         CHECK(result == Result::Success);
         if (result == Result::Success) {
             CHECK(entrance->play(Animation::shift(entering, {1.5f, 0.0f, 0.0f}), 0.5f,
-                                 Easing::Linear) == Result::Success);
+                                 AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
             CHECK(entrance->wait(0.5f) == Result::Success);
             CHECK(entrance->play(Animation::fadeIn(entering, {-0.5f, 0.0f, 0.0f}, 0.8f),
-                                 1.0f, Easing::Linear) == Result::Success);
+                                 1.0f, AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
             Surface surface;
             CHECK(renderer->render(entrance, 0.25f, surface) == Result::Success);
             CHECK(changed(surface, config.background) == 0u);
@@ -526,8 +531,9 @@ void fadeAnimations(Renderer* renderer)
         CHECK(result == Result::Success);
         if (result == Result::Success) {
             CHECK(exit->play(Animation::fadeOut(exiting, {2.0f, 0.0f, 0.0f}), 1.0f,
-                             Easing::Linear) == Result::Success);
-            CHECK(exit->play(Animation::fadeIn(exiting), 0.5f, Easing::Linear) == Result::Success);
+                             AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
+            CHECK(exit->play(Animation::fadeIn(exiting), 0.5f, AnimCurve::preset(AnimCurvePreset::Linear))
+                  == Result::Success);
             Surface surface;
             CHECK(renderer->render(exit, 0.0f, surface) == Result::Success);
             auto start = extent(surface, config.background);
@@ -564,12 +570,12 @@ void fadeAnimations(Renderer* renderer)
         auto targetResult = handoff->add(target);
         CHECK(sourceResult == Result::Success && targetResult == Result::Success);
         if (sourceResult == Result::Success && targetResult == Result::Success) {
-            CHECK(handoff->fadeTransform(source, target, 1.0f, Easing::Linear)
+            CHECK(handoff->fadeTransform(source, target, 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
                   == Result::Success);
             CHECK(near(handoff->duration(), 1.0f));
-            CHECK(handoff->play(Animation::fadeOut(source), 0.25f, Easing::Linear)
+            CHECK(handoff->play(Animation::fadeOut(source), 0.25f, AnimCurve::preset(AnimCurvePreset::Linear))
                   == Result::InvalidArguments);
-            CHECK(handoff->play(Animation::indicate(target), 0.25f, Easing::Linear)
+            CHECK(handoff->play(Animation::indicate(target), 0.25f, AnimCurve::preset(AnimCurvePreset::Linear))
                   == Result::Success);
 
             Surface surface;
@@ -666,9 +672,9 @@ void scaleAndIndicateAnimations(Renderer* renderer)
                          ? scene->add(group) : Result::InvalidArguments;
         CHECK(groupResult == Result::Success);
         if (groupResult == Result::Success) {
-            CHECK(scene->play(Animation::growFromCenter(group), 1.0f, Easing::Linear)
+            CHECK(scene->play(Animation::growFromCenter(group), 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
                   == Result::Success);
-            CHECK(scene->play(Animation::shrinkToCenter(group), 1.0f, Easing::Linear)
+            CHECK(scene->play(Animation::shrinkToCenter(group), 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
                   == Result::Success);
             auto halves = [&](const Surface& surface) {
                 auto background = pixel(config.background);
@@ -735,7 +741,7 @@ void scaleAndIndicateAnimations(Renderer* renderer)
         CHECK(result == Result::Success);
         if (result == Result::Success) {
             CHECK(edgeScene->play(Animation::growFromEdge(edgeBar, GrowthEdge::Bottom),
-                                  1.0f, Easing::Linear) == Result::Success);
+                                  1.0f, AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
             Surface surface;
             CHECK(renderer->render(edgeScene, 0.5f, surface) == Result::Success);
             auto middleExtent = extent(surface, config.background);
@@ -772,7 +778,7 @@ void scaleAndIndicateAnimations(Renderer* renderer)
         CHECK(result == Result::Success);
         if (result == Result::Success) {
             CHECK(indicateScene->play(Animation::indicate(indicated, Color::hex("#ffd166"), 1.4f),
-                                      1.0f, Easing::Linear) == Result::Success);
+                                      1.0f, AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
             Surface surface;
             CHECK(renderer->render(indicateScene, 0.0f, surface) == Result::Success);
             auto startHash = checksum(surface);
@@ -854,7 +860,8 @@ void emphasisEffects(Renderer* renderer)
 
     // Growth peaks halfway; rotation starts counterclockwise and returns to the original pose.
     auto model = bar->model;
-    CHECK(scene->play(Animation::wiggle(bar, 1.5f, 0.6f, 2.0f), 1.0f, Easing::Linear) == Result::Success);
+    CHECK(scene->play(Animation::wiggle(bar, 1.5f, 0.6f, 2.0f), 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
     CHECK(near(scene->duration(), 1.0f));
     auto tipped = [](float grow, float turn, float length, float thickness) {
         return Vec2{grow * (length * std::cos(turn) + thickness * std::fabs(std::sin(turn))),
@@ -875,9 +882,11 @@ void emphasisEffects(Renderer* renderer)
 
     // It may begin while the object travels, growing and turning about the moving center.
     CHECK(scene->seek(0.0f) == Result::Success);
-    CHECK(scene->play(Animation::shift(riding, {4.0f, 0.0f, 0.0f}), 2.0f, Easing::Linear) == Result::Success);
+    CHECK(scene->play(Animation::shift(riding, {4.0f, 0.0f, 0.0f}), 2.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
     CHECK(scene->seek(0.5f) == Result::Success);
-    CHECK(scene->play(Animation::wiggle(riding, 1.5f, 0.5f, 1.0f), 1.0f, Easing::Linear) == Result::Success);
+    CHECK(scene->play(Animation::wiggle(riding, 1.5f, 0.5f, 1.0f), 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
     auto peak = tipped(1.5f, 0.5f, 1.0f, 1.0f);
     auto late = tipped(1.25f, 0.5f * 0.5f * std::sin(0.75f * 3.14159265f), 1.0f, 1.0f);
     CHECK(placed(scene, riding, 0.5f, -1.0f, -2.0f, 1.0f, 1.0f));
@@ -959,7 +968,8 @@ void emphasisEffects(Renderer* renderer)
     // It may begin while the target travels: the frame stands where the target is when it
     // begins, and the travel goes on. An untagged target leaves its tag out.
     CHECK(marked->seek(0.0f) == Result::Success);
-    CHECK(marked->play(Animation::shift(moving, {4.0f, 0.0f, 0.0f}), 2.0f, Easing::Linear) == Result::Success);
+    CHECK(marked->play(Animation::shift(moving, {4.0f, 0.0f, 0.0f}), 2.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
     CHECK(marked->seek(0.5f) == Result::Success);
     auto around = Emphasis::circumscribe(moving);
     around.width = 1.0f;
@@ -1060,7 +1070,8 @@ void emphasisEffects(Renderer* renderer)
 
     // It may begin while its target travels: the stretch runs along the line where it is when
     // the flash begins, and the travel goes on.
-    CHECK(traced->play(Animation::shift(holder, {0.0f, 4.0f, 0.0f}), 2.0f, Easing::Linear) == Result::Success);
+    CHECK(traced->play(Animation::shift(holder, {0.0f, 4.0f, 0.0f}), 2.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
     CHECK(traced->seek(3.5f) == Result::Success);
     passing.target = line;
     passing.window = 0.25f;
@@ -1225,7 +1236,8 @@ void emphasisEffects(Renderer* renderer)
 
     // It may begin while its target travels, and though its fade runs beside its growth, it
     // leaves the cursor at its end, as a play does.
-    CHECK(rippled->play(Animation::shift(disc, {4.0f, 0.0f, 0.0f}), 2.0f, Easing::Linear) == Result::Success);
+    CHECK(rippled->play(Animation::shift(disc, {4.0f, 0.0f, 0.0f}), 2.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
     CHECK(rippled->seek(4.5f) == Result::Success);
     CHECK(rippled->emphasize(Emphasis::ripple(disc), 1.0f, linear) == Result::Success);
     CHECK(near(rippled->cursor(), 5.5f) && near(rippled->duration(), 6.0f));
@@ -1549,7 +1561,7 @@ void morphAnimations(Renderer* renderer)
         CHECK(sourceResult == Result::Success && targetResult == Result::Success);
         if (sourceResult == Result::Success && targetResult == Result::Success) {
             CHECK(scene->play(Animation::morph(source, target), 1.0f,
-                              Easing::Linear) == Result::Success);
+                              AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
             CHECK(near(scene->duration(), 1.0f));
             auto targetModel = target->model;
             auto targetFill = target->style.fill;
@@ -1560,10 +1572,10 @@ void morphAnimations(Renderer* renderer)
             target->model = targetModel;
             target->style.fill = targetFill;
             CHECK(renderer->render(scene, 0.5f, invalidSurface) == Result::Success);
-            CHECK(scene->play(Animation::fadeOut(source), 0.25f, Easing::Linear)
+            CHECK(scene->play(Animation::fadeOut(source), 0.25f, AnimCurve::preset(AnimCurvePreset::Linear))
                   == Result::InvalidArguments);
             CHECK(near(scene->duration(), 1.0f));
-            CHECK(scene->play(Animation::indicate(target), 0.5f, Easing::Linear)
+            CHECK(scene->play(Animation::indicate(target), 0.5f, AnimCurve::preset(AnimCurvePreset::Linear))
                   == Result::Success);
             Surface surface;
             CHECK(renderer->render(scene, 0.0f, surface) == Result::Success);
@@ -1640,7 +1652,7 @@ void morphAnimations(Renderer* renderer)
             Animation unsupported[] = {
                 Animation::fade(atomicTarget, 0.25f),
                 Animation::morph(unsupportedSource, unsupportedTarget)};
-            CHECK(atomic->play(unsupported, 2u, 1.0f, Easing::Linear)
+            CHECK(atomic->play(unsupported, 2u, 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
                   == Result::NonSupport);
             CHECK(near(atomic->duration(), 0.0f));
             CHECK(near(atomicTarget->opacity, 1.0f));
@@ -1656,7 +1668,7 @@ void morphAnimations(Renderer* renderer)
             CHECK(renderer->render(atomic, 0.0f, surface) == Result::Success);
             CHECK(checksum(surface) == initial);
             CHECK(atomic->play(Animation::morph(atomicSource, atomicTarget), 1.0f,
-                               Easing::Linear) == Result::Success);
+                               AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
         } else {
             if (sourceResult != Result::Success) delete atomicSource;
             if (targetResult != Result::Success) delete atomicTarget;

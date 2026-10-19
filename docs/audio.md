@@ -55,7 +55,7 @@ music.gain = 0.7f;
 music.loop = true;
 audio::Cue cue;
 soundscape->cue(music, cue);
-soundscape->gain(cue, 0.25f, 14.0f, 2.0f, Easing::Smooth);
+soundscape->gain(cue, 0.25f, 14.0f, 2.0f, AnimCurve::preset(AnimCurvePreset::Smooth));
 
 auto player = audio::Player::gen();
 player->load("music.mp3", musicBytes, musicSize);

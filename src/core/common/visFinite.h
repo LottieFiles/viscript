@@ -24,14 +24,6 @@ static inline bool _finite(const Vec3& value) noexcept
     return std::isfinite(value.x) && std::isfinite(value.y) && std::isfinite(value.z);
 }
 
-static inline bool _finite(const Mat3& value) noexcept
-{
-    for (auto item : value.e) {
-        if (!std::isfinite(item)) return false;
-    }
-    return true;
-}
-
 static inline bool _finite(const Mat4& value) noexcept
 {
     for (auto item : value.e) {

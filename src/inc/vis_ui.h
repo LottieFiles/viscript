@@ -33,8 +33,6 @@ struct InputEvent
     Vec2 delta;
     Vec2 wheel;
     int32_t button = -1;
-    uint32_t buttons = 0;
-    uint32_t modifiers = 0;
     float time = 0.0f;
 };
 
@@ -236,15 +234,6 @@ private:
 
     Impl* pImpl = nullptr;
     friend struct UIObject;
-};
-
-struct Lua
-{
-    static Result load(const char* source, uint32_t size, const char* name,
-                       Scene** scene, Panel** panel, char* error, uint32_t errorSize,
-                       vis::Lua::AssetResolver resolver = nullptr,
-                       void* resolverData = nullptr, const Theme* adaptiveTheme = nullptr,
-                       bool* adaptiveThemeUsed = nullptr) noexcept;
 };
 
 }  // namespace vis::ui

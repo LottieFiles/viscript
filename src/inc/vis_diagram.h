@@ -392,9 +392,6 @@ struct Diagram
     Result add(const EdgeSpec& spec, Edge& output) noexcept;
     Result add(const ZoneSpec& spec, Zone& output) noexcept;
 
-    uint32_t nodeCount() const noexcept;
-    uint32_t edgeCount() const noexcept;
-    uint32_t zoneCount() const noexcept;
     // output must be null and remains null when construction fails atomically.
     // Layout/routing use bounded search and may retain unresolved fallback geometry.
     // Ranked pins remain fixed; automatic nodes reflow with local float-ULP spacing
@@ -408,16 +405,6 @@ private:
     Impl* pImpl = nullptr;
 
     explicit Diagram(Impl* impl) noexcept;
-};
-
-struct Lua
-{
-    static Result load(const char* source, uint32_t size, const char* name,
-                       Scene** scene, char* error, uint32_t errorSize,
-                       vis::Lua::AssetResolver resolver = nullptr,
-                       void* resolverData = nullptr,
-                       const Theme* adaptiveTheme = nullptr,
-                       bool* adaptiveThemeUsed = nullptr) noexcept;
 };
 
 }  // namespace vis::diagram

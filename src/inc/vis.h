@@ -3,7 +3,7 @@
 // as it stands at any time into a Surface. A Saver writes frames to PNG, GIF or MP4, and Lua
 // loads a scene from a script. The header reads in this order:
 //   results and enumerations    Result, Type, and the modes of masks, blends, cells, text, cameras
-//   values                      Vec2, Vec3, Mat3, Mat4 (row-major), Color, Range, SampleTime
+//   values                      Vec2, Vec3, Mat4 (row-major), Color, Range, SampleTime
 //   samplers                    the callbacks that cells, plots, contours, fields and warps call
 //   assets, cameras and styles  Asset, AssetLoader, Camera, Gradient, Style, Theme
 //   layout reports              Bounds, BBox and the Layout* records a Renderer measures
@@ -255,16 +255,6 @@ enum struct NumberMode : uint8_t
     Relative
 };
 
-// The first timing curves, kept for the overloads that take them; an AnimCurve has these and more.
-enum struct Easing : uint8_t
-{
-    Linear = 0,
-    Smooth,
-    EaseIn,
-    EaseOut,
-    EaseInOut
-};
-
 enum struct AnimCurvePreset : uint8_t
 {
     Linear = 0,
@@ -319,7 +309,6 @@ struct Vec2
     Vec2 operator/(float s) const noexcept;
     float dot(const Vec2& v) const noexcept;
     float length() const noexcept;
-    Vec2 normalized() const noexcept;
 };
 
 struct AnimCurve
@@ -335,13 +324,12 @@ struct AnimCurve
     static AnimCurve preset(AnimCurvePreset preset, float strength = 1.0f) noexcept;
     static AnimCurve cubicBezier(const Vec2& control1, const Vec2& control2,
                                  float strength = 1.0f) noexcept;
-    AnimCurve reversed() const noexcept;
     bool valid() const noexcept;
 };
 
 struct TimingOptions
 {
-    // Seconds; positive for animations, or zero for immediate restore and States transitions.
+    // Seconds; positive.
     float duration = 1.0f;
     AnimCurve curve;
 };
@@ -368,21 +356,6 @@ struct Vec3
     Vec3 normalized() const noexcept;
 };
 
-// A 3x3 matrix in row-major order, e[row * 3 + column], applied to column vectors; translate()
-// fills the last column.
-struct Mat3
-{
-    float e[9];
-
-    static Mat3 identity() noexcept;
-    static Mat3 translate(const Vec2& v) noexcept;
-    static Mat3 scale(const Vec2& v) noexcept;
-    static Mat3 rotate(float radians) noexcept;
-    Mat3 operator*(const Mat3& m) const noexcept;
-    Vec2 operator*(const Vec2& v) const noexcept;
-    bool inverse(Mat3& out) const noexcept;
-};
-
 // A 4x4 matrix in row-major order, e[row * 4 + column], applied to column vectors.
 struct Mat4
 {
@@ -394,7 +367,6 @@ struct Mat4
     static Mat4 rotateX(float radians) noexcept;
     static Mat4 rotateY(float radians) noexcept;
     static Mat4 rotateZ(float radians) noexcept;
-    static Mat4 from(const Mat3& m) noexcept;
     Mat4 operator*(const Mat4& m) const noexcept;
     Vec3 operator*(const Vec3& v) const noexcept;
 };
@@ -406,8 +378,8 @@ struct Color
     uint8_t b = 255;
     uint8_t a = 255;
 
-    static Color hex(const char* value) noexcept;
-    static Color hex(const char* value, Color fallback) noexcept;
+    // Reads #rgb, #rgba, #rrggbb or #rrggbbaa, with or without the #; anything else gives fallback.
+    static Color hex(const char* value, Color fallback = {255, 255, 255, 255}) noexcept;
 };
 
 using CellSampler = bool (*)(float x, float y, float time,
@@ -548,12 +520,6 @@ struct AssetLoader
     static Result load(const uint32_t* pixels, uint32_t width, uint32_t height, Asset*& output) noexcept;
 };
 
-struct Ray3
-{
-    Vec3 origin;
-    Vec3 direction;
-};
-
 struct CameraInput
 {
     CameraAction action = CameraAction::Pan;
@@ -575,7 +541,6 @@ struct Camera
     // FOV is radians; a 2D scene uses an orthographic front view.
     bool project(const Vec3& world, float aspect, Vec3& ndc) const noexcept;
     bool segment(Vec3& from, Vec3& to) const noexcept;
-    Ray3 ray(const Vec2& ndc, float aspect) const noexcept;
 };
 
 enum struct GradientType : uint8_t
@@ -921,11 +886,6 @@ struct Object
     Result dash(const float* pattern, uint32_t count, float offset = 0.0f) noexcept;
     Object& fill(Color color) noexcept;
     Object& shift(const Vec3& by) noexcept;
-    Object& scale(const Vec3& by) noexcept;
-    Object& rotateX(float radians) noexcept;
-    Object& rotateY(float radians) noexcept;
-    Object& rotateZ(float radians) noexcept;
-    Object& transform(const Mat4& by) noexcept;
     // Composites this subtree as one layer, so group opacity fades overlapping children once.
     // The layer sorts by this object's layer, mean drawing depth and first emission order;
     // child layers sort inside it. Composition may change until the scene is mounted.
@@ -1558,13 +1518,12 @@ struct Text final : Object
     Result text(const char* value) noexcept;
     const char* font() const noexcept;
     Result font(const char* value) noexcept;
-    // Measures rendered lines without legacy font kerning. Fonts registered by Renderer::font
-    // are process-wide; a renderer that registered the font must remain alive. A font that is
-    // not loaded is measured, and drawn, as the default font the engine registers, "default",
-    // and output.fallback says so.
-    // InsufficientCondition: no font loaded at all. InvalidArguments: unset font or size.
-    Result measure(TextExtent& output) const noexcept;
-    // Sets value in the text's font and size as measure() sets the text's own string.
+    // Measures value as rendered lines in the text's font and size, without legacy font kerning;
+    // text() gives the text's own string. Fonts registered by Renderer::font are process-wide; a
+    // renderer that registered the font must remain alive. A font that is not loaded is measured,
+    // and drawn, as the default font the engine registers, "default", and output.fallback says so.
+    // InsufficientCondition: no font loaded at all.
+    // InvalidArguments: null value, unset font or size.
     Result measure(const char* value, TextExtent& output) const noexcept;
     // Returns retained text-change endpoint strings, including the initial string; writes
     // at most capacity pointers. Unchanged text returns its sole string.
@@ -1863,9 +1822,8 @@ struct AnimationTarget
     // A rectangle's corner radius in world units, at most half its shorter side.
     AnimationTarget& corner(float value) noexcept;
     // Line/Arrow/Vector start/end distances in object-local units, before transforms.
-    // A scalar sets both. Values must be finite and nonnegative; consumed segments are empty.
+    // Values must be finite and nonnegative; consumed segments are empty.
     // Warped geometry keeps the trim it had when warped.
-    AnimationTarget& trimDistance(float value) noexcept;
     AnimationTarget& trimDistance(const Vec2& value) noexcept;
     // The gradient's stops and geometry. It keeps the current gradient's type, stop count and
     // explicit geometry fields, so each stop and point has a place to travel to.
@@ -2216,26 +2174,12 @@ struct Scene
     // Stage reuse is invalid. Holds are finite nonnegative, one value or one per stage;
     // style count is zero, one or count - 1. Match overlay applies only to slide/zoom.
     Result transition(Scene* const* scenes, uint32_t count, const Viewport& viewport = {},
-                      float duration = 1.0f, float hold = 0.0f,
-                      Easing easing = Easing::Smooth) noexcept;
-    Result transition(Scene* const* scenes, uint32_t count, const Viewport& viewport,
-                      float duration, float hold, const AnimCurve& curve) noexcept;
-    Result transition(Scene* const* scenes, uint32_t count, const TimingOptions& timing,
-                      const Viewport& viewport = {}, float hold = 0.0f) noexcept
-    {
-        return transition(scenes, count, viewport, timing.duration, hold, timing.curve);
-    }
+                      float duration = 1.0f, float hold = 0.0f, const AnimCurve& curve = {}) noexcept;
     // Styles the transitions as well: styleCount is 1 to give every transition the same style,
     // or count - 1 to give each its own in order, and 0 leaves them all to Match.
     Result transition(Scene* const* scenes, uint32_t count, const Viewport& viewport,
                       float duration, float hold, const AnimCurve& curve,
                       const TransitionStyle* styles, uint32_t styleCount, bool live = true) noexcept;
-    Result transition(Scene* const* scenes, uint32_t count, const TimingOptions& timing,
-                      const Viewport& viewport, float hold, const TransitionStyle* styles,
-                      uint32_t styleCount, bool live = true) noexcept
-    {
-        return transition(scenes, count, viewport, timing.duration, hold, timing.curve, styles, styleCount, live);
-    }
     // Holds is one duration for all stages, or count durations in stage order. Live stages
     // start at zero when their incoming transition begins and hold their last frame at the end.
     // With live false, every stage shows its completed frame throughout.
@@ -2260,13 +2204,7 @@ struct Scene
     // Target must be newly attached at the cursor without clips; source must be live,
     // and its scheduled clips must finish by the fade's end.
     Result fadeTransform(Object* source, Object* target, float duration = 1.0f,
-                         Easing easing = Easing::Smooth) noexcept;
-    Result fadeTransform(Object* source, Object* target, float duration,
-                         const AnimCurve& curve) noexcept;
-    Result fadeTransform(Object* source, Object* target, const TimingOptions& timing) noexcept
-    {
-        return fadeTransform(source, target, timing.duration, timing.curve);
-    }
+                         const AnimCurve& curve = {}) noexcept;
     // Matches descendant pieces; equal Text strings pair first, preserving sampled style
     // and placement while traveling. Unpaired source/target pieces fade out/in. Attach target
     // at the cursor immediately before this call, without clips.
@@ -2274,13 +2212,6 @@ struct Scene
     // Completion removes source or its temporary copy from the timeline; Scene ownership stays.
     Result matchTransform(Object* source, Object* target, float duration = 1.0f,
                           const AnimCurve& curve = {}, const MatchOptions& options = {}) noexcept;
-    Result matchTransform(Object* source, Object* target, const AnimationOptions& timing,
-                          const MatchOptions& options = {}) noexcept
-    {
-        auto match = options;
-        match.lag = timing.lag;
-        return matchTransform(source, target, timing.duration, timing.curve, match);
-    }
     // Reports intentional overlap during a match/cross-fade: paired pieces, yielding slots
     // and roots; copies also exempt their originals. Cross-fades exempt both families.
     bool handoff(const Object* first, const Object* second, float time) const noexcept;
@@ -2291,11 +2222,6 @@ struct Scene
     // if none changes, advances the cursor by duration.
     Result highlight(Object* target, Object* const* selection, uint32_t count, float dim = 0.25f,
                      float duration = 0.5f, const AnimCurve& curve = {}) noexcept;
-    Result highlight(Object* target, Object* const* selection, uint32_t count,
-                     const TimingOptions& timing, float dim = 0.25f) noexcept
-    {
-        return highlight(target, selection, count, dim, timing.duration, timing.curve);
-    }
     // Adds temporary root shapes for duration and removes them afterward, advancing the cursor.
     // Snapshots target geometry at the cursor; frames/rings use world xy bounds and passing
     // flash uses its placed outline. Uses the family's highest layer, or zero for a point flash.
@@ -2303,21 +2229,12 @@ struct Scene
     // InvalidArguments: foreign target, invalid values or unavailable geometry.
     Result emphasize(const Emphasis& emphasis, float duration = 1.0f,
                      const AnimCurve& curve = {}) noexcept;
-    Result emphasize(const Emphasis& emphasis, const TimingOptions& timing) noexcept
-    {
-        return emphasize(emphasis, timing.duration, timing.curve);
-    }
     // Animates same-parent items along direction, gap apart, centered in parent space.
     // Newly attached unclipped items grow into place; existing items slide.
     // If no item moves, advances the cursor by duration.
     Result arrange(Object* const* items, uint32_t count, const Vec3& direction = {1.0f, 0.0f, 0.0f},
                    float gap = 0.25f, const Vec3& center = {}, float duration = 1.0f,
                    const AnimCurve& curve = {}) noexcept;
-    Result arrange(Object* const* items, uint32_t count, const TimingOptions& timing,
-                   const Vec3& direction = {1.0f, 0.0f, 0.0f}, float gap = 0.25f, const Vec3& center = {}) noexcept
-    {
-        return arrange(items, count, direction, gap, center, timing.duration, timing.curve);
-    }
     // Maps target subtrees in their parent spaces, sampling map once during construction.
     // Subdivides outlines to step-sized pieces, then interpolates to the mapped geometry.
     // Shapes bend; text/pictures/points move anchors; connectors retain live endpoints;
@@ -2330,16 +2247,10 @@ struct Scene
     // 2097152 retained warp points.
     Result warp(Object* const* targets, uint32_t count, PointMap map, void* data = nullptr,
                 float duration = 1.0f, const AnimCurve& curve = {}, float step = 0.05f) noexcept;
-    Result warp(Object* const* targets, uint32_t count, PointMap map, const TimingOptions& timing,
-                void* data = nullptr, float step = 0.05f) noexcept
-    {
-        return warp(targets, count, map, data, timing.duration, timing.curve, step);
-    }
     // Pushes cursor state for each target subtree, up to 4096 objects/call, without advancing time.
     // Saves transforms, paint/effects, geometry, layer, text and counting value. Nested saves
     // form a stack; active text/geometry changes save their destinations.
     // Warp geometry stays as authored.
-    Result save(Object* target) noexcept;
     Result save(Object* const* targets, uint32_t count) noexcept;
     // Pops the latest saved subtree state and restores changed properties over duration;
     // zero applies immediately. lag delays later targets. No saved state fails atomically.
@@ -2347,51 +2258,20 @@ struct Scene
     // Added/removed descendants retain their state. An unchanged restore waits for duration.
     // Does not revive removed descendants, undo warps or switch plain/counting Text modes.
     // Ends layout authoring, as play() does.
-    Result restore(Object* target, float duration = 0.0f, const AnimCurve& curve = {}) noexcept;
-    Result restore(Object* target, const TimingOptions& timing) noexcept
-    {
-        return restore(target, timing.duration, timing.curve);
-    }
     Result restore(Object* const* targets, uint32_t count, float duration = 0.0f,
                    const AnimCurve& curve = {}, float lag = 0.0f) noexcept;
-    Result restore(Object* const* targets, uint32_t count, const AnimationOptions& timing) noexcept
-    {
-        return restore(targets, count, timing.duration, timing.curve, timing.lag);
-    }
     // Validates and reserves the whole command atomically; targets are distinct scene objects.
     // Non-model channels require chronological nonoverlap. Model motion may layer with
     // invertible authored models; shift needs no inverse. Times need distinct finite float
     // boundaries. Family birth/removal gates apply; remove waits for active clips.
-    Result play(const Animation& animation, float duration = 1.0f, Easing easing = Easing::Smooth) noexcept;
-    Result play(const Animation& animation, float duration, const AnimCurve& curve) noexcept;
-    Result play(const Animation& animation, const TimingOptions& timing) noexcept
-    {
-        return play(animation, timing.duration, timing.curve);
-    }
-    Result play(const Animation* animations, uint32_t count, float duration, Easing easing = Easing::Smooth, float lag = 0.0f) noexcept;
+    Result play(const Animation& animation, float duration = 1.0f, const AnimCurve& curve = {}) noexcept;
     Result play(const Animation* animations, uint32_t count, float duration,
-                const AnimCurve& curve, float lag = 0.0f) noexcept;
-    Result play(const Animation* animations, uint32_t count, const AnimationOptions& timing) noexcept
-    {
-        return play(animations, count, timing.duration, timing.curve, timing.lag);
-    }
-    Result play(const AnimationTarget& target, float duration = 1.0f, Easing easing = Easing::Smooth) noexcept;
-    Result play(const AnimationTarget& target, float duration, const AnimCurve& curve) noexcept;
-    Result play(const AnimationTarget& target, const TimingOptions& timing) noexcept
-    {
-        return play(target, timing.duration, timing.curve);
-    }
+                const AnimCurve& curve = {}, float lag = 0.0f) noexcept;
+    Result play(const AnimationTarget& target, float duration = 1.0f, const AnimCurve& curve = {}) noexcept;
     Result play(const AnimationTarget* targets, uint32_t count, float duration,
-                Easing easing = Easing::Smooth, float lag = 0.0f) noexcept;
-    Result play(const AnimationTarget* targets, uint32_t count, float duration,
-                const AnimCurve& curve, float lag = 0.0f) noexcept;
-    Result play(const AnimationTarget* targets, uint32_t count, const AnimationOptions& timing) noexcept
-    {
-        return play(targets, count, timing.duration, timing.curve, timing.lag);
-    }
-    // runtime(nullptr) clears all modifiers. Add/remove preserve other modules' slots;
-    // registered callback/data lifetimes must cover every sample.
-    Result runtime(const RuntimeModifier* modifier) noexcept;
+                const AnimCurve& curve = {}, float lag = 0.0f) noexcept;
+    // Adds a modifier, or replaces the one with the same data, and removes one by its data;
+    // other modules' modifiers stay. Registered callback/data lifetimes must cover every sample.
     Result runtimeAdd(const RuntimeModifier* modifier) noexcept;
     Result runtimeRemove(void* data) noexcept;
     // Applies interactive camera input through registered runtime modifiers.
@@ -2401,44 +2281,21 @@ struct Scene
     // 2D rejects orbit; layered return to 2D waits for earlier moves. Turning/projection
     // cannot layer while earlier motion remains 2D.
     Result look(const Camera& camera, CameraView view, float duration = 1.0f,
-                Easing easing = Easing::Smooth) noexcept;
-    Result look(const Camera& camera, CameraView view, float duration,
-                const AnimCurve& curve) noexcept;
-    Result look(const Camera& camera, CameraView view, const TimingOptions& timing) noexcept
-    {
-        return look(camera, view, timing.duration, timing.curve);
-    }
+                const AnimCurve& curve = {}) noexcept;
     // Circles a 3D camera about its target: the eye and the up direction turn by angle
     // radians about axis, counterclockwise seen from the axis tip. Unlike look, which takes
     // the shortest turn, any angle is kept, so 2 * pi circles the target once.
     Result orbit(float angle, const Vec3& axis, float duration = 1.0f,
-                 Easing easing = Easing::Smooth) noexcept;
-    Result orbit(float angle, const Vec3& axis, float duration, const AnimCurve& curve) noexcept;
-    Result orbit(float angle, const Vec3& axis, const TimingOptions& timing) noexcept
-    {
-        return orbit(angle, axis, timing.duration, timing.curve);
-    }
+                 const AnimCurve& curve = {}) noexcept;
     // Move the camera of view index as look and orbit move the scene's camera, from the cursor.
     // A move that begins while another move of the same view runs adds its change to it; the
     // cameras of the scene and of each view move on their own.
     Result look(uint32_t view, const Camera& camera, CameraView cameraView, float duration,
                 const AnimCurve& curve) noexcept;
-    Result look(uint32_t view, const Camera& camera, CameraView cameraView, const TimingOptions& timing) noexcept
-    {
-        return look(view, camera, cameraView, timing.duration, timing.curve);
-    }
     Result orbit(uint32_t view, float angle, const Vec3& axis, float duration,
                  const AnimCurve& curve) noexcept;
-    Result orbit(uint32_t view, float angle, const Vec3& axis, const TimingOptions& timing) noexcept
-    {
-        return orbit(view, angle, axis, timing.duration, timing.curve);
-    }
     // Fades the whole of view index to opacity, from 0 to 1, from the cursor.
     Result fade(uint32_t view, float opacity, float duration, const AnimCurve& curve) noexcept;
-    Result fade(uint32_t view, float opacity, const TimingOptions& timing) noexcept
-    {
-        return fade(view, opacity, timing.duration, timing.curve);
-    }
     Result wait(float duration = 1.0f) noexcept;
     // Cursor starts the next play/look/wait/add. seek may move backward for parallel tracks;
     // non-model property clips remain chronological and nonoverlapping. Layered camera moves
@@ -2560,14 +2417,12 @@ struct Saver
     static Result png(const Surface& surface, const char* path) noexcept;
     // Saves every frame of the timeline as a GIF or an MP4, by the path's extension, at fps
     // frames per second (0: the scene's). Both run ffmpeg from the PATH, so neither is
-    // supported in WebAssembly or Windows builds.
+    // supported in WebAssembly or Windows builds. An MP4 takes soundtrack as its audio: any
+    // file ffmpeg reads, such as a WAV or MP3, played from Scene time 0. A longer track is cut
+    // where the video ends and a shorter one leaves the rest silent. Only .mp4 carries audio;
+    // nullptr saves no audio.
     static Result save(const Scene* scene, Renderer& renderer, const char* path,
-                       uint32_t fps = 0) noexcept;
-    // Saves an MP4 like save() with soundtrack as its audio: any file ffmpeg reads, such as
-    // a WAV or MP3, played from Scene time 0. A longer track is cut where the video ends and
-    // a shorter one leaves the rest silent. Only .mp4 carries audio; nullptr saves no audio.
-    static Result save(const Scene* scene, Renderer& renderer, const char* path, uint32_t fps,
-                       const char* soundtrack) noexcept;
+                       uint32_t fps = 0, const char* soundtrack = nullptr) noexcept;
 };
 
 struct Lua
@@ -2592,7 +2447,6 @@ struct Lua
 double springResponse(double seconds, double mass, double stiffness, double damping,
                       double displacement, double velocity = 0.0) noexcept;
 
-float ease(Easing easing, float progress) noexcept;
 float ease(const AnimCurve& curve, float progress) noexcept;
 const char* result(Result result) noexcept;
 const char* type(Type type) noexcept;

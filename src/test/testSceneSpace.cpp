@@ -392,11 +392,12 @@ void spaceScreenLabels(Renderer* renderer)
     plane->orientation = TextOrientation::Plane;
     CHECK(space->placeScreen(plane, 0u, 1.0f) == Result::InvalidArguments);
     delete plane;
-    CHECK(scene->orbit(pi * 0.5f, {0.0f, 0.0f, 1.0f}, 2.0f, Easing::Linear) == Result::Success);
+    CHECK(scene->orbit(pi * 0.5f, {0.0f, 0.0f, 1.0f}, 2.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
     CHECK(space->placeScreen(labels[0], 0u, 1.0f) == Result::InsufficientCondition);
     auto grow = AnimationTarget::from(labels[0]);
     grow.size(28.0f);
-    CHECK(scene->play(&grow, 1u, 1.0f, Easing::Linear) == Result::Success);
+    CHECK(scene->play(&grow, 1u, 1.0f, AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
     const float times[] = {0.0f, 1.25f, 0.2f, 2.0f, 2.5f, 3.0f, 1.25f};
     for (auto time : times) {
         auto camera = config.camera;
@@ -593,8 +594,10 @@ void spaceLabelOpacity(Renderer* renderer)
         CHECK(space->place(deep, 0u, 0.0f) == Result::Success);
         CHECK(space->place(fresh, 0u, -2.0f) == Result::Success && space->add(fresh) == Result::Success);
         CHECK(space->place(loose, 1u, 1.0f) == Result::Success);
-        CHECK(scene->play(Animation::fadeIn(space), 1.0f, Easing::Linear) == Result::Success);
-        CHECK(scene->play(Animation::uncreate(space), 1.0f, Easing::Linear) == Result::Success);
+        CHECK(scene->play(Animation::fadeIn(space), 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+              == Result::Success);
+        CHECK(scene->play(Animation::uncreate(space), 1.0f, AnimCurve::preset(AnimCurvePreset::Linear))
+              == Result::Success);
         Surface surface;
         // Halfway through the fade the labels below the space show at half strength.
         CHECK(renderer->render(scene, 0.5f, surface) == Result::Success);
@@ -652,7 +655,7 @@ void cursorDecimals(Renderer* renderer)
     CHECK(middle(276u) == pixel(Color::hex("#ffffff")));
     // Three fades of 0.3 that begin 0.4 of it apart end 0.54 on.
     Animation fades[] = {Animation::fade(dots[0], 0.5f), Animation::fade(dots[1], 0.5f), Animation::fade(dots[2], 0.5f)};
-    CHECK(scene->play(fades, 3u, 0.3f, Easing::Linear, 0.4f) == Result::Success);
+    CHECK(scene->play(fades, 3u, 0.3f, AnimCurve::preset(AnimCurvePreset::Linear), 0.4f) == Result::Success);
     CHECK(scene->cursor() == 9.74f);
     delete scene;
 }

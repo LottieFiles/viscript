@@ -648,35 +648,22 @@ static Result _frames(const Scene* scene, Renderer& renderer, const char* path, 
 }
 #endif
 
-Result Saver::save(const Scene* scene, Renderer& renderer, const char* path, uint32_t fps) noexcept
+Result Saver::save(const Scene* scene, Renderer& renderer, const char* path, uint32_t fps,
+                   const char* soundtrack) noexcept
 {
     if (!scene || !path || !path[0]) return Result::InvalidArguments;
     auto gif = _ends(path, ".gif");
     auto mp4 = _ends(path, ".mp4");
     if (!gif && !mp4) return Result::InvalidArguments;
+    if (soundtrack && (!mp4 || !soundtrack[0])) return Result::InvalidArguments;
 #if defined(__EMSCRIPTEN__) || defined(_WIN32)
     static_cast<void>(renderer);
     static_cast<void>(fps);
     return Result::NonSupport;
 #else
     if (gif) return _frames(scene, renderer, path, fps, GIF_OPTIONS, false);
-    return _frames(scene, renderer, path, fps, MP4_OPTIONS, true);
-#endif
-}
-
-Result Saver::save(const Scene* scene, Renderer& renderer, const char* path, uint32_t fps,
-                   const char* soundtrack) noexcept
-{
-    if (!soundtrack) return save(scene, renderer, path, fps);
-    if (!scene || !path || !soundtrack[0] || !_ends(path, ".mp4")) {
-        return Result::InvalidArguments;
-    }
-#if defined(__EMSCRIPTEN__) || defined(_WIN32)
-    static_cast<void>(renderer);
-    static_cast<void>(fps);
-    return Result::NonSupport;
-#else
-    return _frames(scene, renderer, path, fps, MP4_SOUNDTRACK_OPTIONS, true, soundtrack);
+    return _frames(scene, renderer, path, fps, soundtrack ? MP4_SOUNDTRACK_OPTIONS : MP4_OPTIONS, true,
+                   soundtrack);
 #endif
 }
 

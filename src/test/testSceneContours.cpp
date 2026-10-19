@@ -138,7 +138,7 @@ void contourLabels(Renderer* renderer)
     auto grid = curve->contourGrid();
     grid.level = 1.0;
     CHECK(scene->play(AnimationTarget::from(curve).geometry(moved, count, nullptr, 1u, nullptr, &grid),
-                      1.0f, Easing::Linear) == Result::Success);
+                      1.0f, AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
     delete[] moved;
     CHECK(curve->labelContours(options) == Result::InsufficientCondition);
     LayoutReport initial, again;
@@ -262,7 +262,7 @@ void contourStates(Renderer* renderer)
             field.a = 0.75 + i*0.1875;
             auto next = trace(0.0);
             CHECK(next && scene->play(AnimationTarget::from(ellipse).geometry(next->points(), next->count(),
-                  nullptr, next->contours()), 0.25f, Easing::Linear) == Result::Success);
+                  nullptr, next->contours()), 0.25f, AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
             delete next;
         }
         auto calls = field.calls;
@@ -297,7 +297,8 @@ void contourStates(Renderer* renderer)
             uint32_t ends[2];
             for (auto i = 0u; next && i < next->contours(); i++) ends[i] = next->contourEnd(i);
             CHECK(next && scene->play(AnimationTarget::from(curve).geometry(next->points(), next->count(),
-                  next->contours() > 1u ? ends : nullptr, next->contours()), 0.25f, Easing::Linear) == Result::Success);
+                  next->contours() > 1u ? ends : nullptr, next->contours()), 0.25f,
+                  AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
             delete next;
         }
         auto calls = field.calls;
@@ -443,7 +444,8 @@ void plotEndpointColor(Renderer* renderer)
     CHECK(sample.color.r == 0 && sample.color.g > 0 && sample.color.b > 0 && sample.color.a == 255);
     CHECK(plot->style.gradient.enabled());
     CHECK(scene->wait(1) == Result::Success);
-    CHECK(scene->play(AnimationTarget::from(plot).progress(0), 1, Easing::Linear) == Result::Success);
+    CHECK(scene->play(AnimationTarget::from(plot).progress(0), 1, AnimCurve::preset(AnimCurvePreset::Linear))
+          == Result::Success);
     CHECK(renderer->sample(scene, 2, {40.5f, 50.5f}, candidates, 1u, sample) == Result::Success);
     CHECK(sample.color.r == 255 && sample.color.g == 0 && sample.color.b == 0 && sample.color.a == 255);
     delete scene;
