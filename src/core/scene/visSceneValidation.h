@@ -1,3 +1,4 @@
+// Checks that scene validation shares: finite ranges and identity matrices.
 #ifndef _VIS_SCENE_VALIDATION_H_
 #define _VIS_SCENE_VALIDATION_H_
 

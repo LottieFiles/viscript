@@ -1,3 +1,5 @@
+// SwRenderer on ThorVG's software engine: renders into a Surface, and reads bounds,
+// intersections, layout reports and pixel samples from what it drew.
 #include <cmath>
 #include <cstddef>
 #include <cstdio>

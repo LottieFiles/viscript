@@ -1,3 +1,5 @@
+// The Lua binding of the tex module: tex formulas, the parts and sides they expose, and the
+// pairing of two formulas for a match transform.
 #include <cmath>
 #include <cstdio>
 #include <cstring>

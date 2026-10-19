@@ -1,3 +1,5 @@
+// Sampled groups: Riemann sums, vector fields and stream lines built from the callbacks a Range
+// steps through.
 #include <algorithm>
 #include <cfloat>
 #include <cmath>

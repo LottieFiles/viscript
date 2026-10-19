@@ -1,3 +1,4 @@
+// The audit command of the viscript command line (see visAudit.cpp).
 #ifndef _VIS_AUDIT_H_
 #define _VIS_AUDIT_H_
 

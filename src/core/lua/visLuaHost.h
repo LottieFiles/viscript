@@ -1,3 +1,5 @@
+// Loads a scene for a host with every optional module this build has: their Lua hooks, the
+// context they fill while loading, and the runtime that may keep the Lua state alive.
 #ifndef _VIS_LUA_HOST_H_
 #define _VIS_LUA_HOST_H_
 

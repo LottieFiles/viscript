@@ -1,3 +1,4 @@
+// The runtime module's hooks for the core's Lua loader (see visLuaExtension.h).
 #ifndef _VIS_LUA_RUNTIME_EXTENSION_H_
 #define _VIS_LUA_RUNTIME_EXTENSION_H_
 

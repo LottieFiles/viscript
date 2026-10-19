@@ -17,7 +17,7 @@ function resize(canvas: Canvas, width: number, height: number): void {
     if (canvas.height !== height) canvas.height = height;
 }
 
-// The CSS `ease` curve the page's old ghost canvas faded with, near enough.
+// A smoothstep, near the CSS `ease` curve, which a ghost of the previous frame fades out along.
 const ease = (t: number): number => t * t * (3 - 2 * t);
 
 interface Ghost {

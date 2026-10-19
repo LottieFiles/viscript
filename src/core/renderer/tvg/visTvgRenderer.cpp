@@ -1,3 +1,5 @@
+// Builds ThorVG paints from a display list for both engines: paths, circles, text with font
+// fallback and math glyphs, numbers, pictures and effects, reusing the retained paint tree.
 #include <cmath>
 #include <cstddef>
 #include <cstdio>

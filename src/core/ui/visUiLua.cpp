@@ -1,3 +1,5 @@
+// The Lua binding of the UI module: panels with buttons, sliders, toggles, sample areas and
+// camera controls.
 #include <cmath>
 #include <cstring>
 

@@ -1,3 +1,5 @@
+// Pairs the outlines of a morph: resampled to even arc length and aligned so that points travel
+// the shortest way.
 #include <algorithm>
 #include <cmath>
 #include <cstring>

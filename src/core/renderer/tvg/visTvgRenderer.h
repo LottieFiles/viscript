@@ -1,3 +1,4 @@
+// What the two ThorVG renderers share: the retained paint tree, diagnostics and font loading.
 #ifndef _VIS_TVG_RENDERER_H_
 #define _VIS_TVG_RENDERER_H_
 
@@ -48,7 +49,7 @@ tvg::Paint* tvgPaint(const DrawCommand& command) noexcept;
 bool tvgVisible(const DrawCommand& command) noexcept;
 // Retained paint tree shared by the CPU and GL renderers. It keeps one tvg::Paint per
 // stable draw-command identity across frames, attached to the canvas once, and applies
-// only the changes of each new DisplayList (see docs/architecture.md, "Renderer").
+// only the changes of each new DisplayList (see docs/architecture.md, "Retained rendering").
 RetainedTree* tvgRetainedGen() noexcept;
 void tvgRetainedFree(RetainedTree* tree) noexcept;
 void tvgRetainedReset(RetainedTree* tree) noexcept;

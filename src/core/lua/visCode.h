@@ -1,3 +1,4 @@
+// The token classes, languages and per-line state of the code tokenizer (visCode.cpp).
 #ifndef _VIS_CODE_H_
 #define _VIS_CODE_H_
 

@@ -1,3 +1,4 @@
+// The audio module's public API: cues on a scene's soundscape, and the player that plays them.
 #ifndef _VIS_AUDIO_H_
 #define _VIS_AUDIO_H_
 

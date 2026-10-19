@@ -1,3 +1,4 @@
+// Theme presets and the color each role resolves to.
 #include "vis.h"
 
 namespace vis

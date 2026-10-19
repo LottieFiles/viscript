@@ -1,3 +1,4 @@
+// The Lua binding of the audio module: cues on a scene's soundscape and their gains.
 #include <cmath>
 #include <cstring>
 
@@ -8,7 +9,6 @@ extern "C" {
 
 #include "vis_audio.h"
 #include "visAudioLuaExtension.h"
-
 #include "../lua/visLuaValues.h"
 
 namespace vis::audio

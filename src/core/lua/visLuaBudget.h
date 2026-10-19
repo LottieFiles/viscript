@@ -1,3 +1,4 @@
+// The Lua memory and path limits that the binding and the modules share.
 #ifndef _VIS_LUA_BUDGET_H_
 #define _VIS_LUA_BUDGET_H_
 

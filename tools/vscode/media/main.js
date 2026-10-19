@@ -1,3 +1,6 @@
+// The preview webview: draws the scene the extension sends into the canvas with the runtime's
+// client, and runs the player around it: transport and playback range, speed, camera, fit and
+// zoom, the series menu, the source inspector, performance stats, runtime audio and export.
 import {frameElapsed, normalizeTime} from "./time.mjs";
 import {
     advancePlaybackTime,

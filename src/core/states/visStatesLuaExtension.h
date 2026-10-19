@@ -1,3 +1,4 @@
+// The states module's hooks for the core's Lua loader (see visLuaExtension.h).
 #ifndef _VIS_STATES_LUA_EXTENSION_H_
 #define _VIS_STATES_LUA_EXTENSION_H_
 

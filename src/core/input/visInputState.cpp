@@ -1,3 +1,5 @@
+// The input module's state: the keys and pointers a frame holds, and the action maps that name
+// them.
 #include <cmath>
 #include <cstring>
 #include <new>

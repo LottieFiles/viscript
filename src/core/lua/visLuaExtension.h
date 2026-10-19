@@ -1,3 +1,5 @@
+// What a module's Lua binding uses from the core: load hooks, timing tables, handing objects to
+// a scene, and the handle kinds.
 #ifndef _VIS_LUA_EXTENSION_H_
 #define _VIS_LUA_EXTENSION_H_
 

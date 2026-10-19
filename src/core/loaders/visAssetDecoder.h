@@ -1,3 +1,4 @@
+// The image decoder the asset loader calls: probe for the size, decode for the pixels.
 #ifndef _VIS_ASSET_DECODER_H_
 #define _VIS_ASSET_DECODER_H_
 

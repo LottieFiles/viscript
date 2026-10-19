@@ -1,3 +1,5 @@
+// Builds a laid-out formula into scene objects: glyph outlines, radicals, delimiters and
+// accents drawn as shapes, measured in the scene's fonts, with the keys that pair two formulas.
 #include <cmath>
 #include <cstdarg>
 #include <cstdio>

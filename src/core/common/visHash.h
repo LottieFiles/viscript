@@ -1,3 +1,4 @@
+// Hashes bytes into a running 64-bit FNV-1a hash.
 #ifndef _VIS_HASH_H_
 #define _VIS_HASH_H_
 

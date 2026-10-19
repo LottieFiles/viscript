@@ -1,3 +1,5 @@
+// Parses TeX math into nodes: the symbols, operators, delimiters, accents, fractions, roots,
+// scripts and environments of the supported subset.
 #include <cstdarg>
 #include <cstdio>
 #include <cstring>

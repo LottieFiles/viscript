@@ -1,6 +1,6 @@
+// valid(): the checks a Config and an Object pass before a scene takes them.
 #include "visScene.h"
 #include "visSceneValidation.h"
-
 #include "../common/visConstants.h"
 
 namespace vis

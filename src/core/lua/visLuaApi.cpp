@@ -1,3 +1,5 @@
+// The vis.* library functions (merge, keys, format, tostring, the random seed) and luaOpenApi,
+// which registers the scene API, the module methods and the global guard.
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -404,7 +406,7 @@ int detail::luaOpenApi(lua_State* lua, const LuaApi& api)
     lua_pushcfunction(lua, _trackTiming);
     lua_call(lua, 8, 1);
     lua_setfield(lua, LUA_REGISTRYINDEX, TRACKER_FLUSH);
-    // Last, so the preludes above read globals without the guard.
+    // Last, so the tracker prelude above reads globals without the guard.
     lua_pushglobaltable(lua);
     _guard(lua, "");
     lua_pop(lua, 1);

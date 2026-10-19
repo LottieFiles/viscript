@@ -1,3 +1,4 @@
+// SwRenderer in a build without the CPU engine.
 #include "vis.h"
 #include "visRendererBackend.h"
 

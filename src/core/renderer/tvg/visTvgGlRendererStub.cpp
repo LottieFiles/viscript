@@ -1,3 +1,4 @@
+// GlRenderer in a build without the GL engine: glEnabled() is false.
 #include "vis.h"
 #include "visRendererBackend.h"
 

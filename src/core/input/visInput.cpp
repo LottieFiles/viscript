@@ -1,3 +1,5 @@
+// The input module's controller: pointer follows, key moves and triggers, and camera actions,
+// applied to a scene through runtime modifiers.
 #include <cmath>
 #include <new>
 
@@ -11,6 +13,7 @@ namespace vis::input
 
 namespace
 {
+
 constexpr uint32_t ShortcutModifiers = 2u | 4u | 8u;
 uint8_t RuntimeKey = 0u;
 

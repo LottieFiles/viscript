@@ -20,6 +20,27 @@ It is the player behind the [documentation site](../../docs/page) and the
    replaces a worker that hangs                    for image bytes
 ```
 
+## Words
+
+- **Player** (`VisPlayer`): one per canvas. It loads a scene, plays, pauses and seeks it, follows
+  the host's theme, loads when seen and frees its engine when not.
+- **Render host** (`createRenderHost`): one per page or plugin. It starts the render server, gives
+  it the runtime, fonts and images, coalesces frame requests and replaces a worker that hangs.
+- **Render server** (`RenderServer`): in the render worker, or on the main thread as a fallback.
+  It compiles scenes and draws their frames, with one session per player.
+- **Instance pool** (`InstancePool`): the WASM instances the server shares between sessions; a
+  font is loaded once per instance.
+- **Surface**: the server's side of a player's canvas, the `OffscreenCanvas` it draws frames onto.
+- **Scheduler**: one per window; the animation frame loop and the observers that tell players
+  when they are seen, resized or hidden.
+- **Catalog** (`createCatalog`): a fixed table of images, each fetched once, and which of them a
+  scene loads.
+- **Font provider**: answers `fetch(name)` with a font's bytes or `null`; see [Fonts](#fonts).
+- **Compiler** (`createSandboxCompiler`): runs JavaScript scenes in a sandboxed frame so that the
+  server is sent only the Lua they build; see [Scene code](#scene-code).
+- **Frozen**: a playing scene out of view; no frames are drawn, and after `releaseDelay` its
+  engine is freed until it is seen again.
+
 ## Use
 
 ```js

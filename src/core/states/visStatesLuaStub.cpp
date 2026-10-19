@@ -1,3 +1,4 @@
+// The states module's Lua::load in a build without Lua: reports NonSupport.
 #include <cstdio>
 
 #include "vis_states.h"

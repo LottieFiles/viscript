@@ -1,3 +1,4 @@
+// The diagram module's internal records and the layout passes its sources share.
 #ifndef _VIS_DIAGRAM_PRIVATE_H_
 #define _VIS_DIAGRAM_PRIVATE_H_
 

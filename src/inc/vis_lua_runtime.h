@@ -1,3 +1,5 @@
+// The retained Lua runtime's public API: per-frame callbacks over a loaded scene, its overlays,
+// input and sounds.
 #ifndef _VIS_LUA_RUNTIME_H_
 #define _VIS_LUA_RUNTIME_H_
 

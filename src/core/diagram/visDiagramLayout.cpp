@@ -1,3 +1,5 @@
+// The diagram module's node and zone layout: ranks and rows placed apart, with overlaps
+// resolved by shifting along the secondary axis.
 #include <algorithm>
 #include <cmath>
 #include <cstring>

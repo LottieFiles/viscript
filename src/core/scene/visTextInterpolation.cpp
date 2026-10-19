@@ -1,3 +1,5 @@
+// Text that changes over time: UTF-8 codepoints, the clusters that stay together, and the
+// string shown part way between two strings.
 #include <cmath>
 #include <cstring>
 #include <new>

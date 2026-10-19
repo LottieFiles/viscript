@@ -1,3 +1,5 @@
+// The diagram module's physical checks: edges that cross or come too near nodes and zones, and
+// the clearance they keep, reported as PhysicalConstraintIssues.
 #include <cmath>
 #include <cstring>
 #include <limits>

@@ -1,3 +1,4 @@
+// The Lua binding of the input module: controllers with pointer follows and key moves.
 #include <cmath>
 #include <cstring>
 

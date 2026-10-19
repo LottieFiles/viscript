@@ -1,3 +1,4 @@
+// The pieces of a match transform and how they pair (see visMatch.cpp).
 #ifndef _VIS_MATCH_H_
 #define _VIS_MATCH_H_
 

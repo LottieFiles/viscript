@@ -1,3 +1,4 @@
+// Saves an MP4 through ffmpeg, H.264 with an optional AAC soundtrack (see visSaver.h).
 #include "visSaver.h"
 
 namespace vis::saver

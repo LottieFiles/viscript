@@ -1,3 +1,5 @@
+// The C API of the engine: the C++ API behind opaque handles and integer results, for hosts
+// without C++.
 #ifndef _VIS_CAPI_H_
 #define _VIS_CAPI_H_
 

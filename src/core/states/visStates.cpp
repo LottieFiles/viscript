@@ -1,3 +1,5 @@
+// The states module: named states of an object's transform, opacity and progress, with
+// transitions between them applied through a runtime modifier.
 #include <cmath>
 #include <cstring>
 #include <new>

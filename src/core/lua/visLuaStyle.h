@@ -1,3 +1,5 @@
+// Reads styles from Lua tables for the binding: gradients, blur, shadow, blend mode and text
+// options.
 #ifndef _VIS_LUA_STYLE_H_
 #define _VIS_LUA_STYLE_H_
 

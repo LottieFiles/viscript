@@ -1,3 +1,4 @@
+// Names of the Lua metatables and registry tables that the binding and the modules share.
 #ifndef _VIS_LUA_API_H_
 #define _VIS_LUA_API_H_
 

@@ -1,3 +1,4 @@
+// Finiteness checks for the value types, and whether a matrix is affine.
 #ifndef _VIS_FINITE_H_
 #define _VIS_FINITE_H_
 

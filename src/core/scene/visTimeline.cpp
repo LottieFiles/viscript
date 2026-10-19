@@ -1,3 +1,4 @@
+// The scene's cursor: wait, seek, markers, the diagnostic and the duration.
 #include <cstring>
 
 #include "visScene.h"

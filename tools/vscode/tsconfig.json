@@ -7,6 +7,8 @@
     "outDir": "out",
     "lib": ["ES2022"],
     "strict": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
     "sourceMap": true,
     "esModuleInterop": true,
     "skipLibCheck": true

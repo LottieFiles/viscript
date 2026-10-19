@@ -1,3 +1,4 @@
+// Types of the JavaScript scene API in bindings.js, checked by src/test/testTypes.ts.
 export type Color = string;
 export type ThemeColorRole = "background" | "foreground" | "muted" | "accent" | "secondary" |
     "success" | "warning" | "danger" | "info" | "surface" | "border" | "result" | "focus";

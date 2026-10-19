@@ -1,3 +1,4 @@
+// Probes and decodes encoded images to RGBA pixels with ThorVG's picture loaders.
 #include <cmath>
 #include <limits>
 #include <new>

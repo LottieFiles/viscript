@@ -1,3 +1,4 @@
+// The limits and storage of morphs (see visMorph.cpp).
 #ifndef _VIS_MORPH_H_
 #define _VIS_MORPH_H_
 

@@ -1,3 +1,5 @@
+// The scene's private side: visual states, object entries, clips, cameras, views, transitions,
+// markers, saves, warps and Scene::Impl, which the renderer and the modules read.
 #ifndef _VIS_SCENE_H_
 #define _VIS_SCENE_H_
 

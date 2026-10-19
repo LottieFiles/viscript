@@ -1,3 +1,4 @@
+// The renderer backends a build has, and text measurement for the scene.
 #ifndef _VIS_RENDERER_BACKEND_H_
 #define _VIS_RENDERER_BACKEND_H_
 

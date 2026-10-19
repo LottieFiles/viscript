@@ -1,3 +1,4 @@
+// Color arithmetic that the display list and its blends share: clamping, opacity and mixing.
 #ifndef _VIS_DISPLAY_COLOR_H_
 #define _VIS_DISPLAY_COLOR_H_
 

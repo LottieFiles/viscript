@@ -1,3 +1,5 @@
+// Tokenizes source code for code blocks: the keywords, strings, numbers and comments of each
+// language the grammars name, one line at a time.
 #include <cstring>
 
 #include "visCode.h"

@@ -1,3 +1,4 @@
+// Plot contours: level lines traced through a sampled grid, and labels placed along them.
 #include <algorithm>
 #include <cfloat>
 #include <cmath>
@@ -9,7 +10,6 @@
 
 #include "vis.h"
 #include "visScene.h"
-
 #include "../common/visConstants.h"
 
 namespace vis

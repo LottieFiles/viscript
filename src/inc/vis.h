@@ -1,3 +1,41 @@
+// viscript's public C++ API. A Scene owns a tree of objects and a timeline: every play,
+// transition, camera move and wait is recorded from the cursor, and a Renderer draws the scene
+// as it stands at any time into a Surface. A Saver writes frames to PNG, GIF or MP4, and Lua
+// loads a scene from a script. The header reads in this order:
+//   results and enumerations    Result, Type, and the modes of masks, blends, cells, text, cameras
+//   values                      Vec2, Vec3, Mat3, Mat4 (row-major), Color, Range, SampleTime
+//   samplers                    the callbacks that cells, plots, contours, fields and warps call
+//   assets, cameras and styles  Asset, AssetLoader, Camera, Gradient, Style, Theme
+//   layout reports              Bounds, BBox and the Layout* records a Renderer measures
+//   objects                     Object, Group, Space, shapes, Plot, Text, Picture, Cell, Connector
+//   animations                  Animation, AnimationTarget, MatchOptions, Emphasis, CloneOptions
+//   scenes                      Config, Viewport, SceneView, transitions, RuntimeModifier, Scene
+//   rendering and saving        Surface, SwRenderer, GlRenderer, Renderer, Saver, Lua
+//
+// Words the API uses:
+//   object    a node of the tree, with a style, a model matrix, a layer, an opacity and a progress.
+//             A group draws nothing itself; a space is a group with axes that places by its ranges.
+//   tag       an object's name, unique among the objects attached to a scene; object(tag) finds it.
+//   cursor    where the next play, look, wait or add starts in time; wait() and seek() move it.
+//   clip      one animated change of one object's property over a span of time; a play adds one per
+//             target, and clipCount() counts them.
+//   channel   the property a clip animates: model, opacity, stroke, fill, width, geometry and more.
+//             On one object, channels other than the model cannot overlap in time.
+//   family    an object with everything below it, as plays, fades and handoffs treat it.
+//   piece     one shape or text below an object that a match transform carries or fades on its own.
+//   handoff   the scene's record that two families overlap on purpose while pieces travel between
+//             them, which handoff() reports.
+//   layer     the draw order of an object; a subtree that isolate(), a mask, a blend, a blur or a
+//             shadow composites as one is also called a layer.
+//   viewport  a rectangle of the frame showing another scene, mounted by viewport(); a transition
+//             shows a sequence of scenes there in turn.
+//   view      a second look at this scene's own objects through a camera of its own (SceneView).
+//   warp      a mapping of points applied to subtrees, which bends their geometry from then on.
+//   save      a pushed copy of a subtree's state, which restore() animates back to.
+//   runtime   callbacks a host registers to adjust objects and the camera each sample, and to take
+//             input; the UI, input, states and Lua runtime modules work through them.
+//   marker    a named cursor time, set by mark().
+//   theme     the fonts, sizes and colors objects take when they set none of their own.
 #ifndef _VIS_H_
 #define _VIS_H_
 
@@ -224,6 +262,7 @@ enum struct NumberMode : uint8_t
     Relative
 };
 
+// The first timing curves, kept for the overloads that take them; an AnimCurve has these and more.
 enum struct Easing : uint8_t
 {
     Linear = 0,
@@ -336,6 +375,8 @@ struct Vec3
     Vec3 normalized() const noexcept;
 };
 
+// A 3x3 matrix in row-major order, e[row * 3 + column], applied to column vectors; translate()
+// fills the last column.
 struct Mat3
 {
     float e[9];
@@ -349,6 +390,7 @@ struct Mat3
     bool inverse(Mat3& out) const noexcept;
 };
 
+// A 4x4 matrix in row-major order, e[row * 4 + column], applied to column vectors.
 struct Mat4
 {
     float e[16];
@@ -873,6 +915,9 @@ struct Object
     Result alignTo(const Object* target, const Vec3& direction) noexcept;
     Object& tag(const char* value) noexcept;
     const char* tag() const noexcept;
+    // The chaining setters below style a detached object. Once it is attached to a scene they
+    // return without changing it: edit its fields and call Scene::update(object) at cursor zero,
+    // or play an AnimationTarget.
     Object& stroke(Color color) noexcept;
     Object& stroke(Color color, float width) noexcept;
     Object& strokeWidth(float width) noexcept;

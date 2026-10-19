@@ -1,3 +1,5 @@
+// Asset and AssetLoader: images from a file, from encoded bytes or from raw pixels, decoded on
+// first use.
 #include <cstdio>
 #include <cstring>
 #include <new>

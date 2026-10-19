@@ -1,3 +1,5 @@
+// The UI module: buttons, sliders and sample areas on a panel, their input, and the retargeted
+// visuals they show through runtime modifiers.
 #include <cmath>
 #include <new>
 
@@ -11,6 +13,7 @@ namespace vis::ui
 
 namespace
 {
+
 uint8_t RuntimeKey = 0u;
 
 static float _clamp01(float value) noexcept

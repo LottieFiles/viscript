@@ -1,3 +1,5 @@
+// The display list: the draw commands and layers of one frame, between the scene and the
+// renderers.
 #ifndef _VIS_DISPLAY_LIST_H_
 #define _VIS_DISPLAY_LIST_H_
 

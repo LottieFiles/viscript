@@ -1,3 +1,5 @@
+// The input module's public API: input events, key and pointer state, action maps, and the
+// controller that moves objects and the camera from them.
 #ifndef _VIS_INPUT_H_
 #define _VIS_INPUT_H_
 

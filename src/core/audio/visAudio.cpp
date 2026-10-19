@@ -1,3 +1,5 @@
+// The audio module's soundscape: the cues a scene schedules on its buses, their gains over
+// time, and the mix sampled at any scene time.
 #include <cmath>
 #include <cstring>
 #include <limits>

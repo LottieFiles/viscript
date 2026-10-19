@@ -1,3 +1,5 @@
+// WarpDraft: gathers the points a warp will move, a space's grid, ticks and numbers among them,
+// and maps them.
 #include <cmath>
 
 #include "visSceneValidation.h"

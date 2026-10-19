@@ -1,3 +1,6 @@
+// viscript audit: samples a scene over its duration and reports text that leaves the canvas or
+// its container, overlaps, occluded scenes and diagram issues, less the allowances the options
+// grant.
 #include <cerrno>
 #include <cmath>
 #include <cstdio>

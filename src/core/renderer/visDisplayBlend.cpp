@@ -1,3 +1,5 @@
+// DisplayList::blend(): a display list part way between two others, with matched commands
+// interpolated and the rest cross-faded.
 #include <algorithm>
 #include <cmath>
 #include <cstring>

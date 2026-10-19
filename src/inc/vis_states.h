@@ -1,3 +1,4 @@
+// The states module's public API: named states of an object and the transitions between them.
 #ifndef _VIS_STATES_H_
 #define _VIS_STATES_H_
 

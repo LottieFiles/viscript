@@ -1,3 +1,4 @@
+// Double-precision vectors for geometry that float would drift in, narrowed back afterwards.
 #ifndef _VIS_GEOMETRY64_H_
 #define _VIS_GEOMETRY64_H_
 

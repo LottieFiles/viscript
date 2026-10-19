@@ -1,3 +1,5 @@
+// The Lua binding of the diagram module: diagrams that take node, connect and zone, build, and
+// the built handle's root, nodes, edges, zones and routes.
 #include <cmath>
 #include <cstring>
 #include <new>
@@ -9,7 +11,6 @@ extern "C" {
 
 #include "vis_diagram.h"
 #include "visDiagramLuaExtension.h"
-
 #include "../lua/visLuaValues.h"
 
 namespace vis::diagram
@@ -79,6 +80,8 @@ static const char* _fieldString(lua_State* lua, int index, const char* name,
     return value;
 }
 
+// Reads {x, y} or {x = , y = } like the core's _vec2, but refuses other keys and keeps the
+// diagram's error wording. _fieldPair reads one from a field, or returns the fallback.
 static Vec2 _vec2(lua_State* lua, int index, const char* name)
 {
     luaL_checktype(lua, index, LUA_TTABLE);

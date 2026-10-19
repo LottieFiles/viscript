@@ -1,3 +1,4 @@
+// The UI module's public API: panels of buttons, sliders and sample areas that take input events.
 #ifndef _VIS_UI_H_
 #define _VIS_UI_H_
 

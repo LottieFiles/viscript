@@ -1,3 +1,16 @@
+// The scene engine behind vis.h: owns the objects, records what each play, transition and
+// camera move does as clips on a timeline, and samples them into the frame a renderer draws.
+// Sections, each marked "// ---------- name ----------":
+//  Limits and billboards / Fingerprints and validity / Interpolation and matrices
+//  / Time spans and visual states / Storing shapes / Applying clips and overlap rules
+//  / Motion paths / Morph pairs and geometry ownership / Scene transition frames
+//  / Storage growth and bookkeeping / Sampling clips / Animation factories / Animation targets
+//  / Creating scenes and attaching objects / Cloning / Placement, measuring and viewports
+//  / Object transitions / Layers, effects and fade transforms / Match transforms and handoffs
+//  / Highlights and emphasis / Arranging / Preparing plays / Playing animations / Updating objects
+//  / Saving and restoring / Warps / Runtime modifiers and camera input / Cameras and views
+//  / Frames and queries
+
 #include <algorithm>
 #include <atomic>
 #include <cmath>
@@ -21,6 +34,8 @@
 
 namespace vis
 {
+
+// ---------- Limits and billboards ----------
 
 static constexpr uint32_t MAX_OBJECTS = 1048576;
 static constexpr uint32_t MAX_OBJECT_DEPTH = 64;
@@ -50,6 +65,8 @@ Mat4 Scene::Impl::billboardReference(const Object* object) const noexcept
     }
     return reference;
 }
+
+// ---------- Fingerprints and validity ----------
 
 static bool _equal(const Color& first, const Color& second)
 {
@@ -474,6 +491,8 @@ uint64_t fingerprint(const Object* object) noexcept
     }
     return hash;
 }
+
+// ---------- Interpolation and matrices ----------
 
 static bool _equal(const Mat4& first, const Mat4& second)
 {
@@ -1067,6 +1086,8 @@ static const char* _planarReason(char (&reason)[256], float time)
     return reason;
 }
 
+// ---------- Time spans and visual states ----------
+
 // A span of time whose ends count when closed.
 struct TimeSpan
 {
@@ -1205,6 +1226,8 @@ static void _rebase(ObjectEntry& entry, VisualState state)
     _unheld(state, entry.base);
     entry.base = state;
 }
+
+// ---------- Storing shapes ----------
 
 void Scene::Impl::store(Object* object, const VisualState& state) noexcept
 {
@@ -1373,6 +1396,8 @@ bool Scene::Impl::room(Object* object, const GeometryShape& shape) noexcept
     }
     return true;
 }
+
+// ---------- Applying clips and overlap rules ----------
 
 // Gives the object of entry the colors of source where it shows the theme's, in its base and in
 // its clips, which clips holds in the list of entry.
@@ -1826,6 +1851,8 @@ static const char* _unplayable(const ObjectEntry* entry, const Object* object, b
     return nullptr;
 }
 
+// ---------- Motion paths ----------
+
 static constexpr uint32_t MAX_PATH_VERTICES = 2048;
 static constexpr uint32_t MAX_MOTION_VERTICES = 262144;
 
@@ -2101,6 +2128,8 @@ void Scene::Impl::dropPaths(uint32_t count, uint32_t vertices) noexcept
     pathVertices = vertices;
 }
 
+// ---------- Morph pairs and geometry ownership ----------
+
 Result Scene::Impl::pair(const Animation& animation, uint32_t& index) noexcept
 {
     auto& impl = *this;
@@ -2280,6 +2309,8 @@ SceneSequence::~SceneSequence()
     delete[] transitions;
 }
 
+// ---------- Scene transition frames ----------
+
 void SceneTransition::frame(const Viewport& viewport, float progress, uint8_t outgoingAlpha,
                             uint8_t incomingAlpha, TransitionFrame& output) const noexcept
 {
@@ -2357,6 +2388,8 @@ void SceneTransition::frame(const Viewport& viewport, float progress, uint8_t ou
     output.outgoingOpacity = output.outgoingAbove ? above : shown;
     output.incomingOpacity = output.outgoingAbove ? shown : above;
 }
+
+// ---------- Storage growth and bookkeeping ----------
 
 // Lets go of the records of save and the copies of strings they hold.
 static void _release(SavedState& save)
@@ -2760,6 +2793,8 @@ void Scene::Impl::discard(Object* copy, uint32_t first) noexcept
     delete copy;
 }
 
+// ---------- Sampling clips ----------
+
 // The model a layered clip leaves when its change is change and the clips before it give model:
 // the change applies on top, its pivot first moved to where the object has carried it.
 static Mat4 _layer(const Clip& clip, const Mat4& change, const Mat4& model)
@@ -3039,6 +3074,8 @@ Result Scene::Impl::sample(float time, Camera& camera, CameraView& view) const n
     return valid(sampled) ? Result::Success : Result::InvalidArguments;
 }
 
+// ---------- Animation factories ----------
+
 Animation Animation::create(Object* target, DrawDirection direction) noexcept
 {
     Animation animation;
@@ -3247,6 +3284,8 @@ Animation Animation::wiggle(Object* target, float scale, float angle, float swin
     animation.value = swings;
     return animation;
 }
+
+// ---------- Animation targets ----------
 
 static constexpr uint32_t TARGET_MODEL = 1u << 0u;
 static constexpr uint32_t TARGET_OPACITY = 1u << 1u;
@@ -3602,6 +3641,8 @@ Scene::~Scene()
 {
     delete pImpl;
 }
+
+// ---------- Creating scenes and attaching objects ----------
 
 Scene* Scene::gen(const Config& config) noexcept
 {
@@ -3974,6 +4015,8 @@ static constexpr auto CLONE_EDIT = "the copy's settings could not be changed";
 static constexpr auto CLONE_TREE = "the copy's settings may change, but not the objects below it";
 // How many numbered ids a clone tries, from <id>:copy to <id>:copy4096.
 static constexpr uint32_t CLONE_ID_LIMIT = 4096;
+
+// ---------- Cloning ----------
 
 // One object of a clone: the source, the state it shows at the cursor and its copy.
 struct CloneItem
@@ -4598,6 +4641,8 @@ Result Scene::clone(Object* source, Object*& output, const CloneOptions& options
 static constexpr auto MEASURE_TEXT = "only a valid text can be measured";
 static constexpr auto MEASURE_FONT = "the text's font cannot set it at its size";
 
+// ---------- Placement, measuring and viewports ----------
+
 // World units per pixel at the camera; a perspective camera measures at its target.
 static float _pixelWorld(const Config& config)
 {
@@ -4914,6 +4959,8 @@ Result Scene::remove(Object* object) noexcept
     return Result::Success;
 }
 
+// ---------- Object transitions ----------
+
 static AnimCurve _legacyCurve(Easing easing) noexcept
 {
     if (static_cast<uint8_t>(easing) > static_cast<uint8_t>(Easing::EaseInOut)) {
@@ -5161,6 +5208,8 @@ Result Scene::play(const Animation& animation, float duration, const AnimCurve& 
     return play(&animation, 1, duration, curve, 0.0f);
 }
 
+// ---------- Layers, effects and fade transforms ----------
+
 static bool _effectModel(const Object* object, const Mat4& model, float scale,
                          const Vec3& offset, Mat4& output)
 {
@@ -5392,6 +5441,8 @@ Result Scene::fadeTransform(Object* source, Object* target, float duration,
     pImpl->handoffs[pImpl->handoffCnt++] = {source, target, begin, pImpl->cursor};
     return remove(source);
 }
+
+// ---------- Match transforms and handoffs ----------
 
 struct MatchPieces
 {
@@ -5827,6 +5878,8 @@ bool Scene::shows(const Object* object) const noexcept
     }
     return true;
 }
+
+// ---------- Highlights and emphasis ----------
 
 // The objects below object, at any depth, that are not groups, or object itself if it is not.
 static uint32_t _leaves(Object* object, Object** output, uint32_t count = 0u)
@@ -6343,6 +6396,8 @@ Result Scene::emphasize(const Emphasis& emphasis, float duration, const AnimCurv
     return _emphasize(*this, impl, shapes, windows, count, duration, curve);
 }
 
+// ---------- Arranging ----------
+
 // How far bounds reach from their center along a unit axis.
 static float _reach(const Bounds& bounds, const Vec3& axis)
 {
@@ -6433,6 +6488,8 @@ Result Scene::arrange(Object* const* items, uint32_t count, const Vec3& directio
     release();
     return result;
 }
+
+// ---------- Preparing plays ----------
 
 static bool _connectorReferences(const ObjectEntry* objects, uint32_t count,
                                  const Object* object)
@@ -7079,6 +7136,8 @@ static Result _connectorCycle(const Impl& impl, const Animation* animations, uin
     delete[] queue;
     return cyclic ? Result::InvalidArguments : Result::Success;
 }
+
+// ---------- Playing animations ----------
 
 Result Scene::play(const Animation* animations, uint32_t count, float duration, Easing easing, float lag) noexcept
 {
@@ -7792,6 +7851,8 @@ static void _carry(Impl& impl, Object* object, int64_t moved)
     }
 }
 
+// ---------- Updating objects ----------
+
 Result Scene::update(const AnimationTarget& target) noexcept
 {
     pImpl->diagnostic = nullptr;
@@ -7955,6 +8016,8 @@ Result Scene::update(const AnimationTarget& target) noexcept
     if (target.properties & TARGET_EFFECTS) object->objEffects = true;
     return Result::Success;
 }
+
+// ---------- Saving and restoring ----------
 
 // How many objects object holds at any depth, itself included.
 static uint32_t _family(const Object* object)
@@ -8345,6 +8408,8 @@ Result Scene::restore(Object* const* targets, uint32_t count, float duration, co
     return Result::Success;
 }
 
+// ---------- Warps ----------
+
 // Points the warps of one scene keep in all, each before and after: 48 MB at most.
 bool Scene::Impl::growWarps(uint32_t count) noexcept
 {
@@ -8539,6 +8604,8 @@ Result Scene::warp(Object* const* targets, uint32_t count, PointMap map, void* d
     return Result::Success;
 }
 
+// ---------- Runtime modifiers and camera input ----------
+
 Result Scene::runtime(const RuntimeModifier* modifier) noexcept
 {
     if (!modifier) {
@@ -8625,6 +8692,8 @@ Result Scene::cameraInput(const CameraInput& input) noexcept
     }
     return Result::NonSupport;
 }
+
+// ---------- Cameras and views ----------
 
 Result Scene::look(const Camera& camera, CameraView view, float duration, Easing easing) noexcept
 {
@@ -8903,6 +8972,8 @@ bool Scene::viewAt(uint32_t index, SceneView& view) const noexcept
     view.opacity = entry.opacity;
     return true;
 }
+
+// ---------- Frames and queries ----------
 
 // The height of the world a camera shows across the frame, at its target for a perspective one.
 static double _span(const Camera& camera) noexcept

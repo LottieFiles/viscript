@@ -1,3 +1,4 @@
+// WarpDraft: the points a warp gathers before it becomes a WarpShape.
 #ifndef _VIS_WARP_H_
 #define _VIS_WARP_H_
 

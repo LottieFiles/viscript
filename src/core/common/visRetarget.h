@@ -1,3 +1,5 @@
+// Retargeting: an eased move from one state to another that a newer target restarts from where
+// it is. The UI, input and states modules move their values with it.
 #ifndef _VIS_RETARGET_H_
 #define _VIS_RETARGET_H_
 

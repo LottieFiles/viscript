@@ -1,3 +1,4 @@
+// The frame pipeline to ffmpeg that the GIF and video savers share.
 #ifndef _VIS_SAVER_H_
 #define _VIS_SAVER_H_
 

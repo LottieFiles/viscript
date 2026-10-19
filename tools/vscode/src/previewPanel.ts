@@ -1,3 +1,6 @@
+// The preview panel: one webview that shows the scene of the active Lua or JavaScript document,
+// reloads it as the document changes, serves its assets and fonts from the extension, follows
+// series and source references, and exports PNG, GIF and MP4 through the webview.
 import * as path from "node:path";
 import * as vscode from "vscode";
 import {openVerifiedGitDiff, verifiedGitDiff, type GitDiffReference} from "./gitSnapshots";

@@ -1,3 +1,4 @@
+// The pieces and builds of formulas in a scene (see visTexScene.cpp).
 #ifndef _VIS_TEX_SCENE_H_
 #define _VIS_TEX_SCENE_H_
 

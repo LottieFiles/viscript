@@ -1,3 +1,6 @@
+// The C functions the WebAssembly runtime exports to client.js: engines that load scenes from
+// Lua, render frames into pixels, report layouts and errors as JSON, and take input, assets
+// and audio.
 #include <cstdarg>
 #include <cmath>
 #include <cstdio>

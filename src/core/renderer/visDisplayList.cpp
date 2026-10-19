@@ -1,3 +1,5 @@
+// Builds a frame's display list: the draw commands of every object a scene shows at a time, as
+// strokes, plots, contours, spaces, warps, text and pictures that the renderers draw.
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -14,6 +16,7 @@
 
 namespace vis
 {
+
 static constexpr uint32_t MAX_SPACE_NUMBERS = 256;
 
 static Color _shade(Color color, float factor, float opacity)

@@ -1,3 +1,5 @@
+// Timeline arithmetic that the scene and the modules share: decimal-stable times, and where
+// the items of a lagged group begin and end.
 #ifndef _VIS_TIMELINE_H_
 #define _VIS_TIMELINE_H_
 

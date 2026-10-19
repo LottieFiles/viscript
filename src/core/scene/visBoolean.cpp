@@ -1,3 +1,5 @@
+// Path::combine(): union, intersection, difference and exclusion of path regions in double
+// precision, as contours the renderer fills.
 #include <cmath>
 #include <new>
 

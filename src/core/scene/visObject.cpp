@@ -1,3 +1,5 @@
+// Object and its kinds: construction, the chaining setters, tree edits, bounds, outlines and the
+// geometry each shape keeps.
 #include <algorithm>
 #include <cmath>
 #include <cstdio>

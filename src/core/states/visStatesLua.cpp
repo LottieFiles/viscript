@@ -1,3 +1,5 @@
+// The Lua binding of the states module: controllers that define states, play transitions,
+// advance and report events.
 #include <cmath>
 #include <cstring>
 
@@ -8,7 +10,6 @@ extern "C" {
 
 #include "vis_states.h"
 #include "visStatesLuaExtension.h"
-
 #include "../lua/visLuaValues.h"
 
 namespace vis::states

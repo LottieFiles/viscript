@@ -1,3 +1,6 @@
+// Reads Lua values and table fields for the bindings: numbers and vectors with their checks,
+// option lists, colors and points. The core binding and the optional modules share these;
+// a module keeps only the readers of shapes it alone accepts.
 #ifndef _VIS_LUA_VALUES_H_
 #define _VIS_LUA_VALUES_H_
 

@@ -1,3 +1,4 @@
+// The diagram module's edge routing: orthogonal paths between ports that keep clear of nodes.
 #include <cmath>
 
 #include "visDiagram.h"

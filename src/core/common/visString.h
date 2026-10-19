@@ -1,3 +1,4 @@
+// Copies a C string into new storage, or gives nullptr.
 #ifndef _VIS_STRING_H_
 #define _VIS_STRING_H_
 

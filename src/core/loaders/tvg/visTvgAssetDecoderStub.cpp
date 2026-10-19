@@ -1,3 +1,5 @@
+// The image decoder in a build without ThorVG's picture loaders: probe and decode report
+// NonSupport.
 #include "visAssetDecoder.h"
 
 namespace vis::asset

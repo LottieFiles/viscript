@@ -1,3 +1,4 @@
+// Renderer: the engine chosen per instance or by default, forwarding to the CPU or GL backend.
 #include <atomic>
 #include <new>
 

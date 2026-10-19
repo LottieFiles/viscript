@@ -1,3 +1,4 @@
+// tex::check(): parses a formula to report whether the module can set it.
 #include <cstdio>
 #include <cstring>
 

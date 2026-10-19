@@ -1,3 +1,4 @@
+// LayoutReport's accessors and Surface's buffer.
 #include <cstddef>
 #include <limits>
 #include <new>

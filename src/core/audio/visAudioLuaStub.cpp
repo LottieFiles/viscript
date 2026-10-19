@@ -1,3 +1,4 @@
+// The audio module's Lua::load in a build without Lua: reports NonSupport.
 #include <cstdio>
 
 #include "vis_audio.h"

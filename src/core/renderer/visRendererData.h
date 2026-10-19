@@ -1,3 +1,4 @@
+// LayoutReport::Impl: the records a layout report keeps and grows.
 #ifndef _VIS_RENDERER_DATA_H_
 #define _VIS_RENDERER_DATA_H_
 

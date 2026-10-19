@@ -1,3 +1,4 @@
+// Saves a GIF through ffmpeg with a generated palette (see visSaver.h).
 #include "visSaver.h"
 
 namespace vis::saver

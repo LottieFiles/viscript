@@ -1,3 +1,4 @@
+// Vector and interval arithmetic that the diagram module's layout and routing share.
 #ifndef _VIS_DIAGRAM_GEOMETRY_H_
 #define _VIS_DIAGRAM_GEOMETRY_H_
 

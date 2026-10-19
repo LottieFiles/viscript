@@ -1,3 +1,4 @@
+// Pairs the pieces of a match transform: a diff of text lines, then shapes by kind and order.
 #include <cstring>
 #include <new>
 

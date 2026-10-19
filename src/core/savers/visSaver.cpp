@@ -1,3 +1,4 @@
+// Saver: PNG written by hand, and frames piped to ffmpeg for GIF and MP4.
 #include <cmath>
 #include <cstdio>
 #include <cstring>

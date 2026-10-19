@@ -1,3 +1,5 @@
+// The audio module's player: decodes cue assets with miniaudio, plays the buses in step with
+// scene time, and mixes them into buffers on request.
 #include <cmath>
 #include <cstring>
 #include <new>

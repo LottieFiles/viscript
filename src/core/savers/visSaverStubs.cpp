@@ -1,3 +1,4 @@
+// The GIF and video savers in a build without them: NonSupport.
 #include "visSaver.h"
 
 namespace vis

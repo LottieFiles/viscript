@@ -20,6 +20,36 @@ Guides explain how to use the current engine. API comments describe ownership,
 units, supported inputs, error results, and resource limits. Internal comments
 explain decisions that the code alone does not make clear.
 
+Each source file opens with a comment that says what it holds. `visLua.cpp` and `visScene.cpp`
+list their sections at the top; each section is marked `// ---------- name ----------`.
+
+## Names
+
+Files are `vis` and what they hold, in CamelCase: `visScene.cpp`, `visLuaValues.h`. A module
+under `src/core/<module>/` has `visX.cpp` for the engine side, `visXLua.cpp` for its Lua
+binding, `visXLuaExtension.h` for what the binding shares with the core loader, and
+`visXLuaStub.cpp` for a build that leaves the binding out.
+
+Functions and structs that one file uses are `static` and start with an underscore
+(`_options`, `_fieldNumber`); helpers shared through a private header are `static inline`.
+Functions a header declares for other files take no underscore (`fingerprint`, `diffMatch`,
+`luaOpenApi`). Structs private to the Lua binding start with `Lua` (`LuaScene`, `LuaSpan`), and
+the private side of a public type is its `Impl`.
+
+The core writes limits and messages as `constexpr` constants in capitals (`LUA_CLIP_LIMIT`,
+`TIMELINE_UNBORN`); the modules and the public header use CamelCase (`SourceLimit`,
+`Scene::RuntimeLimit`). Keep to the style of the file you are in. Public types are made with a
+static `gen()` and report failure as a `Result` or a null pointer; public methods are `noexcept`.
+
+## The standard library
+
+The engine is built without exceptions and RTTI and owns its memory in arrays it grows itself:
+allocate with `new (std::nothrow)`, report a null result as `Result::OutOfMemory` or a null
+object, and free in the owner's destructor. The standard library serves what has no failure of
+its own: `<cmath>`, `<cstring>`, `<limits>`, `<algorithm>`, and `std::unique_ptr` for an array
+a function frees before it returns. Containers, strings and streams stay out of `src/core`,
+`src/inc` and `src/cli`; tests and tools may use them.
+
 ## Commit messages
 
 Use `module: purpose` or `module/feature: purpose`, with a short lowercase prefix

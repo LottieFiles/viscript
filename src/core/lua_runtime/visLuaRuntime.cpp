@@ -1,3 +1,5 @@
+// The retained Lua runtime: keeps a scene's VM alive after loading so that update callbacks
+// move overlays, answer input and start sounds each frame, in fixed steps.
 #include <cmath>
 #include <cstdio>
 #include <cstring>

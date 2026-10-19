@@ -1,3 +1,7 @@
+// The JavaScript scene API. vis.scene() gives a SceneBuilder whose calls record the Lua that does
+// the same, so a JavaScript scene is a program that builds Lua for the engine: compileScene()
+// returns that Lua, and evaluateScene() runs a source file to get the scene. client.js, the
+// player's compiler and the VS Code preview share this file; its copies are kept with client.js's.
 const OBJECTS = [
     "point",
     "line",

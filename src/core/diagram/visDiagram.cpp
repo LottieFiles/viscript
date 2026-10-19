@@ -1,3 +1,5 @@
+// The diagram module: nodes, edges and zones laid out by rank, grid, timeline or by hand, and
+// built into scene objects with a constraint report.
 #include <atomic>
 #include <cmath>
 #include <cstdio>

@@ -1,10 +1,11 @@
+// The arithmetic of the value types in vis.h: vectors, matrices, colors, camera projection,
+// animation curves and easing, the spring response, and the names of results.
 #include <cmath>
 #include <cstring>
 #include <limits>
 
 #include "vis.h"
 #include "visFinite.h"
-
 #include "visConstants.h"
 
 namespace vis

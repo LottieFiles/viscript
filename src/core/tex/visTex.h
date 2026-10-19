@@ -1,3 +1,4 @@
+// The tex module's private types: parsed nodes, glyph metrics and the laid-out items.
 #ifndef _VIS_TEX_PRIVATE_H_
 #define _VIS_TEX_PRIVATE_H_
 

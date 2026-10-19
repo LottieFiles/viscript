@@ -1,3 +1,4 @@
+// GlRenderer on ThorVG's GL engine: draws a display list into a GL target (experimental).
 #include <cmath>
 #include <new>
 

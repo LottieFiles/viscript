@@ -1,3 +1,5 @@
+// The diagram module's public API: nodes, edges and zones, their layouts, routes and constraint
+// reports, built into a scene.
 #ifndef _VIS_DIAGRAM_H_
 #define _VIS_DIAGRAM_H_
 

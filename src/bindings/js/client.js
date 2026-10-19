@@ -1,3 +1,8 @@
+// The runtime's JavaScript client. createVis() starts one engine in the WebAssembly module and
+// returns methods that load Lua or JavaScript scenes, render frames, read bounds, intersections
+// and layout reports, load fonts and assets, feed input, and drive the retained runtime and its
+// audio. The player's server, the VS Code preview and the tests use it. Copies live in
+// tools/vscode/runtime and tools/skill/vis-skills/assets/wasm, refreshed by scripts/sync-wasm.mjs.
 import createModule from "./vis-wasm.js";
 import {compileScene} from "./bindings.js";
 

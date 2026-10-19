@@ -1,3 +1,16 @@
+// The Lua binding of the scene API: the vis.* library, the factories that make objects, and the
+// methods of scenes, objects, views and trackers, held to the budgets one script may spend.
+// Sections, each marked "// ---------- name ----------":
+//  Budgets and handles / Styles, charges and attaching / Lines, arrows, points and text / Spans
+//  / Code blocks / Matrices, tables, groups and spaces / Circles, arcs, angles and polygons
+//  / Plots, areas and regions / Riemann sums, contours and fields
+//  / Routes, paths, curves and surfaces / Pictures, cells, connectors and samples / Layout methods
+//  / Timing and motion options / Braces / Playing animations and targets
+//  / Reveal, transform and warp animations / Fades, emphasis and morphs
+//  / Code edits, highlights and group transitions / Object styles and queries / Cameras
+//  / Waiting, removing and cloning / Timeline control and viewports / Scene transitions / Trackers
+//  / Focus and views / Themes / Scene creation, method tables and opening
+
 #include <cfloat>
 #include <cmath>
 #include <cstdio>
@@ -26,6 +39,8 @@ extern "C" {
 
 namespace vis
 {
+
+// ---------- Budgets and handles ----------
 
 // Budgets cover every live draft in one load. Retained tracker states charge geometry
 // and 512 bytes/clip; pending samples flush without reducing their total cost.
@@ -415,6 +430,8 @@ static const char* _fieldId(lua_State* lua, Scene* scene, int index)
 
 // Applies the style options at index other than the id, leaving what they do not name.
 static void _looks(lua_State* lua, Scene* scene, Object* object, int index);
+
+// ---------- Styles, charges and attaching ----------
 
 static void _style(lua_State* lua, Scene* scene, Object* object, int index)
 {
@@ -963,6 +980,8 @@ static Vec2 _trimDistance(lua_State* lua, int index)
     return value;
 }
 
+// ---------- Lines, arrows, points and text ----------
+
 static int _line(lua_State* lua)
 {
     auto space = _space(lua);
@@ -1138,6 +1157,8 @@ static int _numberText(lua_State* lua)
     }
     return _add(lua, space, owner, object, 2, "number");
 }
+
+// ---------- Spans ----------
 
 // How spans cuts its strings into texts.
 enum struct LuaSplit : uint8_t
@@ -1765,6 +1786,8 @@ static constexpr const char* CODE_CLASSES[] = {
     "plain", "keyword", "string", "number", "comment", "function", "type", "operator"};
 static constexpr const char* CODE_COLORS[] = {
     "foreground", "secondary", "success", "danger", "muted", "accent", "warning", "foreground"};
+
+// ---------- Code blocks ----------
 
 // One token of a code block, measured in world units before it attaches.
 struct LuaCodeToken
@@ -2418,6 +2441,8 @@ static int _search(lua_State* lua)
     if (!count) return luaL_error(lua, "'%s' matches only blanks, which no token holds", query.text);
     return 1;
 }
+
+// ---------- Matrices, tables, groups and spaces ----------
 
 // How an entry of a matrix sits across its column.
 enum struct LuaJustify : uint8_t
@@ -3406,6 +3431,8 @@ static int _spaceGen(lua_State* lua)
     return 1;
 }
 
+// ---------- Circles, arcs, angles and polygons ----------
+
 static int _circle(lua_State* lua)
 {
     auto space = _space(lua);
@@ -3619,6 +3646,8 @@ static int _polygon(lua_State* lua)
     auto owner = _owner(lua, space.scene);
     return _add(lua, space, owner, Polygon::gen(points, count), 2, "polygon");
 }
+
+// ---------- Plots, areas and regions ----------
 
 // Where a value of a plot lies: undefined, as nil, nan or an infinity, or below, inside or above
 // its y_range, which holds every defined value when there is none.
@@ -4431,6 +4460,8 @@ static int _exclusion(lua_State* lua)
 static constexpr const char* RIEMANN_SHAPE_STYLES[] = {
     "color", "stroke", "fill", "gradient", "width", "dash", "dash_offset", "layer"};
 
+// ---------- Riemann sums, contours and fields ----------
+
 // scene:riemann{fn = f, x_range = {a, b, dx}, sample = "left"}: the rectangles of a Riemann sum
 // of fn, one for each step of x_range and as tall as fn at the left end, the right end, or the
 // midpoint of its step, as a group whose children are the rectangles from left to right.
@@ -5185,6 +5216,8 @@ static int _streamLines(lua_State* lua)
     return _attach(lua, space, owner, group, groupStyle, "stream lines");
 }
 
+// ---------- Routes, paths, curves and surfaces ----------
+
 static int _route(lua_State* lua)
 {
     auto space = _space(lua);
@@ -5660,6 +5693,8 @@ static int _surface(lua_State* lua)
     }
     return _add(lua, space, owner, object, 2, "surface");
 }
+
+// ---------- Pictures, cells, connectors and samples ----------
 
 static Result _asset(LuaScene* scene, const char* name, const Asset*& asset, Asset*& owned)
 {
@@ -6138,6 +6173,8 @@ static int _voxel(lua_State* lua)
     return _sampleGen(lua, true);
 }
 
+// ---------- Layout methods ----------
+
 static int _moveTo(lua_State* lua)
 {
     auto handle = _layoutHandle(lua);
@@ -6212,6 +6249,8 @@ static int _arrangeGrid(lua_State* lua)
     }
     return 0;
 }
+
+// ---------- Timing and motion options ----------
 
 static AnimCurvePreset _curvePreset(lua_State* lua, const char* value, size_t size)
 {
@@ -6440,6 +6479,8 @@ static float _pixelWorld(const Config& config)
     }
     return camera.orthoHeight / height;
 }
+
+// ---------- Braces ----------
 
 // Where a brace stands: its ends lie on the line from start along across, width apart, and its
 // tip points along out, across and out being unit vectors in the xy plane of its space.
@@ -6752,6 +6793,8 @@ static int _brace(lua_State* lua)
     lua_insert(lua, -2);
     return 2;
 }
+
+// ---------- Playing animations and targets ----------
 
 // Plays animations; copies is what the clones of the morphs from copies among them cost.
 static int _play(lua_State* lua, LuaScene* box, const Animation* animations, uint32_t count,
@@ -7477,6 +7520,8 @@ static int _restore(lua_State* lua)
     return _charge(lua, box, before);
 }
 
+// ---------- Reveal, transform and warp animations ----------
+
 static Animation _revealAnimation(Object* object, AnimationKind kind,
                                   DrawDirection direction)
 {
@@ -8104,6 +8149,8 @@ static int _warp(lua_State* lua)
     return _charge(lua, box, clips);
 }
 
+// ---------- Fades, emphasis and morphs ----------
+
 static int _fade(lua_State* lua)
 {
     detail::luaTiming(lua, 4);
@@ -8652,6 +8699,8 @@ static constexpr const char* CODE_EDIT_KEYS[][6] = {
     {"append", nullptr, nullptr, nullptr, nullptr, nullptr},
     {"prepend", nullptr, nullptr, nullptr, nullptr, nullptr}};
 
+// ---------- Code edits, highlights and group transitions ----------
+
 // Pushes text with value set in front of line number, counting from 1, or after the last line
 // when number is one past it, as whole lines: a line feed at the end of value opens none.
 static void _codeInsertLines(lua_State* lua, const char* text, size_t length, uint32_t number, const char* value,
@@ -9098,6 +9147,8 @@ static int _transition(lua_State* lua)
     return _play(lua, box, animations, static_cast<uint32_t>(count), _duration(lua, 4, 1.0f), _curve(lua, 5));
 }
 
+// ---------- Object styles and queries ----------
+
 static int _stroke(lua_State* lua)
 {
     detail::luaTiming(lua, 4);
@@ -9245,6 +9296,8 @@ static int _measure(lua_State* lua)
     lua_pushnumber(lua, extent.height);
     return 2;
 }
+
+// ---------- Cameras ----------
 
 // A camera move or a fade of a view counts against the animation and memory limits of an object
 // animation; a frame reads them once, not for each object, so they add nothing to the evaluation.
@@ -9469,6 +9522,8 @@ static int _orbit(lua_State* lua)
     return _orbitCamera(lua, _sceneCamera(_scene(lua)));
 }
 
+// ---------- Waiting, removing and cloning ----------
+
 static int _wait(lua_State* lua)
 {
     auto scene = _sceneQuiet(lua)->scene;
@@ -9650,6 +9705,8 @@ static int _clone(lua_State* lua)
     return 2;
 }
 
+// ---------- Timeline control and viewports ----------
+
 // Time arguments are seconds from the scene start or the name of a marker.
 static float _time(lua_State* lua, const Scene* scene, int index)
 {
@@ -9799,6 +9856,8 @@ static int _viewport(lua_State* lua)
     child->memory = nullptr;
     return _evaluate(lua, parent);
 }
+
+// ---------- Scene transitions ----------
 
 static TransitionKind _transitionKind(lua_State* lua, int index)
 {
@@ -10101,7 +10160,10 @@ static int _springResponse(lua_State* lua)
     return 1;
 }
 
-// Tracker helpers, reachable only from the tracker prelude below.
+// ---------- Trackers ----------
+
+// Tracker helpers, reachable only from the tracker prelude in visLuaTracker.h, which
+// luaOpenApi hands them to as arguments.
 static int _trackerEase(lua_State* lua)
 {
     auto curve = _curve(lua, 1);
@@ -10197,6 +10259,8 @@ static int _trackerSettle(lua_State* lua)
     lua_concat(lua, 2);
     return lua_error(lua);
 }
+
+// ---------- Focus and views ----------
 
 // scene:focus(target_or_array, {padding, duration, curve}) frames the targets'
 // authored world bounds with a 2D pan/zoom, so authors never compute camera numbers.
@@ -10432,6 +10496,8 @@ static int _viewFade(lua_State* lua)
     return 0;
 }
 
+// ---------- Themes ----------
+
 static ThemePreset _themePreset(lua_State* lua, int index)
 {
     size_t size;
@@ -10589,6 +10655,8 @@ static Theme _theme(lua_State* lua, int index)
     lua_pop(lua, 1);
     return theme;
 }
+
+// ---------- Scene creation, method tables and opening ----------
 
 static int _sceneGen(lua_State* lua)
 {
