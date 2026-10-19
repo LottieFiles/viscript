@@ -90,6 +90,21 @@ static void renderBounds(Renderer* renderer)
         CHECK(renderer->intersects(scene, left, right, 0.0f, intersects, 6.0f) == Result::Success);
         CHECK(intersects);
         CHECK(renderer->intersects(scene, left, left, 0.0f, intersects) == Result::InvalidArguments);
+        // Both objects are checked before either is measured, so one outside the scene is a
+        // wrong argument even next to one that draws nothing.
+        auto blank = Rectangle::gen({1.0f, 0.0f, 0.0f}, {1.0f, 1.0f});
+        auto stray = Rectangle::gen();
+        CHECK(blank && stray);
+        if (blank) blank->stroke({0, 0, 0, 0});
+        if (blank && scene->add(blank) == Result::Success) {
+            CHECK(renderer->intersects(scene, blank, left, 0.0f, intersects)
+                  == Result::InsufficientCondition);
+            CHECK(renderer->intersects(scene, blank, stray, 0.0f, intersects)
+                  == Result::InvalidArguments);
+        } else {
+            delete blank;
+        }
+        delete stray;
     } else {
         delete left;
         delete overlap;

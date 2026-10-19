@@ -1,6 +1,5 @@
 // Probes and decodes encoded images to RGBA pixels with ThorVG's picture loaders.
 #include <cmath>
-#include <limits>
 #include <new>
 
 #include <thorvg.h>
@@ -11,8 +10,6 @@
 
 namespace vis::asset
 {
-
-static constexpr uint32_t MAX_ASSET_PIXELS = 16777216;
 
 static Result _result(tvg::Result result)
 {
@@ -26,84 +23,51 @@ static Result _result(tvg::Result result)
     }
 }
 
-static Result _size(tvg::Picture* picture, uint32_t& outputWidth, uint32_t& outputHeight)
-{
-    float sourceWidth;
-    float sourceHeight;
-    auto status = picture->size(&sourceWidth, &sourceHeight);
-    if (status != tvg::Result::Success || !std::isfinite(sourceWidth) || !std::isfinite(sourceHeight) || sourceWidth <= 0.0f || sourceHeight <= 0.0f) {
-        picture->unref();
-        return status == tvg::Result::Success ? Result::InvalidArguments : _result(status);
-    }
-    auto widthValue = std::ceil(static_cast<double>(sourceWidth));
-    auto heightValue = std::ceil(static_cast<double>(sourceHeight));
-    if (widthValue > UINT32_MAX || heightValue > UINT32_MAX) {
-        picture->unref();
-        return Result::InvalidArguments;
-    }
-    auto width = static_cast<uint32_t>(widthValue);
-    auto height = static_cast<uint32_t>(heightValue);
-    if (!width || !height || height > MAX_ASSET_PIXELS / width) {
-        picture->unref();
-        return Result::InvalidArguments;
-    }
-    outputWidth = width;
-    outputHeight = height;
-    return Result::Success;
-}
-
-static Result _decode(tvg::Picture* picture, uint32_t*& output, uint32_t& outputWidth,
-                      uint32_t& outputHeight)
-{
-    uint32_t width;
-    uint32_t height;
-    auto result = _size(picture, width, height);
-    if (result != Result::Success) return result;
-    auto pixels = new (std::nothrow) uint32_t[static_cast<size_t>(width) * height]();
-    if (!pixels) {
-        picture->unref();
-        return Result::OutOfMemory;
-    }
-    auto canvas = tvg::SwCanvas::gen();
-    if (!canvas) {
-        picture->unref();
-        delete[] pixels;
-        return Result::NonSupport;
-    }
-    if (picture->size(static_cast<float>(width), static_cast<float>(height)) != tvg::Result::Success || canvas->target(pixels, width, width, height, tvg::ColorSpace::ABGR8888S) != tvg::Result::Success) {
-        picture->unref();
-        delete canvas;
-        delete[] pixels;
-        return Result::NonSupport;
-    }
-    if (canvas->add(picture) != tvg::Result::Success) {
-        picture->unref();
-        delete canvas;
-        delete[] pixels;
-        return Result::NonSupport;
-    }
-    if (canvas->update() != tvg::Result::Success || canvas->draw(true) != tvg::Result::Success || canvas->sync() != tvg::Result::Success) {
-        delete canvas;
-        delete[] pixels;
-        return Result::NonSupport;
-    }
-    delete canvas;
-    output = pixels;
-    outputWidth = width;
-    outputHeight = height;
-    return Result::Success;
-}
-
-static Result _load(const void* data, uint32_t size, const char* mime, tvg::Picture*& picture)
+// Loads data into picture and gives its size in whole pixels. The caller unrefs picture, which
+// a reference of its own keeps alive past a canvas that holds it.
+static Result _load(const void* data, uint32_t size, const char* mime, tvg::Picture*& picture,
+                    uint32_t& outputWidth, uint32_t& outputHeight)
 {
     picture = tvg::Picture::gen();
     if (!picture) return Result::OutOfMemory;
+    picture->ref();
     auto result = _result(picture->load(static_cast<const char*>(data), size, mime, nullptr, true));
-    if (result != Result::Success) {
-        picture->unref();
-        picture = nullptr;
+    if (result != Result::Success) return result;
+    float sourceWidth;
+    float sourceHeight;
+    result = _result(picture->size(&sourceWidth, &sourceHeight));
+    if (result != Result::Success) return result;
+    if (!std::isfinite(sourceWidth) || !std::isfinite(sourceHeight) || sourceWidth <= 0.0f || sourceHeight <= 0.0f) {
+        return Result::InvalidArguments;
     }
-    return result;
+    auto widthValue = std::ceil(static_cast<double>(sourceWidth));
+    auto heightValue = std::ceil(static_cast<double>(sourceHeight));
+    if (widthValue > UINT32_MAX || heightValue > UINT32_MAX) return Result::InvalidArguments;
+    auto width = static_cast<uint32_t>(widthValue);
+    auto height = static_cast<uint32_t>(heightValue);
+    if (!width || !height || height > MAX_ASSET_PIXELS / width) return Result::InvalidArguments;
+    outputWidth = width;
+    outputHeight = height;
+    return Result::Success;
+}
+
+// Draws picture, stretched to width by height, into new pixels.
+static Result _draw(tvg::Picture* picture, uint32_t width, uint32_t height, uint32_t*& output)
+{
+    auto pixels = new (std::nothrow) uint32_t[static_cast<size_t>(width) * height]();
+    if (!pixels) return Result::OutOfMemory;
+    auto canvas = tvg::SwCanvas::gen();
+    auto drawn = canvas && picture->size(static_cast<float>(width), static_cast<float>(height)) == tvg::Result::Success
+              && canvas->target(pixels, width, width, height, tvg::ColorSpace::ABGR8888S) == tvg::Result::Success
+              && canvas->add(picture) == tvg::Result::Success && canvas->update() == tvg::Result::Success
+              && canvas->draw(true) == tvg::Result::Success && canvas->sync() == tvg::Result::Success;
+    delete canvas;
+    if (!drawn) {
+        delete[] pixels;
+        return Result::NonSupport;
+    }
+    output = pixels;
+    return Result::Success;
 }
 
 Result probe(const void* data, uint32_t size, const char* mime,
@@ -114,11 +78,8 @@ Result probe(const void* data, uint32_t size, const char* mime,
     if (!data || !size || !mime || !mime[0]) return Result::InvalidArguments;
     if (!renderer::tvgInit()) return Result::NonSupport;
     tvg::Picture* picture = nullptr;
-    auto result = _load(data, size, mime, picture);
-    if (result == Result::Success) {
-        result = _size(picture, width, height);
-        if (result == Result::Success) picture->unref();
-    }
+    auto result = _load(data, size, mime, picture, width, height);
+    if (picture) picture->unref();
     renderer::tvgTerm();
     return result;
 }
@@ -132,8 +93,10 @@ Result decode(const void* data, uint32_t size, const char* mime,
     if (!data || !size || !mime || !mime[0]) return Result::InvalidArguments;
     if (!renderer::tvgInit()) return Result::NonSupport;
     tvg::Picture* picture = nullptr;
-    auto result = _load(data, size, mime, picture);
-    if (result == Result::Success) result = _decode(picture, pixels, width, height);
+    auto result = _load(data, size, mime, picture, width, height);
+    if (result == Result::Success) result = _draw(picture, width, height, pixels);
+    if (result != Result::Success) width = height = 0;
+    if (picture) picture->unref();
     renderer::tvgTerm();
     return result;
 }

@@ -2,8 +2,6 @@
 #ifndef _VIS_RENDERER_DATA_H_
 #define _VIS_RENDERER_DATA_H_
 
-#include <new>
-
 #include "vis.h"
 #include "../common/visGrow.h"
 
@@ -12,12 +10,18 @@ namespace vis
 
 struct LayoutReport::Impl
 {
+    // The objects behind a visual record, until the walk turns them into object indices.
+    struct Source
+    {
+        const Object* object = nullptr;
+        const Object* counterpart = nullptr;
+    };
+
     LayoutScene* scenes = nullptr;
     LayoutObject* objects = nullptr;
     LayoutVisual* visuals = nullptr;
+    Source* sources = nullptr;
     LayoutPath* paths = nullptr;
-    const Object** visualObjects = nullptr;
-    const Object** visualCounterparts = nullptr;
     LayoutCollision* collisions = nullptr;
     LayoutContainment* containments = nullptr;
     uint32_t sceneCnt = 0;
@@ -26,6 +30,7 @@ struct LayoutReport::Impl
     uint32_t objectCap = 0;
     uint32_t visualCnt = 0;
     uint32_t visualCap = 0;
+    uint32_t sourceCap = 0;
     uint32_t pathCnt = 0;
     uint32_t pathCap = 0;
     uint32_t collisionCnt = 0;
@@ -41,9 +46,8 @@ struct LayoutReport::Impl
         delete[] scenes;
         delete[] objects;
         delete[] visuals;
+        delete[] sources;
         delete[] paths;
-        delete[] visualObjects;
-        delete[] visualCounterparts;
         delete[] collisions;
         delete[] containments;
     }
@@ -64,73 +68,45 @@ struct LayoutReport::Impl
         samplePadding = 0.0f;
     }
 
+    // Appends value to items, which grow when full.
+    template<typename T>
+    static bool append(T*& items, uint32_t& count, uint32_t& capacity, const T& value)
+    {
+        if (!grow(items, count, capacity, 1u, 16u)) return false;
+        items[count++] = value;
+        return true;
+    }
+
     bool add(const LayoutScene& value)
     {
-        if (!grow(scenes, sceneCnt, sceneCap, 1u, 16u)) return false;
-        scenes[sceneCnt++] = value;
-        return true;
+        return append(scenes, sceneCnt, sceneCap, value);
     }
 
     bool add(const LayoutObject& value)
     {
-        if (!grow(objects, objectCnt, objectCap, 1u, 16u)) return false;
-        objects[objectCnt++] = value;
-        return true;
+        return append(objects, objectCnt, objectCap, value);
     }
 
-    bool add(const LayoutVisual& value, const Object* object,
-             const Object* counterpart)
+    bool add(const LayoutVisual& value, const Object* object, const Object* counterpart)
     {
-        if (visualCnt >= visualCap) {
-            auto next = visualCap ? visualCap * 2u : 16u;
-            if (next < visualCap || next <= visualCnt) next = visualCnt + 1u;
-            auto grown = new (std::nothrow) LayoutVisual[next];
-            auto grownObjects = new (std::nothrow) const Object*[next];
-            auto grownCounterparts = new (std::nothrow) const Object*[next];
-            if (!grown || !grownObjects || !grownCounterparts) {
-                delete[] grown;
-                delete[] grownObjects;
-                delete[] grownCounterparts;
-                return false;
-            }
-            for (auto i = 0u; i < visualCnt; i++) {
-                grown[i] = visuals[i];
-                grownObjects[i] = visualObjects[i];
-                grownCounterparts[i] = visualCounterparts[i];
-            }
-            delete[] visuals;
-            delete[] visualObjects;
-            delete[] visualCounterparts;
-            visuals = grown;
-            visualObjects = grownObjects;
-            visualCounterparts = grownCounterparts;
-            visualCap = next;
-        }
-        visuals[visualCnt] = value;
-        visualObjects[visualCnt] = object;
-        visualCounterparts[visualCnt++] = counterpart;
-        return true;
-    }
-
-    bool add(const LayoutCollision& value)
-    {
-        if (!grow(collisions, collisionCnt, collisionCap, 1u, 16u)) return false;
-        collisions[collisionCnt++] = value;
-        return true;
+        auto count = visualCnt;
+        return append(sources, count, sourceCap, Source{object, counterpart})
+            && append(visuals, visualCnt, visualCap, value);
     }
 
     bool add(const LayoutPath& value)
     {
-        if (!grow(paths, pathCnt, pathCap, 1u, 16u)) return false;
-        paths[pathCnt++] = value;
-        return true;
+        return append(paths, pathCnt, pathCap, value);
+    }
+
+    bool add(const LayoutCollision& value)
+    {
+        return append(collisions, collisionCnt, collisionCap, value);
     }
 
     bool add(const LayoutContainment& value)
     {
-        if (!grow(containments, containmentCnt, containmentCap, 1u, 16u)) return false;
-        containments[containmentCnt++] = value;
-        return true;
+        return append(containments, containmentCnt, containmentCap, value);
     }
 };
 

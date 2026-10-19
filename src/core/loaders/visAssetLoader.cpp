@@ -6,20 +6,12 @@
 
 #include "vis.h"
 #include "visAssetDecoder.h"
+#include "../common/visString.h"
 
 namespace vis
 {
 
-static constexpr uint32_t MAX_ASSET_PIXELS = 16777216;
 static constexpr long MAX_ASSET_BYTES = 268435456;
-
-static char* _copy(const char* text)
-{
-    auto size = std::strlen(text) + 1;
-    auto copy = new (std::nothrow) char[size];
-    if (copy) std::memcpy(copy, text, size);
-    return copy;
-}
 
 static bool _ends(const char* path, const char* suffix)
 {
@@ -133,7 +125,7 @@ Result AssetLoader::load(const void* data, uint32_t size, const char* mime,
     auto result = asset::probe(data, size, mime, width, height);
     if (result != Result::Success) return result;
     auto bytes = new (std::nothrow) uint8_t[size];
-    auto type = _copy(mime);
+    auto type = _duplicate(mime);
     if (bytes && type) {
         std::memcpy(bytes, data, size);
         output = new (std::nothrow) Asset(nullptr, bytes, size, type, width, height);
@@ -147,7 +139,7 @@ Result AssetLoader::load(const void* data, uint32_t size, const char* mime,
 Result AssetLoader::load(const uint32_t* pixels, uint32_t width, uint32_t height, Asset*& output) noexcept
 {
     output = nullptr;
-    if (!pixels || !width || !height || height > MAX_ASSET_PIXELS / width) return Result::InvalidArguments;
+    if (!pixels || !width || !height || height > asset::MAX_ASSET_PIXELS / width) return Result::InvalidArguments;
     auto copy = new (std::nothrow) uint32_t[static_cast<size_t>(width) * height];
     if (!copy) return Result::OutOfMemory;
     std::memcpy(copy, pixels, static_cast<size_t>(width) * height * sizeof(uint32_t));

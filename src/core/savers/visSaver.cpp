@@ -1,5 +1,6 @@
 // Saver: PNG written by hand, and frames piped to ffmpeg for GIF and MP4.
 #include <cmath>
+#include <cstdarg>
 #include <cstdio>
 #include <cstring>
 #include <limits>
@@ -72,16 +73,18 @@ static bool _chunk(FILE* file, const char* type, const uint8_t* data, uint32_t s
     return _write(file, checksum, sizeof(checksum));
 }
 
-static uint8_t* _rgba(const Surface& surface, bool filters, size_t& size)
+// Writes the surface's pixels as RGBA bytes, after a filter byte of 0 on each row when filters is
+// set, into output: new when null, else holding as many bytes for a surface of the same size.
+// Gives their size, or 0 when they do not fit in memory.
+static size_t _rgba(const Surface& surface, bool filters, uint8_t*& output)
 {
     auto limit = std::numeric_limits<size_t>::max();
-    if (surface.width() > limit / 4u) return nullptr;
+    if (surface.width() > limit / 4u) return 0;
     auto row = static_cast<size_t>(surface.width()) * 4;
     auto stride = row + (filters ? 1u : 0u);
-    if (stride < row || surface.height() > limit / stride) return nullptr;
-    size = stride * surface.height();
-    auto output = new (std::nothrow) uint8_t[size];
-    if (!output) return nullptr;
+    if (stride < row || surface.height() > limit / stride) return 0;
+    if (!output) output = new (std::nothrow) uint8_t[stride * surface.height()];
+    if (!output) return 0;
     size_t offset = 0;
     for (auto y = 0u; y < surface.height(); y++) {
         if (filters) output[offset++] = 0;
@@ -93,7 +96,7 @@ static uint8_t* _rgba(const Surface& surface, bool filters, size_t& size)
             output[offset++] = static_cast<uint8_t>(pixel >> 24);
         }
     }
-    return output;
+    return offset;
 }
 
 static uint8_t _paeth(int left, int up, int corner)
@@ -362,9 +365,9 @@ Result Saver::png(const Surface& surface, const char* path) noexcept
     if (!surface.data() || !surface.width() || !surface.height() || surface.stride() < surface.width() || !path) {
         return Result::InvalidArguments;
     }
-    size_t rawSize;
-    auto raw = _rgba(surface, true, rawSize);
-    if (!raw) return Result::OutOfMemory;
+    uint8_t* raw = nullptr;
+    auto rawSize = _rgba(surface, true, raw);
+    if (!rawSize) return Result::OutOfMemory;
     _filter(raw, surface.width(), surface.height());
     size_t zlibSize;
     auto zlib = _deflate(raw, rawSize, zlibSize);
@@ -423,6 +426,22 @@ static bool _ends(const char* value, const char* suffix)
 }
 
 #if !defined(__EMSCRIPTEN__) && !defined(_WIN32)
+// Formats a new string of the size it needs; nullptr when that fails or memory runs out.
+__attribute__((format(printf, 1, 2)))
+static char* _format(const char* format, ...)
+{
+    va_list arguments;
+    va_start(arguments, format);
+    auto size = std::vsnprintf(nullptr, 0, format, arguments);
+    va_end(arguments);
+    auto output = size < 0 ? nullptr : new (std::nothrow) char[static_cast<size_t>(size) + 1u];
+    if (!output) return nullptr;
+    va_start(arguments, format);
+    std::vsnprintf(output, static_cast<size_t>(size) + 1u, format, arguments);
+    va_end(arguments);
+    return output;
+}
+
 static char* _quote(const char* path)
 {
     auto size = std::strlen(path);
@@ -446,22 +465,14 @@ static char* _quote(const char* path)
     return output;
 }
 
+// Makes an empty file next to path, with a name of its own, and gives that name.
 static char* _temporary(const char* path)
 {
-    auto size = std::strlen(path);
-    static constexpr char suffix[] = ".vis-XXXXXX";
-    if (size > std::numeric_limits<size_t>::max() - sizeof(suffix)) return nullptr;
-    auto output = new (std::nothrow) char[size + sizeof(suffix)];
+    auto output = _format("%s.vis-XXXXXX", path);
     if (!output) return nullptr;
-    std::memcpy(output, path, size);
-    std::memcpy(output + size, suffix, sizeof(suffix));
     auto descriptor = mkstemp(output);
-    if (descriptor < 0) {
-        delete[] output;
-        return nullptr;
-    }
-    if (close(descriptor) == 0) return output;
-    unlink(output);
+    if (descriptor >= 0 && close(descriptor) == 0) return output;
+    if (descriptor >= 0) unlink(output);
     delete[] output;
     return nullptr;
 }
@@ -509,8 +520,47 @@ static constexpr auto GIF_OPTIONS = "-filter_complex '[0:v]split[a][b];[a]palett
 static constexpr auto MP4_OPTIONS = "-an -c:v libx264 -pix_fmt yuv420p -f mp4";
 static constexpr auto MP4_SOUNDTRACK_OPTIONS = "-c:v libx264 -pix_fmt yuv420p -c:a aac -b:a 192k -f mp4";
 
+// Renders each frame into the input of the command, an ffmpeg that encodes them.
+static Result _pipe(const Scene* scene, Renderer& renderer, const char* command, uint32_t fps,
+                    uint32_t frameCount)
+{
+    auto pipe = popen(command, "w");
+    if (!pipe) return Result::NonSupport;
+#if defined(__APPLE__)
+    if (fcntl(fileno(pipe), F_SETNOSIGPIPE, 1) != 0) {
+        pclose(pipe);
+        return Result::IoError;
+    }
+#else
+    SigpipeGuard sigpipe;
+    if (!sigpipe.block()) {
+        pclose(pipe);
+        return Result::IoError;
+    }
+#endif
+    Surface surface;
+    uint8_t* bytes = nullptr;
+    auto result = Result::Success;
+    for (auto frame = 0u; frame < frameCount && result == Result::Success; frame++) {
+        auto time = static_cast<float>(frame) / static_cast<float>(fps);
+        result = renderer.render(scene, time, surface);
+        if (result != Result::Success) break;
+        // The surface keeps its size from frame to frame, so the bytes do too.
+        auto size = _rgba(surface, false, bytes);
+        if (!size) result = Result::OutOfMemory;
+        else if (std::fwrite(bytes, 1, size, pipe) != size) result = Result::IoError;
+    }
+    delete[] bytes;
+    auto status = pclose(pipe);
+#if !defined(__APPLE__)
+    sigpipe.restore();
+#endif
+    if (status != 0 && result == Result::Success) result = Result::IoError;
+    return result;
+}
+
 // Pipes the frames to ffmpeg with the output options, which must encode the soundtrack's audio
-// when there is one.
+// when there is one. ffmpeg writes a temporary file, which replaces path once it succeeds.
 static Result _frames(const Scene* scene, Renderer& renderer, const char* path, uint32_t fps,
                       const char* options, bool evenDimensions, const char* soundtrack = nullptr)
 {
@@ -520,130 +570,30 @@ static Result _frames(const Scene* scene, Renderer& renderer, const char* path, 
     if (result != Result::Success) return result;
     if (evenDimensions && ((config.width & 1u) || (config.height & 1u))) return Result::InvalidArguments;
     // The soundtrack is the second input, read for as long as the video lasts.
-    char* audio = nullptr;
+    std::unique_ptr<char[]> audio;
     if (soundtrack) {
         auto track = std::fopen(soundtrack, "rb");
         if (!track) return Result::IoError;
         std::fclose(track);
-        auto quotedTrack = _quote(soundtrack);
-        if (!quotedTrack) return Result::OutOfMemory;
-        auto audioSize = std::strlen(quotedTrack) + 96u;
-        audio = new (std::nothrow) char[audioSize];
-        auto audioLength = audio ? std::snprintf(audio, audioSize, "-t %.6f -i %s -map 0:v:0 -map 1:a:0",
-                                                 static_cast<double>(frameCount) / fps, quotedTrack)
-                                 : -1;
-        delete[] quotedTrack;
-        if (audioLength < 0 || static_cast<size_t>(audioLength) >= audioSize) {
-            delete[] audio;
-            return Result::OutOfMemory;
+        std::unique_ptr<char[]> quoted(_quote(soundtrack));
+        if (quoted) {
+            audio.reset(_format("-t %.6f -i %s -map 0:v:0 -map 1:a:0 ",
+                                static_cast<double>(frameCount) / fps, quoted.get()));
         }
+        if (!audio) return Result::OutOfMemory;
     }
-    auto temporary = _temporary(path);
-    if (!temporary) {
-        delete[] audio;
-        return Result::IoError;
+    std::unique_ptr<char[]> temporary(_temporary(path));
+    if (!temporary) return Result::IoError;
+    std::unique_ptr<char[]> quoted(_quote(temporary.get()));
+    std::unique_ptr<char[]> command;
+    if (quoted) {
+        command.reset(_format("ffmpeg -loglevel error -y -f rawvideo -pixel_format rgba -video_size %ux%u "
+                              "-framerate %u -i pipe:0 %s%s %s", config.width, config.height, fps,
+                              audio ? audio.get() : "", options, quoted.get()));
     }
-    auto quoted = _quote(temporary);
-    if (!quoted) {
-        delete[] audio;
-        unlink(temporary);
-        delete[] temporary;
-        return Result::OutOfMemory;
-    }
-    auto optionSize = std::strlen(options) + (audio ? std::strlen(audio) : 0u);
-    if (std::strlen(quoted) > std::numeric_limits<size_t>::max() - optionSize - 384u) {
-        delete[] audio;
-        delete[] quoted;
-        unlink(temporary);
-        delete[] temporary;
-        return Result::OutOfMemory;
-    }
-    auto commandSize = std::strlen(quoted) + optionSize + 384u;
-    auto command = new (std::nothrow) char[commandSize];
-    if (!command) {
-        delete[] audio;
-        delete[] quoted;
-        unlink(temporary);
-        delete[] temporary;
-        return Result::OutOfMemory;
-    }
-    auto commandLength = std::snprintf(command, commandSize,
-                                       "ffmpeg -loglevel error -y -f rawvideo -pixel_format rgba -video_size %ux%u -framerate %u -i pipe:0 %s%s%s %s",
-                                       config.width, config.height, fps, audio ? audio : "", audio ? " " : "",
-                                       options, quoted);
-    delete[] audio;
-    delete[] quoted;
-    if (commandLength < 0 || static_cast<size_t>(commandLength) >= commandSize) {
-        delete[] command;
-        unlink(temporary);
-        delete[] temporary;
-        return Result::OutOfMemory;
-    }
-    auto pipe = popen(command, "w");
-    delete[] command;
-    if (!pipe) {
-        unlink(temporary);
-        delete[] temporary;
-        return Result::NonSupport;
-    }
-
-#if defined(__APPLE__)
-    if (fcntl(fileno(pipe), F_SETNOSIGPIPE, 1) != 0) {
-        pclose(pipe);
-        unlink(temporary);
-        delete[] temporary;
-        return Result::IoError;
-    }
-#else
-    SigpipeGuard sigpipe;
-    if (!sigpipe.block()) {
-        pclose(pipe);
-        unlink(temporary);
-        delete[] temporary;
-        return Result::IoError;
-    }
-#endif
-
-    Surface surface;
-    uint8_t* bytes = nullptr;
-    size_t byteSize = 0;
-    result = Result::Success;
-    for (auto frame = 0u; frame < frameCount; frame++) {
-        auto time = static_cast<float>(frame) / static_cast<float>(fps);
-        result = renderer.render(scene, time, surface);
-        if (result != Result::Success) break;
-        if (!bytes) {
-            bytes = _rgba(surface, false, byteSize);
-            if (!bytes) {
-                result = Result::OutOfMemory;
-                break;
-            }
-        } else {
-            auto offset = 0u;
-            for (auto y = 0u; y < surface.height(); y++) {
-                for (auto x = 0u; x < surface.width(); x++) {
-                    auto pixel = surface.data()[static_cast<size_t>(y) * surface.stride() + x];
-                    bytes[offset++] = static_cast<uint8_t>(pixel);
-                    bytes[offset++] = static_cast<uint8_t>(pixel >> 8);
-                    bytes[offset++] = static_cast<uint8_t>(pixel >> 16);
-                    bytes[offset++] = static_cast<uint8_t>(pixel >> 24);
-                }
-            }
-        }
-        if (std::fwrite(bytes, 1, byteSize, pipe) != byteSize) {
-            result = Result::IoError;
-            break;
-        }
-    }
-    delete[] bytes;
-    auto status = pclose(pipe);
-#if !defined(__APPLE__)
-    sigpipe.restore();
-#endif
-    if (status != 0 && result == Result::Success) result = Result::IoError;
-    if (result == Result::Success && std::rename(temporary, path) != 0) result = Result::IoError;
-    if (result != Result::Success) unlink(temporary);
-    delete[] temporary;
+    result = command ? _pipe(scene, renderer, command.get(), fps, frameCount) : Result::OutOfMemory;
+    if (result == Result::Success && std::rename(temporary.get(), path) != 0) result = Result::IoError;
+    if (result != Result::Success) unlink(temporary.get());
     return result;
 }
 #endif
