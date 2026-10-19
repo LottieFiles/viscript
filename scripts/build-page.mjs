@@ -12,40 +12,28 @@ const {default: rehypeHighlight} = await import(resolve(page, "node_modules/rehy
 const content = join(page, "content"), out = join(page, "build");
 
 // ```lua live``` fences become <Scene code="..." editable /> players; a ```js live``` fence
-// right after one is the same scene in JavaScript and joins that player.
-// Add `preview` (```lua live preview```) for a full-width player without the editor.
+// right after one is the same scene in JavaScript and joins that player. Other adjacent fences
+// tagged `tab=Label` are grouped into <Tabs><Tab label="Label">…</Tab></Tabs>.
 const live = (node, language) => node?.type === "code" && node.lang === language && /\blive\b/.test(node.meta ?? "");
-// Adjacent fences tagged `tab=Label` are grouped into <Tabs><Tab label="Label">…</Tab></Tabs>.
-const tabOf = (node) => node?.type === "code" && /\btab=(\w+)/.exec(node.meta ?? "")?.[1];
-const codeTabs = () => (tree) => {
-    const walk = (node) => {
-        if (!node.children) return;
-        for (let i = 0; i < node.children.length; i++) {
-            if (!tabOf(node.children[i])) { walk(node.children[i]); continue; }
-            let end = i;
-            while (tabOf(node.children[end + 1])) end++;
-            const tabs = node.children.slice(i, end + 1).map((code) => ({
-                type: "mdxJsxFlowElement", name: "Tab", children: [code],
-                attributes: [{type: "mdxJsxAttribute", name: "label", value: tabOf(code)}],
-            }));
-            node.children.splice(i, end - i + 1, {type: "mdxJsxFlowElement", name: "Tabs", attributes: [], children: tabs});
-        }
-    };
-    walk(tree);
-};
-const liveScenes = () => (tree) => {
+const tabOf = (node) => node?.type === "code" && !live(node, "lua") && /\btab=(\w+)/.exec(node.meta ?? "")?.[1];
+const element = (name, attributes, children = []) => ({type: "mdxJsxFlowElement", name, children,
+    attributes: Object.entries(attributes).map(([key, value]) => ({type: "mdxJsxAttribute", name: key, value}))});
+const fences = () => (tree) => {
     const walk = (node) => {
         if (!node.children) return;
         for (let i = 0; i < node.children.length; i++) {
             const child = node.children[i];
-            if (!live(child, "lua")) { walk(child); continue; }
-            const js = live(node.children[i + 1], "js") ? node.children.splice(i + 1, 1)[0].value : null;
-            node.children[i] = {type: "mdxJsxFlowElement", name: "Scene", children: [], attributes: [
-                {type: "mdxJsxAttribute", name: "code", value: child.value},
-                ...(js ? [{type: "mdxJsxAttribute", name: "js", value: js}] : []),
-                // ```lua live preview``` plays full width without the editor
-                ...(/\bpreview\b/.test(child.meta) ? [] : [{type: "mdxJsxAttribute", name: "editable", value: null}]),
-            ]};
+            if (live(child, "lua")) {
+                const js = live(node.children[i + 1], "js") ? node.children.splice(i + 1, 1)[0].value : null;
+                node.children[i] = element("Scene", {code: child.value, ...(js ? {js} : {}), editable: null});
+            } else if (tabOf(child)) {
+                let end = i;
+                while (tabOf(node.children[end + 1])) end++;
+                const tabs = node.children.slice(i, end + 1).map((tab) => element("Tab", {label: tabOf(tab)}, [tab]));
+                node.children.splice(i, end - i + 1, element("Tabs", {}, tabs));
+            } else {
+                walk(child);
+            }
         }
     };
     walk(tree);
@@ -69,7 +57,7 @@ for (const file of files.sort()) {
     const id = relative(content, file).replace(/\.mdx$/, "");
     const [meta, body] = frontmatter(readFileSync(file, "utf8"));
     const target = join(out, id + ".js");
-    let code = String(await compile(body, {jsxImportSource: "@page", remarkPlugins: [remarkGfm, liveScenes, codeTabs], rehypePlugins: [[rehypeHighlight, {plainText: ["text"]}]]}));
+    let code = String(await compile(body, {jsxImportSource: "@page", remarkPlugins: [remarkGfm, fences], rehypePlugins: [[rehypeHighlight, {plainText: ["text"]}]]}));
     code = code.replace('"@page/jsx-runtime"', JSON.stringify(relative(dirname(target), join(page, "jsx-runtime.js")).replace(/^(?!\.)/, "./")));
     mkdirSync(dirname(target), {recursive: true});
     writeFileSync(target, code);

@@ -166,7 +166,6 @@ canvas.live.input { cursor: crosshair; }
 .hljs-comment { color: var(--cm-cmt); font-style: italic; }
 .hljs-title, .hljs-built_in { color: var(--cm-fn); }
 .hljs-variable, .hljs-params, .hljs-attr, .hljs-property { color: var(--cm-var); }
-.prose .scene.stage-frame { margin: 20px 0 8px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
 .tabs { margin: 16px 0; }
 .tabs .tab-bar { display: flex; gap: 2px; width: max-content; padding: 2px; margin-bottom: -1px; border: 1px solid var(--line); border-bottom: 0; border-radius: 8px 8px 0 0; background: var(--panel); }
 .tabs .tab-bar button { padding: 3px 12px; border: 0; border-radius: 6px; background: none; color: var(--mute); font: 12px var(--mono); cursor: pointer; }
