@@ -948,7 +948,6 @@ struct Object
 private:
     explicit Object(Type type) noexcept;
     bool owned() const noexcept;
-    bool grow() noexcept;
     Result layout(const Mat4& model) noexcept;
     // Records why a layout call failed on the owning scene and returns result.
     Result fail(Result result, const char* reason) const noexcept;

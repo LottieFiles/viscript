@@ -6,6 +6,7 @@
 
 #include "vis_states.h"
 #include "../common/visFinite.h"
+#include "../common/visGrow.h"
 #include "../common/visRetarget.h"
 #include "../scene/visScene.h"
 
@@ -88,31 +89,6 @@ static Mat4 _matrix(const State& state, const Vec3& origin) noexcept
         * Mat4::rotateX(state.rotation.x)
         * Mat4::scale(state.scale)
         * Mat4::translate(origin * -1.0f);
-}
-
-template<typename Value>
-static bool _grow(Value*& values, uint32_t count, uint32_t& capacity,
-                  uint32_t required, uint32_t limit) noexcept
-{
-    if (required <= capacity) return true;
-    if (required > limit) return false;
-    auto grownCapacity = capacity ? capacity * 2u : 8u;
-    if (grownCapacity < capacity || grownCapacity > limit) grownCapacity = limit;
-    while (grownCapacity < required) {
-        if (grownCapacity > limit / 2u) {
-            grownCapacity = limit;
-            break;
-        }
-        grownCapacity *= 2u;
-    }
-    auto grown = new (std::nothrow) Value[grownCapacity];
-    if (!grown) return false;
-    for (auto i = 0u; i < count; i++)
-        grown[i] = values[i];
-    delete[] values;
-    values = grown;
-    capacity = grownCapacity;
-    return true;
 }
 
 static AnimCurve _curve(Easing easing) noexcept
@@ -255,9 +231,8 @@ Result Controller::define(Object* object, const char* name, const State& state) 
         }
         resolved.originEnabled = true;
     }
-    if (!_grow(pImpl->definitions, pImpl->definitionCount,
-               pImpl->definitionCapacity, pImpl->definitionCount + 1u,
-               StateLimit)) {
+    if (!grow(pImpl->definitions, pImpl->definitionCount,
+              pImpl->definitionCapacity, 1u, 8u, StateLimit)) {
         return Result::OutOfMemory;
     }
     auto& definition = pImpl->definitions[pImpl->definitionCount++];
@@ -315,10 +290,10 @@ Result Controller::transition(const Target* targets, uint32_t count, float durat
         || !pImpl->nextTransaction) {
         return Result::InsufficientCondition;
     }
-    if (!_grow(pImpl->tracks, pImpl->trackCount, pImpl->trackCapacity,
-               pImpl->trackCount + newTracks, ObjectLimit)
-        || !_grow(pImpl->events, pImpl->eventCount, pImpl->eventCapacity,
-                  pImpl->eventCount + count, EventLimit)) {
+    if (!grow(pImpl->tracks, pImpl->trackCount, pImpl->trackCapacity,
+              newTracks, 8u, ObjectLimit)
+        || !grow(pImpl->events, pImpl->eventCount, pImpl->eventCapacity,
+                 count, 8u, EventLimit)) {
         return Result::OutOfMemory;
     }
     auto transaction = pImpl->nextTransaction++;

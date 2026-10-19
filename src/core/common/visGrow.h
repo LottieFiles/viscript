@@ -22,8 +22,7 @@ static inline bool grow(T*& items, uint32_t count, uint32_t& capacity, uint32_t 
     while (next - count < more) next = next > limit / 2u ? limit : next * 2u;
     auto grown = new (std::nothrow) T[next];
     if (!grown) return false;
-    for (auto i = 0u; i < count; i++)
-        grown[i] = items[i];
+    for (auto i = 0u; i < count; i++) grown[i] = items[i];
     delete[] items;
     items = grown;
     capacity = next;

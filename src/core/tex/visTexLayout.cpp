@@ -6,6 +6,7 @@
 #include <new>
 
 #include "visTex.h"
+#include "../common/visGrow.h"
 
 // Sets a parsed formula the way TeX sets math (The TeXbook, Appendix G): atoms spaced by
 // their classes, scripts, fractions and roots by the rules there, with TeX's font parameters
@@ -258,17 +259,9 @@ struct Setter
             out.items[slot] = item;
             return slot;
         }
-        if (out.count >= out.capacity) {
-            auto capacity = out.capacity ? out.capacity * 2u : 64u;
-            auto items = new (std::nothrow) Item[capacity];
-            if (!items) {
-                fail("out of memory");
-                return 0u;
-            }
-            for (auto i = 0u; i < out.count; i++) items[i] = out.items[i];
-            delete[] out.items;
-            out.items = items;
-            out.capacity = capacity;
+        if (!grow(out.items, out.count, out.capacity, 1u, 64u)) {
+            fail("out of memory");
+            return 0u;
         }
         out.items[out.count] = item;
         return out.count++;

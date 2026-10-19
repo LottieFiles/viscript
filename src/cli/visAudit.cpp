@@ -11,6 +11,7 @@
 #include "visAudit.h"
 #include "visCliCommon.h"
 #include "visSaver.h"
+#include "../core/common/visGrow.h"
 #ifdef VIS_DIAGRAM
 #include "vis_diagram.h"
 #endif
@@ -253,23 +254,6 @@ struct Issue
     float viewHeight = 0.0f;
 };
 
-// Makes room for one more value after count, doubling the capacity or starting it at first.
-template<typename T>
-static bool _grow(T*& values, uint32_t count, uint32_t& capacity, uint32_t first) noexcept
-{
-    if (count < capacity) return true;
-    auto nextCapacity = capacity ? capacity * 2u : first;
-    if (nextCapacity < capacity) return false;
-    auto next = new (std::nothrow) T[nextCapacity];
-    if (!next) return false;
-    for (auto i = 0u; i < count; i++)
-        next[i] = values[i];
-    delete[] values;
-    values = next;
-    capacity = nextCapacity;
-    return true;
-}
-
 struct IssueList
 {
     Issue* values = nullptr;
@@ -313,7 +297,7 @@ struct TextList
     TextRecord* add(const Scene* scene, const Object* object, const char* path) noexcept
     {
         if (auto value = find(scene, object, path)) return value;
-        if (!_grow(values, count, capacity, 32u)) return nullptr;
+        if (!grow(values, count, capacity, 1u, 32u)) return nullptr;
         auto value = values + count++;
         *value = {scene, object, path, false};
         return value;
@@ -352,7 +336,7 @@ struct ScenePathList
     {
         output = find(scene, value);
         if (output || !value) return true;
-        if (!_grow(values, count, capacity, 16u)) return false;
+        if (!grow(values, count, capacity, 1u, 16u)) return false;
         auto size = std::strlen(value);
         auto copy = new (std::nothrow) char[size + 1u];
         if (!copy) return false;
@@ -401,7 +385,7 @@ struct DiagramList
     DiagramRecord* add(const diagram::IR* receipt, const Scene* scene, const char* path,
                        const Object* root) noexcept
     {
-        if (!_grow(values, count, capacity, 8u)) return nullptr;
+        if (!grow(values, count, capacity, 1u, 8u)) return nullptr;
         auto constraints = new (std::nothrow) diagram::ConstraintReport;
         auto physical = new (std::nothrow) diagram::PhysicalConstraintReport;
         if (!constraints || !physical) {
@@ -497,7 +481,7 @@ static Issue* _record(IssueList& issues, IssueCode code, Scope scope, Subject su
         }
     }
     if (!issue) {
-        if (!_grow(issues.values, issues.count, issues.capacity, 32u)) return nullptr;
+        if (!grow(issues.values, issues.count, issues.capacity, 1u, 32u)) return nullptr;
         issue = issues.values + issues.count++;
         *issue = {};
         issue->code = code;
@@ -903,7 +887,7 @@ static bool _addDiagramContainment(Options& options, const char* path, const dia
     containment.role = _slice(role);
     containment.inset = options.panelInset;
     containment.generated = true;
-    if (!_grow(options.containments, options.containmentCount, options.containmentCapacity, 8u)) return false;
+    if (!grow(options.containments, options.containmentCount, options.containmentCapacity, 1u, 8u)) return false;
     options.containments[options.containmentCount++] = containment;
     return true;
 }

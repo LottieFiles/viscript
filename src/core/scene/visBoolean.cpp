@@ -5,6 +5,7 @@
 
 #include "vis.h"
 #include "visScene.h"
+#include "../common/visGrow.h"
 #include "../common/visSort.h"
 
 namespace vis
@@ -189,24 +190,6 @@ static bool _segmentBefore(const void* first, const void* second, const void*)
     return static_cast<const BooleanSegment*>(first)->key < static_cast<const BooleanSegment*>(second)->key;
 }
 
-template<typename T>
-static bool _push(T*& items, uint32_t& count, uint32_t& capacity, const T& item)
-{
-    if (count == capacity) {
-        auto grown = capacity ? capacity * 2u : 64u;
-        if (grown <= capacity) return false;
-        auto next = new (std::nothrow) T[grown];
-        if (!next) return false;
-        for (auto i = 0u; i < count; i++)
-            next[i] = items[i];
-        delete[] items;
-        items = next;
-        capacity = grown;
-    }
-    items[count++] = item;
-    return true;
-}
-
 // The contours of a closed shape mapped into the plane of the result.
 static Result _region(const Object* object, const BooleanAffine& map, BooleanRegion& region)
 {
@@ -301,7 +284,9 @@ static bool _cut(const BooleanEdge* edges, uint32_t first, uint32_t second, doub
     auto tolerance1 = tolerance / length1;
     auto tolerance2 = tolerance / length2;
     auto add = [&](uint32_t edge, double t, const BooleanPoint& point) {
-        return _push(splits, count, capacity, BooleanSplit{point, t, edge});
+        if (!grow(splits, count, capacity, 1u, 64u)) return false;
+        splits[count++] = {point, t, edge};
+        return true;
     };
     auto offset = _minus(f.from, e.from);
     auto denominator = _cross(d1, d2);

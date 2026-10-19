@@ -6,6 +6,7 @@
 
 #include "vis.h"
 #include "visDisplayList.h"
+#include "../common/visGrow.h"
 #include "../common/visSort.h"
 
 // DisplayList::split(): the painter's order of a 3D scene sorts every drawing as one piece, so a
@@ -842,18 +843,9 @@ Result DisplayList::split(const Config& config) noexcept
             continue;
         }
         if (added + made - 1u > ADDED || count + added + made - 1u > DISPLAY_COMMAND_LIMIT) continue;
-        if (allCount + made > allCapacity) {
-            auto capacity = allCapacity ? allCapacity * 2u : 64u;
-            while (capacity < allCount + made) capacity *= 2u;
-            auto grown = new (std::nothrow) DepthRun[capacity];
-            if (!grown) {
-                result = Result::OutOfMemory;
-                break;
-            }
-            if (allCount) std::memcpy(grown, allRuns, sizeof(DepthRun) * allCount);
-            delete[] allRuns;
-            allRuns = grown;
-            allCapacity = capacity;
+        if (!grow(allRuns, allCount, allCapacity, made, 64u)) {
+            result = Result::OutOfMemory;
+            break;
         }
         std::memcpy(allRuns + allCount, runs, sizeof(DepthRun) * made);
         plans[i] = {allCount, made, command.depth, lowered, true, lifted};

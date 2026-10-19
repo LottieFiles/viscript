@@ -5,6 +5,7 @@
 #include <new>
 
 #include "vis.h"
+#include "../common/visGrow.h"
 
 namespace vis
 {
@@ -63,32 +64,16 @@ struct LayoutReport::Impl
         samplePadding = 0.0f;
     }
 
-    template<typename T>
-    static bool grow(T*& values, uint32_t& capacity, uint32_t count)
-    {
-        if (count <= capacity) return true;
-        auto next = capacity ? capacity * 2u : 16u;
-        if (next < capacity || next < count) next = count;
-        auto grown = new (std::nothrow) T[next];
-        if (!grown) return false;
-        for (auto i = 0u; i < capacity; i++)
-            grown[i] = values[i];
-        delete[] values;
-        values = grown;
-        capacity = next;
-        return true;
-    }
-
     bool add(const LayoutScene& value)
     {
-        if (!grow(scenes, sceneCap, sceneCnt + 1u)) return false;
+        if (!grow(scenes, sceneCnt, sceneCap, 1u, 16u)) return false;
         scenes[sceneCnt++] = value;
         return true;
     }
 
     bool add(const LayoutObject& value)
     {
-        if (!grow(objects, objectCap, objectCnt + 1u)) return false;
+        if (!grow(objects, objectCnt, objectCap, 1u, 16u)) return false;
         objects[objectCnt++] = value;
         return true;
     }
@@ -129,21 +114,21 @@ struct LayoutReport::Impl
 
     bool add(const LayoutCollision& value)
     {
-        if (!grow(collisions, collisionCap, collisionCnt + 1u)) return false;
+        if (!grow(collisions, collisionCnt, collisionCap, 1u, 16u)) return false;
         collisions[collisionCnt++] = value;
         return true;
     }
 
     bool add(const LayoutPath& value)
     {
-        if (!grow(paths, pathCap, pathCnt + 1u)) return false;
+        if (!grow(paths, pathCnt, pathCap, 1u, 16u)) return false;
         paths[pathCnt++] = value;
         return true;
     }
 
     bool add(const LayoutContainment& value)
     {
-        if (!grow(containments, containmentCap, containmentCnt + 1u)) return false;
+        if (!grow(containments, containmentCnt, containmentCap, 1u, 16u)) return false;
         containments[containmentCnt++] = value;
         return true;
     }

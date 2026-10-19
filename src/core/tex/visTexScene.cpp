@@ -9,6 +9,7 @@
 
 #include "visTex.h"
 #include "visTexScene.h"
+#include "../common/visSort.h"
 
 namespace vis::tex
 {
@@ -548,33 +549,13 @@ static void _accent(Outline& outline, const Item& item)
     }
 }
 
-// Sorts the items of a layout by where their TeX starts, keeping the order of the layout among
-// items of one token, as a merge sort does.
-static bool _order(const Layout& layout, uint32_t* order)
+// Whether the item at index first of the items data starts before the one at second in the TeX;
+// sorted stably, the items of one token keep the order of the layout.
+static bool _startsBefore(const void* first, const void* second, const void* data)
 {
-    auto count = layout.count;
-    for (auto i = 0u; i < count; i++) order[i] = i;
-    if (count < 2u) return true;
-    auto scratch = new (std::nothrow) uint32_t[count];
-    if (!scratch) return false;
-    for (auto width = 1u; width < count; width *= 2u) {
-        for (auto low = 0u; low < count; low += 2u * width) {
-            auto middle = low + width < count ? low + width : count;
-            auto high = low + 2u * width < count ? low + 2u * width : count;
-            auto i = low;
-            auto j = middle;
-            auto k = low;
-            while (i < middle && j < high) {
-                if (layout.items[order[j]].begin < layout.items[order[i]].begin) scratch[k++] = order[j++];
-                else scratch[k++] = order[i++];
-            }
-            while (i < middle) scratch[k++] = order[i++];
-            while (j < high) scratch[k++] = order[j++];
-        }
-        std::memcpy(order, scratch, sizeof(uint32_t) * count);
-    }
-    delete[] scratch;
-    return true;
+    auto& a = static_cast<const Item*>(data)[*static_cast<const uint32_t*>(first)];
+    auto& b = static_cast<const Item*>(data)[*static_cast<const uint32_t*>(second)];
+    return a.begin < b.begin;
 }
 
 // The frame a formula is set in: its em in world units, the font's ascent and descent in
@@ -885,11 +866,13 @@ bool draw(Built& output, const Vec3& origin, bool detached, char* error, uint32_
     auto& items = laid->laid;
     auto count = laid->count;
     auto split = laid->split;
-    std::unique_ptr<uint32_t[]> order(new (std::nothrow) uint32_t[items.count ? items.count : 1u]);
+    std::unique_ptr<uint32_t[]> order(new (std::nothrow) uint32_t[items.count ? 2u * items.count : 1u]);
 
     // The pieces in the order of the TeX.
     output.pieces = new (std::nothrow) Piece[items.count ? items.count : 1u];
-    if (!output.pieces || !order || !_order(items, order.get())) return _fail(error, errorSize, "out of memory");
+    if (!output.pieces || !order) return _fail(error, errorSize, "out of memory");
+    for (auto i = 0u; i < items.count; i++) order[i] = i;
+    stableSort(order.get(), order.get() + items.count, items.count, sizeof(uint32_t), _startsBefore, items.items);
 
     output.root = Group::gen();
     if (!output.root) return _fail(error, errorSize, "out of memory");

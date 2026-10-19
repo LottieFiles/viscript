@@ -2,9 +2,8 @@
 #ifndef _VIS_WARP_H_
 #define _VIS_WARP_H_
 
-#include <new>
-
 #include "visScene.h"
+#include "../common/visGrow.h"
 
 namespace vis
 {
@@ -32,22 +31,13 @@ struct WarpDraft
     void add(const Vec3& point)
     {
         if (full || failed) return;
-        if (count == capacity) {
-            if (capacity >= PointLimit) {
-                full = true;
-                return;
-            }
-            auto grown = capacity ? capacity * 2u : 64u;
-            auto copy = new (std::nothrow) Vec3[grown];
-            if (!copy) {
-                failed = true;
-                return;
-            }
-            for (auto i = 0u; i < count; i++)
-                copy[i] = points[i];
-            delete[] points;
-            points = copy;
-            capacity = grown;
+        if (count >= PointLimit) {
+            full = true;
+            return;
+        }
+        if (!grow(points, count, capacity, 1u, 64u, PointLimit)) {
+            failed = true;
+            return;
         }
         points[count++] = point;
     }
@@ -71,18 +61,9 @@ struct WarpDraft
         if (full || failed) return;
         auto begin = runCount ? runs[runCount - 1u].end : 0u;
         if (count == begin) return;
-        if (runCount == runCapacity) {
-            auto grown = runCapacity ? runCapacity * 2u : 8u;
-            auto copy = new (std::nothrow) WarpRun[grown];
-            if (!copy) {
-                failed = true;
-                return;
-            }
-            for (auto i = 0u; i < runCount; i++)
-                copy[i] = runs[i];
-            delete[] runs;
-            runs = copy;
-            runCapacity = grown;
+        if (!grow(runs, runCount, runCapacity, 1u, 8u)) {
+            failed = true;
+            return;
         }
         runs[runCount++] = {count, part, value};
     }

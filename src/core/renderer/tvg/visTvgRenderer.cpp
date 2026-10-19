@@ -17,6 +17,7 @@
 #include "visDisplayList.h"
 #include "visTvgRenderer.h"
 #include "visScene.h"
+#include "../../common/visGrow.h"
 
 namespace vis
 {
@@ -658,25 +659,6 @@ static char* _dup(const char* text)
     return copy;
 }
 
-template<typename T>
-static bool _reserve(T*& values, uint32_t& capacity, uint32_t count)
-{
-    if (count <= capacity) return true;
-    auto next = capacity ? capacity : 16u;
-    while (next < count) {
-        if (next > UINT32_MAX / 2u) return false;
-        next *= 2u;
-    }
-    auto grown = new (std::nothrow) T[next];
-    if (!grown) return false;
-    for (auto i = 0u; i < capacity; i++)
-        grown[i] = values[i];
-    delete[] values;
-    values = grown;
-    capacity = next;
-    return true;
-}
-
 static uint32_t _hash(const void* first, const void* second, uint32_t extra)
 {
     auto value = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(first)) * 0x9E3779B97F4A7C15ull;
@@ -1252,7 +1234,7 @@ static RetainedNode* _nodeGen()
 
 static bool _push(tvg::Paint**& values, uint32_t& count, uint32_t& capacity, tvg::Paint* paint)
 {
-    if (!_reserve(values, capacity, count + 1u)) return false;
+    if (!grow(values, count, capacity, 1u, 16u)) return false;
     values[count++] = paint;
     return true;
 }
@@ -1296,7 +1278,8 @@ static bool _ranks(RetainedNode* node, const DisplayList& list)
 {
     auto count = list.count;
     if (!count) return true;
-    if (!_reserve(node->orderIndex, node->orderCap, count) || !_reserve(node->rankOf, node->rankOfCap, count)) {
+    if (!grow(node->orderIndex, 0u, node->orderCap, count, 16u)
+        || !grow(node->rankOf, 0u, node->rankOfCap, count, 16u)) {
         return false;
     }
     auto required = 16u;
@@ -1436,7 +1419,7 @@ static bool _effects(tvg::Scene* scene, const DisplayLayer& layer)
 static Result _composites(RetainedNode* node, const DisplayList& list)
 {
     if (!list.layerCount) return Result::Success;
-    if (!_reserve(node->layers, node->layerCap, list.layerCount)) return Result::OutOfMemory;
+    if (!grow(node->layers, 0u, node->layerCap, list.layerCount, 16u)) return Result::OutOfMemory;
     for (auto i = 0u; i < list.layerCount; i++) {
         auto& layer = list.layers[i];
         RetainedComposite* composite = nullptr;
@@ -1446,7 +1429,7 @@ static Result _composites(RetainedNode* node, const DisplayList& list)
             }
         }
         if (!composite) {
-            if (!_reserve(node->composites, node->compositeCap, node->compositeCnt + 1u)) {
+            if (!grow(node->composites, node->compositeCnt, node->compositeCap, 1u, 16u)) {
                 return Result::OutOfMemory;
             }
             composite = new (std::nothrow) RetainedComposite;
@@ -1584,7 +1567,7 @@ static Result _local(RetainedNode* node, const Config& config, const DisplayList
                 if (!_capture(*slot, command)) return Result::OutOfMemory;
             }
         } else {
-            if (!_reserve(node->slots, node->slotCap, node->slotCnt + 1u)) return Result::OutOfMemory;
+            if (!grow(node->slots, node->slotCnt, node->slotCap, 1u, 16u)) return Result::OutOfMemory;
             slot = new (std::nothrow) Slot;
             if (!slot) return Result::OutOfMemory;
             slot->key = key;
@@ -1635,12 +1618,12 @@ static RetainedMount* _mount(RetainedNode* node, uint8_t kind, const Scene* firs
             return mount;
         }
         // A different scene now occupies this mount: release the old subtree.
-        if (!_reserve(node->deadMounts, node->deadMountCap, node->deadMountCnt + 1u)) return nullptr;
+        if (!grow(node->deadMounts, node->deadMountCnt, node->deadMountCap, 1u, 16u)) return nullptr;
         if (mount->wrapper && !_push(node->dead, node->deadCnt, node->deadCap, mount->wrapper)) return nullptr;
         node->deadMounts[node->deadMountCnt++] = mount;
         node->mounts[index] = nullptr;
     } else {
-        if (!_reserve(node->mounts, node->mountCap, node->mountCnt + 1u)) return nullptr;
+        if (!grow(node->mounts, node->mountCnt, node->mountCap, 1u, 16u)) return nullptr;
         node->mounts[node->mountCnt++] = nullptr;
     }
     auto mount = new (std::nothrow) RetainedMount;
@@ -1808,7 +1791,7 @@ static Result _reconcile(RetainedNode* node, RetainedContainer& container)
         suffix++;
     }
     // Paints that leave stay attached until the end, so the mirror may briefly hold both.
-    if (!_reserve(container.attached, container.attachedCap, count + total)) return Result::OutOfMemory;
+    if (!grow(container.attached, count, container.attachedCap, total, 16u)) return Result::OutOfMemory;
     attached = container.attached;
 
     if (total - prefix - suffix > 64u) {
@@ -1886,7 +1869,7 @@ static Result _end(RetainedNode* node)
     // Mounts no longer present (e.g. a sequence before it begins).
     for (auto i = node->mountUsed; i < node->mountCnt; i++) {
         auto mount = node->mounts[i];
-        if (!_reserve(node->deadMounts, node->deadMountCap, node->deadMountCnt + 1u)) return Result::OutOfMemory;
+        if (!grow(node->deadMounts, node->deadMountCnt, node->deadMountCap, 1u, 16u)) return Result::OutOfMemory;
         if (mount->wrapper && !_push(node->dead, node->deadCnt, node->deadCap, mount->wrapper)) {
             return Result::OutOfMemory;
         }
@@ -1902,7 +1885,7 @@ static Result _end(RetainedNode* node)
             node->composites[kept++] = composite;
             continue;
         }
-        if (!_reserve(node->deadComposites, node->deadCompositeCap, node->deadCompositeCnt + 1u)
+        if (!grow(node->deadComposites, node->deadCompositeCnt, node->deadCompositeCap, 1u, 16u)
             || !_push(node->dead, node->deadCnt, node->deadCap, composite->content.scene)) {
             return Result::OutOfMemory;
         }

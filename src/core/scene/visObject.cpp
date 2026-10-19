@@ -11,6 +11,7 @@
 #include "../common/visFinite.h"
 #include "../common/visString.h"
 #include "../common/visConstants.h"
+#include "../common/visGrow.h"
 #include "visRendererBackend.h"
 #include "visScene.h"
 
@@ -88,21 +89,6 @@ bool Object::owned() const noexcept
     return objOwner;
 }
 
-bool Object::grow() noexcept
-{
-    if (childCnt < childCap) return true;
-    auto capacity = childCap ? childCap * 2u : 8u;
-    if (capacity < childCap) return false;
-    auto grown = new (std::nothrow) Object*[capacity];
-    if (!grown) return false;
-    for (auto i = 0u; i < childCnt; i++)
-        grown[i] = children[i];
-    delete[] children;
-    children = grown;
-    childCap = capacity;
-    return true;
-}
-
 static bool _height(const Object* object, uint32_t depth, uint32_t& height)
 {
     if (!object || depth > MAX_OBJECT_DEPTH) return false;
@@ -132,7 +118,7 @@ Result Object::add(Object* object) noexcept
     if (!_height(object, 0u, height) || ancestors + height > MAX_OBJECT_DEPTH) {
         return fail(Result::InsufficientCondition, CHILD_DEPTH);
     }
-    if (!grow()) return fail(Result::OutOfMemory, "out of memory");
+    if (!grow(children, childCnt, childCap, 1u, 8u)) return fail(Result::OutOfMemory, "out of memory");
     if (objOwner) {
         auto result = objOwner->attach(object, this);
         if (result != Result::Success) return result;

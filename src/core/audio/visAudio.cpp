@@ -6,6 +6,7 @@
 #include <new>
 
 #include "vis_audio.h"
+#include "../common/visGrow.h"
 #include "../common/visString.h"
 
 namespace vis::audio
@@ -56,36 +57,6 @@ struct Soundscape::Impl
         for (auto i = 0u; i < cueCount; i++) delete[] const_cast<char*>(cues[i].asset);
         delete[] cues;
         delete[] gains;
-    }
-
-    bool growCues() noexcept
-    {
-        if (cueCount < cueCapacity) return true;
-        auto capacity = cueCapacity ? cueCapacity * 2u : 8u;
-        if (capacity > CueLimit) capacity = CueLimit;
-        if (capacity <= cueCapacity) return false;
-        auto grown = new (std::nothrow) CueConfig[capacity];
-        if (!grown) return false;
-        for (auto i = 0u; i < cueCount; i++) grown[i] = cues[i];
-        delete[] cues;
-        cues = grown;
-        cueCapacity = capacity;
-        return true;
-    }
-
-    bool growGains() noexcept
-    {
-        if (gainCount < gainCapacity) return true;
-        auto capacity = gainCapacity ? gainCapacity * 2u : 16u;
-        if (capacity > GainLimit) capacity = GainLimit;
-        if (capacity <= gainCapacity) return false;
-        auto grown = new (std::nothrow) GainClip[capacity];
-        if (!grown) return false;
-        for (auto i = 0u; i < gainCount; i++) grown[i] = gains[i];
-        delete[] gains;
-        gains = grown;
-        gainCapacity = capacity;
-        return true;
     }
 
     Scene* scene = nullptr;
@@ -139,7 +110,7 @@ Result Soundscape::cue(const CueConfig& config, Cue& output) noexcept
         return Result::InvalidArguments;
     }
     auto asset = _duplicate(config.asset);
-    if (!asset || !pImpl->growCues()) {
+    if (!asset || !grow(pImpl->cues, pImpl->cueCount, pImpl->cueCapacity, 1u, 8u, CueLimit)) {
         delete[] asset;
         return Result::OutOfMemory;
     }
@@ -184,7 +155,9 @@ Result Soundscape::gain(Cue cue, float value, float begin, float duration,
     auto from = 0.0f;
     auto result = sample(cue, begin, from);
     if (result != Result::Success) return result;
-    if (!pImpl->growGains()) return Result::OutOfMemory;
+    if (!grow(pImpl->gains, pImpl->gainCount, pImpl->gainCapacity, 1u, 16u, GainLimit)) {
+        return Result::OutOfMemory;
+    }
     auto& clip = pImpl->gains[pImpl->gainCount++];
     clip.cue = cue;
     clip.begin = begin;
