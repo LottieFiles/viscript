@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { inflateSync } from "node:zlib";
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, truncateSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -4519,6 +4519,26 @@ return root
         ].join("\n"));
         const missing = render([missingPath, "-o", join(directory, "missing.mp4")], 3);
         assert.match(missing.stderr, /could not read the audio asset 'missing\.wav' at .*missing\.wav/);
+
+        // A render loads at most 64 audio files, of at most 64 MiB together, and names the limit
+        // it meets; the --audio file needs a cue of its own among a scene's 256.
+        const cues = (name, count, asset) => writeScript(name, [
+            "local scene = vis.scene { width = 16, height = 16 }",
+            `for i = 1, ${count} do vis.audio.cue(scene, { asset = ${asset} }) end`,
+            "scene:wait(0.1)",
+            "return scene",
+        ].join("\n"));
+        for (let i = 1; i <= 65; i++) writeFileSync(join(directory, `many${i}.wav`), "x");
+        const many = render([cues("many.lua", 65, "\"many\" .. i .. \".wav\""), "-o", join(directory, "many.mp4")], 3);
+        assert.match(many.stderr, /could not load the audio asset 'many65\.wav': a render may use at most 64 audio files/);
+        for (let i = 1; i <= 3; i++) {
+            writeFileSync(join(directory, `large${i}.wav`), "");
+            truncateSync(join(directory, `large${i}.wav`), 22 * 1024 * 1024);
+        }
+        const large = render([cues("large.lua", 3, "\"large\" .. i .. \".wav\""), "-o", join(directory, "large.mp4")], 3);
+        assert.match(large.stderr, /could not load the audio asset 'large3\.wav': together the audio files may hold at most 64 MiB/);
+        const full = render([cues("full.lua", 256, "\"tone.wav\""), "-o", join(directory, "full.mp4"), "--audio", tonePath], 3);
+        assert.match(full.stderr, /the scene has no room for the --audio file among its 256 cues/);
     }
 } finally {
     rmSync(directory, { recursive: true, force: true });

@@ -100,9 +100,10 @@ struct Soundtrack
 // The cue name under which the file given with --audio joins a scene's own cues.
 static constexpr char NARRATION_ASSET[] = "viscript --audio";
 
-// Reads the file at path and loads it into player under name; label names the file in
-// messages.
-static bool _loadSound(audio::Player* player, const char* name, const char* path, const char* label)
+// Reads the file at path and loads it into player under name, counting it in assets, the number
+// of assets the player holds; label names the file in messages.
+static bool _loadSound(audio::Player* player, const char* name, const char* path, const char* label,
+                       uint32_t& assets)
 {
     auto file = std::fopen(path, "rb");
     long size = -1;
@@ -124,9 +125,19 @@ static bool _loadSound(audio::Player* player, const char* name, const char* path
     auto status = read == static_cast<size_t>(size)
                 ? player->load(name, bytes, static_cast<uint32_t>(size)) : Result::IoError;
     delete[] bytes;
-    if (status == Result::Success) return true;
+    if (status == Result::Success) {
+        assets++;
+        return true;
+    }
+    // The player refuses an asset past its count or byte limit with InsufficientCondition; the
+    // names loaded here differ, so the count tells which limit.
     if (status == Result::IoError) {
         std::fprintf(stderr, "viscript: render failed: could not read %s at %s\n", label, path);
+    } else if (status != Result::InsufficientCondition) {
+        std::fprintf(stderr, "viscript: render failed: could not load %s: %s\n", label, _describe(status));
+    } else if (assets == audio::Player::AssetLimit) {
+        std::fprintf(stderr, "viscript: render failed: could not load %s: a render may use at most %u audio "
+                     "files\n", label, audio::Player::AssetLimit);
     } else {
         std::fprintf(stderr, "viscript: render failed: could not load %s: together the audio files may hold "
                      "at most %u MiB\n", label, audio::Player::AssetTotalByteLimit / (1024u * 1024u));
@@ -135,7 +146,7 @@ static bool _loadSound(audio::Player* player, const char* name, const char* path
 }
 
 // Loads the audio asset a cue names, from the script's folder unless the name is absolute.
-static bool _loadAsset(audio::Player* player, const char* script, const char* name)
+static bool _loadAsset(audio::Player* player, const char* script, const char* name, uint32_t& assets)
 {
     auto slash = std::strrchr(script, '/');
     auto root = name[0] == '/' || !slash ? 0u : static_cast<size_t>(slash - script) + 1u;
@@ -149,7 +160,7 @@ static bool _loadAsset(audio::Player* player, const char* script, const char* na
     std::memcpy(path, script, root);
     std::memcpy(path + root, name, nameSize + 1u);
     std::snprintf(label, sizeof(label), "the audio asset '%s'", name);
-    auto loaded = _loadSound(player, name, path, label);
+    auto loaded = _loadSound(player, name, path, label, assets);
     delete[] path;
     return loaded;
 }
@@ -180,18 +191,25 @@ static bool _soundtrack(const Scene* scene, audio::Soundscape* soundscape, const
         std::fprintf(stderr, "viscript: render failed: out of memory\n");
         return false;
     }
+    uint32_t assets = 0u;
     if (narration) {
         audio::CueConfig cue;
         cue.asset = NARRATION_ASSET;
         cue.bus = audio::Bus::Music;
         audio::Cue handle;
-        if (soundscape->cue(cue, handle) != Result::Success) {
-            std::fprintf(stderr, "viscript: render failed: the scene has no room for the --audio file among its "
-                         "%u cues\n", audio::Soundscape::CueLimit);
+        auto status = soundscape->cue(cue, handle);
+        if (status != Result::Success) {
+            if (status == Result::InsufficientCondition) {
+                std::fprintf(stderr, "viscript: render failed: the scene has no room for the --audio file among "
+                             "its %u cues\n", audio::Soundscape::CueLimit);
+            } else {
+                std::fprintf(stderr, "viscript: render failed: could not cue the --audio file: %s\n",
+                             _describe(status));
+            }
             delete player;
             return false;
         }
-        if (!_loadSound(player, NARRATION_ASSET, narration, "the --audio file")) {
+        if (!_loadSound(player, NARRATION_ASSET, narration, "the --audio file", assets)) {
             delete player;
             return false;
         }
@@ -205,7 +223,7 @@ static bool _soundtrack(const Scene* scene, audio::Soundscape* soundscape, const
             soundscape->cueAt(j, earlier);
             loaded = std::strcmp(earlier.asset, cue.asset) == 0;
         }
-        if (!loaded && !_loadAsset(player, script, cue.asset)) {
+        if (!loaded && !_loadAsset(player, script, cue.asset, assets)) {
             delete player;
             return false;
         }
