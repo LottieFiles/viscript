@@ -51,8 +51,9 @@ struct Built
     ~Built();
 };
 
-// Sets count sources as one formula in the fonts and theme of scene, as build() does, but
-// draws nothing yet: the box of output tells how large it is, so that it can be placed.
+// Sets count sources as one formula in the fonts and theme of scene, as parts of a group each
+// when split, but draws nothing yet: the box of output tells how large it is, so that it can be
+// placed.
 bool prepare(Scene* scene, const char* const* sources, uint32_t count, bool split, const Options& options,
              Built& output, char* error, uint32_t errorSize) noexcept;
 
@@ -64,11 +65,6 @@ bool draw(Built& output, const Vec3& origin, bool detached, char* error, uint32_
 // The left end of the baseline of the formula output prepared, where the point and align of
 // options pin its box, or its baseline.
 Vec3 origin(const Built& output, const Options& options) noexcept;
-
-// Sets count sources as one formula in the fonts and theme of scene and draws it where the
-// point and align of options pin its box. split sets them as parts, one group each.
-bool build(Scene* scene, const char* const* sources, uint32_t count, bool split, const Options& options,
-           bool detached, Built& output, char* error, uint32_t errorSize) noexcept;
 
 // The TeX of source from begin to end without the blanks TeX ignores, keeping one after a
 // control word that a letter follows, written to output, which has room for end - begin + 1.

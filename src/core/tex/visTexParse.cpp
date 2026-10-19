@@ -562,24 +562,10 @@ struct Parser
         node.kind = kind;
         node.begin = begin;
         node.end = pos;
-        node.spanEnd = pos;
         return index;
     }
 
     Node& at(int32_t index) { return out.nodes[index]; }
-
-    const char* keep(const char* text, uint32_t length)
-    {
-        if (out.stringCount + length + 1u > out.stringCapacity) {
-            fail("the formula is too complex to set");
-            return nullptr;
-        }
-        auto copy = out.strings + out.stringCount;
-        std::memcpy(copy, text, length);
-        copy[length] = '\0';
-        out.stringCount += length + 1u;
-        return copy;
-    }
 
     void blank()
     {
@@ -657,20 +643,14 @@ struct Parser
                 ended = Ended::Ampersand;
                 break;
             }
-            if (c == '^' || c == '_') {
+            if (c == '^' || c == '_' || c == '\'') {
+                // Scripts with nothing before them to attach to take an empty nucleus.
                 if (last == None || at(last).kind == Kind::Space || at(last).kind == Kind::Style) {
                     link(first, last, add(Kind::Group, pos));
                     if (failed) break;
                 }
-                script(last, c == '^');
-                continue;
-            }
-            if (c == '\'') {
-                if (last == None || at(last).kind == Kind::Space || at(last).kind == Kind::Style) {
-                    link(first, last, add(Kind::Group, pos));
-                    if (failed) break;
-                }
-                primes(last);
+                if (c == '\'') primes(last);
+                else script(last, c == '^');
                 continue;
             }
             if (c == '\\') {
@@ -710,19 +690,18 @@ struct Parser
         return failed ? None : first;
     }
 
-    // The list one argument holds: a braced list, or one atom.
-    int32_t argument(const char* command, uint32_t begin)
+    // The list one argument holds: a braced list, or one atom. A missing one fails with
+    // message, which names command and where it began.
+    int32_t argument(const char* command, uint32_t begin, const char* message = "'\\%s' needs an argument at %u")
     {
         blank();
         if (pos >= size || source[pos] == '}' || source[pos] == '&' || source[pos] == '^' || source[pos] == '_'
             || this->command("right") || this->command("end")) {
-            return fail("'\\%s' needs an argument at %u", command, character(begin));
+            return fail(message, command, character(begin));
         }
-        if (source[pos] == '{') {
-            pos++;
-            return list(Stop::Brace);
-        }
-        return atom();
+        if (source[pos] != '{') return atom();
+        pos++;
+        return list(Stop::Brace);
     }
 
     void script(int32_t target, bool up)
@@ -735,29 +714,17 @@ struct Parser
             fail(up ? "double superscript at %u" : "double subscript at %u", character(begin));
             return;
         }
-        blank();
-        if (pos >= size || source[pos] == '}' || source[pos] == '&' || source[pos] == '^' || source[pos] == '_'
-            || command("right") || command("end")) {
-            fail(up ? "'^' needs something to raise at %u" : "'_' needs something to lower at %u", character(begin));
-            return;
-        }
-        int32_t list;
-        if (source[pos] == '{') {
-            pos++;
-            list = this->list(Stop::Brace);
-        } else {
-            list = atom();
-        }
+        auto list = argument(up ? "^" : "_", begin,
+                             up ? "'%s' needs something to raise at %u" : "'%s' needs something to lower at %u");
         if (failed) return;
         if (primed) {
             auto last = slot;
             while (at(last).next != None) last = at(last).next;
             at(last).next = list;
-            at(target).flags = static_cast<uint8_t>(at(target).flags & ~FlagPrimed);
+            node.flags = static_cast<uint8_t>(node.flags & ~FlagPrimed);
         } else {
-            (up ? at(target).sup : at(target).sub) = list;
+            slot = list;
         }
-        at(target).spanEnd = pos;
     }
 
     void primes(int32_t target)
@@ -776,12 +743,10 @@ struct Parser
             at(prime).text = "′";
             at(prime).length = static_cast<uint32_t>(std::strlen("′"));
             at(prime).end = pos;
-            at(prime).spanEnd = pos;
             link(first, last, prime);
         }
         at(target).sup = first;
         at(target).flags = static_cast<uint8_t>(at(target).flags | FlagPrimed);
-        at(target).spanEnd = pos;
     }
 
     // The class and alphabet of a character typed as it is.
@@ -837,7 +802,7 @@ struct Parser
             auto body = list(Stop::Brace);
             if (failed) return None;
             at(node).body = body;
-            at(node).end = at(node).spanEnd = pos;
+            at(node).end = pos;
             return node;
         }
         if (c == '\\') return controlSequence();
@@ -978,7 +943,6 @@ struct Parser
             auto body = argument(accent->name, begin);
             if (failed) return None;
             at(node).body = body;
-            at(node).spanEnd = pos;
             return node;
         }
         if (auto font = _find(FONTS, word, length)) {
@@ -993,7 +957,6 @@ struct Parser
             fixed = savedFixed;
             if (failed) return None;
             at(node).body = body;
-            at(node).spanEnd = pos;
             return node;
         }
         if (auto text = _find(TEXTS, word, length)) {
@@ -1005,7 +968,6 @@ struct Parser
             at(node).text = value;
             at(node).length = textLength;
             at(node).variant = static_cast<Variant>(text->value);
-            at(node).flags = FlagOwned;
             return node;
         }
         if (auto style = _find(STYLES, word, length)) {
@@ -1031,7 +993,6 @@ struct Parser
             auto denominator = argument(label, begin);
             if (failed) return None;
             at(node).extra = denominator;
-            at(node).spanEnd = pos;
             return node;
         }
         if (is("sqrt")) {
@@ -1047,7 +1008,6 @@ struct Parser
             auto body = argument("sqrt", begin);
             if (failed) return None;
             at(node).body = body;
-            at(node).spanEnd = pos;
             return node;
         }
         if (is("left")) return fence(begin);
@@ -1091,7 +1051,7 @@ struct Parser
             at(node).text = value;
             at(node).length = textLength;
             at(node).cls = Class::Op;
-            at(node).flags = static_cast<uint8_t>(FlagOwned | (limits ? FlagLimits : 0u));
+            if (limits) at(node).flags = FlagLimits;
             return node;
         }
         if (is("not")) {
@@ -1145,7 +1105,7 @@ struct Parser
         if (failed) return None;
         at(node).body = body;
         at(node).right = static_cast<uint8_t>(right);
-        at(node).closeEnd = at(node).spanEnd = pos;
+        at(node).closeEnd = pos;
         return node;
     }
 
@@ -1194,7 +1154,7 @@ struct Parser
                 auto body = list(Stop::Cell);
                 if (failed) return None;
                 at(cell).body = body;
-                at(cell).end = at(cell).spanEnd = pos;
+                at(cell).end = pos;
                 link(firstCell, lastCell, cell);
                 if (ended == Ended::Ampersand) continue;
                 if (ended == Ended::Source) {
@@ -1204,7 +1164,7 @@ struct Parser
                 break;
             }
             at(row).body = firstCell;
-            at(row).end = at(row).spanEnd = pos;
+            at(row).end = pos;
             // A final \\ before \end leaves no row of its own.
             auto empty = firstCell == lastCell && at(firstCell).body == None;
             if (!(done && empty && firstRow != None)) link(firstRow, lastRow, row);
@@ -1221,7 +1181,7 @@ struct Parser
                         character(close), static_cast<int>(length), word);
         }
         at(node).body = firstRow;
-        at(node).end = at(node).spanEnd = at(node).closeEnd = pos;
+        at(node).end = at(node).closeEnd = pos;
         return node;
     }
 };

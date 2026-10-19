@@ -60,12 +60,12 @@ static void _atoms()
     const Node* nodes[8] = {};
     CHECK(_list(parse, parse.first, nodes, 8) == 5u);
     CHECK(_text(*nodes[0], "a") && nodes[0]->cls == Class::Ord && nodes[0]->variant == Variant::Italic);
-    CHECK(nodes[0]->begin == 0u && nodes[0]->end == 1u && nodes[0]->spanEnd == 3u);
+    CHECK(nodes[0]->begin == 0u && nodes[0]->end == 1u);
     CHECK(nodes[0]->sup != None && _text(parse.nodes[nodes[0]->sup], "2"));
     CHECK(parse.nodes[nodes[0]->sup].variant == Variant::Upright && nodes[0]->sub == None);
     CHECK(_text(*nodes[1], "+") && nodes[1]->cls == Class::Bin);
     CHECK(_text(*nodes[3], "=") && nodes[3]->cls == Class::Rel);
-    CHECK(_text(*nodes[4], "c") && nodes[4]->begin == 8u && nodes[4]->spanEnd == 11u);
+    CHECK(_text(*nodes[4], "c") && nodes[4]->begin == 8u);
 
     // A minus is the minus sign, and a lone script takes an empty nucleus.
     CHECK(_parse("-x_{i j}^{\\prime}", parse));

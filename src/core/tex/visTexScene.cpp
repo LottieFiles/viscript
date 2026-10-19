@@ -4,6 +4,7 @@
 #include <cstdarg>
 #include <cstdio>
 #include <cstring>
+#include <memory>
 #include <new>
 
 #include "visTex.h"
@@ -23,16 +24,6 @@ static constexpr uint32_t PathSamples = 16u;
 static constexpr uint32_t None32 = 0xffffffffu;
 // The most cells the longest common subsequence of two formulas' pieces may take.
 static constexpr uint64_t MatchLimit = 1u << 22;
-
-static float _min(float a, float b)
-{
-    return a < b ? a : b;
-}
-
-static float _max(float a, float b)
-{
-    return a > b ? a : b;
-}
 
 static bool _fail(char* error, uint32_t errorSize, const char* format, ...)
 {
@@ -894,38 +885,28 @@ bool draw(Built& output, const Vec3& origin, bool detached, char* error, uint32_
     auto& items = laid->laid;
     auto count = laid->count;
     auto split = laid->split;
-    auto order = new (std::nothrow) uint32_t[items.count ? items.count : 1u];
-    auto finish = [&](bool result) {
-        delete[] order;
-        if (result) {
-            delete output.laid;
-            output.laid = nullptr;
-        }
-        return result;
-    };
+    std::unique_ptr<uint32_t[]> order(new (std::nothrow) uint32_t[items.count ? items.count : 1u]);
 
     // The pieces in the order of the TeX.
     output.pieces = new (std::nothrow) Piece[items.count ? items.count : 1u];
-    if (!output.pieces || !order || !_order(items, order)) return finish(_fail(error, errorSize, "out of memory"));
+    if (!output.pieces || !order || !_order(items, order.get())) return _fail(error, errorSize, "out of memory");
 
     output.root = Group::gen();
-    if (!output.root) return finish(_fail(error, errorSize, "out of memory"));
+    if (!output.root) return _fail(error, errorSize, "out of memory");
     output.ownsRoot = true;
     output.root->typeset = true;
     output.root->fill(laid->fill);
     if (split) {
         output.parts = new (std::nothrow) Group*[count]{};
         output.ownsPart = new (std::nothrow) bool[count]{};
-        if (!output.parts || !output.ownsPart) return finish(_fail(error, errorSize, "out of memory"));
+        if (!output.parts || !output.ownsPart) return _fail(error, errorSize, "out of memory");
         for (auto i = 0u; i < count; i++) {
             output.parts[i] = Group::gen();
-            if (!output.parts[i]) return finish(_fail(error, errorSize, "out of memory"));
+            if (!output.parts[i]) return _fail(error, errorSize, "out of memory");
             output.partCount = i + 1u;
             output.ownsPart[i] = true;
             if (detached) continue;
-            if (output.root->add(output.parts[i]) != Result::Success) {
-                return finish(_fail(error, errorSize, "out of memory"));
-            }
+            if (output.root->add(output.parts[i]) != Result::Success) return _fail(error, errorSize, "out of memory");
             output.ownsPart[i] = false;
         }
     }
@@ -940,20 +921,22 @@ bool draw(Built& output, const Vec3& origin, bool detached, char* error, uint32_
         auto length = item.end > item.begin ? item.end - item.begin : 0u;
         auto& piece = output.pieces[output.pieceCount];
         piece.key = new (std::nothrow) char[length + 1u];
-        if (!piece.key) return finish(_fail(error, errorSize, "out of memory"));
+        if (!piece.key) return _fail(error, errorSize, "out of memory");
         key(laid->joined, item.begin, item.begin + length, piece.key);
         piece.part = split ? part : 0u;
         output.pieceCount++;
         auto object = _object(item, options, laid->frame, origin.x, origin.y, laid->metrics);
-        if (!object) return finish(_fail(error, errorSize, "out of memory"));
+        if (!object) return _fail(error, errorSize, "out of memory");
         auto parent = split ? static_cast<Object*>(output.parts[part]) : output.root;
         if (parent->add(object) != Result::Success) {
             delete object;
-            return finish(_fail(error, errorSize, "could not place '%s'", piece.key));
+            return _fail(error, errorSize, "could not place '%s'", piece.key);
         }
         piece.object = object;
     }
-    return finish(true);
+    delete output.laid;
+    output.laid = nullptr;
+    return true;
 }
 
 Vec3 origin(const Built& output, const Options& options) noexcept
@@ -963,13 +946,6 @@ Vec3 origin(const Built& output, const Options& options) noexcept
     if (options.baseline) return {left, options.point.y, options.point.z};
     auto baseline = options.point.y + options.align.y * (output.height + output.depth) - output.height;
     return {left, baseline, options.point.z};
-}
-
-bool build(Scene* scene, const char* const* sources, uint32_t count, bool split, const Options& options,
-           bool detached, Built& output, char* error, uint32_t errorSize) noexcept
-{
-    if (!prepare(scene, sources, count, split, options, output, error, errorSize)) return false;
-    return draw(output, origin(output, options), detached, error, errorSize);
 }
 
 // The pieces of each part, which follow one another in the order of the TeX.
@@ -984,16 +960,10 @@ bool match(const Side& source, const Side& target, uint32_t* partners) noexcept
 {
     auto n = source.count;
     auto m = target.count;
-    auto taken = new (std::nothrow) uint32_t[m ? m : 1u];
-    auto ranges = new (std::nothrow) uint32_t[2u * (source.sourceCount + target.sourceCount) + 4u];
-    auto used = new (std::nothrow) bool[source.sourceCount ? source.sourceCount : 1u]{};
-    auto release = [&](bool result) {
-        delete[] taken;
-        delete[] ranges;
-        delete[] used;
-        return result;
-    };
-    if (!taken || !ranges || !used) return release(false);
+    std::unique_ptr<uint32_t[]> taken(new (std::nothrow) uint32_t[m ? m : 1u]);
+    std::unique_ptr<uint32_t[]> ranges(new (std::nothrow) uint32_t[2u * (source.sourceCount + target.sourceCount) + 4u]);
+    std::unique_ptr<bool[]> used(new (std::nothrow) bool[source.sourceCount ? source.sourceCount : 1u]{});
+    if (!taken || !ranges || !used) return false;
     for (auto j = 0u; j < m; j++) taken[j] = None32;
     for (auto i = 0u; i < n; i++) {
         if (partners[i] != None32) taken[partners[i]] = i;
@@ -1005,7 +975,7 @@ bool match(const Side& source, const Side& target, uint32_t* partners) noexcept
     auto same = [&](uint32_t i, uint32_t j) { return std::strcmp(source.pieces[i].key, target.pieces[j].key) == 0; };
 
     // Parts that read the same pair piece by piece.
-    auto sourceFirst = ranges;
+    auto sourceFirst = ranges.get();
     auto sourceLast = sourceFirst + source.sourceCount;
     auto targetFirst = sourceLast + source.sourceCount;
     auto targetLast = targetFirst + target.sourceCount;
@@ -1028,13 +998,9 @@ bool match(const Side& source, const Side& target, uint32_t* partners) noexcept
     }
 
     // The pieces left pair by their TeX in order, as the longest common subsequence keeps it.
-    auto a = new (std::nothrow) uint32_t[n ? n : 1u];
-    auto b = new (std::nothrow) uint32_t[m ? m : 1u];
-    if (!a || !b) {
-        delete[] a;
-        delete[] b;
-        return release(false);
-    }
+    std::unique_ptr<uint32_t[]> a(new (std::nothrow) uint32_t[n ? n : 1u]);
+    std::unique_ptr<uint32_t[]> b(new (std::nothrow) uint32_t[m ? m : 1u]);
+    if (!a || !b) return false;
     auto as = 0u;
     auto bs = 0u;
     for (auto i = 0u; i < n; i++) {
@@ -1045,12 +1011,8 @@ bool match(const Side& source, const Side& target, uint32_t* partners) noexcept
     }
     if (as && bs && static_cast<uint64_t>(as + 1u) * (bs + 1u) <= MatchLimit) {
         auto columns = bs + 1u;
-        auto table = new (std::nothrow) uint16_t[static_cast<size_t>(as + 1u) * columns];
-        if (!table) {
-            delete[] a;
-            delete[] b;
-            return release(false);
-        }
+        std::unique_ptr<uint16_t[]> table(new (std::nothrow) uint16_t[static_cast<size_t>(as + 1u) * columns]);
+        if (!table) return false;
         for (auto i = as + 1u; i > 0u; i--) {
             for (auto j = bs + 1u; j > 0u; j--) {
                 auto& cell = table[static_cast<size_t>(i - 1u) * columns + (j - 1u)];
@@ -1072,10 +1034,7 @@ bool match(const Side& source, const Side& target, uint32_t* partners) noexcept
                 j++;
             }
         }
-        delete[] table;
     }
-    delete[] a;
-    delete[] b;
 
     // Then each piece of target takes the first piece of source left that reads the same.
     for (auto j = 0u; j < m; j++) {
@@ -1086,7 +1045,7 @@ bool match(const Side& source, const Side& target, uint32_t* partners) noexcept
             break;
         }
     }
-    return release(true);
+    return true;
 }
 
 }  // namespace detail
@@ -1096,42 +1055,36 @@ Formula::~Formula()
     delete built;
 }
 
+// Sets count sources as one formula in the fonts and theme of scene, as parts when split, into a
+// new build, and draws it where the point and align of options pin its box. False with why in
+// error when it cannot.
+static bool _build(detail::Built*& built, Scene* scene, const char* const* sources, uint32_t count, bool split,
+                   const Options& options, char* error, uint32_t errorSize) noexcept
+{
+    built = new (std::nothrow) detail::Built;
+    if (!built) return detail::_fail(error, errorSize, "out of memory");
+    return detail::prepare(scene, sources, count, split, options, *built, error, errorSize)
+        && detail::draw(*built, detail::origin(*built, options), false, error, errorSize);
+}
+
 Formula* Formula::gen(Scene* scene, const char* const* parts, uint32_t count, const Options& options, char* error,
                       uint32_t errorSize) noexcept
 {
     auto formula = new (std::nothrow) Formula;
-    if (!formula) {
-        if (error && errorSize) std::snprintf(error, errorSize, "out of memory");
-        return nullptr;
-    }
-    auto built = new (std::nothrow) detail::Built;
-    if (!built || !detail::build(scene, parts, count, true, options, false, *built, error, errorSize)) {
-        if (!built && error && errorSize) std::snprintf(error, errorSize, "out of memory");
-        delete built;
-        delete formula;
-        return nullptr;
-    }
-    formula->built = built;
-    return formula;
+    if (formula && _build(formula->built, scene, parts, count, true, options, error, errorSize)) return formula;
+    if (!formula) detail::_fail(error, errorSize, "out of memory");
+    delete formula;
+    return nullptr;
 }
 
 Formula* Formula::gen(Scene* scene, const char* source, const Options& options, char* error,
                       uint32_t errorSize) noexcept
 {
     auto formula = new (std::nothrow) Formula;
-    if (!formula) {
-        if (error && errorSize) std::snprintf(error, errorSize, "out of memory");
-        return nullptr;
-    }
-    auto built = new (std::nothrow) detail::Built;
-    if (!built || !detail::build(scene, &source, 1u, false, options, false, *built, error, errorSize)) {
-        if (!built && error && errorSize) std::snprintf(error, errorSize, "out of memory");
-        delete built;
-        delete formula;
-        return nullptr;
-    }
-    formula->built = built;
-    return formula;
+    if (formula && _build(formula->built, scene, &source, 1u, false, options, error, errorSize)) return formula;
+    if (!formula) detail::_fail(error, errorSize, "out of memory");
+    delete formula;
+    return nullptr;
 }
 
 Group* Formula::root() const noexcept
@@ -1184,23 +1137,21 @@ uint32_t pair(const Formula& source, const Formula& target, Object** pairs, uint
 {
     auto& from = *source.built;
     auto& to = *target.built;
-    auto partners = new (std::nothrow) uint32_t[from.pieceCount ? from.pieceCount : 1u];
+    std::unique_ptr<uint32_t[]> partners(new (std::nothrow) uint32_t[from.pieceCount ? from.pieceCount : 1u]);
     if (!partners) return 0u;
     for (auto i = 0u; i < from.pieceCount; i++) partners[i] = detail::None32;
     detail::Side sides[] = {{from.pieces, from.pieceCount, from.sources, from.sourceCount},
                             {to.pieces, to.pieceCount, to.sources, to.sourceCount}};
+    if (!detail::match(sides[0], sides[1], partners.get())) return 0u;
     auto count = 0u;
-    if (detail::match(sides[0], sides[1], partners)) {
-        for (auto i = 0u; i < from.pieceCount && count < capacity; i++) {
-            if (partners[i] == detail::None32) continue;
-            if (pairs) {
-                pairs[2u * count] = from.pieces[i].object;
-                pairs[2u * count + 1u] = to.pieces[partners[i]].object;
-            }
-            count++;
+    for (auto i = 0u; i < from.pieceCount && count < capacity; i++) {
+        if (partners[i] == detail::None32) continue;
+        if (pairs) {
+            pairs[2u * count] = from.pieces[i].object;
+            pairs[2u * count + 1u] = to.pieces[partners[i]].object;
         }
+        count++;
     }
-    delete[] partners;
     return count;
 }
 

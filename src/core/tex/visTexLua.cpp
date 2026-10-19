@@ -10,6 +10,7 @@ extern "C" {
 #include <lauxlib.h>
 }
 
+#include "../lua/visLuaBudget.h"
 #include "vis_tex.h"
 #include "visTex.h"
 #include "visTexLuaExtension.h"
@@ -47,6 +48,14 @@ static constexpr const char* PART_OPTIONS[] = {"text", "color", "fill"};
 // The options of a tex part of spans, {tex = "x^2"}, besides the group options.
 static constexpr const char* SPAN_OPTIONS[] = {"tex", "display", "size", "font", "role", "rise", "color", "fill"};
 static constexpr const char* SHAPE_STYLES[] = {"stroke", "gradient", "width", "radius", "dash", "dash_offset"};
+
+// The tables of options that set TeX: a formula's, one of its parts, and a tex part of spans.
+enum struct LuaOptions : uint8_t
+{
+    Formula,
+    Part,
+    Span
+};
 
 // A formula a script set: what it built, and the scene and id of its group once attached. Its
 // user value is the handle of its scene, which it keeps alive, so that a formula found by the
@@ -87,27 +96,33 @@ static int _get(lua_State* lua, int index, const char* name)
     return lua_rawget(lua, index);
 }
 
-// Stops the script on an option a formula, or one of its parts, does not take.
-static void _check(lua_State* lua, int index, bool part)
+// Stops the script on an option the table at index, of kind, does not take. Only a part holds a
+// numbered entry, its string first.
+static void _check(lua_State* lua, int index, LuaOptions kind)
 {
+    // What a numbered entry is told, as is a tex part of spans that also sets text.
+    auto numbered = kind == LuaOptions::Formula ? "tex takes its options by name, such as tex = \"x^2\""
+                    : kind == LuaOptions::Part  ? "a tex part holds one string, first or as text"
+                                                : "a spans part sets text or tex, not both";
     lua_pushnil(lua);
     while (lua_next(lua, index)) {
         if (lua_type(lua, -2) == LUA_TNUMBER) {
-            if (!part || !lua_isinteger(lua, -2) || lua_tointeger(lua, -2) != 1) {
-                luaL_error(lua, part ? "a tex part holds one string, first or as text"
-                                     : "tex takes its options by name, such as tex = \"x^2\"");
+            if (kind != LuaOptions::Part || !lua_isinteger(lua, -2) || lua_tointeger(lua, -2) != 1) {
+                luaL_error(lua, "%s", numbered);
             }
         } else if (lua_type(lua, -2) != LUA_TSTRING) {
             luaL_error(lua, "option names must be strings");
         } else {
             auto name = lua_tostring(lua, -2);
+            if (kind == LuaOptions::Span && std::strcmp(name, "text") == 0) luaL_error(lua, "%s", numbered);
             if (_listed(name, SHAPE_STYLES)) {
                 luaL_error(lua, "tex draws glyphs and filled shapes, so %s is unsupported; color and fill set its color",
                            name);
             }
-            if (!_listed(name, GROUP_STYLES) && !(part ? _listed(name, PART_OPTIONS) : _listed(name, FORMULA_OPTIONS))) {
-                luaL_error(lua, "unknown option '%s'", name);
-            }
+            auto option = kind == LuaOptions::Formula ? _listed(name, FORMULA_OPTIONS)
+                          : kind == LuaOptions::Part  ? _listed(name, PART_OPTIONS)
+                                                      : _listed(name, SPAN_OPTIONS);
+            if (!option && !_listed(name, GROUP_STYLES)) luaL_error(lua, "unknown option '%s'", name);
         }
         lua_pop(lua, 1);
     }
@@ -119,6 +134,16 @@ static float _number(lua_State* lua, int index, const char* name)
     auto value = lua_tonumber(lua, index);
     if (!std::isfinite(value)) luaL_error(lua, "%s must be finite", name);
     return static_cast<float>(value);
+}
+
+// Reads the boolean name of the table at index into value, when the table sets it.
+static void _boolean(lua_State* lua, int index, const char* name, bool& value)
+{
+    if (_get(lua, index, name) != LUA_TNIL) {
+        if (!lua_isboolean(lua, -1)) luaL_error(lua, "%s must be a boolean", name);
+        value = lua_toboolean(lua, -1);
+    }
+    lua_pop(lua, 1);
 }
 
 // Two or, with depth, three numbers, as a list or as x, y and z.
@@ -183,22 +208,14 @@ static Options _options(lua_State* lua, int index)
         else luaL_error(lua, "text orientation must be 'billboard' or 'plane'");
     }
     lua_pop(lua, 1);
-    if (_get(lua, index, "display") != LUA_TNIL) {
-        if (!lua_isboolean(lua, -1)) luaL_error(lua, "display must be a boolean");
-        options.display = lua_toboolean(lua, -1);
-    }
-    lua_pop(lua, 1);
-    if (_get(lua, index, "baseline") != LUA_TNIL) {
-        if (!lua_isboolean(lua, -1)) luaL_error(lua, "baseline must be a boolean");
-        options.baseline = lua_toboolean(lua, -1);
-    }
-    lua_pop(lua, 1);
+    _boolean(lua, index, "display", options.display);
+    _boolean(lua, index, "baseline", options.baseline);
     if (_get(lua, index, "font") != LUA_TNIL) {
         if (lua_type(lua, -1) != LUA_TSTRING) luaL_error(lua, "font must be a string");
         size_t size;
         auto font = lua_tolstring(lua, -1, &size);
         if (std::strlen(font) != size) luaL_error(lua, "font cannot contain zero bytes");
-        if (size > 4096u) luaL_error(lua, "font name exceeds the 4096-byte limit");
+        if (size > LUA_PATH_LIMIT) luaL_error(lua, "font name exceeds the 4096-byte limit");
         options.font = font;
     }
     lua_pop(lua, 1);
@@ -210,7 +227,7 @@ static Options _options(lua_State* lua, int index)
 static const char* _part(lua_State* lua, int part)
 {
     if (lua_istable(lua, part)) {
-        _check(lua, part, true);
+        _check(lua, part, LuaOptions::Part);
         lua_rawgeti(lua, part, 1);
         auto text = _get(lua, part, "text") != LUA_TNIL;
         if (text && !lua_isnil(lua, -2)) luaL_error(lua, "a tex part takes its string first or as text, not both");
@@ -388,7 +405,7 @@ static int _tex(lua_State* lua)
 {
     luaL_checktype(lua, 2, LUA_TTABLE);
     lua_settop(lua, 2);
-    _check(lua, 2, false);
+    _check(lua, 2, LuaOptions::Formula);
     auto options = _options(lua, 2);
     auto scene = core::luaHandleScene(lua, 1);
     auto box = lua_gettop(lua);
@@ -444,24 +461,6 @@ static int _placeTex(lua_State* lua)
     return _attach(lua, store, list, 2, scene);
 }
 
-// Stops the script on an option a tex part of spans does not take.
-static void _checkSpan(lua_State* lua, int index)
-{
-    lua_pushnil(lua);
-    while (lua_next(lua, index)) {
-        if (lua_type(lua, -2) == LUA_TNUMBER) luaL_error(lua, "a spans part sets text or tex, not both");
-        if (lua_type(lua, -2) != LUA_TSTRING) luaL_error(lua, "option names must be strings");
-        auto name = lua_tostring(lua, -2);
-        if (std::strcmp(name, "text") == 0) luaL_error(lua, "a spans part sets text or tex, not both");
-        if (_listed(name, SHAPE_STYLES)) {
-            luaL_error(lua, "tex draws glyphs and filled shapes, so %s is unsupported; color and fill set its color",
-                       name);
-        }
-        if (!_listed(name, GROUP_STYLES) && !_listed(name, SPAN_OPTIONS)) luaL_error(lua, "unknown option '%s'", name);
-        lua_pop(lua, 1);
-    }
-}
-
 // The maker of the tex parts of spans, {tex = "x^2"}, which spans calls with its handle, the
 // part and its setting: the formula set inline, in text style unless display is set, in the
 // size, font and role the setting gives. Its line box is the font's, grown to hold the formula,
@@ -471,14 +470,10 @@ static int _spanTex(lua_State* lua)
     lua_settop(lua, 3);
     luaL_checktype(lua, 2, LUA_TTABLE);
     luaL_checktype(lua, 3, LUA_TTABLE);
-    _checkSpan(lua, 2);
+    _check(lua, 2, LuaOptions::Span);
     auto options = _options(lua, 3);
     options.display = false;
-    if (_get(lua, 2, "display") != LUA_TNIL) {
-        if (!lua_isboolean(lua, -1)) luaL_error(lua, "display must be a boolean");
-        options.display = lua_toboolean(lua, -1);
-    }
-    lua_pop(lua, 1);
+    _boolean(lua, 2, "display", options.display);
     auto scene = core::luaHandleScene(lua, 1);
     auto box = lua_gettop(lua);
     _get(lua, 2, "tex");
@@ -583,7 +578,6 @@ static int _partOf(lua_State* lua)
 // run is how many pieces its part has in all.
 struct LuaSide
 {
-    uint32_t count = 0;
     detail::Piece* pieces = nullptr;
     uint32_t keyed = 0;
     const char** sources = nullptr;
@@ -630,20 +624,30 @@ static uint32_t _partSize(const detail::Built& built, uint32_t index)
     return last - first;
 }
 
+// Pushes the userdata that holds the arrays of side: room pieces and as many leaves, the
+// sources and sizes of runs runs, and then extra numbers, right after the sizes. Returns the
+// leaves.
+static Object** _arrays(lua_State* lua, LuaSide& side, uint32_t room, uint32_t runs, uint32_t extra)
+{
+    auto bytes = (sizeof(detail::Piece) + sizeof(Object*)) * room + (sizeof(const char*) + sizeof(uint32_t)) * runs
+                 + sizeof(uint32_t) * extra;
+    auto memory = static_cast<char*>(lua_newuserdatauv(lua, bytes, 0));
+    auto sources = memory + (sizeof(detail::Piece) + sizeof(Object*)) * room;
+    side.pieces = new (memory) detail::Piece[room];
+    side.sources = reinterpret_cast<const char**>(sources);
+    side.sizes = reinterpret_cast<uint32_t*>(sources + sizeof(const char*) * runs);
+    return reinterpret_cast<Object**>(memory + sizeof(detail::Piece) * room);
+}
+
 // Gathers the side of object, whose arrays a userdata left on the stack holds; none when it
 // has more than limit leaves.
 static LuaSide _side(lua_State* lua, int box, Scene* scene, Object* object, uint32_t limit)
 {
     LuaSide side;
-    side.count = _leafCount(object);
-    auto room = side.count && side.count <= limit ? side.count : 1u;
-    auto bytes = (sizeof(detail::Piece) + sizeof(Object*) + sizeof(const char*) + sizeof(uint32_t)) * room;
-    auto memory = static_cast<char*>(lua_newuserdatauv(lua, bytes, 0));
-    side.pieces = new (memory) detail::Piece[room];
-    auto leaves = reinterpret_cast<Object**>(memory + sizeof(detail::Piece) * room);
-    side.sources = reinterpret_cast<const char**>(memory + (sizeof(detail::Piece) + sizeof(Object*)) * room);
-    side.sizes = reinterpret_cast<uint32_t*>(memory + (sizeof(detail::Piece) + sizeof(Object*) + sizeof(const char*)) * room);
-    if (side.count > limit) return side;
+    auto total = _leafCount(object);
+    auto room = total && total <= limit ? total : 1u;
+    auto leaves = _arrays(lua, side, room, room, 0u);
+    if (total > limit) return side;
     auto count = 0u;
     _gather(object, leaves, count);
     // A piece lies right below the group of its formula, or below the group of its part.
@@ -715,17 +719,10 @@ static LuaSide _below(lua_State* lua, const LuaSide& whole, int index, Object* o
                       const uint32_t* taken, char* mark, uint32_t*& places)
 {
     LuaSide side;
-    side.count = _leafCount(object);
-    auto room = side.count ? side.count : 1u;
+    auto total = _leafCount(object);
+    auto room = total ? total : 1u;
     auto runs = whole.runs ? whole.runs : 1u;
-    auto bytes = (sizeof(detail::Piece) + sizeof(Object*) + sizeof(uint32_t)) * room
-                 + (sizeof(const char*) + sizeof(uint32_t)) * runs;
-    auto memory = static_cast<char*>(lua_newuserdatauv(lua, bytes, 0));
-    side.pieces = new (memory) detail::Piece[room];
-    auto leaves = reinterpret_cast<Object**>(memory + sizeof(detail::Piece) * room);
-    side.sources = reinterpret_cast<const char**>(memory + (sizeof(detail::Piece) + sizeof(Object*)) * room);
-    side.sizes = reinterpret_cast<uint32_t*>(memory + (sizeof(detail::Piece) + sizeof(Object*)) * room
-                                             + sizeof(const char*) * runs);
+    auto leaves = _arrays(lua, side, room, runs, room);
     places = side.sizes + runs;
     side.runs = whole.runs;
     for (auto r = 0u; r < whole.runs; r++) {

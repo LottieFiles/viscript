@@ -10,6 +10,17 @@ namespace vis::tex::detail
 // The longest formula the module sets, in bytes of TeX source.
 static constexpr uint32_t SourceLimit = 16384u;
 
+// The greater and the lesser of a and b; b when they compare equal or either is NaN.
+static inline float _max(float a, float b)
+{
+    return a > b ? a : b;
+}
+
+static inline float _min(float a, float b)
+{
+    return a < b ? a : b;
+}
+
 // The classes of math atoms, which decide the space between neighbors, as The TeXbook gives
 // them in its chapter on math spacing.
 enum struct Class : uint8_t
@@ -135,8 +146,6 @@ static constexpr uint8_t FlagNoBar = 8u;
 static constexpr uint8_t FlagMu = 16u;
 // An integral, whose limits stand beside it and which is drawn taller.
 static constexpr uint8_t FlagIntegral = 32u;
-// The text of a glyph or word is owned by the parse (not static, not in the source).
-static constexpr uint8_t FlagOwned = 64u;
 
 struct Node
 {
@@ -156,10 +165,9 @@ struct Node
     int32_t sup = None;
     int32_t sub = None;
     int32_t next = None;
-    // The source of the node's own tokens, as byte offsets; spanEnd also covers its scripts.
+    // The source of the node's own tokens, as byte offsets.
     uint32_t begin = 0;
     uint32_t end = 0;
-    uint32_t spanEnd = 0;
     // The closing token of a fence or array: its \right and delimiter, or its \end{...}.
     uint32_t close = 0;
     uint32_t closeEnd = 0;

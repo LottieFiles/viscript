@@ -2,6 +2,7 @@
 #include <cstdarg>
 #include <cstdio>
 #include <cstring>
+#include <memory>
 #include <new>
 
 #include "visTex.h"
@@ -39,16 +40,6 @@ static constexpr int8_t SPACING[8][8] = {
 static constexpr float NullDelimiter = 0.12f;
 static constexpr float ScriptSpace = 0.05f;
 static constexpr uint32_t NoSlot = UINT32_MAX;
-
-static float _max(float a, float b)
-{
-    return a > b ? a : b;
-}
-
-static float _min(float a, float b)
-{
-    return a < b ? a : b;
-}
 
 static float _clamp(float value, float low, float high)
 {
@@ -113,17 +104,6 @@ struct Box
     float center = 0.0f;
 };
 
-template<typename T>
-struct Buffer
-{
-    T* data;
-    explicit Buffer(uint32_t count) : data(new (std::nothrow) T[count ? count : 1u]()) {}
-    ~Buffer() { delete[] data; }
-    T& operator[](uint32_t index) { return data[index]; }
-    Buffer(const Buffer&) = delete;
-    Buffer& operator=(const Buffer&) = delete;
-};
-
 static Class _class(const Node& node)
 {
     switch (node.kind) {
@@ -144,6 +124,17 @@ static bool _prime(const Node& node)
 {
     return node.kind == Kind::Glyph && node.sup == None && node.sub == None && node.length == 3u
         && std::memcmp(node.text, "′", 3u) == 0;
+}
+
+// An item keyed by the TeX of node, which shows the node's text if it has one.
+static Item _item(const Node& node)
+{
+    Item item;
+    item.text = node.text;
+    item.length = node.length;
+    item.begin = node.begin;
+    item.end = node.end;
+    return item;
 }
 
 // The character a delimiter takes at the size its font draws it, if fonts commonly have it.
@@ -306,15 +297,35 @@ struct Setter
         }
     }
 
-    // The box a glyph set at size draws its outlines in, which the scene gives its text. Where
-    // the metrics tell no reach, as for a character the font lacks, the upright box stands in.
-    static void inkBox(Item& item, const Glyph& glyph, float size)
+    // Places item as the text of glyph set at scale, in slot or after the items so far, and
+    // returns the box TeX gives a character: its advance, and the height and depth of its
+    // outline. Its ink is the box the outlines cover as drawn, which the scene gives its text;
+    // where the metrics tell no reach, as for a character the font lacks, the upright box
+    // stands in.
+    Box placeText(uint32_t slot, Item item, const Glyph& glyph, float scale)
     {
         auto reach = glyph.inkLeft != 0.0f || glyph.inkRight != 0.0f;
-        item.inkLeft = (reach ? glyph.inkLeft : glyph.left) * size;
-        item.inkRight = (reach ? glyph.inkRight : glyph.right) * size;
-        item.inkTop = glyph.top * size;
-        item.inkBottom = glyph.bottom * size;
+        item.kind = ItemKind::Text;
+        item.scale = scale;
+        item.width = glyph.advance * scale;
+        item.height = _max(glyph.top * scale, 0.0f);
+        item.depth = _max(-glyph.bottom * scale, 0.0f);
+        item.inkLeft = (reach ? glyph.inkLeft : glyph.left) * scale;
+        item.inkRight = (reach ? glyph.inkRight : glyph.right) * scale;
+        item.inkTop = glyph.top * scale;
+        item.inkBottom = glyph.bottom * scale;
+        auto index = place(slot, item);
+        return {index, index + 1u, item.width, item.height, item.depth};
+    }
+
+    // Sets inner between the delimiter boxes left and right, with the first item of the
+    // whole in slot.
+    Box between(uint32_t slot, const Box& left, const Box& inner, const Box& right)
+    {
+        move(inner, left.width, 0.0f);
+        move(right, left.width + inner.width, 0.0f);
+        return {slot, out.count, left.width + inner.width + right.width,
+                _max(inner.height, _max(left.height, right.height)), _max(inner.depth, _max(left.depth, right.depth))};
     }
 
     bool measure(const char* text, uint32_t length, Variant variant, Glyph& glyph)
@@ -449,28 +460,13 @@ struct Setter
     // its advance, TeX's italic correction.
     Box text(const Node& node, Style style, float& delta)
     {
-        auto box = empty();
         auto size = style.size();
         Glyph glyph;
-        if (!measure(node.text, node.length, node.variant, glyph)) return box;
-        Item item;
-        item.kind = ItemKind::Text;
+        if (!measure(node.text, node.length, node.variant, glyph)) return empty();
+        auto item = _item(node);
         item.variant = glyph.plain ? Variant::Upright : node.variant;
-        item.scale = size;
         item.slant = glyph.slant;
-        item.width = glyph.advance * size;
-        item.height = _max(glyph.top * size, 0.0f);
-        item.depth = _max(-glyph.bottom * size, 0.0f);
-        inkBox(item, glyph, size);
-        item.text = node.text;
-        item.length = node.length;
-        item.begin = node.begin;
-        item.end = node.end;
-        place(NoSlot, item);
-        box.last = out.count;
-        box.width = glyph.advance * size;
-        box.height = _max(glyph.top * size, 0.0f);
-        box.depth = _max(-glyph.bottom * size, 0.0f);
+        auto box = placeText(NoSlot, item, glyph, size);
         // A leaning glyph reaches further right at its top and left at its bottom.
         auto right = glyph.right + glyph.slant * _max(glyph.top, 0.0f);
         auto left = glyph.left + glyph.slant * _min(glyph.bottom, 0.0f);
@@ -490,30 +486,18 @@ struct Setter
     // below or its scripts beside it.
     Box operation(const Node& node, Style style)
     {
-        auto box = empty();
         auto size = style.size();
         Glyph glyph;
-        if (!measure(node.text, node.length, Variant::Upright, glyph)) return box;
+        if (!measure(node.text, node.length, Variant::Upright, glyph)) return empty();
         auto integral = (node.flags & FlagIntegral) != 0u;
         auto display = style.level == Level::Display;
         auto ink = glyph.top - glyph.bottom;
         auto target = display ? (integral ? 1.9f : 1.35f) : (integral ? 1.1f : 0.95f);
         auto scale = size * (ink > 0.0f ? _clamp(target / ink, 1.0f, 2.2f) : 1.0f);
         auto shift = font.axis * size - (glyph.top + glyph.bottom) * 0.5f * scale;
-        Item item;
-        item.kind = ItemKind::Text;
+        auto item = _item(node);
         item.y = shift;
-        item.scale = scale;
-        item.width = glyph.advance * scale;
-        item.height = _max(glyph.top * scale, 0.0f);
-        item.depth = _max(-glyph.bottom * scale, 0.0f);
-        inkBox(item, glyph, scale);
-        item.text = node.text;
-        item.length = node.length;
-        item.begin = node.begin;
-        item.end = node.end;
-        place(NoSlot, item);
-        box.last = out.count;
+        auto box = placeText(NoSlot, item, glyph, scale);
         auto extent = _max(glyph.advance, glyph.right) * scale;
         box.width = extent;
         box.height = _max(glyph.top * scale + shift, 0.0f);
@@ -675,42 +659,23 @@ struct Setter
         auto width = _max(numerator.width, denominator.width);
         move(numerator, (width - numerator.width) * 0.5f, u);
         move(denominator, (width - denominator.width) * 0.5f, -v);
-        Box inner;
-        inner.first = slot + 1u;
-        inner.last = out.count;
-        inner.width = width;
-        inner.height = _max(u + numerator.height, axis + rule * 0.5f);
-        inner.depth = _max(v + denominator.depth, rule * 0.5f - axis);
-        Box box;
-        box.first = slot;
+        Box inner{slot + 1u, out.count, width, _max(u + numerator.height, axis + rule * 0.5f),
+                  _max(v + denominator.depth, rule * 0.5f - axis)};
         if (bar) {
-            Item item;
+            auto item = _item(node);
             item.kind = ItemKind::Rule;
-            item.x = 0.0f;
             item.y = axis - rule * 0.5f;
             item.width = width;
             item.height = rule;
             item.thickness = rule;
-            item.begin = node.begin;
-            item.end = node.end;
             place(slot, item);
             move(Box{slot, out.count}, NullDelimiter * size, 0.0f);
-            box.last = out.count;
-            box.width = width + 2.0f * NullDelimiter * size;
-            box.height = inner.height;
-            box.depth = inner.depth;
-            return box;
+            return {slot, out.count, width + 2.0f * NullDelimiter * size, inner.height, inner.depth};
         }
         auto fit = _max(this->fit(inner, size), (display ? 2.39f : 1.01f) * size);
         auto left = delimiter(slot, Delim::LeftParen, fit, style, node.begin, node.end);
-        move(inner, left.width, 0.0f);
         auto right = delimiter(NoSlot, Delim::RightParen, fit, style, node.begin, node.end);
-        move(right, left.width + width, 0.0f);
-        box.last = out.count;
-        box.width = left.width + width + right.width;
-        box.height = _max(inner.height, _max(left.height, right.height));
-        box.depth = _max(inner.depth, _max(left.depth, right.depth));
-        return box;
+        return between(slot, left, inner, right);
     }
 
     // TeX's rule 11: a root sign whose bar stands a clearance over the radicand, with the
@@ -738,7 +703,7 @@ struct Setter
             raise = 0.6f * ((top + 2.0f * rule) - _max(body.depth, -bottom));
             move(index, signAt + 10.0f * mu - index.width, raise);
         }
-        Item item;
+        auto item = _item(node);
         item.kind = ItemKind::Radical;
         item.x = signAt;
         item.y = bottom;
@@ -746,8 +711,6 @@ struct Setter
         item.height = height;
         item.scale = size;
         item.thickness = rule;
-        item.begin = node.begin;
-        item.end = node.end;
         place(sign, item);
         item.kind = ItemKind::Rule;
         item.x = signAt + signWidth;
@@ -780,22 +743,13 @@ struct Setter
 
     Box fence(const Node& node, Style style)
     {
-        auto size = style.size();
         auto slot = reserve();
         auto inner = list(node.body, style);
         if (failed) return empty();
-        auto fit = this->fit(inner, size);
+        auto fit = this->fit(inner, style.size());
         auto left = delimiter(slot, static_cast<Delim>(node.left), fit, style, node.begin, node.end);
-        move(inner, left.width, 0.0f);
         auto right = delimiter(NoSlot, static_cast<Delim>(node.right), fit, style, node.close, node.closeEnd);
-        move(right, left.width + inner.width, 0.0f);
-        Box box;
-        box.first = slot;
-        box.last = out.count;
-        box.width = left.width + inner.width + right.width;
-        box.height = _max(inner.height, _max(left.height, right.height));
-        box.depth = _max(inner.depth, _max(left.depth, right.depth));
-        return box;
+        return between(slot, left, inner, right);
     }
 
     // A delimiter at least size tall, centered on the axis: the font's own glyph where it is
@@ -820,21 +774,9 @@ struct Setter
             Glyph glyph;
             if (metrics.glyph(character, length, Variant::Upright, glyph) && !glyph.missing
                 && size <= (glyph.top - glyph.bottom) * scale * 1.01f) {
-                item.kind = ItemKind::Text;
-                item.scale = scale;
-                item.width = glyph.advance * scale;
-                item.height = _max(glyph.top * scale, 0.0f);
-                item.depth = _max(-glyph.bottom * scale, 0.0f);
-                inkBox(item, glyph, scale);
                 item.text = character;
                 item.length = length;
-                auto index = place(slot, item);
-                box.first = index;
-                box.last = index + 1u;
-                box.width = glyph.advance * scale;
-                box.height = _max(glyph.top * scale, 0.0f);
-                box.depth = _max(-glyph.bottom * scale, 0.0f);
-                return box;
+                return placeText(slot, item, glyph, scale);
             }
         }
         auto height = _max(size, scale);
@@ -867,9 +809,7 @@ struct Setter
         auto body = list(node.body, which == Accent::Underline ? style : style.cramp());
         if (failed) return empty();
         auto rule = this->rule(size);
-        Item item;
-        item.begin = node.begin;
-        item.end = node.end;
+        auto item = _item(node);
         item.scale = size;
         item.thickness = rule;
         Box box;
@@ -961,12 +901,12 @@ struct Setter
             cells += count;
             if (count > columns) columns = count;
         }
-        Buffer<Box> boxes(cells);
-        Buffer<float> widths(columns);
-        Buffer<float> offsets(columns);
-        Buffer<float> heights(rows);
-        Buffer<float> depths(rows);
-        if (!boxes.data || !widths.data || !offsets.data || !heights.data || !depths.data) {
+        std::unique_ptr<Box[]> boxes(new (std::nothrow) Box[cells]);
+        std::unique_ptr<float[]> widths(new (std::nothrow) float[columns]());
+        std::unique_ptr<float[]> offsets(new (std::nothrow) float[columns]());
+        std::unique_ptr<float[]> heights(new (std::nothrow) float[rows]());
+        std::unique_ptr<float[]> depths(new (std::nothrow) float[rows]());
+        if (!boxes || !widths || !offsets || !heights || !depths) {
             fail("out of memory");
             return empty();
         }
@@ -1018,16 +958,8 @@ struct Setter
 
         auto fit = this->fit(content, size);
         auto opening = delimiter(slot, left, fit, style, node.begin, parse.nodes[node.body].begin);
-        move(content, opening.width, 0.0f);
         auto closing = delimiter(NoSlot, right, fit, style, node.close, node.closeEnd);
-        move(closing, opening.width + content.width, 0.0f);
-        Box box;
-        box.first = slot;
-        box.last = out.count;
-        box.width = opening.width + content.width + closing.width;
-        box.height = _max(content.height, _max(opening.height, closing.height));
-        box.depth = _max(content.depth, _max(opening.depth, closing.depth));
-        return box;
+        return between(slot, opening, content, closing);
     }
 };
 
