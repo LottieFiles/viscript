@@ -1,6 +1,5 @@
 // The viscript command line: render, benchmark, layout and inspect, with the fonts, assets and
 // audio the arguments name. The audit command is in visAudit.cpp.
-#include <cerrno>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
