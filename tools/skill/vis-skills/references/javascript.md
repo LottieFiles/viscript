@@ -1,6 +1,6 @@
 # JavaScript and TypeScript API
 
-Import `vis` and `createVis` from the installed runtime's `client.js`. The builder records a scene definition; `createVis` loads it into a renderable runtime. API declarations beside the runtime describe its options and capabilities.
+Import `vis` and `createVis` from the installed runtime's `client.js`. The builder records a scene definition; a runtime from `createVis` loads and renders it. API declarations beside the runtime describe its options and capabilities.
 
 ```js
 import {createVis, vis} from "./client.js";
@@ -16,9 +16,10 @@ const vector = plane.vector({value: [3, 2], stroke: "accent", width: 2, tip: 7, 
 vector.label({text: "a = (3, 2)", point: [3.25, 2.2], align: [0, 0.5], role: "code", fill: "accent"});
 definition.wait(0.35).fadeIn(figure, {duration: 0.55, curve: "gentle"}).wait(0.65);
 
-const runtime = await createVis(definition, "vector-scene.js");
+const runtime = await createVis();
 runtime.font("JetBrainsMono", new Uint8Array(await
     (await fetch("./JetBrainsMono.ttf")).arrayBuffer()), "ttf");
+runtime.load(definition, "vector-scene.js");
 runtime.draw(document.querySelector("canvas"), runtime.duration);
 ```
 
@@ -171,31 +172,30 @@ samples.forEach((point, index) => {
 
 ## Fonts, assets, and lifecycle
 
-Register font and image bytes with stable application names. A bootstrap scene lets the host register assets before loading the authored definition:
+Register font and image bytes with stable application names. A runtime started without a scene takes them before it loads the authored definition:
 
 ```js
-const runtime = await createVis(vis.scene({width: 1, height: 1}), "bootstrap.js");
+const runtime = await createVis();
 runtime.font("Scene Sans", fontBytes, "ttf");
 runtime.asset("diagram", imageBytes, "png");
-runtime.loadScene(definition, "scene.js");
+runtime.load(definition, "scene.js");
 ```
 
 Serve browser runtime files over HTTP. In Node, pass `.wasm` bytes as `wasmBinary`.
 
 ```js
-runtime.render(time);             // pixel view
-runtime.render(time, true);       // copied pixels
+runtime.render(time);             // a copy of the pixels
 runtime.draw(canvas, time);
 runtime.bounds("subject", time);
 runtime.intersects("title", "plot", time, 4);
 runtime.layoutReport(time, 4);
 runtime.resize(width, height);
-runtime.loadScene(nextDefinition, "next.js");
-runtime.loadLua(luaSource, "next.lua");
+runtime.load(nextDefinition, "next.js");
+runtime.load(luaSource, "next.lua");
 runtime.destroy();
 ```
 
-Use copied pixels for persistent results and destroy the runtime at teardown. Failed reload preserves the last valid scene.
+Destroy the runtime at teardown. Failed reload preserves the last valid scene.
 
 `layoutReport` uses root pixels across nested Scenes. Resolve objects by `scenePath + id`; visual records refer back to object indices, and paths refer to their owning visuals. Inspect visible, unoccluded paint at boundary times and run CLI `audit` on `compileScene(definition)` output. Follow [review.md](review.md) for frame and image selection.
 

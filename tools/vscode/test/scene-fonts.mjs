@@ -151,7 +151,7 @@ const frames = (runtime, times) => times.map((time) => Buffer.from(runtime.rende
 
 for (const scene of SCENES) {
     const eager = await engine(Object.keys(FILES));
-    eager.loadLua(scene.source, scene.name);
+    eager.load(scene.source, scene.name);
     assert.deepEqual(eager.missingFonts(), []);
     const times = scene.times(eager.duration);
     const expected = frames(eager, times);
@@ -159,7 +159,7 @@ for (const scene of SCENES) {
 
     // The fonts the opening frame shows draw it alone; the rest come later in the timeline.
     const early = await engine(scene.early);
-    early.loadLua(scene.source, scene.name);
+    early.load(scene.source, scene.name);
     const [opening, end] = frames(early, [times[0], times.at(-1)]);
     assert.ok(opening.equals(expected[0]), `${scene.name}: the opening frame needs only ${scene.early}`);
     assert.ok(!end.equals(expected.at(-1)), `${scene.name}: the last frame needs more fonts`);
@@ -168,7 +168,7 @@ for (const scene of SCENES) {
     early.destroy();
 
     const bare = await engine();
-    bare.loadLua(scene.source, scene.name);
+    bare.load(scene.source, scene.name);
     assert.deepEqual(bare.missingFonts().sort(), [...scene.needs].sort(), `${scene.name}: fonts named on the first load`);
     bare.destroy();
 
@@ -183,7 +183,7 @@ for (const scene of SCENES) {
         let count = 0;
         remembered = await loadWithFonts(lazy, (runtime) => {
             count += 1;
-            runtime.loadLua(scene.source, scene.name);
+            runtime.load(scene.source, scene.name);
         }, fonts, {expected: remembered});
         assert.deepEqual([...remembered].sort(), [...scene.needs].sort(), `${scene.name}: fonts given`);
         assert.equal(count, loads, `${scene.name}: loads`);

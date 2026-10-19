@@ -29,7 +29,7 @@ export async function saveGif(scene, fps, progress = () => {}, signal = null, ra
     const gif = GIFEncoder();
     for (let frame = 0; frame < plan.frames; frame += 1) {
         active(signal);
-        const pixels = scene.render(frameTime(plan, frame), true);
+        const pixels = scene.render(frameTime(plan, frame));
         const palette = quantize(pixels, 256);
         const index = applyPalette(pixels, palette);
         gif.writeFrame(index, plan.width, plan.height, {

@@ -168,12 +168,12 @@ try {
     assert.equal(pointerUp.handled, true);
     assert.equal(pointerUp.release, true);
 
-    runtime.loadLua("return vis.scene {width = 32, height = 18}", "ordinary.lua");
+    runtime.load("return vis.scene {width = 32, height = 18}", "ordinary.lua");
     assert.equal(runtime.retainedLua, false);
     assert.equal(runtime.runtimeTime, 0);
     assert.equal(runtime.advanceRuntime(0.1), null);
 
-    runtime.loadLua(`
+    runtime.load(`
 local scene = vis.scene {
     width = 320, height = 180,
     camera = {view = "2d", target = {0, 0}, height = 18},
@@ -199,7 +199,7 @@ return scene
     assert.deepEqual(runtime.bounds("atomic-subject", 0), committed);
     assert.throws(() => runtime.advanceRuntime(0.1), /scene authoring is unavailable after loading/);
 
-    runtime.loadLua(`
+    runtime.load(`
 local scene = vis.scene {width = 64, height = 36}
 local diagram = vis.diagram(scene, {id = "runtime-lock"})
 vis.runtime(scene, {

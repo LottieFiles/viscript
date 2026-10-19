@@ -50,14 +50,10 @@ const event = (runtime, type, fields = {}) => runtime.input({
 
 async function loadTemplate(name) {
     const source = fs.readFileSync(path.join(templateRoot, name), "utf8");
-    const runtime = await createVis(
-        "return vis.scene {width = 8, height = 8}",
-        "interactive-template-bootstrap.lua",
-        {wasmBinary},
-    );
+    const runtime = await createVis({wasmBinary});
     try {
         for (const [fontName, data] of fonts) runtime.font(fontName, data, "ttf");
-        runtime.loadLua(source, name);
+        runtime.load(source, name);
         return runtime;
     } catch (error) {
         runtime.destroy();

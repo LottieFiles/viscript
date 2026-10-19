@@ -118,7 +118,7 @@ try {
     assert(Object.isFrozen(sampleUp.sample.object));
 
     const facePixel = () => {
-        const pixels = runtime.render(0, true);
+        const pixels = runtime.render(0);
         const offset = (50 * 200 + 75) * 4;
         return [...pixels.slice(offset, offset + 4)];
     };

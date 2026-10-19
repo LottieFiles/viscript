@@ -37,7 +37,7 @@ try {
     assert(step.dropped > 0.8);
     const after = runtime.bounds("autonomous-subject", 0);
     assert(after.x > before.x);
-    assert.equal(runtime.render(0, true).length, 160 * 90 * 4);
+    assert.equal(runtime.render(0).length, 160 * 90 * 4);
 } finally {
     runtime.destroy();
 }

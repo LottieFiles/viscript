@@ -34,15 +34,14 @@ return s
 const runtimes = [];
 try {
     for (const language of ["lua", "js"]) {
-        const runtime = await createVis("return vis.scene {}", "bootstrap.lua", {wasmBinary});
+        const runtime = await createVis({wasmBinary});
         runtimes.push(runtime);
         runtime.font("Pretendard", font, "ttf");
-        if (language === "lua") runtime.loadLua(source, "trim-distance.lua");
-        else runtime.loadScene(authored, "trim-distance.js");
+        runtime.load(language === "lua" ? source : authored, `trim-distance.${language}`);
         assert.equal(runtime.duration, 2);
     }
     for (const time of [0, 0.5, 1, 1.5, 2]) {
-        assert.deepEqual(runtimes[0].render(time, true), runtimes[1].render(time, true));
+        assert.deepEqual(runtimes[0].render(time), runtimes[1].render(time));
         for (const id of ["line", "arrow", "vector", "brace"]) {
             assert.deepEqual(runtimes[0].bounds(id, time), runtimes[1].bounds(id, time));
         }
@@ -56,7 +55,7 @@ try {
         "local l=s:line {from={0,0}, to={1,0}} s:play({target=l, buff=1}, 1)",
         "local l=s:line {from={0,0}, to={1,0}} local t=s:tracker(0) s:bind(l,t,function(v) return {buff=v} end)",
     ]) {
-        assert.throws(() => runtimes[0].loadLua(`local s=vis.scene{} ${body} return s`),
+        assert.throws(() => runtimes[0].load(`local s=vis.scene{} ${body} return s`),
             /unknown option 'buff'|a bound state cannot set 'buff'/);
     }
 } finally {

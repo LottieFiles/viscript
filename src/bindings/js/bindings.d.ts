@@ -1320,6 +1320,10 @@ export class SceneBuilder {
     transform(target: Handle, matrix: Mat4, options: TimingOptions): this;
     fade(target: Handle, opacity: number, duration?: number, curve?: AnimCurve): this;
     fade(target: Handle, opacity: number, options: TimingOptions): this;
+    /**
+     * Fades the from targets to opacity 0 and the to targets to 1 together. Unlike fadeTransform, it takes any
+     * targets and keeps from in the scene, invisible.
+     */
     transition(from: Handle | readonly Handle[], to: Handle | readonly Handle[], duration?: number, curve?: AnimCurve): this;
     transition(from: Handle | readonly Handle[], to: Handle | readonly Handle[], options: TimingOptions): this;
     stroke(target: Handle, color: Color, duration?: number, curve?: AnimCurve): this;

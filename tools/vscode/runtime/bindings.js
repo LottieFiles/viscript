@@ -92,42 +92,9 @@ const PIVOT_ANCHORS = new Set([
     "bottom_left",
     "bottom_right",
 ]);
-// Bound-state properties and the per-track segment budget.
-const TRACKER_KEYS = [
-    "transform",
-    "opacity",
-    "stroke",
-    "fill",
-    "progress",
-    "dash_offset",
-    "tail",
-    "tip",
-    "width",
-    "radius",
-    "size",
-    "corner",
-    "trimDistance",
-    "gradient",
-    "blur",
-    "shadow",
-    "value",
-    "points",
-    "from",
-    "to",
-    "origin",
-    "control1",
-    "control2",
-    "fn",
-    "x_range",
-    "y_range",
-    "discontinuities",
-    "center",
-    "vertex",
-    "start",
-    "angle",
-    "level",
-    "values",
-];
+// The properties a bound state may set besides shift (an offset, see _boundDescriptor): those of
+// play but arc, text, retype and layer. And the per-track segment budget.
+const TRACKER_KEYS = PLAY_PROPERTIES.filter((key) => !["shift", "arc", "text", "retype", "layer"].includes(key));
 const TRACKER_CLIP_LIMIT = 65536;
 // Treat sub-tolerance intervals as one instant when checking track overlap.
 const TRACKER_EPSILON = 1e-4;
@@ -143,25 +110,13 @@ const VIEW_HIDDEN_LIMIT = 256;
 const SCALE_OPTIONS = ["about", "shift", "arc", "duration", "easing", "curve", "lag"];
 const MOVE_ALONG_OPTIONS = ["from", "to", "orient", "duration", "easing", "curve", "lag"];
 const CREATE_DIRECTIONS = new Set(["forward", "reverse", "clockwise", "counterclockwise"]);
-const GROWTH_EDGES = new Set(["left", "right", "bottom", "top"]);
+// The sides an object grows from and a slide transition comes in from.
+const SIDES = new Set(["left", "right", "bottom", "top"]);
 const AUDIO_BUSES = new Set(["music", "effect", "ui"]);
 const MASK_MODES = new Set(["alpha", "inverse_alpha", "luma", "inverse_luma"]);
 const TRANSITION_STYLES = new Set(["match", "fade", "slide", "zoom_in", "zoom_out"]);
-const TRANSITION_SIDES = new Set(["left", "right", "bottom", "top"]);
 // Options that shape one transition style, at the top of the options or in an entry of styles.
 const TRANSITION_STYLE_OPTIONS = ["style", "from", "area", "area_margin", "match"];
-const ANIM_CURVE_PRESETS = new Set([
-    "linear",
-    "smooth",
-    "ease_in",
-    "ease_out",
-    "ease_in_out",
-    "gentle",
-    "snappy",
-    "back",
-    "bounce",
-    "elastic",
-]);
 const FADE_OPTIONS = Object.freeze({
     shift: [0, 0, 0],
     scale: 1,
@@ -251,6 +206,18 @@ const SCENE_TRACKERS = new WeakMap();
 // The text, language, id and parent of each code block, which search and edit read.
 const CODE_BLOCKS = new WeakMap();
 
+// Whether value is a plain object: made by an object literal, or without a prototype.
+function _plain(value) {
+    const prototype = value ? Object.getPrototypeOf(value) : undefined;
+    return prototype === Object.prototype || prototype === null;
+}
+
+// Throws unless every key of value is one of names, giving label and the first other key.
+function _known(value, names, label) {
+    const unknown = Object.keys(value).find((key) => !names.includes(key));
+    if (unknown !== undefined) throw new TypeError(`${label}: ${unknown}`);
+}
+
 function _string(value) {
     if (value.includes("\0")) throw new TypeError("Strings cannot contain zero bytes");
     const escaped = value.replace(/[\\"\x01-\x1f\x7f]/g, (character) => {
@@ -274,16 +241,15 @@ const GRADIENT_KEYS = Object.freeze({
 // Booleans and end-stop colors keep the legacy two-stop linear form.
 function _gradient(value) {
     if (value === undefined || typeof value === "boolean" || typeof value === "string") return value;
-    if (!value || (Object.getPrototypeOf(value) !== Object.prototype && Object.getPrototypeOf(value) !== null)) {
+    if (!_plain(value)) {
         throw new TypeError("gradient must be a boolean, color, or gradient options object");
     }
     const keys = GRADIENT_KEYS[value.type];
     if (!keys) throw new TypeError('gradient.type must be "linear", "radial", or "conic"');
+    _known(value, keys, `Unknown ${value.type} gradient option`);
     const output = {};
     for (const key of Object.keys(value)) {
-        if (!keys.includes(key)) throw new TypeError(`Unknown ${value.type} gradient option: ${key}`);
-        if (value[key] === undefined) continue;
-        output[key === "focalRadius" ? "focal_radius" : key] = value[key];
+        if (value[key] !== undefined) output[key === "focalRadius" ? "focal_radius" : key] = value[key];
     }
     if (output.stops !== undefined) {
         if (!Array.isArray(output.stops) || output.stops.length < 2 || output.stops.length > 8) {
@@ -307,17 +273,16 @@ function _maskMode(value) {
 // the options of that style.
 function _transitionStyle(value) {
     if (typeof value === "string") value = { style: value };
-    if (!value || (Object.getPrototypeOf(value) !== Object.prototype && Object.getPrototypeOf(value) !== null)) {
+    if (!_plain(value)) {
         throw new TypeError("A scene transition style must be a style name or a plain object");
     }
-    const unknown = Object.keys(value).find((key) => !TRANSITION_STYLE_OPTIONS.includes(key));
-    if (unknown) throw new TypeError(`Unknown scene transition style option: ${unknown}`);
+    _known(value, TRANSITION_STYLE_OPTIONS, "Unknown scene transition style option");
     if (Object.hasOwn(value, "style") && !TRANSITION_STYLES.has(value.style)) {
         throw new TypeError("Scene transition style must be match, fade, slide, zoom_in or zoom_out");
     }
     if (Object.hasOwn(value, "from")) {
         if (value.style !== "slide") throw new TypeError("Scene transition from applies only to the slide style");
-        if (!TRANSITION_SIDES.has(value.from)) {
+        if (!SIDES.has(value.from)) {
             throw new TypeError("Scene transition from must be left, right, top or bottom");
         }
     }
@@ -338,8 +303,7 @@ function _transitionStyle(value) {
         const area = value.area;
         const keys = ["x", "y", "width", "height"];
         if (
-            !area ||
-            Object.getPrototypeOf(area) !== Object.prototype ||
+            !_plain(area) ||
             Object.keys(area).some((key) => !keys.includes(key)) ||
             keys.some((key) => !Number.isFinite(area[key]))
         ) {
@@ -366,7 +330,7 @@ function _lua(value) {
     if (typeof value === "string") return _string(value);
     if (typeof value === "boolean") return value ? "true" : "false";
     if (Array.isArray(value)) return `{${value.map(_lua).join(",")}}`;
-    if (value && (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null)) {
+    if (_plain(value)) {
         return `{${Object.keys(value)
             .sort()
             .map((key) => `[${_string(key)}]=${_lua(value[key])}`)
@@ -380,8 +344,7 @@ function _spaceRange(value, name) {
     let range;
     if (Array.isArray(value) && value.length === 3) range = value;
     else if (
-        value &&
-        (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null) &&
+        _plain(value) &&
         Object.hasOwn(value, "min") &&
         Object.hasOwn(value, "max") &&
         Object.hasOwn(value, "step")
@@ -705,28 +668,33 @@ function _surfacePoint(point) {
     return [Math.fround(values[0]), Math.fround(values[1]), Math.fround(values[2] ?? 0)];
 }
 
+// Returns what fn returns, calling it as the scene's sampling pass over a callback, inside which
+// the scene cannot be authored.
+function _sampling(scene, fn) {
+    const state = SCENE_STATES.get(scene);
+    state.sampleActive = true;
+    try {
+        return fn();
+    } finally {
+        state.sampleActive = false;
+    }
+}
+
 // A surface colored by a function takes the colors the function gives instead, one for each
 // point in order: the builder calls it where Lua surface would, with the x, y and z of the point.
 function _surfaceOptions(scene, options) {
     if (!options || typeof options.colors !== "function") return options;
     if (!Array.isArray(options.points)) throw new TypeError("Surface requires points");
-    const state = SCENE_STATES.get(scene);
-    const colors = [];
-    state.sampleActive = true;
-    try {
-        for (const point of options.points) {
-            const [x, y, z] = _surfacePoint(point);
-            const color = options.colors(x, y, z);
-            if (typeof color !== "string") {
-                throw new TypeError(
-                    `Surface colors must return a hex color or Theme color role; at (${x}, ${y}, ${z}) it did not`,
-                );
-            }
-            colors.push(color);
+    const colors = _sampling(scene, () => Array.from(options.points, (point) => {
+        const [x, y, z] = _surfacePoint(point);
+        const color = options.colors(x, y, z);
+        if (typeof color !== "string") {
+            throw new TypeError(
+                `Surface colors must return a hex color or Theme color role; at (${x}, ${y}, ${z}) it did not`,
+            );
         }
-    } finally {
-        state.sampleActive = false;
-    }
+        return color;
+    }));
     return { ...options, colors };
 }
 
@@ -738,7 +706,7 @@ function _sampleColor(value, name) {
 }
 
 function _viewportBounds(bounds) {
-    if (!bounds || (Object.getPrototypeOf(bounds) !== Object.prototype && Object.getPrototypeOf(bounds) !== null)) {
+    if (!_plain(bounds)) {
         throw new TypeError("Viewport bounds must be a normalized rectangle");
     }
     const { x, y, width, height } = bounds;
@@ -764,7 +732,7 @@ function _direction(value) {
 }
 
 function _growthEdge(value) {
-    if (!GROWTH_EDGES.has(value)) {
+    if (!SIDES.has(value)) {
         throw new TypeError("Growth edge must be left, right, bottom, or top");
     }
     return value;
@@ -774,7 +742,7 @@ function _springResponse(seconds, options) {
     if (!Number.isFinite(seconds) || seconds < 0) {
         throw new RangeError("seconds must be a finite non-negative number");
     }
-    if (!options || (Object.getPrototypeOf(options) !== Object.prototype && Object.getPrototypeOf(options) !== null)) {
+    if (!_plain(options)) {
         throw new TypeError("spring response requires an options object");
     }
     const fields = ["mass", "stiffness", "damping", "displacement", "velocity"];
@@ -843,7 +811,7 @@ function _curveStrength(value) {
 }
 
 function _curvePreset(preset, strength = 1) {
-    if (!ANIM_CURVE_PRESETS.has(preset)) {
+    if (!Object.hasOwn(CURVE_SHAPES, preset)) {
         throw new TypeError(`Unknown animation curve preset: ${preset}`);
     }
     return Object.freeze({ preset, strength: _curveStrength(strength) });
@@ -874,11 +842,8 @@ function _curveValue(value) {
     let curve;
     if (typeof value === "string") {
         curve = _curvePreset(value);
-    } else if (value && (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null)) {
-        const unknown = Object.keys(value).filter(
-            (key) => key !== "preset" && key !== "bezier" && key !== "strength" && key !== "reverse",
-        );
-        if (unknown.length) throw new TypeError(`Unknown animation curve option: ${unknown[0]}`);
+    } else if (_plain(value)) {
+        _known(value, ["preset", "bezier", "strength", "reverse"], "Unknown animation curve option");
         const hasPreset = Object.hasOwn(value, "preset");
         const hasBezier = Object.hasOwn(value, "bezier");
         if (hasPreset === hasBezier) throw new TypeError("Animation curve requires exactly one of preset or bezier");
@@ -990,22 +955,19 @@ function _timingValues(options, fallback = 1, zero = false, name = "Timing") {
 }
 
 function _timing(options, fallback = 1, stagger = false, zero = false, fields = [], name = "Timing") {
-    if (!options || (Object.getPrototypeOf(options) !== Object.prototype && Object.getPrototypeOf(options) !== null)) {
+    if (!_plain(options)) {
         throw new TypeError(`${name} options must be a plain object`);
     }
-    const unknown = Object.keys(options).find((key) =>
-        !["duration", "curve", "easing"].includes(key) && !(stagger && key === "lag") && !fields.includes(key));
-    if (unknown) throw new TypeError(`Unknown ${name} option: ${unknown}`);
+    _known(options, ["duration", "curve", "easing", ...(stagger ? ["lag"] : []), ...fields], `Unknown ${name} option`);
     return {..._timingValues(options, fallback, zero, name),
         options: Object.fromEntries(fields.filter((key) => Object.hasOwn(options, key)).map((key) => [key, options[key]]))};
 }
 
 function _effectOptions(value, defaults, name, minimumScale) {
-    if (!value || (Object.getPrototypeOf(value) !== Object.prototype && Object.getPrototypeOf(value) !== null)) {
+    if (!_plain(value)) {
         throw new TypeError(`${name} options must be a plain object`);
     }
-    const unknown = Object.keys(value).filter((key) => !Object.hasOwn(defaults, key) && key !== "curve");
-    if (unknown.length) throw new TypeError(`Unknown ${name} option: ${unknown[0]}`);
+    _known(value, [...Object.keys(defaults), "curve"], `Unknown ${name} option`);
     _timingValues(value, defaults.duration, false, name);
     const options = { ...defaults, ...value };
     if (Object.hasOwn(value, "curve")) delete options.easing;
@@ -1036,16 +998,12 @@ function _snapshot(scene) {
     if (existing) return existing;
     _flushTracks(scene);
     const state = SCENE_STATES.get(scene);
-    const snapshot = {
-        config: state.config, lines: [], handles: state.handles, audio: state.audio, timelines: state.timelines,
-    };
+    const snapshot = Object.freeze({
+        config: state.config, lines: Object.freeze([...state.lines]), handles: state.handles, audio: state.audio,
+        timelines: state.timelines,
+    });
     SCENE_SNAPSHOTS.set(scene, snapshot);
-    for (const line of state.lines) {
-        if (typeof line === "function") snapshot.lines.push(line);
-        else snapshot.lines.push(line);
-    }
-    Object.freeze(snapshot.lines);
-    return Object.freeze(snapshot);
+    return snapshot;
 }
 
 // Store handles, cues, and marks in tables to avoid Lua's 200-local function limit.
@@ -1276,11 +1234,10 @@ class GroupHandle extends Handle {
         if (!(typeof find === "string" && find.length) && !(find instanceof RegExp)) {
             throw new TypeError("Search needs a non-empty string or a RegExp to find");
         }
-        if (!options || (Object.getPrototypeOf(options) !== Object.prototype && Object.getPrototypeOf(options) !== null)) {
+        if (!_plain(options)) {
             throw new TypeError("Search options must be a plain object");
         }
-        const unknown = Object.keys(options).find((key) => !SEARCH_OPTIONS.includes(key));
-        if (unknown) throw new TypeError(`Unknown Search option: ${unknown}`);
+        _known(options, SEARCH_OPTIONS, "Unknown Search option");
         const query = _codeQuery(options, "");
         const spans = _codeSpans(code.text, code.language);
         const covered = new Set();
@@ -1319,13 +1276,10 @@ function _sampleField(handle, callback, options, spatial) {
     handle.owner._assertQuiet();
     const name = spatial ? "voxel" : "cell";
     if (typeof callback !== "function") throw new TypeError(`${name} callback must be a function`);
-    if (!options || (Object.getPrototypeOf(options) !== Object.prototype && Object.getPrototypeOf(options) !== null)) {
+    if (!_plain(options)) {
         throw new TypeError(`${name} options must be a plain object`);
     }
-    const unknown = Object.keys(options).filter(
-        (key) => key !== "mode" && key !== "padding" && key !== "duration" && key !== "fps",
-    );
-    if (unknown.length) throw new TypeError(`Unknown ${name} option: ${unknown[0]}`);
+    _known(options, ["mode", "padding", "duration", "fps"], `Unknown ${name} option`);
     const mode = options.mode ?? "padd";
     const padding = options.padding ?? 0.05;
     const durationValue = options.duration ?? 0;
@@ -1361,10 +1315,8 @@ function _sampleField(handle, callback, options, spatial) {
     if (slice * depth * frames > 262144) {
         throw new RangeError(`${name} exceeds the 262144-color sample limit`);
     }
-    const state = SCENE_STATES.get(handle.owner);
     const colors = [];
-    state.sampleActive = true;
-    try {
+    _sampling(handle.owner, () => {
         for (let frame = 0; frame < frames; frame++) {
             const time = frames > 1 ? Math.fround(duration * frame / (frames - 1)) : 0;
             for (let iz = 0; iz < depth; iz++) {
@@ -1373,17 +1325,13 @@ function _sampleField(handle, callback, options, spatial) {
                     const y = Math.fround(axes[1].start + Math.fround(iy * axes[1].step));
                     for (let ix = 0; ix < axes[0].count; ix++) {
                         const x = Math.fround(axes[0].start + Math.fround(ix * axes[0].step));
-                        colors.push(_sampleColor(
-                            spatial ? callback(x, y, z, time) : callback(x, y, time),
-                            name,
-                        ));
+                        colors.push(_sampleColor(spatial ? callback(x, y, z, time) : callback(x, y, time), name));
                     }
                 }
             }
         }
-    } finally {
-        state.sampleActive = false;
-    }
+    });
+    const state = SCENE_STATES.get(handle.owner);
     const object = `objects[${++state.handles}]`;
     const settings = `{mode=${_string(mode)},padding=${_lua(padding)},duration=${_lua(duration)},fps=${fps}}`;
     const values = _lua(colors);
@@ -1419,53 +1367,15 @@ class SpaceHandle extends Handle {
     }
 }
 
-for (const method of FACTORIES) {
+// A handle makes objects below it; it gets the composite builders after SceneBuilder.
+for (const method of [...FACTORIES, "label"]) {
     Handle.prototype[method] = function (options = {}) {
         return this._object(method, options);
     };
 }
 
-Handle.prototype.label = function (options = {}) {
-    return this._object("label", options);
-};
-
 Handle.prototype.spans = function (parts, options = {}) {
     return this.owner._spans(parts, options, this);
-};
-
-Handle.prototype.tex = function (options) {
-    return this.owner._tex(options, this);
-};
-
-Handle.prototype.brace = function (options) {
-    return this.owner._brace(options, this);
-};
-
-Handle.prototype.code = function (options) {
-    return this.owner._code(options, this);
-};
-
-Handle.prototype.area = function (options) {
-    return this.owner._area(options, this);
-};
-
-Handle.prototype.riemann = function (options) {
-    return this.owner._riemann(options, this);
-};
-
-Handle.prototype.vectorField = function (options) {
-    return this.owner._vectorField(options, this);
-};
-Handle.prototype.contour = function (options) {
-    return this.owner._contour(options, this);
-};
-
-Handle.prototype.matrix = function (options) {
-    return this.owner._matrix(options, this);
-};
-
-Handle.prototype.table = function (options) {
-    return this.owner._table(options, this);
 };
 
 // The children spans makes of its parts, in order: one per part object, a text or a formula,
@@ -1494,14 +1404,12 @@ function _spanTexts(parts, split) {
 // Checks the TeX of a formula: a string, or a non-empty array of strings and part objects that
 // hold their TeX as text.
 function _texSource(tex, what) {
-    const plain = (value) => value && (Object.getPrototypeOf(value) === Object.prototype
-        || Object.getPrototypeOf(value) === null);
     if (typeof tex !== "string" && !(Array.isArray(tex) && tex.length)) {
         throw new TypeError(`${what} requires tex: a string, or a non-empty array of strings and part objects`);
     }
     if (!Array.isArray(tex)) return;
     for (const part of tex) {
-        if (typeof part !== "string" && (!plain(part) || typeof part.text !== "string")) {
+        if (typeof part !== "string" && (!_plain(part) || typeof part.text !== "string")) {
             throw new TypeError("A tex part must be a string or a plain object with a text string");
         }
     }
@@ -1916,7 +1824,7 @@ const CODE_EDITS = Object.freeze({
 // The text that one edit makes of text, as Lua edit makes it, with a RegExp allowed wherever
 // it finds a text; prefix starts its messages.
 function _codeEdit(text, edit, language, prefix) {
-    if (!edit || (Object.getPrototypeOf(edit) !== Object.prototype && Object.getPrototypeOf(edit) !== null)) {
+    if (!_plain(edit)) {
         throw new TypeError(`${prefix}An edit must be a plain object`);
     }
     const kinds = Object.keys(CODE_EDITS).filter((kind) => Object.hasOwn(edit, kind));
@@ -1924,8 +1832,7 @@ function _codeEdit(text, edit, language, prefix) {
         throw new TypeError(`${prefix}An edit takes one of replace, insert, remove, append and prepend`);
     }
     const [kind] = kinds;
-    const unknown = Object.keys(edit).find((key) => !CODE_EDITS[kind].includes(key));
-    if (unknown) throw new TypeError(`${prefix}Unknown ${kind} option: ${unknown}`);
+    _known(edit, CODE_EDITS[kind], `${prefix}Unknown ${kind} option`);
     const name = `${kind[0].toUpperCase()}${kind.slice(1)}`;
     // The text the edit puts in: with for replace, the value of insert, append and prepend.
     const value = kind === "replace" ? edit.with : edit[kind];
@@ -1988,7 +1895,7 @@ class Tracker {
 // The state a binding's function gives for the values its trackers have reached, or for values.
 function _boundState(binding, values = binding.trackers.map((tracker) => TRACKERS.get(tracker).value)) {
     const state = binding.fn(...values);
-    if (!state || (Object.getPrototypeOf(state) !== Object.prototype && Object.getPrototypeOf(state) !== null)) {
+    if (!_plain(state)) {
         throw new TypeError("A bound function must return a state object");
     }
     const key = Object.keys(state).find(
@@ -2286,12 +2193,10 @@ export class SceneBuilder {
     // x, y and z, each in the order given. A label is a string, which becomes a text, or a handle,
     // which the script names.
     _labelsTable(options) {
-        if (!options || (Object.getPrototypeOf(options) !== Object.prototype
-            && Object.getPrototypeOf(options) !== null)) {
+        if (!_plain(options)) {
             throw new TypeError("Space labels must be a plain object of x, y and z lists of [value, label]");
         }
-        const unknown = Object.keys(options).find((key) => !LABELS_OPTIONS.includes(key));
-        if (unknown) throw new TypeError(`Unknown space labels option: ${unknown}`);
+        _known(options, LABELS_OPTIONS, "Unknown space labels option");
         if (options.placement !== undefined && options.placement !== "world" && options.placement !== "screen") {
             throw new TypeError("Space labels placement must be 'world' or 'screen'");
         }
@@ -2342,8 +2247,7 @@ export class SceneBuilder {
     // Materialize function plots as endpoint and uncut-column samples. Native playback blends
     // columns and recuts bands; non-finite explicit points split polylines.
     _plotOptions(options) {
-        if (!options || (Object.getPrototypeOf(options) !== Object.prototype
-            && Object.getPrototypeOf(options) !== null)) {
+        if (!_plain(options)) {
             throw new TypeError("Plot options must be a plain object");
         }
         const { fn, points, ...rest } = options;
@@ -2367,15 +2271,9 @@ export class SceneBuilder {
             const range = _spaceRange(fields.x_range, "Plot x_range");
             const grid = _plotGrid(range);
             const breaks = [...(fields.discontinuities ?? [])].sort((a, b) => a - b);
-            const state = SCENE_STATES.get(this);
-            let pieces;
             const samples = [];
-            state.sampleActive = true;
-            try {
-                pieces = _plotPieces(fn, grid, range[2], fields.y_range ?? null, breaks, samples);
-            } finally {
-                state.sampleActive = false;
-            }
+            const pieces = _sampling(this, () =>
+                _plotPieces(fn, grid, range[2], fields.y_range ?? null, breaks, samples));
             if (!pieces.length) {
                 throw new RangeError(fields.y_range === undefined
                     ? "Plot has nothing to draw: fn needs two defined values in a row"
@@ -2413,12 +2311,10 @@ export class SceneBuilder {
         if (!Array.isArray(parts) || !parts.length) {
             throw new TypeError("Spans require a non-empty array of strings and part objects");
         }
-        const plain = (value) => value && (Object.getPrototypeOf(value) === Object.prototype
-            || Object.getPrototypeOf(value) === null);
-        if (!plain(options)) throw new TypeError("Spans options must be a plain object");
+        if (!_plain(options)) throw new TypeError("Spans options must be a plain object");
         const items = parts.map((part) => {
             if (typeof part === "string") return _lua(part);
-            if (!plain(part)) throw new TypeError("A spans part must be a string or a plain object");
+            if (!_plain(part)) throw new TypeError("A spans part must be a string or a plain object");
             if (!Object.hasOwn(part, "tex")) return this._options(part);
             if (Object.hasOwn(part, "text")) throw new TypeError("A spans part sets text or tex, not both");
             _texSource(part.tex, "A spans tex part");
@@ -2456,9 +2352,7 @@ export class SceneBuilder {
     // formula's, as the module names them; part() finds glyphs and shapes by their TeX.
     _tex(options, parent = null) {
         this._assertQuiet();
-        const plain = (value) => value && (Object.getPrototypeOf(value) === Object.prototype
-            || Object.getPrototypeOf(value) === null);
-        if (!plain(options)) throw new TypeError("Tex options must be a plain object");
+        if (!_plain(options)) throw new TypeError("Tex options must be a plain object");
         _texSource(options.tex, "Tex");
         const value = this._texTable(options);
         const state = SCENE_STATES.get(this);
@@ -2495,17 +2389,13 @@ export class SceneBuilder {
         });
     }
 
-    tex(options) {
-        return this._tex(options);
-    }
-
     // A curly brace beside the handles of around, or along the segment from from to to, which
     // the script draws as a filled path, and at its tip the label: a string the script sets as
     // a text named <id>/label, or a handle it moves there. Returns the brace and the label, as
     // the script returns them; the label is undefined when there is none.
     _brace(options, parent = null) {
         this._assertQuiet();
-        if (!options || (Object.getPrototypeOf(options) !== Object.prototype && Object.getPrototypeOf(options) !== null)) {
+        if (!_plain(options)) {
             throw new TypeError("Brace options must be a plain object");
         }
         const label = options.label;
@@ -2527,16 +2417,11 @@ export class SceneBuilder {
         return [brace, this._track(new Handle(this, text, "text"), parent, id)];
     }
 
-    brace(options) {
-        return this._brace(options);
-    }
-
     // Source code set line by line in colored tokens; its children are the lines, and theirs
     // the tokens.
     _code(options, parent = null) {
         this._assertQuiet();
-        if (!options || (Object.getPrototypeOf(options) !== Object.prototype
-            && Object.getPrototypeOf(options) !== null)) {
+        if (!_plain(options)) {
             throw new TypeError("Code options must be a plain object");
         }
         if (typeof options.text !== "string") throw new TypeError("Code requires a text string");
@@ -2584,16 +2469,11 @@ export class SceneBuilder {
         return block;
     }
 
-    code(options) {
-        return this._code(options);
-    }
-
     // The region between the graph of fn and base over x_range, as a polygon: the builder
     // calls the functions, as Lua area does at each step.
     _area(options, parent = null) {
         this._assertQuiet();
-        if (!options || (Object.getPrototypeOf(options) !== Object.prototype
-            && Object.getPrototypeOf(options) !== null)) {
+        if (!_plain(options)) {
             throw new TypeError("Area options must be a plain object");
         }
         const { fn, x_range: xRange, base, ...style } = options;
@@ -2620,16 +2500,11 @@ export class SceneBuilder {
         return this._object("polygon", { ...style, points }, parent);
     }
 
-    area(options) {
-        return this._area(options);
-    }
-
     // The rectangles of a Riemann sum, one per step of x_range, as a group whose children are
     // the rectangles: the builder calls fn where Lua riemann would and emits the heights.
     _riemann(options, parent = null) {
         this._assertQuiet();
-        if (!options || (Object.getPrototypeOf(options) !== Object.prototype
-            && Object.getPrototypeOf(options) !== null)) {
+        if (!_plain(options)) {
             throw new TypeError("Riemann options must be a plain object");
         }
         const { fn, values, sample, x_range: xRange, ...style } = options;
@@ -2668,10 +2543,6 @@ export class SceneBuilder {
         return sum;
     }
 
-    riemann(options) {
-        return this._riemann(options);
-    }
-
     _contourSamples(fn, values, xRange, yRange, levelCount = 1) {
         const finite = (value) => Number.isFinite(value) && Math.abs(value) <= SINGLE_MAX;
         if (xRange === undefined) throw new TypeError("Contour requires x_range");
@@ -2691,41 +2562,31 @@ export class SceneBuilder {
         if (values !== undefined && (!Array.isArray(values) || values.length !== count)) {
             throw new TypeError(`Contour values must hold one finite number for each of the ${count} samples of x_range and y_range`);
         }
-        const state = SCENE_STATES.get(this);
         const samples = [];
-        state.sampleActive = true;
-        try {
+        _sampling(this, () => {
             for (const y of ys) for (const x of xs) {
                 const value = fn === undefined ? values[samples.length] : fn(x, y);
                 if (!finite(value)) throw new RangeError(`Contour ${fn === undefined ? "values" : "fn"} must give a finite number; at (${x}, ${y}) it did not`);
                 samples.push(value);
             }
-        } finally {
-            state.sampleActive = false;
-        }
+        });
         return { samples, xRange: gridX, yRange: gridY };
     }
 
     // Scalar samples cross into Lua as values; the core traces the bilinear field they define.
     _contour(options, parent = null) {
         this._assertQuiet();
-        if (!options || (Object.getPrototypeOf(options) !== Object.prototype
-            && Object.getPrototypeOf(options) !== null)) {
+        if (!_plain(options)) {
             throw new TypeError("Contour options must be a plain object");
         }
         const { fn, values, levels, x_range: xRange, y_range: yRange, ...style } = options;
         const allowed = ["colors", "id", "color", "stroke", "width", "dash", "dash_offset", "opacity",
             "progress", "layer", "isolate", "mask", "blend", "blur", "shadow", "labels"];
-        for (const key of Object.keys(style)) {
-            if (!allowed.includes(key)) throw new TypeError(`Unknown Contour option: ${key}`);
-        }
+        _known(style, allowed, "Unknown Contour option");
         const labels = style.labels;
         if (labels !== undefined && typeof labels !== "boolean") {
-            if (!labels || (Object.getPrototypeOf(labels) !== Object.prototype
-                && Object.getPrototypeOf(labels) !== null)) throw new TypeError("Contour labels must be a boolean or a plain object");
-            for (const key of Object.keys(labels)) {
-                if (!["format", "size", "spacing", "padding", "upright"].includes(key)) throw new TypeError(`Unknown Contour labels option: ${key}`);
-            }
+            if (!_plain(labels)) throw new TypeError("Contour labels must be a boolean or a plain object");
+            _known(labels, ["format", "size", "spacing", "padding", "upright"], "Unknown Contour labels option");
             if (labels.format !== undefined && (typeof labels.format !== "string" || !/^%\.[0-6]f$/.test(labels.format))) {
                 throw new TypeError("Contour label format must be %.0f through %.6f");
             }
@@ -2764,17 +2625,12 @@ export class SceneBuilder {
         return group;
     }
 
-    contour(options) {
-        return this._contour(options);
-    }
-
     // An arrow for fn at every sample of the grid, as a group whose children are the arrows row
     // by row from the bottom left: the builder calls fn where Lua vector_field would and emits
     // the vectors as values.
     _vectorField(options, parent = null) {
         this._assertQuiet();
-        if (!options || (Object.getPrototypeOf(options) !== Object.prototype
-            && Object.getPrototypeOf(options) !== null)) {
+        if (!_plain(options)) {
             throw new TypeError("Vector field options must be a plain object");
         }
         const { fn, values, x_range: xRange, y_range: yRange, ...style } = options;
@@ -2827,16 +2683,11 @@ export class SceneBuilder {
         return field;
     }
 
-    vectorField(options) {
-        return this._vectorField(options);
-    }
-
     // Entries in rows and columns between brackets, as a group whose children are its rows,
     // each a group of the texts of its entries, and then its two brackets.
     _matrix(options, parent = null) {
         this._assertQuiet();
-        if (!options || (Object.getPrototypeOf(options) !== Object.prototype
-            && Object.getPrototypeOf(options) !== null)) {
+        if (!_plain(options)) {
             throw new TypeError("Matrix options must be a plain object");
         }
         const rows = _gridRows(options.rows, "Matrix");
@@ -2880,16 +2731,11 @@ export class SceneBuilder {
         return matrix;
     }
 
-    matrix(options) {
-        return this._matrix(options);
-    }
-
     // Entries in cells that tile a grid, the header's first, as a group whose children are its
     // rows, each a group of the texts of its entries, then its stripes and then its rules.
     _table(options, parent = null) {
         this._assertQuiet();
-        if (!options || (Object.getPrototypeOf(options) !== Object.prototype
-            && Object.getPrototypeOf(options) !== null)) {
+        if (!_plain(options)) {
             throw new TypeError("Table options must be a plain object");
         }
         const body = _gridRows(options.rows, "Table");
@@ -2939,10 +2785,6 @@ export class SceneBuilder {
         return table;
     }
 
-    table(options) {
-        return this._table(options);
-    }
-
     // The handle created with this id, or null.
     find(id) {
         if (typeof id !== "string") throw new TypeError("Scene find requires an id string");
@@ -2956,8 +2798,7 @@ export class SceneBuilder {
         // A copy takes no time, but it takes the state its source shows, which the tracks set.
         this._assertMutable("instant");
         const sourceName = this._handle(source);
-        if (!options || (Object.getPrototypeOf(options) !== Object.prototype
-            && Object.getPrototypeOf(options) !== null)) {
+        if (!_plain(options)) {
             throw new TypeError("Clone options must be a plain object");
         }
         const state = SCENE_STATES.get(this);
@@ -3008,13 +2849,10 @@ export class SceneBuilder {
 
     sound(options) {
         this._assertMutable();
-        if (!options || (Object.getPrototypeOf(options) !== Object.prototype
-            && Object.getPrototypeOf(options) !== null)) {
+        if (!_plain(options)) {
             throw new TypeError("Sound options must be a plain object");
         }
-        const fields = new Set(["asset", "bus", "begin", "end", "gain", "loop"]);
-        const unknown = Object.keys(options).find((key) => !fields.has(key));
-        if (unknown) throw new TypeError(`Unknown Sound option: ${unknown}`);
+        _known(options, ["asset", "bus", "begin", "end", "gain", "loop"], "Unknown Sound option");
         if (typeof options.asset !== "string" || !options.asset.length
             || options.asset.includes("\0")
             || new TextEncoder().encode(options.asset).length > 255) {
@@ -3050,10 +2888,7 @@ export class SceneBuilder {
         this._assertQuiet();
         const fromName = this._handle(from);
         const toName = this._handle(to);
-        if (
-            !options ||
-            (Object.getPrototypeOf(options) !== Object.prototype && Object.getPrototypeOf(options) !== null)
-        ) {
+        if (!_plain(options)) {
             throw new TypeError("Connector options must be a plain object");
         }
         if (Object.hasOwn(options, "from") || Object.hasOwn(options, "to")) {
@@ -3092,11 +2927,10 @@ export class SceneBuilder {
         // A view takes no time, but its camera may aim at an object where the tracks leave it.
         this._assertMutable("instant");
         const rect = _lua(_viewportBounds(bounds));
-        if (!options || (Object.getPrototypeOf(options) !== Object.prototype && Object.getPrototypeOf(options) !== null)) {
+        if (!_plain(options)) {
             throw new TypeError("View options must be a plain object");
         }
-        const unknown = Object.keys(options).find((key) => !VIEW_OPTIONS.includes(key));
-        if (unknown) throw new TypeError(`Unknown View option: ${unknown}`);
+        _known(options, VIEW_OPTIONS, "Unknown View option");
         const { camera, optical, background, opacity, layer, hide } = options;
         if (camera !== undefined && (!camera || typeof camera !== "object" || Array.isArray(camera))) {
             throw new TypeError("View camera must be a look camera object");
@@ -3140,15 +2974,11 @@ export class SceneBuilder {
         if (stages.length > 16) throw new RangeError("Scene transition supports at most 16 stages");
         const state = SCENE_STATES.get(this);
         if (state.transition) throw new TypeError("A scene can own only one scene transition");
-        if (
-            !options ||
-            (Object.getPrototypeOf(options) !== Object.prototype && Object.getPrototypeOf(options) !== null)
-        ) {
+        if (!_plain(options)) {
             throw new TypeError("Scene transition options must be a plain object");
         }
-        const allowed = new Set(["duration", "hold", "live", "easing", "curve", "viewport", "styles", ...TRANSITION_STYLE_OPTIONS]);
-        const unknown = Object.keys(options).find((key) => !allowed.has(key));
-        if (unknown) throw new TypeError(`Unknown scene transition option: ${unknown}`);
+        const fields = ["duration", "hold", "live", "easing", "curve", "viewport", "styles"];
+        _known(options, [...fields, ...TRANSITION_STYLE_OPTIONS], "Unknown scene transition option");
         if (Object.hasOwn(options, "easing") && Object.hasOwn(options, "curve")) {
             throw new TypeError("Scene transition options must use either easing or curve, not both");
         }
@@ -3237,8 +3067,7 @@ export class SceneBuilder {
     _camera(camera) {
         const target = camera && typeof camera === "object" ? camera.target : undefined;
         const objects = Array.isArray(target) ? target.some((item) => item instanceof Handle) : target instanceof Handle;
-        const prototype = objects ? Object.getPrototypeOf(camera) : undefined;
-        if (!objects || (prototype !== Object.prototype && prototype !== null)) return _lua(camera);
+        if (!objects || !_plain(camera)) return _lua(camera);
         return `{${Object.keys(camera)
             .sort()
             .map((key) => {
@@ -3282,11 +3111,10 @@ export class SceneBuilder {
         }
         if (key !== "mask") return `[${_string(key === "trimDistance" ? "trim_distance" : key)}]=${_lua(value)}`;
         if (value instanceof Handle) return `["mask"]=${this._handle(value)}`;
-        if (!value || (Object.getPrototypeOf(value) !== Object.prototype && Object.getPrototypeOf(value) !== null)) {
+        if (!_plain(value)) {
             throw new TypeError("Mask must be a handle or {target, mode}");
         }
-        const unknown = Object.keys(value).find((name) => name !== "target" && name !== "mode");
-        if (unknown) throw new TypeError(`Unknown mask option: ${unknown}`);
+        _known(value, ["target", "mode"], "Unknown mask option");
         if (!Object.hasOwn(value, "target")) throw new TypeError("Mask requires a target");
         const mode = value.mode === undefined ? "" : `["mode"]=${_lua(_maskMode(value.mode))},`;
         return `["mask"]={${mode}["target"]=${this._handle(value.target)}}`;
@@ -3312,57 +3140,12 @@ export class SceneBuilder {
         return this;
     }
 
-    create(target, duration = 1, easing = "smooth", lag = 0, direction) {
-        if (typeof duration === "object") {
-            if (arguments.length > 2) throw new TypeError("Timing options cannot be combined with positional arguments");
-            ({duration, curve: easing, lag, options: {direction}} = _timing(duration, 1, true, false, ["direction"]));
-        }
-        if (direction === undefined) return this._animate("create", target, [duration, easing, lag]);
-        this._assertMutable();
-        _direction(direction);
-        return this._animate("create", target, [duration, easing, lag, direction]);
-    }
-
-    uncreate(target, duration = 1, easing = "smooth", lag = 0, direction = "forward") {
-        if (typeof duration === "object") {
-            if (arguments.length > 2) throw new TypeError("Timing options cannot be combined with positional arguments");
-            ({duration, curve: easing, lag, options: {direction = "forward"}} = _timing(duration, 1, true, false, ["direction"]));
-        }
-        this._assertMutable();
-        _direction(direction);
-        return this._animate("uncreate", target, [duration, easing, lag, direction]);
-    }
-
     fillReveal(target, duration = 1, easing = "smooth", lag = 0) {
         if (typeof duration === "object") {
             if (arguments.length > 2) throw new TypeError("Timing options cannot be combined with positional arguments");
             ({duration, curve: easing, lag} = _timing(duration, 1, true));
         }
         return this._animate("fill_reveal", target, [duration, easing, lag]);
-    }
-
-    drawBorderThenFill(target, duration = 1, easing = "smooth", lag = 0, direction) {
-        if (typeof duration === "object") {
-            if (arguments.length > 2) throw new TypeError("Timing options cannot be combined with positional arguments");
-            ({duration, curve: easing, lag, options: {direction}} = _timing(duration, 1, true, false, ["direction"]));
-        }
-        if (direction === undefined) {
-            return this._animate("draw_border_then_fill", target, [duration, easing, lag]);
-        }
-        this._assertMutable();
-        _direction(direction);
-        return this._animate("draw_border_then_fill", target, [duration, easing, lag, direction]);
-    }
-
-    write(target, duration = 1, easing = "smooth", lag = 0, direction) {
-        if (typeof duration === "object") {
-            if (arguments.length > 2) throw new TypeError("Timing options cannot be combined with positional arguments");
-            ({duration, curve: easing, lag, options: {direction}} = _timing(duration, 1, true, false, ["direction"]));
-        }
-        if (direction === undefined) return this._animate("write", target, [duration, easing, lag]);
-        this._assertMutable();
-        _direction(direction);
-        return this._animate("write", target, [duration, easing, lag, direction]);
     }
 
     _effect(method, target, options, defaults, name, minimumScale) {
@@ -3381,14 +3164,6 @@ export class SceneBuilder {
         return this._effect("fade_out", target, options, FADE_OPTIONS, "FadeOut", 0);
     }
 
-    growFromCenter(target, duration = 1, easing = "smooth") {
-        if (typeof duration === "object") {
-            if (arguments.length > 2) throw new TypeError("Timing options cannot be combined with positional arguments");
-            ({duration, curve: easing} = _timing(duration));
-        }
-        return this._animate("grow_from_center", target, [duration, easing]);
-    }
-
     growFromEdge(target, edge, duration = 1, easing = "smooth") {
         if (typeof duration === "object") {
             if (arguments.length > 3) throw new TypeError("Timing options cannot be combined with positional arguments");
@@ -3397,14 +3172,6 @@ export class SceneBuilder {
         this._assertMutable();
         _growthEdge(edge);
         return this._animate("grow_from_edge", target, [edge, duration, easing]);
-    }
-
-    shrinkToCenter(target, duration = 1, easing = "smooth") {
-        if (typeof duration === "object") {
-            if (arguments.length > 2) throw new TypeError("Timing options cannot be combined with positional arguments");
-            ({duration, curve: easing} = _timing(duration));
-        }
-        return this._animate("shrink_to_center", target, [duration, easing]);
     }
 
     // Flashes a handle, or each of an array of handles at once, such as the tokens a search
@@ -3487,11 +3254,10 @@ export class SceneBuilder {
         if (lag === null || typeof lag !== "object") {
             if (lag !== undefined) lagValue = `,${_lua(lag)}`;
         } else {
-            if (Object.getPrototypeOf(lag) !== Object.prototype && Object.getPrototypeOf(lag) !== null) {
+            if (!_plain(lag)) {
                 throw new TypeError("Morph options must be a number or a plain object");
             }
-            const unknown = Object.keys(lag).find((key) => key !== "lag" && key !== "copy" && key !== "pairs");
-            if (unknown) throw new TypeError(`Unknown morph option: ${unknown}`);
+            _known(lag, ["lag", "copy", "pairs"], "Unknown morph option");
             if (lag.lag !== undefined && !(Number.isFinite(lag.lag) && lag.lag >= 0)) {
                 throw new RangeError("Morph lag must be a finite number of zero or more");
             }
@@ -3560,15 +3326,6 @@ export class SceneBuilder {
         return this;
     }
 
-    shift(target, by, duration = 1, easing = "smooth") {
-        if (typeof duration === "object") {
-            if (arguments.length > 3) throw new TypeError("Timing options cannot be combined with positional arguments");
-            ({duration, curve: easing} = _timing(duration));
-        }
-        this._assertTransformable(target);
-        return this._animate("shift", target, [by, duration, easing]);
-    }
-
     // Serializes rotate, scale, and moveAlong options; an `about` handle names its local.
     matchTransform(source, target, duration = 1, easing = "smooth", options = {}) {
         if (typeof duration === "object") {
@@ -3581,11 +3338,10 @@ export class SceneBuilder {
         if (sourceName === targetName) {
             throw new TypeError("MatchTransform source and target must be distinct handles");
         }
-        if (!options || (Object.getPrototypeOf(options) !== Object.prototype && Object.getPrototypeOf(options) !== null)) {
+        if (!_plain(options)) {
             throw new TypeError("MatchTransform options must be a plain object");
         }
-        const unknown = Object.keys(options).filter((key) => !MATCH_OPTIONS.includes(key));
-        if (unknown.length) throw new TypeError(`Unknown MatchTransform option: ${unknown[0]}`);
+        _known(options, MATCH_OPTIONS, "Unknown MatchTransform option");
         if (options.arc !== undefined && !(Number.isFinite(options.arc) && Math.abs(options.arc) < 2 * Math.PI)) {
             throw new RangeError("MatchTransform arc must be a finite angle between -2*pi and 2*pi radians");
         }
@@ -3653,11 +3409,10 @@ export class SceneBuilder {
         if (!code) throw new TypeError("Edit needs a block that code made");
         const list = Array.isArray(edits) ? edits : [edits];
         if (!list.length || list.length > 1024) throw new TypeError("Edit takes an edit or an array of 1 to 1024 edits");
-        if (!options || (Object.getPrototypeOf(options) !== Object.prototype && Object.getPrototypeOf(options) !== null)) {
+        if (!_plain(options)) {
             throw new TypeError("Edit options must be a plain object");
         }
-        const unknown = Object.keys(options).find((key) => !EDIT_OPTIONS.includes(key));
-        if (unknown) throw new TypeError(`Unknown Edit option: ${unknown}`);
+        _known(options, EDIT_OPTIONS, "Unknown Edit option");
         if (options.id !== undefined && typeof options.id !== "string") throw new TypeError("Edit id must be a string");
         if (options.arc !== undefined && !(Number.isFinite(options.arc) && Math.abs(options.arc) < 2 * Math.PI)) {
             throw new RangeError("Edit arc must be a finite angle between -2*pi and 2*pi radians");
@@ -3714,11 +3469,10 @@ export class SceneBuilder {
         } else {
             throw new TypeError("Arrange takes a group or a non-empty array of handles");
         }
-        if (!options || (Object.getPrototypeOf(options) !== Object.prototype && Object.getPrototypeOf(options) !== null)) {
+        if (!_plain(options)) {
             throw new TypeError("Arrange options must be a plain object");
         }
-        const unknown = Object.keys(options).find((key) => !ARRANGE_OPTIONS.includes(key));
-        if (unknown) throw new TypeError(`Unknown Arrange option: ${unknown}`);
+        _known(options, ARRANGE_OPTIONS, "Unknown Arrange option");
         if (options.gap !== undefined && !(Number.isFinite(options.gap) && options.gap >= 0)) {
             throw new RangeError("Arrange gap must be a finite number of zero or more");
         }
@@ -3745,11 +3499,8 @@ export class SceneBuilder {
         this._assertMutable();
         const targetName = this._handle(target);
         const last = selection[selection.length - 1];
-        const options = last && (Object.getPrototypeOf(last) === Object.prototype || Object.getPrototypeOf(last) === null)
-            ? selection.pop()
-            : {};
-        const unknown = Object.keys(options).find((key) => !HIGHLIGHT_OPTIONS.includes(key));
-        if (unknown) throw new TypeError(`Unknown Highlight option: ${unknown}`);
+        const options = _plain(last) ? selection.pop() : {};
+        _known(options, HIGHLIGHT_OPTIONS, "Unknown Highlight option");
         if (options.dim !== undefined && !(Number.isFinite(options.dim) && options.dim >= 0 && options.dim <= 1)) {
             throw new RangeError("Highlight dim must be an opacity from 0 to 1");
         }
@@ -3785,11 +3536,10 @@ export class SceneBuilder {
     }
 
     _motionOptions(options, allowed, name) {
-        if (!options || (Object.getPrototypeOf(options) !== Object.prototype && Object.getPrototypeOf(options) !== null)) {
+        if (!_plain(options)) {
             throw new TypeError(`${name} options must be a plain object`);
         }
-        const unknown = Object.keys(options).filter((key) => !allowed.includes(key));
-        if (unknown.length) throw new TypeError(`Unknown ${name} option: ${unknown[0]}`);
+        _known(options, allowed, `Unknown ${name} option`);
         _timingValues(options, 1, false, name);
         if (options.arc !== undefined && !(Number.isFinite(options.arc) && Math.abs(options.arc) < 2 * Math.PI)) {
             throw new RangeError(`${name} arc must be a finite angle between -2*pi and 2*pi radians`);
@@ -3865,11 +3615,10 @@ export class SceneBuilder {
         }
         const targetName = this._target(target);
         if (typeof fn !== "function") throw new TypeError("Warp fn must be a function of x and y that returns [x, y]");
-        if (!options || (Object.getPrototypeOf(options) !== Object.prototype && Object.getPrototypeOf(options) !== null)) {
+        if (!_plain(options)) {
             throw new TypeError("Warp requires options with x_range and y_range, the samples the builder calls fn at");
         }
-        const unknown = Object.keys(options).filter((key) => !WARP_OPTIONS.includes(key));
-        if (unknown.length) throw new TypeError(`Unknown Warp option: ${unknown[0]}`);
+        _known(options, WARP_OPTIONS, "Unknown Warp option");
         if (options.x_range === undefined) throw new TypeError("Warp requires x_range");
         if (options.y_range === undefined) throw new TypeError("Warp requires y_range");
         const columns = _warpSamples(options.x_range, "Warp x_range");
@@ -3883,37 +3632,13 @@ export class SceneBuilder {
             throw new RangeError("Warp step must be a positive length");
         }
         const timing = `${_lua(duration)},${_lua(easing)}`;
+        const values = _sampling(this, () => rows.samples.flatMap((y) =>
+            columns.samples.map((x) => _sampleVector(fn, x, y, "Warp fn").map(_single))));
         const state = SCENE_STATES.get(this);
-        const values = [];
-        state.sampleActive = true;
-        try {
-            for (const y of rows.samples) {
-                for (const x of columns.samples) values.push(_sampleVector(fn, x, y, "Warp fn").map(_single));
-            }
-        } finally {
-            state.sampleActive = false;
-        }
         const samples = `{["values"]=${_lua(values)},["x_range"]=${_lua(columns.range)},["y_range"]=${_lua(rows.range)}}`;
         const settings = options.step === undefined ? "" : `,{["step"]=${_lua(options.step)}}`;
         state.lines.push((scene) => `${scene}:warp(${targetName},${samples},${timing}${settings})`);
         return this;
-    }
-
-    transform(target, matrix, duration = 1, easing = "smooth") {
-        if (typeof duration === "object") {
-            if (arguments.length > 3) throw new TypeError("Timing options cannot be combined with positional arguments");
-            ({duration, curve: easing} = _timing(duration));
-        }
-        this._assertTransformable(target);
-        return this._animate("transform", target, [matrix, duration, easing]);
-    }
-
-    fade(target, opacity, duration = 1, easing = "smooth") {
-        if (typeof duration === "object") {
-            if (arguments.length > 3) throw new TypeError("Timing options cannot be combined with positional arguments");
-            ({duration, curve: easing} = _timing(duration));
-        }
-        return this._animate("fade", target, [opacity, duration, easing]);
     }
 
     transition(from, to, duration = 1, easing = "smooth") {
@@ -3930,22 +3655,6 @@ export class SceneBuilder {
             (scene) => `${scene}:transition(${fromName},${toName},${durationValue},${easingValue})`,
         );
         return this;
-    }
-
-    stroke(target, color, duration = 1, easing = "smooth") {
-        if (typeof duration === "object") {
-            if (arguments.length > 3) throw new TypeError("Timing options cannot be combined with positional arguments");
-            ({duration, curve: easing} = _timing(duration));
-        }
-        return this._animate("stroke", target, [color, duration, easing]);
-    }
-
-    fill(target, color, duration = 1, easing = "smooth") {
-        if (typeof duration === "object") {
-            if (arguments.length > 3) throw new TypeError("Timing options cannot be combined with positional arguments");
-            ({duration, curve: easing} = _timing(duration));
-        }
-        return this._animate("fill", target, [color, duration, easing]);
     }
 
     play(specification, duration = 1, easing = "smooth", lag = 0) {
@@ -4205,14 +3914,10 @@ export class SceneBuilder {
         const counts = [];
         const cuts = [];
         const descriptors = specifications.map((descriptor) => {
-            if (
-                !descriptor ||
-                (Object.getPrototypeOf(descriptor) !== Object.prototype && Object.getPrototypeOf(descriptor) !== null)
-            ) {
+            if (!_plain(descriptor)) {
                 throw new TypeError("Animation descriptors must be plain objects");
             }
-            const unknown = Object.keys(descriptor).filter((key) => key !== "target" && !PLAY_PROPERTIES.includes(key));
-            if (unknown.length) throw new TypeError(`Unknown animation property: ${unknown[0]}`);
+            _known(descriptor, ["target", ...PLAY_PROPERTIES], "Unknown animation property");
             const targetName = this._handle(descriptor.target);
             if (targets.has(targetName)) throw new TypeError(`Animation ${verb} cannot contain duplicate targets`);
             targets.add(targetName);
@@ -4364,15 +4069,9 @@ export class SceneBuilder {
             if (has("x_range")) range = _spaceRange(descriptor.x_range, "Plot x_range");
             else if (!range) throw new TypeError("Plot fn requires x_range");
             const grid = _plotGrid(range);
-            const state = SCENE_STATES.get(this);
-            let pieces;
             const samples = [];
-            state.sampleActive = true;
-            try {
-                pieces = _plotPieces(descriptor.fn, grid, range[2], band, breaks ?? [], samples);
-            } finally {
-                state.sampleActive = false;
-            }
+            const pieces = _sampling(this, () =>
+                _plotPieces(descriptor.fn, grid, range[2], band, breaks ?? [], samples));
             line = _plotLine(pieces);
             stored = _plotStored(pieces, samples);
         } else {
@@ -4542,6 +4241,57 @@ export class SceneBuilder {
 for (const method of FACTORIES) {
     SceneBuilder.prototype[method] = function (options = {}) {
         return this._object(method, options);
+    };
+}
+
+// The builders of composite objects, on the scene and, placing them below it, on every handle.
+for (const method of ["tex", "brace", "code", "area", "riemann", "vectorField", "contour", "matrix", "table"]) {
+    SceneBuilder.prototype[method] = function (options) {
+        return this[`_${method}`](options);
+    };
+    Handle.prototype[method] = function (options) {
+        return this.owner[`_${method}`](options, this);
+    };
+}
+
+// The animations that draw or erase targets, under their Lua names. A direction goes to Lua only
+// when given, but uncreate always gives one, forward by default.
+for (const [method, lua] of [["create", "create"], ["uncreate", "uncreate"], ["write", "write"],
+    ["drawBorderThenFill", "draw_border_then_fill"]]) {
+    const fallback = method === "uncreate" ? "forward" : undefined;
+    SceneBuilder.prototype[method] = function (target, duration = 1, easing = "smooth", lag = 0, direction = fallback) {
+        if (typeof duration === "object") {
+            if (arguments.length > 2) throw new TypeError("Timing options cannot be combined with positional arguments");
+            ({duration, curve: easing, lag, options: {direction = fallback}} =
+                _timing(duration, 1, true, false, ["direction"]));
+        }
+        if (direction === undefined) return this._animate(lua, target, [duration, easing, lag]);
+        this._assertMutable();
+        _direction(direction);
+        return this._animate(lua, target, [duration, easing, lag, direction]);
+    };
+}
+
+// The animations that grow targets from their centers or shrink them to them.
+for (const [method, lua] of [["growFromCenter", "grow_from_center"], ["shrinkToCenter", "shrink_to_center"]]) {
+    SceneBuilder.prototype[method] = function (target, duration = 1, easing = "smooth") {
+        if (typeof duration === "object") {
+            if (arguments.length > 2) throw new TypeError("Timing options cannot be combined with positional arguments");
+            ({duration, curve: easing} = _timing(duration));
+        }
+        return this._animate(lua, target, [duration, easing]);
+    };
+}
+
+// The animations of targets to a value; shift and transform move them, which a connector cannot.
+for (const method of ["shift", "transform", "fade", "stroke", "fill"]) {
+    SceneBuilder.prototype[method] = function (target, value, duration = 1, easing = "smooth") {
+        if (typeof duration === "object") {
+            if (arguments.length > 3) throw new TypeError("Timing options cannot be combined with positional arguments");
+            ({duration, curve: easing} = _timing(duration));
+        }
+        if (method === "shift" || method === "transform") this._assertTransformable(target);
+        return this._animate(method, target, [value, duration, easing]);
     };
 }
 

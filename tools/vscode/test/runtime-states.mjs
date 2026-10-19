@@ -64,9 +64,9 @@ try {
     const settled = center(runtime.bounds("states-subject", 0));
     assert(Math.abs(settled.x - interrupted.x) < 0.1);
     assert(settled.y < midway.y);
-    assert.equal(runtime.render(0, true).length, 200 * 100 * 4);
+    assert.equal(runtime.render(0).length, 200 * 100 * 4);
 
-    runtime.loadLua(`
+    runtime.load(`
 if not vis.states then error("states module missing") end
 local scene = vis.scene {
     width = 100, height = 50,
@@ -82,7 +82,7 @@ return scene
     assert.equal(runtime.retainedLua, false);
     assert(center(runtime.bounds("states-static", 0)).x > 50);
 
-    runtime.loadLua(`
+    runtime.load(`
 local scene = vis.scene {width = 100, height = 50}
 local a = scene:circle {id = "a"}
 local b = scene:circle {id = "b"}
@@ -100,7 +100,7 @@ return scene
 `, "batch-states.lua");
     assert.equal(runtime.duration, 1);
     assert.ok(runtime.bounds("morphed", 1).width > 0);
-    assert.equal(runtime.render(1, true).length, 100 * 50 * 4);
+    assert.equal(runtime.render(1).length, 100 * 50 * 4);
 } finally {
     runtime.destroy();
 }

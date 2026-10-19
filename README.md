@@ -168,8 +168,8 @@ my-page/
 <script type="module">
 import {createVis, vis} from "./viscript/client.js";
 
-// Start on an empty scene, then register the font text is measured with.
-const runtime = await createVis(vis.scene({width: 16, height: 16}), "boot.js");
+// Start the runtime without a scene, then register the font text is measured with.
+const runtime = await createVis();
 const font = await fetch("./viscript/Pretendard.ttf");
 runtime.font("Pretendard", await font.arrayBuffer(), "ttf");
 
@@ -196,8 +196,7 @@ requestAnimationFrame(function frame(now) {
 </script>
 ```
 
-To run Lua instead, pass the source string: `createVis("return vis.scene {width = 16, height = 16}", "boot.lua")`
-and `runtime.load(luaSource, "scene.lua")`.
+To run Lua instead, load its source: `runtime.load(luaSource, "scene.lua")`.
 
 Serve the folder over HTTP — the module fetches `vis-wasm.wasm`, so opening the file
 directly will not work:

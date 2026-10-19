@@ -12,7 +12,7 @@ import {type Canvas, Surface} from "./surface.ts";
 /** The parts of the runtime bundle (client.js) the server calls. */
 export interface RuntimeApi {
     createVisModule(options: Record<string, unknown>): Promise<VisModule>;
-    createVis(source: string, name: string, options: Record<string, unknown>): Promise<VisScene>;
+    createVis(options: Record<string, unknown>): Promise<VisScene>;
     evaluateScene(source: string, name: string): SceneBuilder;
 }
 
@@ -24,7 +24,6 @@ export interface ServerEnvironment {
     readonly idleMs?: number;
 }
 
-const BOOT = "local s = vis.scene {width = 16, height = 16}\nreturn s";
 const STOPPED = "The viscript runtime stopped after an error; load the scene again";
 /** Fonts one load asks for at most, and the longest name asked for. */
 const MAX_FONTS = 16, MAX_FONT_NAME = 256;
@@ -59,7 +58,7 @@ class Session {
     readonly id: number;
     readonly surface: Surface;
     lease: Lease | null = null;
-    /** The lease's engine holds a scene the player loaded, not the placeholder. */
+    /** The lease's engine holds a scene this player loaded. */
     loaded = false;
     /** The newest load asked for; an older one still waiting on bytes gives way to it. */
     latest = 0;
@@ -93,7 +92,7 @@ export class RenderServer {
         this.#env = env;
         this.#pool = new InstancePool({
             createModule: (onAbort) => this.#createModule(onAbort),
-            createEngine: (module) => env.runtime.createVis(BOOT, "boot.lua", {module}),
+            createEngine: (module) => env.runtime.createVis({module}),
             font: (name: string) => this.#font(name),
             assetBytes: (asset: AssetRef) => this.#fetch(asset.id),
         }, {idleMs: env.idleMs});

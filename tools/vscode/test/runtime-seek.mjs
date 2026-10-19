@@ -36,7 +36,7 @@ async function seekAllScenes(reuseRuntime) {
                 const bytes = fs.readFileSync(path.resolve(examplesRoot, name));
                 runtime.asset(name, bytes, path.extname(name).slice(1));
             }
-            runtime.loadLua(source, fileName);
+            runtime.load(source, fileName);
             const duration = runtime.duration;
             const times = [
                 0,
@@ -62,11 +62,7 @@ async function seekAllScenes(reuseRuntime) {
 }
 
 function createRuntime() {
-    return createVis(
-        "return vis.scene { width = 16, height = 16 }",
-        "bootstrap.lua",
-        {wasmBinary},
-    );
+    return createVis({wasmBinary});
 }
 
 await seekAllScenes(false);

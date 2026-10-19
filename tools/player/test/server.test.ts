@@ -45,7 +45,7 @@ function fakeRuntime() {
             const id = ++modules;
             instantiate({}, () => resolve({id} as never));
         }),
-        createVis: async (_source, _name, options) => {
+        createVis: async (options) => {
             const module = (options.module as {id: number}).id;
             let scene: FakeScene = {width: 16, height: 16};
             let runtimeTime = 0;

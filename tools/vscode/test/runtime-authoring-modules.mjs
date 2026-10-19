@@ -37,14 +37,12 @@ const diagramTemplates = [
 }));
 const nativeDiagram = diagramTemplates[0].source;
 
-const runtime = await createVis("return vis.scene {width = 8, height = 8}", "bootstrap.lua", {
-    wasmBinary,
-});
+const runtime = await createVis({wasmBinary});
 
 try {
     runtime.font("Pretendard", font, "ttf");
     runtime.font("JetBrainsMono", codeFont, "ttf");
-    runtime.loadLua(`
+    runtime.load(`
 local scene = vis.scene {
     width = 320, height = 180, theme = "pro_white",
     camera = {mode = "fixed", view = "2d", target = {0, 0}, height = 10},
@@ -72,11 +70,11 @@ return scene
     assert.ok(runtime.bounds("wasm-diagram:root", settled).width > 0);
     assert.ok(runtime.bounds("wasm-diagram:edge:flow", settled).width > 0);
     assert.ok(runtime.bounds("wasm-object-label", settled).width > 0);
-    const pixels = runtime.render(settled, true);
+    const pixels = runtime.render(settled);
     assert.equal(pixels.length, 320 * 180 * 4);
     assert.ok(pixels.some((value, index) => index % 4 !== 3 && value !== 255));
     for (const template of diagramTemplates) {
-        runtime.loadLua(template.source, `diagram-template-${template.file}`);
+        runtime.load(template.source, `diagram-template-${template.file}`);
         const templateTime = runtime.duration;
         assert.ok(
             runtime.bounds(template.root, templateTime).width > 0,
@@ -101,13 +99,13 @@ return scene
             );
         }
         assert.equal(
-            runtime.render(templateTime, true).length,
+            runtime.render(templateTime).length,
             960 * 540 * 4,
             `${template.file} should render a complete 960x540 frame`,
         );
     }
     for (let index = 0; index < 256; index += 1) {
-        runtime.loadLua(nativeDiagram, `native-diagram-reload-${index}.lua`);
+        runtime.load(nativeDiagram, `native-diagram-reload-${index}.lua`);
     }
 } finally {
     runtime.destroy();

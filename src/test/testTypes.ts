@@ -777,6 +777,17 @@ async function preview(canvas: HTMLCanvasElement)
     // @ts-expect-error Canvas pixel ratio is numeric.
     scene.draw(canvas, scene.duration, "2");
     scene.destroy();
+
+    const empty = await createVis();
+    empty.font("Probe", new Uint8Array([0]));
+    const loadedDuration: number = empty.load(definition, "typed-scene.js");
+    const pixels: Uint8ClampedArray = empty.render(loadedDuration);
+    void pixels;
+    // @ts-expect-error Render always returns a copy, so it takes no copy flag.
+    empty.render(0, true);
+    // @ts-expect-error Builder scenes load through load.
+    empty.loadScene(definition);
+    empty.destroy();
 }
 
 void preview;

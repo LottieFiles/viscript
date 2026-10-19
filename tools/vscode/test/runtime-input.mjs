@@ -92,9 +92,6 @@ try {
     assert.equal(typeof runtime.input, "function");
     assert.equal(typeof runtime.beginInputFrame, "function");
     assert.equal(typeof runtime.releaseInput, "function");
-    assert.equal(typeof runtime.keyState, "function");
-    assert.equal(typeof runtime.pointerState, "function");
-    assert.equal(typeof runtime.actionMap, "function");
 
     runtime.beginInputFrame(0);
     const pointerInitial = center(runtime.bounds("pointer-follower", 0));
@@ -111,17 +108,6 @@ try {
     assert(pointerMiddle.y < pointerInitial.y && pointerMiddle.y > pointerEnd.y);
     assert(Math.abs(pointerEnd.x - 150) < 0.1);
     assert(Math.abs(pointerEnd.y - 25) < 0.1);
-    assert.deepEqual(runtime.pointerState(1), {
-        pointerId: 1,
-        position: {x: 150, y: 25},
-        delta: {x: 5, y: -3},
-        wheel: {x: 0, y: 0},
-        previousButtons: 0,
-        buttons: 0,
-        pressed: 0,
-        released: 0,
-        active: true,
-    });
     assert.equal(event("wheel", {
         x: 150,
         y: 25,
@@ -129,10 +115,7 @@ try {
         wheelY: -4,
         time: 0.21,
     }).handled, false);
-    assert.deepEqual(runtime.pointerState(1)?.wheel, {x: 2, y: -4});
     runtime.beginInputFrame(0.25);
-    assert.deepEqual(runtime.pointerState(1)?.delta, {x: 0, y: 0});
-    assert.deepEqual(runtime.pointerState(1)?.wheel, {x: 0, y: 0});
 
     assert.equal(event("pointercancel", {x: 150, y: 25, time: 0.3}).handled, true);
     const pointerReset = center(runtime.bounds("pointer-follower", 0.5));
@@ -186,16 +169,8 @@ try {
     const afterShortcut = center(runtime.bounds("key-mover", 1.42));
     assert(Math.abs(afterShortcut.x - keyReturned.x) < 0.1);
 
-    const actions = runtime.actionMap()
-        .bindKey("Move", "A", {x: -1, y: 0})
-        .bindKey("Move", "D", {x: 1, y: 0})
-        .bindKey("Move", "W", {x: 0, y: 1})
-        .bindKey("Move", "S", {x: 0, y: -1})
-        .bindKey("Boost", "Shift")
-        .bindKey("Switch", "Tab")
-        .bindKey("Dash", "Space")
-        .bindPointer("Fire", 0, {x: 1, y: 0}, 1);
-    assert.equal(actions.count, 8);
+    // Keys and buttons the scene does not bind reach the retained Input state unhandled, and
+    // releasing them all reports no error.
     runtime.beginInputFrame(1.5);
     assert.equal(event("keydown", {key: "W", time: 1.51}).handled, false);
     assert.equal(event("keydown", {key: "D", time: 1.52}).handled, false);
@@ -206,95 +181,9 @@ try {
         buttons: 1,
         time: 1.53,
     }).handled, false);
-    const wState = runtime.keyState("W");
-    assert(Math.abs(wState.begin - 1.51) < 1e-5);
-    assert(Math.abs(wState.end - 1.51) < 1e-5);
-    assert.equal(wState.previous, false);
-    assert.equal(wState.down, true);
-    assert.equal(wState.pressed, true);
-    assert.equal(wState.released, false);
-    assert.deepEqual(actions.state("Move"), {
-        previous: {x: 0, y: 0},
-        value: {x: 1, y: 1},
-        delta: {x: 1, y: 1},
-        down: true,
-        pressed: true,
-        released: false,
-    });
-    assert.deepEqual(actions.state("Fire"), {
-        previous: {x: 0, y: 0},
-        value: {x: 1, y: 0},
-        delta: {x: 1, y: 0},
-        down: true,
-        pressed: true,
-        released: false,
-    });
-    runtime.beginInputFrame(1.6);
-    assert.deepEqual(actions.state("Move"), {
-        previous: {x: 1, y: 1},
-        value: {x: 1, y: 1},
-        delta: {x: 0, y: 0},
-        down: true,
-        pressed: false,
-        released: false,
-    });
-    assert.equal(actions.state("Fire")?.pressed, false);
-    assert.equal(actions.state("Fire")?.down, true);
-    const released = runtime.releaseInput(1.61);
-    assert.equal(released.error, undefined);
-    assert.equal(runtime.keyState("W").released, true);
-    assert.deepEqual(actions.state("Move"), {
-        previous: {x: 1, y: 1},
-        value: {x: 0, y: 0},
-        delta: {x: -1, y: -1},
-        down: false,
-        pressed: false,
-        released: true,
-    });
-    assert.equal(actions.state("Fire")?.down, false);
-    assert.equal(actions.state("Fire")?.released, true);
-    runtime.beginInputFrame(1.7);
-    assert.equal(event("keydown", {key: "Space", time: 1.71}).handled, false);
-    assert.equal(event("keyup", {key: "Space", time: 1.72}).handled, false);
-    assert.deepEqual(actions.state("Dash"), {
-        previous: {x: 0, y: 0},
-        value: {x: 0, y: 0},
-        delta: {x: 0, y: 0},
-        down: false,
-        pressed: true,
-        released: true,
-    });
-    runtime.beginInputFrame(1.8);
-    assert.equal(event("keydown", {key: "Shift", time: 1.81}).handled, false);
-    assert.equal(event("keydown", {key: "Tab", time: 1.82}).handled, false);
-    assert.equal(event("keyup", {key: "Tab", time: 1.83}).handled, false);
-    assert.equal(runtime.keyState("Tab").down, false);
-    assert.equal(actions.state("Switch")?.pressed, true);
-    assert.equal(actions.state("Switch")?.released, true);
-    assert.equal(runtime.keyState("Shift").down, true);
-    assert.deepEqual(actions.state("Boost"), {
-        previous: {x: 0, y: 0},
-        value: {x: 1, y: 0},
-        delta: {x: 1, y: 0},
-        down: true,
-        pressed: true,
-        released: false,
-    });
-    runtime.beginInputFrame(1.9);
-    assert.equal(actions.state("Boost")?.down, true);
-    assert.equal(actions.state("Boost")?.pressed, false);
-    assert.equal(event("keyup", {key: "Shift", time: 1.91}).handled, false);
-    assert.equal(actions.state("Boost")?.released, true);
-    assert.equal(actions.remove("Boost"), true);
-    assert.equal(actions.state("Boost"), null);
-    actions.clear();
-    assert.equal(actions.count, 0);
+    assert.equal(runtime.releaseInput(1.61).error, undefined);
     assert.throws(() => runtime.beginInputFrame(-1), /finite and non-negative/);
-    assert.throws(() => runtime.actionMap().bindKey("a".repeat(64), "A"), /63 UTF-8 bytes/);
-    const fullMap = runtime.actionMap();
-    for (let i = 0; i < 256; i++) fullMap.bindKey(`Action${i}`, "A");
-    assert.equal(fullMap.count, 256);
-    assert.throws(() => fullMap.bindKey("Overflow", "A"), /at most 256 bindings/);
+    assert.throws(() => runtime.releaseInput(Number.NaN), /finite and non-negative/);
 
     assert.throws(
         () => event("keydown", {key: "F12", time: 1}),

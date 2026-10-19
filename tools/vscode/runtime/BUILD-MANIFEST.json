@@ -42,23 +42,23 @@
     },
     {
       "path": "client.js",
-      "bytes": 45592,
-      "sha256": "d6aab74bf2d67d28275de3cf9930071b2960741d9038d812336d4662e05ca0b5"
+      "bytes": 29411,
+      "sha256": "8d6388647c028426be34aebf045ed13be501670872ce8fe6db8ff712d0258854"
     },
     {
       "path": "client.d.ts",
-      "bytes": 14023,
-      "sha256": "da7d3a7c53d8114501c2841561434f3b84e8c4d769dd8a59213f9f826d645ffa"
+      "bytes": 12713,
+      "sha256": "852df7ae168f3655853989dddd67de4c07477ada9673394c8e22d8e63287d8e7"
     },
     {
       "path": "bindings.js",
-      "bytes": 221607,
-      "sha256": "759f7cc8bc237c5591b5cd5f25117fb6b223c24529127b81fb8c420d0fb87994"
+      "bytes": 210113,
+      "sha256": "f855d269032208cd2d9a5403dc9d400b85f8d2f4e655fbbca20632b909ea974f"
     },
     {
       "path": "bindings.d.ts",
-      "bytes": 70259,
-      "sha256": "89b7052507b58427e9dbb489d9ecf4617594aaf80508dd796aba03b84de4a556"
+      "bytes": 70442,
+      "sha256": "c261aeab836dcbd1723e98ff078d257181943e7a86e73d49e3ddcd5322638a76"
     },
     {
       "path": "Pretendard.ttf",

@@ -41,7 +41,7 @@ assert.ok(containment.overflow.right > 0);
 
 // A code block is a typeset Group: its token Texts form one block.
 runtime.font("JetBrainsMono", fs.readFileSync(path.join(extensionRoot, "runtime", "JetBrainsMono.ttf")), "ttf");
-runtime.loadLua(`
+runtime.load(`
 local root = vis.scene {width = 200, height = 100, camera = {height = 2}}
 root:group {id = "plain"}
 root:code {text = "a = b", language = "plain", id = "snippet"}

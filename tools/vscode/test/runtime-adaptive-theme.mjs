@@ -9,7 +9,11 @@ const codeFont = fs.readFileSync(path.resolve(extensionRoot, "../../src/examples
 const wasmBinary = fs.readFileSync(path.join(extensionRoot, "runtime", "vis-wasm.wasm"));
 const headingFont = fs.readFileSync(path.join(extensionRoot, "runtime", "IBMPlexSansKR-SemiBold.ttf"));
 const serifHeadingFont = fs.readFileSync(path.join(extensionRoot, "runtime", "SourceSerif4-Semibold.ttf"));
-const runtime = await createVis("return vis.scene {width = 8, height = 8}", "bootstrap.lua", {wasmBinary});
+// Without a source the engine holds no scene until load, so fonts and the host theme go in first.
+const runtime = await createVis({wasmBinary});
+assert.equal(runtime.duration, 0);
+assert.deepEqual(runtime.size(), [0, 0]);
+assert.throws(() => runtime.render(0), /InsufficientCondition/);
 runtime.font("IBM Plex Sans KR", headingFont, "ttf");
 runtime.font("Source Serif 4", serifHeadingFont, "ttf");
 runtime.font("JetBrainsMono", codeFont, "ttf");
@@ -31,36 +35,36 @@ runtime.hostTheme({
     focus: "#4f9dde",
     objects: ["#e89432", "#ef6464", "#72bd78", "#b390d4"],
 });
-runtime.loadLua("local s=vis.scene{width=64,height=64,theme='adaptive_vscode',camera={height=4}}; s:line{from={-1,0},to={1,0},stroke='danger',width=10}; return s", "adaptive.lua");
+runtime.load("local s=vis.scene{width=64,height=64,theme='adaptive_vscode',camera={height=4}}; s:line{from={-1,0},to={1,0},stroke='danger',width=10}; return s", "adaptive.lua");
 assert.equal(runtime.adaptiveTheme, true);
 const adaptivePixels = runtime.render(0);
 assert.deepEqual([...adaptivePixels.slice(0, 4)], [16, 24, 32, 255]);
 const center = (32 * 64 + 32) * 4;
 assert.deepEqual([...adaptivePixels.slice(center, center + 4)], [255, 123, 114, 255]);
 
-runtime.loadLua("return vis.scene {width = 8, height = 8, theme = 'pro_white'}", "fixed.lua");
+runtime.load("return vis.scene {width = 8, height = 8, theme = 'pro_white'}", "fixed.lua");
 assert.equal(runtime.adaptiveTheme, false);
 assert.deepEqual([...runtime.render(0).slice(0, 4)], [255, 255, 255, 255]);
 
-runtime.loadLua("return vis.scene {width = 8, height = 8}", "implicit-pro-white.lua");
+runtime.load("return vis.scene {width = 8, height = 8}", "implicit-pro-white.lua");
 assert.equal(runtime.adaptiveTheme, false);
 assert.deepEqual([...runtime.render(0).slice(0, 4)], [255, 255, 255, 255]);
 
-runtime.loadLua("return vis.scene {width = 8, height = 8, theme = 'pro_black'}", "pro-black.lua");
+runtime.load("return vis.scene {width = 8, height = 8, theme = 'pro_black'}", "pro-black.lua");
 assert.equal(runtime.adaptiveTheme, false);
 assert.deepEqual([...runtime.render(0).slice(0, 4)], [0, 0, 0, 255]);
 for (const removed of ["default", "3_blue_1_eyes"]) {
     assert.throws(
-        () => runtime.loadLua(`return vis.scene {theme = '${removed}'}`, "removed-preset.lua"),
+        () => runtime.load(`return vis.scene {theme = '${removed}'}`, "removed-preset.lua"),
         /theme preset must be 'pro_white', 'pro_black' or 'adaptive_vscode'/,
     );
 }
 
-runtime.loadLua("return vis.scene {width = 8, height = 8, theme = {preset = 'adaptive_vscode'}}", "adaptive-table.lua");
+runtime.load("return vis.scene {width = 8, height = 8, theme = {preset = 'adaptive_vscode'}}", "adaptive-table.lua");
 assert.equal(runtime.adaptiveTheme, true);
 assert.deepEqual([...runtime.render(0).slice(0, 4)], [16, 24, 32, 255]);
 
-runtime.loadLua(`
+runtime.load(`
 local scene = vis.scene {
     width = 320,
     height = 180,
@@ -80,7 +84,7 @@ return scene
 assert.ok(runtime.bounds("h1").width > 0);
 assert.ok(runtime.bounds("h2").width > 0);
 
-runtime.loadLua(`
+runtime.load(`
 local scene = vis.scene {
     width = 320,
     height = 180,
@@ -103,7 +107,7 @@ assert.ok(runtime.bounds("serif-h1").width > 0);
 assert.ok(runtime.bounds("serif-h2").width > 0);
 assert.ok(runtime.bounds("serif-h3").width > 0);
 
-runtime.loadLua(`
+runtime.load(`
 local scene = vis.scene {
     width = 480,
     height = 240,

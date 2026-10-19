@@ -20,7 +20,7 @@ export interface FontAnswer {
 export interface PoolDeps {
     /** Starts a WASM instance; `onAbort` runs if it aborts later. */
     createModule(onAbort: () => void): Promise<VisModule>;
-    /** A new engine in `module`, holding a placeholder scene. */
+    /** A new engine in `module`, without a scene. */
     createEngine(module: VisModule): Promise<VisScene>;
     /** The font for a name, or null when there is none; asked once per name and instance. */
     font(name: string): Promise<FontAnswer | null>;

@@ -155,11 +155,7 @@ export interface VisInputEvent {
     readonly dy: number;
     readonly wheelX: number;
     readonly wheelY: number;
-    /**
-     * Pointer button, or a keydown action:
-     * ArrowLeft=0, ArrowRight=1, ArrowUp=2, ArrowDown=3, ZoomIn=4,
-     * ZoomOut=5, Reset=6, View2D=7, View3D=8.
-     */
+    /** The pointer button that changed, 0 to 31, for pointerdown and pointerup; -1 for other events. */
     readonly button: number;
     readonly buttons: number;
     /** Shift, Ctrl, Alt, and Meta use bits 0 through 3. */
@@ -181,47 +177,6 @@ export interface VisInputResult {
     readonly sample?: VisInputSample;
     /** Present when a handled input operation could not be completed. */
     readonly error?: string;
-}
-
-export interface VisDigitalState {
-    readonly begin: number;
-    readonly end: number;
-    readonly previous: boolean;
-    readonly down: boolean;
-    readonly pressed: boolean;
-    readonly released: boolean;
-}
-
-export interface VisPointerState {
-    readonly pointerId: number;
-    readonly position: Readonly<{x: number; y: number}>;
-    readonly delta: Readonly<{x: number; y: number}>;
-    readonly wheel: Readonly<{x: number; y: number}>;
-    readonly previousButtons: number;
-    readonly buttons: number;
-    readonly pressed: number;
-    readonly released: number;
-    readonly active: boolean;
-}
-
-export interface VisActionState {
-    readonly previous: Readonly<{x: number; y: number}>;
-    readonly value: Readonly<{x: number; y: number}>;
-    readonly delta: Readonly<{x: number; y: number}>;
-    readonly down: boolean;
-    readonly pressed: boolean;
-    readonly released: boolean;
-}
-
-export interface VisActionMap {
-    readonly count: number;
-    bindKey(action: string, key: string,
-            value?: Readonly<{x: number; y: number}>): VisActionMap;
-    bindPointer(action: string, button: number,
-                value?: Readonly<{x: number; y: number}>, pointerId?: number): VisActionMap;
-    remove(action: string): boolean;
-    clear(): void;
-    state(action: string): VisActionState | null;
 }
 
 export interface VisInputSample {
@@ -307,12 +262,10 @@ export interface VisScene {
     readonly runtimeTime: number;
     /** Present only when the experimental audio module was compiled. */
     readonly audio?: VisAudio;
+    /** Loads Lua source or a builder scene and returns its duration; a failed load keeps the scene before it. */
     load(source: string | SceneBuilder, name?: string): number;
-    loadLua(source: string, name?: string): number;
-    loadScene(scene: SceneBuilder, name?: string): number;
-    /** A zero-copy view expires on render, resize, or WASM memory growth. Set copy for persistent pixels.
-     * RGBA rendering requires the CPU engine; GL hosts supply their own presentation/readback bridge. */
-    render(time: number, copy?: boolean): Uint8ClampedArray;
+    /** Renders the frame at time and returns a copy of its RGBA pixels. */
+    render(time: number): Uint8ClampedArray;
     bounds(object: string, time?: number): BBox;
     intersects(first: string, second: string, time?: number, padding?: number): boolean;
     layoutReport(time?: number, padding?: number): LayoutReport;
@@ -334,9 +287,6 @@ export interface VisScene {
     beginInputFrame?(time: number): void;
     /** Releases every retained key and pointer button, including focus-loss recovery. */
     releaseInput?(time: number): VisInputResult;
-    keyState?(key: string): VisDigitalState;
-    pointerState?(pointerId?: number): VisPointerState | null;
-    actionMap?(): VisActionMap;
     /** Present only when the experimental retained Lua runtime was compiled. */
     advanceRuntime?(elapsed: number): VisRuntimeStep | null;
     hostTheme(palette: HostThemePalette): void;
@@ -346,9 +296,15 @@ export interface VisScene {
     destroy(): void;
 }
 
-/** Loads the WebAssembly runtime once, for `createVis(..., {module})`. */
+/** Loads the WebAssembly runtime once, for `createVis({module})`. */
 export function createVisModule(moduleOptions?: VisModuleOptions): Promise<VisModule>;
 
+/**
+ * Starts an engine in `moduleOptions.module`, or in a new WebAssembly instance. It holds no scene until `load`, so
+ * fonts, assets and a host theme can be registered before the first scene uses them.
+ */
+export function createVis(moduleOptions?: VisModuleOptions): Promise<VisScene>;
+/** Starts an engine as `createVis(moduleOptions)` does and loads `source` into it. */
 export function createVis(
     source: string | SceneBuilder,
     name?: string,

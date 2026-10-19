@@ -256,7 +256,7 @@ async function loadScene(scene, {themeRefresh = false} = {}) {
                 candidate.asset(asset.name, bytes, asset.mime);
             }
         }
-        const load = (engine) => engine.loadLua(scene.source, scene.fileName);
+        const load = (engine) => engine.load(scene.source, scene.fileName);
         const fonts = await loadWithFonts(candidate, load, sceneFonts, {
             expected: documentFonts.get(scene.documentUri),
             current: () => generation === loadGeneration,

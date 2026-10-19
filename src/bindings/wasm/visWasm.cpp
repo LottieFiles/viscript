@@ -105,8 +105,6 @@ struct Engine
 #endif
 #if defined(VIS_INPUT)
     vis::input::Controller* input = nullptr;
-    vis::input::DigitalState inputKey;
-    vis::input::PointerState inputPointer;
 #endif
 #if defined(VIS_LUA_RUNTIME)
     vis::lua_runtime::Runtime* luaRuntime = nullptr;
@@ -559,14 +557,6 @@ static VisResult _audioResult(Engine* engine, vis::Result result)
 }
 #endif
 
-// Retained bytes: the encoded source for decoded-on-render assets, RGBA pixels for raw-pixel assets.
-// The lazy RGBA cache that Cell textures request is not counted, which keeps the accounting stable.
-static size_t _assetBytes(const vis::Asset* asset)
-{
-    if (!asset->encoded()) return _assetBytes(asset);
-    return asset->encodedSize();
-}
-
 static const vis::Asset* _asset(const char* name, void* data)
 {
     auto engine = static_cast<Engine*>(data);
@@ -771,8 +761,6 @@ extern "C" VIS_KEEPALIVE VisResult vis_load_lua(VisEngine handle, const char* so
 #endif
 #if defined(VIS_INPUT)
     engine->input = input;
-    engine->inputKey = {};
-    engine->inputPointer = {};
 #endif
 #if defined(VIS_LUA_RUNTIME)
     engine->luaRuntime = luaRuntime;
@@ -833,7 +821,6 @@ extern "C" VIS_KEEPALIVE VisResult vis_load_asset(VisEngine handle, const char* 
     vis::Asset* asset = nullptr;
     auto result = vis::AssetLoader::load(data, size, mime, asset);
     if (result != vis::Result::Success) return _error(engine, result);
-    auto bytes = _assetBytes(asset);
     auto index = engine->assetCount;
     for (auto i = 0u; i < engine->assetCount; i++) {
         if (std::strcmp(engine->assets[i].name, name) == 0) {
@@ -841,28 +828,27 @@ extern "C" VIS_KEEPALIVE VisResult vis_load_asset(VisEngine handle, const char* 
             break;
         }
     }
-    auto retained = engine->assetBytes;
-    if (index < engine->assetCount) {
-        retained -= _assetBytes(engine->assets[index].asset);
-    }
-    if (bytes > VIS_ASSET_MEMORY_LIMIT - retained || (index == engine->assetCount && engine->assetCount >= 64u)) {
+    // Assets count by their encoded source; the RGBA pixels they decode to on render are not
+    // counted, which keeps the accounting stable.
+    auto replaced = index < engine->assetCount ? engine->assets[index].asset : nullptr;
+    auto retained = engine->assetBytes - (replaced ? replaced->encodedSize() : 0u);
+    if (asset->encodedSize() > VIS_ASSET_MEMORY_LIMIT - retained || (!replaced && engine->assetCount >= 64u)) {
         delete asset;
         return _error(engine, vis::Result::OutOfMemory);
     }
-    if (index == engine->assetCount) engine->assetCount++;
-    else {
-        engine->assetBytes -= _assetBytes(engine->assets[index].asset);
-        delete engine->assets[index].asset;
-    }
+    if (!replaced) engine->assetCount++;
+    delete replaced;
     std::memcpy(engine->assets[index].name, name, nameSize + 1u);
     engine->assets[index].asset = asset;
-    engine->assetBytes += _assetBytes(asset);
+    engine->assetBytes = retained + asset->encodedSize();
     engine->error[0] = '\0';
     return VIS_RESULT_SUCCESS;
 }
 
-static VisResult _render(Engine* engine, float time, uint32_t pixelRatio)
+extern "C" VIS_KEEPALIVE VisResult vis_render(VisEngine handle, float time, uint32_t pixelRatio)
 {
+    auto engine = _engine(handle);
+    if (!engine) return VIS_RESULT_INVALID_ARGUMENTS;
     if (!engine->scene || !engine->renderer) return _error(engine, vis::Result::InsufficientCondition);
     auto& config = engine->scene->config();
     if (!pixelRatio || config.width > UINT32_MAX / pixelRatio
@@ -884,19 +870,6 @@ static VisResult _render(Engine* engine, float time, uint32_t pixelRatio)
 #endif
     engine->error[0] = '\0';
     return static_cast<VisResult>(result);
-}
-
-extern "C" VIS_KEEPALIVE VisResult vis_render(VisEngine handle, float time)
-{
-    auto engine = _engine(handle);
-    return engine ? _render(engine, time, 1u) : VIS_RESULT_INVALID_ARGUMENTS;
-}
-
-extern "C" VIS_KEEPALIVE VisResult vis_render_scaled(VisEngine handle, float time,
-                                                            uint32_t pixelRatio)
-{
-    auto engine = _engine(handle);
-    return engine ? _render(engine, time, pixelRatio) : VIS_RESULT_INVALID_ARGUMENTS;
 }
 
 extern "C" VIS_KEEPALIVE VisResult vis_bounds(VisEngine handle, const char* object, float time,
@@ -1166,8 +1139,6 @@ extern "C" VIS_KEEPALIVE VisResult vis_input_begin(VisEngine handle, float time)
     }
     auto result = engine->input->state()->begin(time);
     if (result != vis::Result::Success) return _error(engine, result);
-    engine->inputKey = {};
-    engine->inputPointer = {};
     engine->error[0] = '\0';
     return VIS_RESULT_SUCCESS;
 }
@@ -1189,129 +1160,13 @@ extern "C" VIS_KEEPALIVE uint32_t vis_input_release(VisEngine handle, float time
         engine->rendered = false;
         _clearLayoutReport(engine);
     }
-    engine->inputKey = {};
-    engine->inputPointer = {};
     engine->error[0] = '\0';
     return flags;
-}
-
-extern "C" VIS_KEEPALIVE uint32_t vis_input_key_state(VisEngine handle,
-                                                            uint32_t key)
-{
-    auto engine = _engine(handle);
-    if (!engine || !engine->scene || !engine->input || key == 0u
-        || key > static_cast<uint32_t>(vis::input::Key::Tab)) {
-        return UINT32_MAX;
-    }
-    auto result = engine->input->state()->key(static_cast<vis::input::Key>(key),
-                                               engine->inputKey);
-    if (result != vis::Result::Success) {
-        _error(engine, result);
-        return UINT32_MAX;
-    }
-    engine->error[0] = '\0';
-    return (engine->inputKey.previous ? 1u : 0u)
-         | (engine->inputKey.down ? 2u : 0u)
-         | (engine->inputKey.pressed ? 4u : 0u)
-         | (engine->inputKey.released ? 8u : 0u);
-}
-
-extern "C" VIS_KEEPALIVE float vis_input_key_begin(VisEngine handle)
-{
-    auto engine = _engine(handle);
-    return engine ? engine->inputKey.begin : 0.0f;
-}
-
-extern "C" VIS_KEEPALIVE float vis_input_key_end(VisEngine handle)
-{
-    auto engine = _engine(handle);
-    return engine ? engine->inputKey.end : 0.0f;
-}
-
-extern "C" VIS_KEEPALIVE uint32_t vis_input_pointer_state(VisEngine handle,
-                                                                uint32_t pointer)
-{
-    auto engine = _engine(handle);
-    if (!engine || !engine->scene || !engine->input) return UINT32_MAX;
-    auto result = engine->input->state()->pointer(pointer, engine->inputPointer);
-    if (result == vis::Result::InsufficientCondition) {
-        engine->inputPointer = {};
-        engine->error[0] = '\0';
-        return 0u;
-    }
-    if (result != vis::Result::Success) {
-        _error(engine, result);
-        return UINT32_MAX;
-    }
-    engine->error[0] = '\0';
-    return 1u | (engine->inputPointer.active ? 2u : 0u);
-}
-
-extern "C" VIS_KEEPALIVE float vis_input_pointer_x(VisEngine handle)
-{
-    auto engine = _engine(handle);
-    return engine ? engine->inputPointer.position.x : 0.0f;
-}
-
-extern "C" VIS_KEEPALIVE float vis_input_pointer_y(VisEngine handle)
-{
-    auto engine = _engine(handle);
-    return engine ? engine->inputPointer.position.y : 0.0f;
-}
-
-extern "C" VIS_KEEPALIVE float vis_input_pointer_dx(VisEngine handle)
-{
-    auto engine = _engine(handle);
-    return engine ? engine->inputPointer.delta.x : 0.0f;
-}
-
-extern "C" VIS_KEEPALIVE float vis_input_pointer_dy(VisEngine handle)
-{
-    auto engine = _engine(handle);
-    return engine ? engine->inputPointer.delta.y : 0.0f;
-}
-
-extern "C" VIS_KEEPALIVE float vis_input_pointer_wheel_x(VisEngine handle)
-{
-    auto engine = _engine(handle);
-    return engine ? engine->inputPointer.wheel.x : 0.0f;
-}
-
-extern "C" VIS_KEEPALIVE float vis_input_pointer_wheel_y(VisEngine handle)
-{
-    auto engine = _engine(handle);
-    return engine ? engine->inputPointer.wheel.y : 0.0f;
-}
-
-extern "C" VIS_KEEPALIVE uint32_t vis_input_pointer_previous_buttons(
-    VisEngine handle)
-{
-    auto engine = _engine(handle);
-    return engine ? engine->inputPointer.previousButtons : 0u;
-}
-
-extern "C" VIS_KEEPALIVE uint32_t vis_input_pointer_buttons(VisEngine handle)
-{
-    auto engine = _engine(handle);
-    return engine ? engine->inputPointer.buttons : 0u;
-}
-
-extern "C" VIS_KEEPALIVE uint32_t vis_input_pointer_pressed(VisEngine handle)
-{
-    auto engine = _engine(handle);
-    return engine ? engine->inputPointer.pressed : 0u;
-}
-
-extern "C" VIS_KEEPALIVE uint32_t vis_input_pointer_released(VisEngine handle)
-{
-    auto engine = _engine(handle);
-    return engine ? engine->inputPointer.released : 0u;
 }
 #endif
 
 #if defined(VIS_LUA_RUNTIME)
 // Runtime exports exist only when compiled in; construction-only scenes remain inactive.
-// Hosts feature-detect scheduling and sound exports independently.
 extern "C" VIS_KEEPALIVE uint8_t vis_runtime_active(VisEngine handle)
 {
     auto engine = _engine(handle);
@@ -1407,11 +1262,6 @@ extern "C" VIS_KEEPALIVE VisResult vis_runtime_sound(
 #endif
 
 #if defined(VIS_AUDIO)
-extern "C" VIS_KEEPALIVE uint8_t vis_audio_supported(VisEngine handle)
-{
-    return _engine(handle) ? 1u : 0u;
-}
-
 extern "C" VIS_KEEPALIVE VisResult vis_audio_load(VisEngine handle,
                                                           const char* name,
                                                           const uint8_t* data,
@@ -1548,75 +1398,6 @@ extern "C" VIS_KEEPALIVE VisResult vis_audio_transport(VisEngine handle,
 #endif
 
 #if defined(VIS_UI)
-extern "C" VIS_KEEPALIVE uint32_t vis_ui_input(VisEngine handle, uint32_t type,
-                                                     float x, float y, float dx, float dy,
-                                                     float wheelX, float wheelY, int32_t button,
-                                                     uint32_t buttons, uint32_t modifiers,
-                                                     uint32_t pointer, float time)
-{
-    auto engine = _engine(handle);
-    if (engine) engine->uiSampled = false;
-    if (!engine || !engine->scene || !engine->panel || type > 5u
-        || !std::isfinite(x) || !std::isfinite(y) || !std::isfinite(dx)
-        || !std::isfinite(dy) || !std::isfinite(wheelX) || !std::isfinite(wheelY)
-        || !std::isfinite(time) || time < 0.0f) {
-        return 0u;
-    }
-    constexpr uint32_t Handled = 1u;
-    constexpr uint32_t Redraw = 2u;
-    constexpr uint32_t Capture = 4u;
-    constexpr uint32_t Release = 8u;
-    constexpr uint32_t Sampled = 16u;
-    constexpr uint32_t Failed = 32u;
-    uint32_t flags = 0u;
-    vis::ui::InputEvent event;
-    event.kind = static_cast<vis::ui::InputKind>(type);
-    event.pointer = pointer;
-    event.position = {x, y};
-    event.delta = {dx, dy};
-    event.wheel = {wheelX, wheelY};
-    event.button = button;
-    event.buttons = buttons;
-    event.modifiers = modifiers;
-    event.time = time;
-    auto input = engine->panel->input(event);
-    if (input.handled) flags |= Handled;
-    if (input.redraw) flags |= Redraw;
-    if (input.capture) flags |= Capture;
-    if (input.release) flags |= Release;
-    if (input.status != vis::Result::Success) {
-        _error(engine, input.status);
-        flags |= Failed;
-    }
-    if (input.sample && input.sample->selected()) {
-        engine->uiSample = input.sample->selection();
-        engine->uiSampleValue = input.sample->value();
-        engine->uiSampled = true;
-        flags |= Sampled;
-    }
-    if (!(flags & Handled) && type == 5u && !(modifiers & (2u | 4u | 8u))
-        && engine->scene->config().cameraMode == vis::CameraMode::Interactive) {
-        vis::Result result = vis::Result::InvalidArguments;
-        switch (button) {
-            case 0: result = engine->panel->cameraMove({0.04f, 0.0f}); break;
-            case 1: result = engine->panel->cameraMove({-0.04f, 0.0f}); break;
-            case 2: result = engine->panel->cameraMove({0.0f, -0.04f}); break;
-            case 3: result = engine->panel->cameraMove({0.0f, 0.04f}); break;
-            case 4: result = engine->panel->cameraZoom(-0.12f); break;
-            case 5: result = engine->panel->cameraZoom(0.12f); break;
-            case 6: result = engine->panel->cameraReset(); break;
-            case 7: result = engine->panel->cameraView(vis::CameraView::TwoD); break;
-            case 8: result = engine->panel->cameraView(vis::CameraView::ThreeD); break;
-        }
-        if (result == vis::Result::Success) flags = Handled | Redraw;
-    }
-    if (flags & Redraw) {
-        engine->rendered = false;
-        _clearLayoutReport(engine);
-    }
-    return flags;
-}
-
 extern "C" VIS_KEEPALIVE uint32_t vis_ui_sample_handle(VisEngine handle)
 {
     auto engine = _engine(handle);

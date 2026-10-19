@@ -214,11 +214,11 @@ export async function main(argv) {
 
     let problems = 0;
     for (const mode of options.themes) {
-        const runtime = await createVis("return vis.scene {width = 16, height = 16}", "bootstrap.lua", {wasmBinary});
+        const runtime = await createVis({wasmBinary});
         try {
             runtime.hostTheme({dark: mode === "dark", ...PALETTES[mode]});
             for (const [family, bytes] of fonts) runtime.font(family, bytes, "ttf");
-            runtime.loadLua(source, basename(options.scene));
+            runtime.load(source, basename(options.scene));
             const [width, height] = runtime.size();
             if (mode === options.themes[0]) {
                 const theme = runtime.adaptiveTheme ? "adaptive_vscode" : "fixed theme, palette unchanged";
@@ -231,7 +231,7 @@ export async function main(argv) {
                     throw new Error(`--time ${seconds(at)} is past the end (${seconds(runtime.duration)} s)`);
                 }
                 const file = join(out, `${stem}-${mode}-${seconds(at)}.png`);
-                writeFileSync(file, png(width, height, runtime.render(at, true)));
+                writeFileSync(file, png(width, height, runtime.render(at)));
                 const issues = review(runtime.layoutReport(at, options.padding), options.contain);
                 problems += issues.length;
                 console.log(`${mode} t=${seconds(at)}  ${issues.length ? issues.join("; ") : "ok"}  ${file}`);

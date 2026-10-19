@@ -3,7 +3,7 @@
 wasm_exports = [
     'malloc', 'free', 'vis_create', 'vis_destroy',
     'vis_host_theme', 'vis_adaptive_theme', 'vis_load_lua', 'vis_load_font',
-    'vis_load_asset', 'vis_render', 'vis_render_scaled',
+    'vis_load_asset', 'vis_render',
     'vis_bounds', 'vis_intersects', 'vis_layout_report', 'vis_layout_report_data',
     'vis_layout_report_size', 'vis_resize', 'vis_camera_mode', 'vis_camera_view',
     'vis_pixels', 'vis_pixels_size', 'vis_width', 'vis_height', 'vis_duration',
@@ -14,21 +14,12 @@ if ui_enabled or input_enabled
 endif
 if ui_enabled
     wasm_exports += [
-        'vis_ui_input', 'vis_ui_sample_handle', 'vis_ui_sample_tag', 'vis_ui_sample_type',
-        'vis_ui_sample_x', 'vis_ui_sample_y', 'vis_ui_sample_u', 'vis_ui_sample_v',
-        'vis_ui_sample_rgba',
+        'vis_ui_sample_handle', 'vis_ui_sample_tag', 'vis_ui_sample_type', 'vis_ui_sample_x',
+        'vis_ui_sample_y', 'vis_ui_sample_u', 'vis_ui_sample_v', 'vis_ui_sample_rgba',
     ]
 endif
 if input_enabled
-    wasm_exports += [
-        'vis_input_begin', 'vis_input_release',
-        'vis_input_key_state', 'vis_input_key_begin', 'vis_input_key_end',
-        'vis_input_pointer_state', 'vis_input_pointer_x',
-        'vis_input_pointer_y', 'vis_input_pointer_dx', 'vis_input_pointer_dy',
-        'vis_input_pointer_wheel_x', 'vis_input_pointer_wheel_y',
-        'vis_input_pointer_previous_buttons', 'vis_input_pointer_buttons',
-        'vis_input_pointer_pressed', 'vis_input_pointer_released',
-    ]
+    wasm_exports += ['vis_input_begin', 'vis_input_release']
 endif
 if lua_runtime_enabled
     wasm_exports += [
@@ -40,9 +31,8 @@ if lua_runtime_enabled
 endif
 if audio_enabled
     wasm_exports += [
-        'vis_audio_supported', 'vis_audio_load', 'vis_audio_start',
-        'vis_audio_play', 'vis_audio_stop', 'vis_audio_active',
-        'vis_audio_master_gain', 'vis_audio_bus_gain', 'vis_audio_transport',
+        'vis_audio_load', 'vis_audio_start', 'vis_audio_play', 'vis_audio_stop',
+        'vis_audio_active', 'vis_audio_master_gain', 'vis_audio_bus_gain', 'vis_audio_transport',
     ]
 endif
 

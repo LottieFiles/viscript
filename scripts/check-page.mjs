@@ -22,7 +22,7 @@ const read = (path) => readFileSync(new URL(path, page));
 // The font the page registers under a name, as player.js's provider gives it.
 const pageFont = (name, full) => read(name === "Pretendard" && full ? FULL_PRETENDARD : FONTS.get(name));
 const boot = async ({fonts = [], full = false, assets = []} = {}, module) => {
-    const runtime = await createVis("return vis.scene {width = 16, height = 16}", "bootstrap.lua", {wasmBinary, module});
+    const runtime = await createVis({wasmBinary, module});
     for (const name of fonts) runtime.font(name, pageFont(name, full), "ttf");
     for (const name of assets) runtime.asset(name, read(ASSETS.get(name).path), ASSETS.get(name).mime);
     return runtime;
@@ -84,7 +84,7 @@ const sample = (runtime, clips = []) => {
             runtime.advanceRuntime(1 / 30);
         }
         const [width, height] = runtime.size();
-        const pixels = runtime.render(time, true);
+        const pixels = runtime.render(time);
         assert.equal(pixels.length, width * height * 4);
         frames.push(pixels);
     }
@@ -98,14 +98,14 @@ try {
         try {
             const same = (a, b, label) => a.frames.forEach((frame, f) =>
                 assert.ok(Buffer.from(frame).equals(Buffer.from(b.frames[f])), `${label} frame ${f} changes with the page's resources or shared instance`));
-            const loadLua = (engine) => engine.loadLua(code, `${name}.lua`);
+            const loadLua = (engine) => engine.load(code, `${name}.lua`);
             loadLua(runtime);
             const lua = sample(runtime, clips);
             const luaPage = await engineFor(code, loadLua);
             engines.push(luaPage);
             same(lua, sample(luaPage, clips), "Lua");
             if (!js) continue;
-            const loadJs = (engine) => engine.loadScene(evaluateScene(js, `${name}.js`), `${name}.js`);
+            const loadJs = (engine) => engine.load(evaluateScene(js, `${name}.js`), `${name}.js`);
             loadJs(runtime);
             const other = sample(runtime, clips);
             const jsPage = await engineFor(js, loadJs);

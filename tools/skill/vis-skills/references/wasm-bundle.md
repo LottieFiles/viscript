@@ -22,6 +22,6 @@ If deployment moves the WASM file, provide `locateFile`. For Lua, pass trusted s
 
 ## Fonts, Node, and distribution
 
-Register every selected Theme font before rendering. The presets use `Pretendard` for heading and body roles and monospaced `JetBrainsMono` for code. `hostTheme` (the VS Code Viewer's palette) sets heading and body roles in `Source Serif 4`, and a Source Serif Text that contains Korean switches to `IBM Plex Sans KR`, so register both whenever a host Theme or a custom Theme uses Source Serif 4. In Node, read the `.wasm` bytes and pass `wasmBinary`; copied `render(..., true)` pixels survive subsequent calls. Use `layoutReport(time, 4)` for sampled rendered-layout review, not live layout.
+Register every selected Theme font before rendering. The presets use `Pretendard` for heading and body roles and monospaced `JetBrainsMono` for code. `hostTheme` (the VS Code Viewer's palette) sets heading and body roles in `Source Serif 4`, and a Source Serif Text that contains Korean switches to `IBM Plex Sans KR`, so register both whenever a host Theme or a custom Theme uses Source Serif 4. In Node, read the `.wasm` bytes and pass `wasmBinary`; the pixels `render(time)` returns are a copy that later calls leave alone. Use `layoutReport(time, 4)` for sampled rendered-layout review, not live layout.
 
 Keep each font with its OFL notice, retain all runtime license files, and verify copied releases against `BUILD-MANIFEST.json`.

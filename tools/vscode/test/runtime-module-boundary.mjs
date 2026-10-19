@@ -27,7 +27,7 @@ return vis.scene {
 const runtime = await createVis(source, "runtime-module-boundary.lua", {wasmBinary});
 try {
     assert.equal(typeof runtime.input === "function", expectedInteractive);
-    for (const name of ["beginInputFrame", "releaseInput", "keyState", "pointerState", "actionMap"]) {
+    for (const name of ["beginInputFrame", "releaseInput"]) {
         assert.equal(typeof runtime[name] === "function", expectedInteractive);
     }
     assert.equal(typeof runtime.advanceRuntime === "function", expectedInteractive);

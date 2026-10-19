@@ -70,8 +70,18 @@ VIS_API VisResult vis_load_font(VisEngine engine, const char* name, const uint8_
 VIS_API const char* vis_missing_fonts(VisEngine engine);
 VIS_API VisResult vis_load_asset(VisEngine engine, const char* name, const uint8_t* data, uint32_t size,
                                        const char* mime);
-VIS_API VisResult vis_render(VisEngine engine, float time);
-VIS_API VisResult vis_render_scaled(VisEngine engine, float time, uint32_t pixel_ratio);
+/* Host colors, as 0xRRGGBBAA, for the scenes loaded after it that use the adaptive_vscode theme;
+   dark picks the pro_black base over pro_white, and objects holds 1 to 10 object colors. */
+VIS_API VisResult vis_host_theme(VisEngine engine, uint8_t dark, uint32_t background, uint32_t foreground,
+                                 uint32_t muted, uint32_t accent, uint32_t secondary, uint32_t success,
+                                 uint32_t warning, uint32_t danger, uint32_t info, uint32_t surface,
+                                 uint32_t line, uint32_t result, uint32_t focus, const uint32_t* objects,
+                                 uint32_t object_count);
+/* 1 when the loaded scene uses the adaptive_vscode theme, and so the host colors; else 0. */
+VIS_API uint8_t vis_adaptive_theme(VisEngine engine);
+/* Renders the frame at time, with pixel_ratio (1 or more) pixels for each scene pixel along each
+   axis. */
+VIS_API VisResult vis_render(VisEngine engine, float time, uint32_t pixel_ratio);
 VIS_API VisResult vis_bounds(VisEngine engine, const char* object, float time, VisBBox* output);
 VIS_API VisResult vis_intersects(VisEngine engine, const char* first, const char* second, float time,
                                        float padding, uint8_t* output);
@@ -83,7 +93,7 @@ VIS_API VisResult vis_resize(VisEngine engine, uint32_t width, uint32_t height);
 VIS_API VisResult vis_camera(VisEngine engine, VisCameraAction action, float x, float y);
 VIS_API VisCameraMode vis_camera_mode(VisEngine engine);
 VIS_API VisCameraView vis_camera_view(VisEngine engine);
-/* RGBA bridge requires the CPU engine; pointer expires on engine mutation/destruction. */
+/* The RGBA pixels of the last render; the pointer expires on engine mutation/destruction. */
 VIS_API const uint8_t* vis_pixels(VisEngine engine);
 VIS_API uint32_t vis_pixels_size(VisEngine engine);
 VIS_API uint32_t vis_width(VisEngine engine);

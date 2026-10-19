@@ -9,7 +9,7 @@ int main()
     auto engine = vis_create();
     CHECK(engine != nullptr);
     if (!engine) return 1;
-    CHECK(vis_render(engine, 0.0f) == VIS_RESULT_INSUFFICIENT_CONDITION);
+    CHECK(vis_render(engine, 0.0f, 1u) == VIS_RESULT_INSUFFICIENT_CONDITION);
     CHECK(vis_layout_report(engine, 0.0f, 0.0f) == VIS_RESULT_INSUFFICIENT_CONDITION);
     CHECK(vis_layout_report_data(engine) == nullptr && vis_layout_report_size(engine) == 0);
     CHECK(vis_loop(engine) == 0);
@@ -122,7 +122,7 @@ return scene
     CHECK(vis_load_lua(engine, assetSource, sizeof(assetSource) - 1u, "assets.lua") == VIS_RESULT_SUCCESS);
     CHECK(vis_loop(engine) == 0);
     CHECK(vis_layout_report_data(engine) == nullptr && vis_layout_report_size(engine) == 0);
-    CHECK(vis_render(engine, 0.0f) == VIS_RESULT_SUCCESS);
+    CHECK(vis_render(engine, 0.0f, 1u) == VIS_RESULT_SUCCESS);
     CHECK(vis_pixels(engine) != nullptr && vis_pixels_size(engine) == 160u * 90u * 4u);
     if (auto rendered = reinterpret_cast<const uint8_t*>(vis_pixels(engine))) {
         // The svg-bytes asset renders through Picture with its source colors.
@@ -133,14 +133,14 @@ return scene
         }
         CHECK(red > 100u);
     }
-    CHECK(vis_render_scaled(engine, 0.0f, 2u) == VIS_RESULT_SUCCESS);
+    CHECK(vis_render(engine, 0.0f, 2u) == VIS_RESULT_SUCCESS);
     CHECK(vis_width(engine) == 160u && vis_height(engine) == 90u);
     CHECK(vis_pixels(engine) != nullptr && vis_pixels_size(engine) == 320u * 180u * 4u);
-    CHECK(vis_render_scaled(engine, 0.0f, 0u) == VIS_RESULT_INVALID_ARGUMENTS);
+    CHECK(vis_render(engine, 0.0f, 0u) == VIS_RESULT_INVALID_ARGUMENTS);
     CHECK(vis_pixels(engine) != nullptr && vis_pixels_size(engine) == 320u * 180u * 4u);
     CHECK(vis_resize(engine, 320, 180) == 0);
     CHECK(vis_pixels(engine) == nullptr && vis_pixels_size(engine) == 0);
-    CHECK(vis_render(engine, 0.0f) == 0);
+    CHECK(vis_render(engine, 0.0f, 1u) == 0);
     CHECK(vis_pixels(engine) != nullptr);
     CHECK(vis_pixels_size(engine) == 320u * 180u * 4u);
     CHECK(vis_camera_mode(engine) == VIS_CAMERA_INTERACTIVE);
@@ -176,11 +176,11 @@ return root
     CHECK(vis_load_lua(engine, viewportSource, sizeof(viewportSource) - 1u, "viewport.lua") == VIS_RESULT_SUCCESS);
     CHECK(vis_width(engine) == 200 && vis_height(engine) == 100);
     CHECK(vis_duration(engine) == 1.1f);
-    CHECK(vis_render(engine, vis_duration(engine)) == VIS_RESULT_SUCCESS);
+    CHECK(vis_render(engine, vis_duration(engine), 1u) == VIS_RESULT_SUCCESS);
     CHECK(vis_pixels(engine) != nullptr && vis_pixels_size(engine) == 200u * 100u * 4u);
     CHECK(vis_resize(engine, 400, 200) == VIS_RESULT_SUCCESS);
     CHECK(vis_pixels(engine) == nullptr && vis_pixels_size(engine) == 0);
-    CHECK(vis_render(engine, vis_duration(engine)) == VIS_RESULT_SUCCESS);
+    CHECK(vis_render(engine, vis_duration(engine), 1u) == VIS_RESULT_SUCCESS);
     CHECK(vis_pixels_size(engine) == 400u * 200u * 4u);
     CHECK(std::strcmp(vis_missing_fonts(engine), "") == 0);
 
@@ -196,7 +196,7 @@ root:viewport(inner, {x = 0.5, y = 0, width = 0.5, height = 1})
 return root
     )lua";
     CHECK(vis_load_lua(engine, fontSource, sizeof(fontSource) - 1u, "fonts.lua") == VIS_RESULT_SUCCESS);
-    CHECK(vis_render(engine, 0.0f) == VIS_RESULT_SUCCESS);
+    CHECK(vis_render(engine, 0.0f, 1u) == VIS_RESULT_SUCCESS);
     CHECK(std::strcmp(vis_missing_fonts(engine), "Missing Family\nInner Family\n") == 0);
     CHECK(std::strcmp(vis_missing_fonts(nullptr), "") == 0);
 

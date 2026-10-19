@@ -36,8 +36,7 @@ const INPUT_KEYS = Object.freeze({
     Shift: 46,
     Tab: 47,
 });
-const ACTION_BINDING_LIMIT = 256;
-const ACTION_NAME_LIMIT = 63;
+const encoder = new TextEncoder();
 
 function inputKey(value) {
     if (value === undefined || value === null || value === "") return 0;
@@ -47,136 +46,6 @@ function inputKey(value) {
     if (/^[a-z]$/i.test(value)) return 8 + value.toUpperCase().charCodeAt(0) - 65;
     if (/^[0-9]$/.test(value)) return 34 + value.charCodeAt(0) - 48;
     throw new TypeError(`Unsupported input key '${value}'`);
-}
-
-function actionName(value) {
-    if (typeof value !== "string" || !value.length || value.includes("\0")) {
-        throw new TypeError("Action name must be a non-empty string without zero bytes");
-    }
-    if (new TextEncoder().encode(value).length > ACTION_NAME_LIMIT) {
-        throw new TypeError(`Action name must contain at most ${ACTION_NAME_LIMIT} UTF-8 bytes`);
-    }
-    return value;
-}
-
-function actionValue(value = {x: 1, y: 0}) {
-    if (!value || typeof value !== "object" || !Number.isFinite(value.x)
-        || !Number.isFinite(value.y) || (value.x === 0 && value.y === 0)) {
-        throw new TypeError("Action binding value must contain finite x and y with at least one non-zero component");
-    }
-    return {x: value.x, y: value.y};
-}
-
-function createInputActionMap(readKey, readPointer) {
-    const bindings = [];
-    const bind = (binding) => {
-        const found = bindings.find((candidate) => candidate.action === binding.action
-            && candidate.source === binding.source
-            && (binding.source === "key"
-                ? candidate.key === binding.key
-                : candidate.pointerId === binding.pointerId
-                    && candidate.button === binding.button));
-        if (found) {
-            found.value = binding.value;
-            return api;
-        }
-        if (bindings.length >= ACTION_BINDING_LIMIT) {
-            throw new Error(`Action map supports at most ${ACTION_BINDING_LIMIT} bindings`);
-        }
-        bindings.push(binding);
-        return api;
-    };
-    const api = Object.freeze({
-        get count() {
-            return bindings.length;
-        },
-        bindKey(action, key, value) {
-            const code = inputKey(key);
-            if (!code) throw new TypeError("Action key is required");
-            return bind({source: "key", action: actionName(action), key: code,
-                value: actionValue(value)});
-        },
-        bindPointer(action, button, value, pointerId = 0) {
-            if (!Number.isInteger(button) || button < 0 || button >= 32) {
-                throw new TypeError("Action pointer button must be an integer from 0 to 31");
-            }
-            if (!Number.isInteger(pointerId) || pointerId < 0 || pointerId > 0xffffffff) {
-                throw new TypeError("Action pointer ID must be a uint32 integer");
-            }
-            return bind({source: "pointer", action: actionName(action), button, pointerId,
-                value: actionValue(value)});
-        },
-        remove(action) {
-            const name = actionName(action);
-            let removed = false;
-            for (let i = bindings.length - 1; i >= 0; i--) {
-                if (bindings[i].action !== name) continue;
-                bindings.splice(i, 1);
-                removed = true;
-            }
-            return removed;
-        },
-        clear() {
-            bindings.length = 0;
-        },
-        state(action) {
-            const name = actionName(action);
-            let found = false;
-            let previousDown = false;
-            let down = false;
-            let pressed = false;
-            let released = false;
-            const previous = {x: 0, y: 0};
-            const value = {x: 0, y: 0};
-            for (const binding of bindings) {
-                if (binding.action !== name) continue;
-                found = true;
-                const source = binding.source === "key"
-                    ? readKey(binding.key)
-                    : readPointer(binding.pointerId);
-                if (!source) continue;
-                const mask = binding.source === "pointer" ? (1 << binding.button) >>> 0 : 0;
-                const wasDown = binding.source === "key"
-                    ? source.previous
-                    : Boolean(source.previousButtons & mask);
-                const sourceDown = binding.source === "key"
-                    ? source.down
-                    : Boolean(source.buttons & mask);
-                const sourcePressed = binding.source === "key"
-                    ? source.pressed
-                    : Boolean(source.pressed & mask);
-                const sourceReleased = binding.source === "key"
-                    ? source.released
-                    : Boolean(source.released & mask);
-                if (wasDown) {
-                    previous.x += binding.value.x;
-                    previous.y += binding.value.y;
-                }
-                if (sourceDown) {
-                    value.x += binding.value.x;
-                    value.y += binding.value.y;
-                }
-                previousDown ||= wasDown;
-                down ||= sourceDown;
-                pressed ||= sourcePressed;
-                released ||= sourceReleased;
-            }
-            if (!found) return null;
-            previous.x = Math.max(-1, Math.min(1, previous.x));
-            previous.y = Math.max(-1, Math.min(1, previous.y));
-            value.x = Math.max(-1, Math.min(1, value.x));
-            value.y = Math.max(-1, Math.min(1, value.y));
-            return Object.freeze({
-                previous: Object.freeze(previous),
-                value: Object.freeze(value),
-                delta: Object.freeze({x: value.x - previous.x, y: value.y - previous.y}),
-                down,
-                pressed: (!previousDown && down) || (!previousDown && !down && pressed),
-                released: (previousDown && !down) || (!previousDown && !down && released),
-            });
-        },
-    });
-    return api;
 }
 
 function colorChannel(value, label) {
@@ -212,6 +81,23 @@ function rgba(value, label) {
     return ((red << 24) | (green << 16) | (blue << 8) | alpha) >>> 0;
 }
 
+function nonNegative(value, label) {
+    if (!Number.isFinite(value) || value < 0) throw new RangeError(`${label} must be a non-negative number`);
+}
+
+// Whether value is a plain object: made by an object literal, or without a prototype.
+function plain(value) {
+    const prototype = value ? Object.getPrototypeOf(value) : undefined;
+    return prototype === Object.prototype || prototype === null;
+}
+
+// Throws unless value is a plain object whose keys are all in names.
+function plainFields(value, names, label, field) {
+    if (!plain(value)) throw new TypeError(`${label} must be a plain object`);
+    const unknown = Object.keys(value).find((key) => !names.includes(key));
+    if (unknown !== undefined) throw new TypeError(`Unknown ${field}: ${unknown}`);
+}
+
 // One WASM instance can host many engines. Fonts loaded through any of them are shared by all
 // while one of them is alive; pass the result to createVis as `module` to add an engine without
 // another instance.
@@ -219,7 +105,11 @@ export function createVisModule(moduleOptions = {}) {
     return createModule(moduleOptions);
 }
 
-export async function createVis(source, name = "scene.lua", moduleOptions = {}) {
+// Starts an engine in moduleOptions.module, or in a new instance, and loads source into it.
+// Without a source, as createVis(moduleOptions), the engine holds no scene until load, so fonts,
+// assets and a host theme can go in before the first scene uses them.
+export async function createVis(...args) {
+    const [source, name, moduleOptions = {}] = plain(args[0]) ? [undefined, undefined, args[0]] : args;
     if (!moduleOptions || typeof moduleOptions !== "object" || Array.isArray(moduleOptions)) {
         throw new TypeError("viscript module options must be an object");
     }
@@ -236,67 +126,64 @@ export async function createVis(source, name = "scene.lua", moduleOptions = {}) 
     const assertAlive = () => {
         if (!engine) throw new Error("viscript instance has been destroyed");
     };
-    const loadLua = (sourceText, sourceName = "scene.lua") => {
-        assertAlive();
-        if (typeof sourceText !== "string") throw new TypeError("Lua source must be a string");
-        const source = new TextEncoder().encode(sourceText);
-        const encodedName = new TextEncoder().encode(sourceName);
-        if (!source.length || source.length > 0xffffffff) throw new Error("Lua source must be 1 to 4294967295 bytes");
-        if (!encodedName.length || encodedName.includes(0)) throw new Error("Scene name must be non-empty and cannot contain zero bytes");
-        const sourcePtr = module._malloc(source.length);
-        const namePtr = module._malloc(encodedName.length + 1);
-        if (!sourcePtr || !namePtr) {
-            if (sourcePtr) module._free(sourcePtr);
-            if (namePtr) module._free(namePtr);
-            throw new Error("Unable to allocate WASM input");
-        }
-        let status;
+    const lastError = () => module.UTF8ToString(module._vis_last_error(engine));
+    const check = (result, operation) => {
+        if (result !== 0) throw new Error(lastError() || `${operation} failed (${result})`);
+    };
+    // Calls use with pointers to WASM copies of blocks, then frees them. A byte array is copied with
+    // a terminating zero, so encoded text passes as a C string; a number reserves that many bytes.
+    const withMemory = (blocks, use) => {
+        const pointers = [];
         try {
-            module.HEAPU8.set(source, sourcePtr);
-            module.HEAPU8.set(encodedName, namePtr);
-            module.HEAPU8[namePtr + encodedName.length] = 0;
-            status = module._vis_load_lua(engine, sourcePtr, source.length, namePtr);
+            for (const block of blocks) {
+                const pointer = module._malloc(typeof block === "number" ? block : block.length + 1);
+                if (!pointer) throw new Error("Unable to allocate WASM memory");
+                pointers.push(pointer);
+                if (typeof block === "number") continue;
+                module.HEAPU8.set(block, pointer);
+                module.HEAPU8[pointer + block.length] = 0;
+            }
+            return use(...pointers);
         } finally {
-            module._free(namePtr);
-            module._free(sourcePtr);
+            for (const pointer of pointers) module._free(pointer);
         }
-        if (status !== 0) {
-            const message = module.UTF8ToString(module._vis_last_error(engine));
-            throw new Error(message || `Lua load failed (${status})`);
-        }
+    };
+    const load = (input, sourceName = typeof input === "string" ? "scene.lua" : "scene.js") => {
+        assertAlive();
+        const source = encoder.encode(typeof input === "string" ? input : compileScene(input));
+        const name = encoder.encode(sourceName);
+        if (!source.length || source.length > 0xffffffff) throw new Error("Lua source must be 1 to 4294967295 bytes");
+        if (!name.length || name.includes(0)) throw new Error("Scene name must be non-empty and cannot contain zero bytes");
+        check(withMemory([source, name], (sourcePtr, namePtr) =>
+            module._vis_load_lua(engine, sourcePtr, source.length, namePtr)), "Lua load");
         return module._vis_duration(engine);
     };
-    const loadScene = (definition, sourceName = "scene.js") => loadLua(compileScene(definition), sourceName);
-    const load = (input, sourceName = typeof input === "string" ? "scene.lua" : "scene.js") => {
-        return typeof input === "string" ? loadLua(input, sourceName) : loadScene(input, sourceName);
-    };
 
-    try {
-        load(source, name);
-    } catch (error) {
-        module._vis_destroy(engine);
-        engine = 0;
-        throw error;
+    if (source !== undefined) {
+        try {
+            load(source, name);
+        } catch (error) {
+            module._vis_destroy(engine);
+            engine = 0;
+            throw error;
+        }
     }
 
-    const renderFrame = (time, copy, pixelRatio) => {
+    // The bundled WASM predates vis_render's pixel ratio and takes it in vis_render_scaled; drop
+    // the fallback when the bundles are rebuilt.
+    const renderPixels = module._vis_render_scaled ?? module._vis_render;
+    // Renders a frame and returns a view of its pixels, which the next render, a resize or WASM
+    // memory growth leaves stale: render hands out a copy, draw puts the view on a canvas.
+    const renderFrame = (time, pixelRatio) => {
         assertAlive();
-        const result = pixelRatio === 1
-            ? module._vis_render(engine, time)
-            : module._vis_render_scaled(engine, time, pixelRatio);
-        if (result !== 0) {
-            throw new Error(module.UTF8ToString(module._vis_last_error(engine)) || `Render failed (${result})`);
-        }
-        const ptr = module._vis_pixels(engine);
-        const size = module._vis_pixels_size(engine);
-        const pixels = new Uint8ClampedArray(module.HEAPU8.buffer, ptr, size);
-        return copy ? new Uint8ClampedArray(pixels) : pixels;
+        check(renderPixels(engine, time, pixelRatio), "Render");
+        return new Uint8ClampedArray(module.HEAPU8.buffer, module._vis_pixels(engine), module._vis_pixels_size(engine));
     };
-    const render = (time, copy = false) => renderFrame(time, copy, 1);
+    const render = (time) => renderFrame(time, 1).slice();
 
     const encodedObject = (value, label) => {
         if (typeof value !== "string") throw new TypeError(`${label} must be an object ID`);
-        const encoded = new TextEncoder().encode(value);
+        const encoded = encoder.encode(value);
         if (!encoded.length || encoded.length > 4096 || encoded.includes(0)) {
             throw new TypeError(`${label} must be a non-empty object ID without zero bytes`);
         }
@@ -304,85 +191,30 @@ export async function createVis(source, name = "scene.lua", moduleOptions = {}) 
     };
     const bounds = (object, time = 0) => {
         assertAlive();
-        if (!Number.isFinite(time) || time < 0) throw new RangeError("Bounds time must be a non-negative number");
-        const encoded = encodedObject(object, "Bounds target");
-        const objectPtr = module._malloc(encoded.length + 1);
-        const outputPtr = module._malloc(16);
-        if (!objectPtr || !outputPtr) {
-            if (objectPtr) module._free(objectPtr);
-            if (outputPtr) module._free(outputPtr);
-            throw new Error("Unable to allocate WASM bounds input");
-        }
-        let result;
-        let values;
-        try {
-            module.HEAPU8.set(encoded, objectPtr);
-            module.HEAPU8[objectPtr + encoded.length] = 0;
-            result = module._vis_bounds(engine, objectPtr, time, outputPtr);
-            if (result === 0) values = new Float32Array(module.HEAPU8.buffer, outputPtr, 4).slice();
-        } finally {
-            module._free(outputPtr);
-            module._free(objectPtr);
-        }
-        if (result !== 0) {
-            throw new Error(module.UTF8ToString(module._vis_last_error(engine)) || `Bounds query failed (${result})`);
-        }
-        return Object.freeze({x: values[0], y: values[1], width: values[2], height: values[3]});
+        nonNegative(time, "Bounds time");
+        const target = encodedObject(object, "Bounds target");
+        const [x, y, width, height] = withMemory([target, 16], (objectPtr, outputPtr) => {
+            check(module._vis_bounds(engine, objectPtr, time, outputPtr), "Bounds query");
+            return new Float32Array(module.HEAPU8.buffer, outputPtr, 4).slice();
+        });
+        return Object.freeze({x, y, width, height});
     };
     const intersects = (first, second, time = 0, padding = 0) => {
         assertAlive();
-        if (!Number.isFinite(time) || time < 0) {
-            throw new RangeError("Intersection time must be a non-negative number");
-        }
-        if (!Number.isFinite(padding) || padding < 0) {
-            throw new RangeError("Intersection padding must be a non-negative number");
-        }
-        const firstEncoded = encodedObject(first, "First intersection target");
-        const secondEncoded = encodedObject(second, "Second intersection target");
-        const firstPtr = module._malloc(firstEncoded.length + 1);
-        const secondPtr = module._malloc(secondEncoded.length + 1);
-        const outputPtr = module._malloc(1);
-        if (!firstPtr || !secondPtr || !outputPtr) {
-            if (firstPtr) module._free(firstPtr);
-            if (secondPtr) module._free(secondPtr);
-            if (outputPtr) module._free(outputPtr);
-            throw new Error("Unable to allocate WASM intersection input");
-        }
-        let result;
-        let output;
-        try {
-            module.HEAPU8.set(firstEncoded, firstPtr);
-            module.HEAPU8[firstPtr + firstEncoded.length] = 0;
-            module.HEAPU8.set(secondEncoded, secondPtr);
-            module.HEAPU8[secondPtr + secondEncoded.length] = 0;
-            result = module._vis_intersects(engine, firstPtr, secondPtr, time, padding, outputPtr);
-            output = module.HEAPU8[outputPtr] !== 0;
-        } finally {
-            module._free(outputPtr);
-            module._free(secondPtr);
-            module._free(firstPtr);
-        }
-        if (result !== 0) {
-            throw new Error(
-                module.UTF8ToString(module._vis_last_error(engine)) || `Intersection query failed (${result})`,
-            );
-        }
-        return output;
+        nonNegative(time, "Intersection time");
+        nonNegative(padding, "Intersection padding");
+        const firstTarget = encodedObject(first, "First intersection target");
+        const secondTarget = encodedObject(second, "Second intersection target");
+        return withMemory([firstTarget, secondTarget, 1], (firstPtr, secondPtr, outputPtr) => {
+            check(module._vis_intersects(engine, firstPtr, secondPtr, time, padding, outputPtr), "Intersection query");
+            return module.HEAPU8[outputPtr] !== 0;
+        });
     };
     const layoutReport = (time = 0, padding = 0) => {
         assertAlive();
-        if (!Number.isFinite(time) || time < 0) {
-            throw new RangeError("Layout report time must be a non-negative number");
-        }
-        if (!Number.isFinite(padding) || padding < 0) {
-            throw new RangeError("Layout report padding must be a non-negative number");
-        }
-        const result = module._vis_layout_report(engine, time, padding);
-        if (result !== 0) {
-            throw new Error(
-                module.UTF8ToString(module._vis_last_error(engine)) || `Layout report failed (${result})`,
-            );
-        }
+        nonNegative(time, "Layout report time");
+        nonNegative(padding, "Layout report padding");
+        check(module._vis_layout_report(engine, time, padding), "Layout report");
         const pointer = module._vis_layout_report_data(engine);
         const size = module._vis_layout_report_size(engine);
         if (!pointer || !size) throw new Error("Layout report returned no data");
@@ -392,38 +224,14 @@ export async function createVis(source, name = "scene.lua", moduleOptions = {}) 
     const resource = (loader, label, name, data, mime) => {
         assertAlive();
         const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
-        const encodedName = new TextEncoder().encode(name);
-        const encodedMime = new TextEncoder().encode(mime);
+        const encodedName = encoder.encode(name);
+        const encodedMime = encoder.encode(mime);
         if (!bytes.length || bytes.length > 32 * 1024 * 1024) throw new Error(`${label} must be 1 byte to 32 MiB`);
-        if (!encodedName.length || encodedName.length > 256 || encodedName.includes(0) ||
-            !encodedMime.length || encodedMime.length > 256 || encodedMime.includes(0)) {
+        if ([encodedName, encodedMime].some((text) => !text.length || text.length > 256 || text.includes(0))) {
             throw new Error(`${label} name and MIME must be non-empty, at most 256 bytes, and contain no zero bytes`);
         }
-        const dataPtr = module._malloc(bytes.length);
-        const namePtr = module._malloc(encodedName.length + 1);
-        const mimePtr = module._malloc(encodedMime.length + 1);
-        if (!dataPtr || !namePtr || !mimePtr) {
-            if (dataPtr) module._free(dataPtr);
-            if (namePtr) module._free(namePtr);
-            if (mimePtr) module._free(mimePtr);
-            throw new Error(`Unable to allocate WASM ${label.toLowerCase()} input`);
-        }
-        let result;
-        try {
-            module.HEAPU8.set(bytes, dataPtr);
-            module.HEAPU8.set(encodedName, namePtr);
-            module.HEAPU8[namePtr + encodedName.length] = 0;
-            module.HEAPU8.set(encodedMime, mimePtr);
-            module.HEAPU8[mimePtr + encodedMime.length] = 0;
-            result = loader(engine, namePtr, dataPtr, bytes.length, mimePtr);
-        } finally {
-            module._free(mimePtr);
-            module._free(namePtr);
-            module._free(dataPtr);
-        }
-        if (result !== 0) {
-            throw new Error(module.UTF8ToString(module._vis_last_error(engine)) || `${label} load failed (${result})`);
-        }
+        check(withMemory([bytes, encodedName, encodedMime], (dataPtr, namePtr, mimePtr) =>
+            loader(engine, namePtr, dataPtr, bytes.length, mimePtr)), `${label} load`);
     };
     const font = (name, data, mime = "ttf") => resource(module._vis_load_font, "Font", name, data, mime);
     const missingFonts = () => {
@@ -432,7 +240,6 @@ export async function createVis(source, name = "scene.lua", moduleOptions = {}) 
     };
     const asset = (name, data, mime) => resource(module._vis_load_asset, "Asset", name, data, mime);
     const audioExportNames = [
-        "_vis_audio_supported",
         "_vis_audio_load",
         "_vis_audio_start",
         "_vis_audio_play",
@@ -442,55 +249,32 @@ export async function createVis(source, name = "scene.lua", moduleOptions = {}) 
         "_vis_audio_bus_gain",
         "_vis_audio_transport",
     ];
-    const hasAudio = audioExportNames.every((exportName) => typeof module[exportName] === "function")
-        && module._vis_audio_supported(engine) !== 0;
+    const hasAudio = audioExportNames.every((exportName) => typeof module[exportName] === "function");
     const audio = hasAudio ? (() => {
         const buses = Object.freeze({music: 0, effect: 1, ui: 2});
-        const status = (result, operation) => {
-            if (result === 0) return;
-            throw new Error(module.UTF8ToString(module._vis_last_error(engine))
-                || `Audio ${operation} failed (${result})`);
-        };
         const nameBytes = (name) => {
             if (typeof name !== "string" || !name.length || name.includes("\0")) {
                 throw new TypeError("Audio asset name must be non-empty text without zero bytes");
             }
-            const encoded = new TextEncoder().encode(name);
+            const encoded = encoder.encode(name);
             if (encoded.length > 255) throw new RangeError("Audio asset name must contain at most 255 UTF-8 bytes");
             return encoded;
         };
-        const withName = (name, operation) => {
-            const encoded = nameBytes(name);
-            const pointer = module._malloc(encoded.length + 1);
-            if (!pointer) throw new Error("Unable to allocate WASM audio name input");
-            try {
-                module.HEAPU8.set(encoded, pointer);
-                module.HEAPU8[pointer + encoded.length] = 0;
-                return operation(pointer);
-            } finally {
-                module._free(pointer);
-            }
-        };
         const gain = (value, label) => {
-            const native = Math.fround(value);
-            if (!Number.isFinite(value) || !Number.isFinite(native) || value < 0 || value > 4) {
+            if (!Number.isFinite(value) || value < 0 || value > 4) {
                 throw new RangeError(`${label} must be finite and between 0 and 4`);
             }
-            return native;
+            return Math.fround(value);
         };
         const rate = (value) => {
-            const native = Math.fround(value);
-            if (!Number.isFinite(value) || !Number.isFinite(native) || value < 0.125 || value > 8) {
+            if (!Number.isFinite(value) || value < 0.125 || value > 8) {
                 throw new RangeError("Audio rate must be finite and between 0.125 and 8");
             }
-            return native;
+            return Math.fround(value);
         };
         const bus = (value) => {
-            if (!Object.hasOwn(buses, value)) {
-                throw new TypeError("Audio bus must be music, effect, or ui");
-            }
-            const code = buses[value];
-            return code;
+            if (!Object.hasOwn(buses, value)) throw new TypeError("Audio bus must be music, effect, or ui");
+            return buses[value];
         };
         const voice = (value) => {
             if (!Number.isInteger(value) || value <= 0 || value > 0xffffffff) {
@@ -505,54 +289,33 @@ export async function createVis(source, name = "scene.lua", moduleOptions = {}) 
                 if (!bytes.length || bytes.length > 32 * 1024 * 1024) {
                     throw new RangeError("Audio data must be 1 byte to 32 MiB");
                 }
-                const dataPtr = module._malloc(bytes.length);
-                if (!dataPtr) throw new Error("Unable to allocate WASM audio input");
-                try {
-                    module.HEAPU8.set(bytes, dataPtr);
-                    withName(name, (namePtr) => status(
-                        module._vis_audio_load(engine, namePtr, dataPtr, bytes.length),
-                        "load",
-                    ));
-                } finally {
-                    module._free(dataPtr);
-                }
+                check(withMemory([bytes, nameBytes(name)], (dataPtr, namePtr) =>
+                    module._vis_audio_load(engine, namePtr, dataPtr, bytes.length)), "Audio load");
             },
             start() {
                 assertAlive();
-                status(module._vis_audio_start(engine), "start");
+                check(module._vis_audio_start(engine), "Audio start");
             },
             play(name, options = {}) {
                 assertAlive();
-                if (!options || (Object.getPrototypeOf(options) !== Object.prototype
-                    && Object.getPrototypeOf(options) !== null)) {
-                    throw new TypeError("Audio playback options must be a plain object");
-                }
-                const fields = new Set(["bus", "gain", "rate", "loop"]);
-                const unknown = Object.keys(options).find((key) => !fields.has(key));
-                if (unknown) throw new TypeError(`Unknown audio playback option: ${unknown}`);
+                plainFields(options, ["bus", "gain", "rate", "loop"], "Audio playback options",
+                    "audio playback option");
                 const busCode = bus(options.bus ?? "effect");
                 const gainValue = gain(options.gain ?? 1, "Audio playback gain");
                 const rateValue = rate(options.rate ?? 1);
                 const loop = options.loop ?? false;
                 if (typeof loop !== "boolean") throw new TypeError("Audio playback loop must be boolean");
-                const output = module._malloc(4);
-                if (!output) throw new Error("Unable to allocate WASM audio voice output");
-                try {
-                    return withName(name, (namePtr) => {
-                        status(module._vis_audio_play(
-                            engine, namePtr, busCode, gainValue, rateValue, loop ? 1 : 0, output,
-                        ), "play");
-                        const handle = new Uint32Array(module.HEAPU8.buffer, output, 1)[0];
-                        if (!handle) throw new Error("Audio play returned no voice handle");
-                        return handle;
-                    });
-                } finally {
-                    module._free(output);
-                }
+                return withMemory([nameBytes(name), 4], (namePtr, output) => {
+                    check(module._vis_audio_play(engine, namePtr, busCode, gainValue, rateValue, loop ? 1 : 0, output),
+                        "Audio play");
+                    const handle = new Uint32Array(module.HEAPU8.buffer, output, 1)[0];
+                    if (!handle) throw new Error("Audio play returned no voice handle");
+                    return handle;
+                });
             },
             stop(handle) {
                 assertAlive();
-                status(module._vis_audio_stop(engine, voice(handle)), "stop");
+                check(module._vis_audio_stop(engine, voice(handle)), "Audio stop");
             },
             active(handle) {
                 assertAlive();
@@ -560,23 +323,15 @@ export async function createVis(source, name = "scene.lua", moduleOptions = {}) 
             },
             masterGain(value) {
                 assertAlive();
-                status(module._vis_audio_master_gain(engine, gain(value, "Audio master gain")), "master gain");
+                check(module._vis_audio_master_gain(engine, gain(value, "Audio master gain")), "Audio master gain");
             },
             busGain(name, value) {
                 assertAlive();
-                status(module._vis_audio_bus_gain(
-                    engine, bus(name), gain(value, "Audio bus gain"),
-                ), "bus gain");
+                check(module._vis_audio_bus_gain(engine, bus(name), gain(value, "Audio bus gain")), "Audio bus gain");
             },
             transport(value) {
                 assertAlive();
-                if (!value || (Object.getPrototypeOf(value) !== Object.prototype
-                    && Object.getPrototypeOf(value) !== null)) {
-                    throw new TypeError("Audio transport must be a plain object");
-                }
-                const fields = new Set(["time", "rate", "playing", "seek"]);
-                const unknown = Object.keys(value).find((key) => !fields.has(key));
-                if (unknown) throw new TypeError(`Unknown audio transport field: ${unknown}`);
+                plainFields(value, ["time", "rate", "playing", "seek"], "Audio transport", "audio transport field");
                 const time = Math.fround(value.time);
                 if (!Number.isFinite(value.time) || !Number.isFinite(time) || value.time < 0) {
                     throw new RangeError("Audio transport time must be finite, non-negative, and representable as float32");
@@ -586,9 +341,8 @@ export async function createVis(source, name = "scene.lua", moduleOptions = {}) 
                 if (typeof playing !== "boolean" || typeof seek !== "boolean") {
                     throw new TypeError("Audio transport playing and seek must be boolean");
                 }
-                status(module._vis_audio_transport(
-                    engine, time, rate(value.rate ?? 1), playing ? 1 : 0, seek ? 1 : 0,
-                ), "transport sync");
+                check(module._vis_audio_transport(engine, time, rate(value.rate ?? 1), playing ? 1 : 0, seek ? 1 : 0),
+                    "Audio transport sync");
             },
         });
     })() : undefined;
@@ -601,14 +355,10 @@ export async function createVis(source, name = "scene.lua", moduleOptions = {}) 
         if (typeof module._vis_camera !== "function") return false;
         const result = module._vis_camera(engine, code, x, y);
         if (result === 2 || result === 3) return false;
-        if (result !== 0) {
-            throw new Error(module.UTF8ToString(module._vis_last_error(engine)) || `Camera input failed (${result})`);
-        }
+        check(result, "Camera input");
         return true;
     };
-    const genericInput = typeof module._vis_input === "function";
-    const inputExport = genericInput ? module._vis_input : module._vis_ui_input;
-    const input = typeof inputExport === "function" ? (event) => {
+    const input = typeof module._vis_input === "function" ? (event) => {
         assertAlive();
         if (!event || typeof event !== "object") throw new TypeError("Input must be an event object");
         const type = INPUT_TYPES[event.type];
@@ -632,42 +382,26 @@ export async function createVis(source, name = "scene.lua", moduleOptions = {}) 
             throw new TypeError("Input button, buttons, modifiers, and pointer ID must be valid integers");
         }
         const key = inputKey(event.key);
-        if (genericInput && type >= INPUT_TYPES.keydown && key === 0) {
+        if (type >= INPUT_TYPES.keydown && key === 0) {
             throw new TypeError("Input key is required for keydown and keyup events");
         }
-        const flags = (genericInput
-            ? inputExport(
-                engine,
-                type,
-                event.x,
-                event.y,
-                event.dx,
-                event.dy,
-                event.wheelX,
-                event.wheelY,
-                event.button,
-                event.buttons,
-                event.modifiers,
-                event.pointerId,
-                key,
-                event.repeat ? 1 : 0,
-                event.time,
-            )
-            : inputExport(
-                engine,
-                type,
-                event.x,
-                event.y,
-                event.dx,
-                event.dy,
-                event.wheelX,
-                event.wheelY,
-                event.button,
-                event.buttons,
-                event.modifiers,
-                event.pointerId,
-                event.time,
-            )) >>> 0;
+        const flags = module._vis_input(
+            engine,
+            type,
+            event.x,
+            event.y,
+            event.dx,
+            event.dy,
+            event.wheelX,
+            event.wheelY,
+            event.button,
+            event.buttons,
+            event.modifiers,
+            event.pointerId,
+            key,
+            event.repeat ? 1 : 0,
+            event.time,
+        ) >>> 0;
         let sample;
         if (flags & 16) {
             const getters = [
@@ -715,116 +449,23 @@ export async function createVis(source, name = "scene.lua", moduleOptions = {}) 
             release: Boolean(flags & 8),
         };
         if (sample) result.sample = sample;
-        if (flags & 32) {
-            result.error = module.UTF8ToString(module._vis_last_error(engine))
-                || "Input handling failed";
-        }
+        if (flags & 32) result.error = lastError() || "Input handling failed";
         return Object.freeze(result);
     } : undefined;
-    const stateExports = [
-        "_vis_input_begin",
-        "_vis_input_release",
-        "_vis_input_key_state",
-        "_vis_input_key_begin",
-        "_vis_input_key_end",
-        "_vis_input_pointer_state",
-        "_vis_input_pointer_x",
-        "_vis_input_pointer_y",
-        "_vis_input_pointer_dx",
-        "_vis_input_pointer_dy",
-        "_vis_input_pointer_wheel_x",
-        "_vis_input_pointer_wheel_y",
-        "_vis_input_pointer_previous_buttons",
-        "_vis_input_pointer_buttons",
-        "_vis_input_pointer_pressed",
-        "_vis_input_pointer_released",
-    ];
-    const hasInputState = stateExports.every((name) => typeof module[name] === "function");
-    const beginInputFrame = hasInputState ? (time) => {
+    const hasInputFrames = typeof module._vis_input_begin === "function";
+    const beginInputFrame = (time) => {
         assertAlive();
-        if (!Number.isFinite(time) || time < 0) {
-            throw new TypeError("Input frame time must be finite and non-negative");
-        }
-        const result = module._vis_input_begin(engine, time);
-        if (result !== 0) {
-            throw new Error(module.UTF8ToString(module._vis_last_error(engine))
-                || `Input frame begin failed (${result})`);
-        }
-    } : undefined;
-    const releaseInput = hasInputState ? (time) => {
+        if (!Number.isFinite(time) || time < 0) throw new TypeError("Input frame time must be finite and non-negative");
+        check(module._vis_input_begin(engine, time), "Input frame begin");
+    };
+    const releaseInput = (time) => {
         assertAlive();
-        if (!Number.isFinite(time) || time < 0) {
-            throw new TypeError("Input release time must be finite and non-negative");
-        }
+        if (!Number.isFinite(time) || time < 0) throw new TypeError("Input release time must be finite and non-negative");
         const flags = module._vis_input_release(engine, time) >>> 0;
-        const result = {
-            handled: Boolean(flags & 1),
-            redraw: Boolean(flags & 2),
-            capture: false,
-            release: false,
-        };
-        if (flags & 32) {
-            result.error = module.UTF8ToString(module._vis_last_error(engine))
-                || "Input release failed";
-        }
+        const result = {handled: Boolean(flags & 1), redraw: Boolean(flags & 2), capture: false, release: false};
+        if (flags & 32) result.error = lastError() || "Input release failed";
         return Object.freeze(result);
-    } : undefined;
-    const readKeyState = hasInputState ? (key) => {
-        assertAlive();
-        const flags = module._vis_input_key_state(engine, key) >>> 0;
-        if (flags === 0xffffffff) {
-            throw new Error(module.UTF8ToString(module._vis_last_error(engine))
-                || "Input key-state query failed");
-        }
-        return Object.freeze({
-            begin: module._vis_input_key_begin(engine),
-            end: module._vis_input_key_end(engine),
-            previous: Boolean(flags & 1),
-            down: Boolean(flags & 2),
-            pressed: Boolean(flags & 4),
-            released: Boolean(flags & 8),
-        });
-    } : undefined;
-    const keyState = hasInputState ? (key) => {
-        const code = inputKey(key);
-        if (!code) throw new TypeError("Input key is required");
-        return readKeyState(code);
-    } : undefined;
-    const pointerState = hasInputState ? (pointerId = 0) => {
-        assertAlive();
-        if (!Number.isInteger(pointerId) || pointerId < 0 || pointerId > 0xffffffff) {
-            throw new TypeError("Input pointer ID must be a uint32 integer");
-        }
-        const flags = module._vis_input_pointer_state(engine, pointerId) >>> 0;
-        if (flags === 0xffffffff) {
-            throw new Error(module.UTF8ToString(module._vis_last_error(engine))
-                || "Input pointer-state query failed");
-        }
-        if (!(flags & 1)) return null;
-        return Object.freeze({
-            pointerId,
-            position: Object.freeze({
-                x: module._vis_input_pointer_x(engine),
-                y: module._vis_input_pointer_y(engine),
-            }),
-            delta: Object.freeze({
-                x: module._vis_input_pointer_dx(engine),
-                y: module._vis_input_pointer_dy(engine),
-            }),
-            wheel: Object.freeze({
-                x: module._vis_input_pointer_wheel_x(engine),
-                y: module._vis_input_pointer_wheel_y(engine),
-            }),
-            previousButtons: module._vis_input_pointer_previous_buttons(engine) >>> 0,
-            buttons: module._vis_input_pointer_buttons(engine) >>> 0,
-            pressed: module._vis_input_pointer_pressed(engine) >>> 0,
-            released: module._vis_input_pointer_released(engine) >>> 0,
-            active: Boolean(flags & 2),
-        });
-    } : undefined;
-    const actionMap = hasInputState
-        ? () => createInputActionMap(readKeyState, pointerState)
-        : undefined;
+    };
     const retainedRuntimeExports = [
         "_vis_runtime_active",
         "_vis_runtime_advance",
@@ -833,48 +474,30 @@ export async function createVis(source, name = "scene.lua", moduleOptions = {}) 
         "_vis_runtime_tick",
         "_vis_runtime_steps",
         "_vis_runtime_interpolation",
+        "_vis_runtime_sound_count",
+        "_vis_runtime_sound",
     ];
     const hasRetainedRuntime = retainedRuntimeExports.every(
         (exportName) => typeof module[exportName] === "function",
     );
-    const hasRuntimeSounds = typeof module._vis_runtime_sound_count === "function"
-        && typeof module._vis_runtime_sound === "function";
     const runtimeSounds = () => {
-        if (!hasRuntimeSounds) return Object.freeze([]);
         const count = module._vis_runtime_sound_count(engine) >>> 0;
         if (!count) return Object.freeze([]);
         if (count > 64) throw new Error("Retained runtime returned too many sound events");
-        const buffer = module._malloc(272);
-        if (!buffer) throw new Error("Unable to allocate retained runtime sound output");
-        const assetPtr = buffer;
-        const busPtr = buffer + 256;
-        const gainPtr = buffer + 260;
-        const ratePtr = buffer + 264;
-        const loopPtr = buffer + 268;
         const buses = ["music", "effect", "ui"];
-        const sounds = [];
-        try {
-            for (let index = 0; index < count; index += 1) {
-                const result = module._vis_runtime_sound(
-                    engine, index, assetPtr, 256,
-                    busPtr, gainPtr, ratePtr, loopPtr,
-                );
-                if (result !== 0) {
-                    throw new Error(`Retained runtime sound query failed (${result})`);
-                }
-                const bus = new Uint32Array(module.HEAPU8.buffer, busPtr, 1)[0];
-                sounds.push(Object.freeze({
-                    asset: module.UTF8ToString(assetPtr),
-                    bus: buses[bus] ?? "effect",
-                    gain: new Float32Array(module.HEAPU8.buffer, gainPtr, 1)[0],
-                    rate: new Float32Array(module.HEAPU8.buffer, ratePtr, 1)[0],
-                    loop: module.HEAPU8[loopPtr] !== 0,
-                }));
-            }
-        } finally {
-            module._free(buffer);
-        }
-        return Object.freeze(sounds);
+        // Each event fills the 256-byte asset name, then its bus, gain, rate and loop.
+        return Object.freeze(withMemory([272], (asset) => Array.from({length: count}, (_, index) => {
+            check(module._vis_runtime_sound(engine, index, asset, 256,
+                asset + 256, asset + 260, asset + 264, asset + 268), "Retained runtime sound query");
+            const fields = new DataView(module.HEAPU8.buffer, asset + 256, 16);
+            return Object.freeze({
+                asset: module.UTF8ToString(asset),
+                bus: buses[fields.getUint32(0, true)] ?? "effect",
+                gain: fields.getFloat32(4, true),
+                rate: fields.getFloat32(8, true),
+                loop: fields.getUint8(12) !== 0,
+            });
+        })));
     };
     const retainedLua = () => {
         assertAlive();
@@ -887,11 +510,7 @@ export async function createVis(source, name = "scene.lua", moduleOptions = {}) 
             throw new RangeError("Retained runtime elapsed time must be finite, non-negative, and representable as float32");
         }
         if (!retainedLua()) return null;
-        const result = module._vis_runtime_advance(engine, nativeElapsed);
-        if (result !== 0) {
-            throw new Error(module.UTF8ToString(module._vis_last_error(engine))
-                || `Retained runtime advance failed (${result})`);
-        }
+        check(module._vis_runtime_advance(engine, nativeElapsed), "Retained runtime advance");
         return Object.freeze({
             time: module._vis_runtime_time(engine),
             dropped: module._vis_runtime_dropped(engine),
@@ -909,38 +528,25 @@ export async function createVis(source, name = "scene.lua", moduleOptions = {}) 
         if (!Array.isArray(palette.objects) || !palette.objects.length || palette.objects.length > 10) {
             throw new TypeError("Host theme objects must contain 1 to 10 colors");
         }
-        const objectColors = palette.objects.map((color, index) =>
+        const objects = Uint32Array.from(palette.objects, (color, index) =>
             rgba(color, `Host theme object color ${index + 1}`));
-        const objectsPtr = module._malloc(objectColors.length * 4);
-        if (!objectsPtr) throw new Error("Unable to allocate WASM host theme palette");
-        let result;
-        try {
-            new Uint32Array(module.HEAPU8.buffer, objectsPtr, objectColors.length).set(objectColors);
-            result = module._vis_host_theme(
-                engine,
-                palette.dark ? 1 : 0,
-                rgba(palette.background, "Host theme background"),
-                rgba(palette.foreground, "Host theme foreground"),
-                rgba(palette.muted, "Host theme muted color"),
-                rgba(palette.accent, "Host theme accent"),
-                rgba(palette.secondary, "Host theme secondary color"),
-                rgba(palette.success, "Host theme success color"),
-                rgba(palette.warning, "Host theme warning color"),
-                rgba(palette.danger, "Host theme danger color"),
-                rgba(palette.info, "Host theme info color"),
-                rgba(palette.surface, "Host theme surface color"),
-                rgba(palette.line, "Host theme line color"),
-                rgba(palette.result, "Host theme result color"),
-                rgba(palette.focus, "Host theme focus color"),
-                objectsPtr,
-                objectColors.length,
-            );
-        } finally {
-            module._free(objectsPtr);
-        }
-        if (result !== 0) {
-            throw new Error(module.UTF8ToString(module._vis_last_error(engine)) || `Host theme failed (${result})`);
-        }
+        const colors = [
+            rgba(palette.background, "Host theme background"),
+            rgba(palette.foreground, "Host theme foreground"),
+            rgba(palette.muted, "Host theme muted color"),
+            rgba(palette.accent, "Host theme accent"),
+            rgba(palette.secondary, "Host theme secondary color"),
+            rgba(palette.success, "Host theme success color"),
+            rgba(palette.warning, "Host theme warning color"),
+            rgba(palette.danger, "Host theme danger color"),
+            rgba(palette.info, "Host theme info color"),
+            rgba(palette.surface, "Host theme surface color"),
+            rgba(palette.line, "Host theme line color"),
+            rgba(palette.result, "Host theme result color"),
+            rgba(palette.focus, "Host theme focus color"),
+        ];
+        check(withMemory([new Uint8Array(objects.buffer)], (objectsPtr) => module._vis_host_theme(
+            engine, palette.dark ? 1 : 0, ...colors, objectsPtr, objects.length)), "Host theme");
     };
 
     return {
@@ -972,8 +578,6 @@ export async function createVis(source, name = "scene.lua", moduleOptions = {}) 
             return retainedLua() ? module._vis_runtime_time(engine) : 0;
         },
         load,
-        loadLua,
-        loadScene,
         render,
         bounds,
         intersects,
@@ -984,13 +588,7 @@ export async function createVis(source, name = "scene.lua", moduleOptions = {}) 
         ...(audio ? {audio} : {}),
         cameraInput,
         ...(input ? {input} : {}),
-        ...(hasInputState ? {
-            beginInputFrame,
-            releaseInput,
-            keyState,
-            pointerState,
-            actionMap,
-        } : {}),
+        ...(hasInputFrames ? {beginInputFrame, releaseInput} : {}),
         ...(advanceRuntime ? {advanceRuntime} : {}),
         hostTheme,
         draw(canvas, time, pixelRatio = 1) {
@@ -1010,7 +608,7 @@ export async function createVis(source, name = "scene.lua", moduleOptions = {}) 
             if (canvas.width !== width) canvas.width = width;
             if (canvas.height !== height) canvas.height = height;
             canvas.getContext("2d").putImageData(
-                new ImageData(renderFrame(time, false, pixelRatio), width, height),
+                new ImageData(renderFrame(time, pixelRatio), width, height),
                 0,
                 0,
             );
@@ -1025,8 +623,7 @@ export async function createVis(source, name = "scene.lua", moduleOptions = {}) 
                 width > 0xffffffff || height > Math.floor(67108864 / width)) {
                 throw new Error("Size must be positive integers with at most 67108864 pixels");
             }
-            const result = module._vis_resize(engine, width, height);
-            if (result !== 0) throw new Error(module.UTF8ToString(module._vis_last_error(engine)) || `Resize failed (${result})`);
+            check(module._vis_resize(engine, width, height), "Resize");
         },
         destroy() {
             if (!engine) return;
