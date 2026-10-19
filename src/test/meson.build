@@ -155,6 +155,7 @@ cpp_tests += [
         'when': native, 'args': font_args, 'inc': [lua_inc],
     },
     {'name': 'c-api', 'exe': 'testCapi', 'when': native},
+    {'name': 'memory', 'exe': 'testMemory', 'when': native},
     {
         'name': 'retained', 'exe': 'testRetained', 'when': native, 'inc': [lua_inc],
         'args': font_args + ['-DVIS_TEST_EXAMPLES="' + (meson.project_source_root() / 'src/examples/lua') + '"'],

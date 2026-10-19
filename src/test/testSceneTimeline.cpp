@@ -526,6 +526,10 @@ void timelineDiagnostics()
     CHECK(_says(scene, "morph needs a line, circle, rectangle"));
     CHECK(scene->play(AnimationTarget::from(circle).opacity(2.0f), 1.0f) == Result::InvalidArguments);
     CHECK(_says(scene, "opacity must be between 0 and 1"));
+    // A fade clamps its opacity into range, but not one that is not a number, which play() refuses.
+    auto nan = std::numeric_limits<float>::quiet_NaN();
+    CHECK(scene->play(Animation::fade(circle, nan), 1.0f) == Result::InvalidArguments);
+    CHECK(_says(scene, "opacity must be between 0 and 1"));
     CHECK(scene->play(Animation::fade(circle, 0.5f), -1.0f) == Result::InvalidArguments);
     CHECK(_says(scene, "positive number of seconds"));
     Animation twice[] = {Animation::fade(circle, 0.5f), Animation::shift(circle, {1.0f, 0.0f, 0.0f})};

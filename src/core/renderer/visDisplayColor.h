@@ -1,22 +1,13 @@
-// Color arithmetic that the display list and its blends share: clamping, opacity and mixing.
+// Color arithmetic that the display list and its blends share: opacity and mixing, by shares
+// that _clamp() bounds.
 #ifndef _VIS_DISPLAY_COLOR_H_
 #define _VIS_DISPLAY_COLOR_H_
-
-#include <cmath>
 
 #include "vis.h"
 #include "../common/visMix.h"
 
 namespace vis
 {
-
-static inline float _clamp(float value)
-{
-    if (!std::isfinite(value)) return 0.0f;
-    if (value < 0.0f) return 0.0f;
-    if (value > 1.0f) return 1.0f;
-    return value;
-}
 
 static inline Color _opacity(Color color, float opacity)
 {

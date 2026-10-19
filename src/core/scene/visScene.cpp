@@ -67,6 +67,16 @@ Mat4 Scene::Impl::billboardReference(const Object* object) const noexcept
     return reference;
 }
 
+// The font size that keeps a billboard text of size painting as large when its billboard scale
+// (see billboardScale()) goes from `from` to `to`; false when it is negative or no finite float.
+static bool _billboardSize(float size, float from, float to, float& output)
+{
+    auto scaled = size * static_cast<double>(from) / to;
+    if (!std::isfinite(scaled) || scaled < 0.0 || scaled > std::numeric_limits<float>::max()) return false;
+    output = static_cast<float>(scaled);
+    return true;
+}
+
 // ---------- Fingerprints and validity ----------
 
 static bool _equal(const Color& first, const Color& second)
@@ -508,13 +518,6 @@ static bool _equal(const Mat4& first, const Mat4& second)
         if (first.e[i] != second.e[i]) return false;
     }
     return true;
-}
-
-static float _clamp(float value)
-{
-    if (value < 0.0f) return 0.0f;
-    if (value > 1.0f) return 1.0f;
-    return value;
 }
 
 static uint8_t _lerp(uint8_t from, uint8_t to, float progress)
@@ -2071,7 +2074,7 @@ Result Scene::Impl::follow(const Object* source, const Object* follower, uint32_
     auto parent = Mat4::identity();
     if (follower && !_inverse(_parentWorld(follower), parent)) return impl.fail(Result::InvalidArguments, MOTION_SPACE);
     if (source->type() == Type::Connector) {
-        if (!grow(impl.paths, impl.pathCnt, impl.pathCap, 1u, 4u)) return Result::OutOfMemory;
+        if (!grow(impl.paths, impl.pathCnt, impl.pathCap, 1u, 4u)) return impl.fail(Result::OutOfMemory, SCENE_MEMORY);
         MotionPath path;
         path.source = source;
         path.parent = follower->parent();
@@ -2089,11 +2092,11 @@ Result Scene::Impl::follow(const Object* source, const Object* follower, uint32_
             return Result::Success;
         }
     }
-    if (!grow(impl.paths, impl.pathCnt, impl.pathCap, 1u, 4u)) return Result::OutOfMemory;
+    if (!grow(impl.paths, impl.pathCnt, impl.pathCap, 1u, 4u)) return impl.fail(Result::OutOfMemory, SCENE_MEMORY);
     MotionPath path;
     auto result = _motionPath(source, space, path, relative);
     if (result == Result::InvalidArguments) return impl.fail(result, MOTION_OUTLINE);
-    if (result != Result::Success) return result;
+    if (result != Result::Success) return impl.fail(result, SCENE_MEMORY);
     if (path.count > MAX_MOTION_VERTICES - impl.pathVertices) {
         delete[] path.vertices;
         return impl.fail(Result::InsufficientCondition, MOTION_LIMIT);
@@ -2933,7 +2936,8 @@ Animation Animation::fade(Object* target, float opacity) noexcept
     Animation animation;
     animation.target = target;
     animation.kind = AnimationKind::Fade;
-    animation.value = _clamp(opacity);
+    // Not a number stays one, which play() refuses, where _clamp() would make it 0.
+    animation.value = opacity < 0.0f ? 0.0f : opacity > 1.0f ? 1.0f : opacity;
     return animation;
 }
 
@@ -3201,6 +3205,34 @@ uint32_t Scene::Impl::heirs(const Object* group, uint32_t properties, bool texts
         count = heirs(child, properties, texts, out, capacity, count);
     }
     return count;
+}
+
+// The heirs that a call gives the styles of their groups, such as those a play call animates.
+struct Inheritance
+{
+    Heir* heirs = nullptr;
+    uint32_t count = 0;
+    ~Inheritance() { delete[] heirs; }
+};
+
+// Collects into inheritance the heirs that take the properties passed from group; false when
+// memory runs out. Impl is the scene's implementation, which only scene members may name.
+template<typename Impl>
+static bool _heirs(const Impl& impl, const Object* group, uint32_t passed, Inheritance& inheritance)
+{
+    auto count = impl.heirs(group, passed, nullptr, 0u);
+    inheritance.heirs = count ? new (std::nothrow) Heir[count] : nullptr;
+    if (count && !inheritance.heirs) return false;
+    inheritance.count = impl.heirs(group, passed, inheritance.heirs, count);
+    return true;
+}
+
+// Gives heir the stroke, fill and width it takes from group.
+static void _take(const Heir& heir, const Object* group)
+{
+    if (heir.properties & TARGET_STROKE) heir.object->style.stroke = group->style.stroke;
+    if (heir.properties & TARGET_FILL) heir.object->style.fill = group->style.fill;
+    if (heir.properties & TARGET_WIDTH) heir.object->style.width = group->style.width;
 }
 
 AnimationTarget AnimationTarget::from(Object* target) noexcept
@@ -3631,7 +3663,7 @@ Result Scene::attach(Object* object, Object* parent) noexcept
     auto fonts = new (std::nothrow) char*[count]{};
     if (!fonts) {
         delete[] tree;
-        return Result::OutOfMemory;
+        return pImpl->fail(Result::OutOfMemory, SCENE_MEMORY);
     }
     for (auto i = 0u; i < count; i++) {
         if (tree[i]->type() != Type::Text) continue;
@@ -3644,14 +3676,14 @@ Result Scene::attach(Object* object, Object* parent) noexcept
             delete[] fonts[j];
         delete[] fonts;
         delete[] tree;
-        return Result::OutOfMemory;
+        return pImpl->fail(Result::OutOfMemory, SCENE_MEMORY);
     }
     if (!grow(pImpl->objects, pImpl->objectCnt, pImpl->objectCap, count, 8u, MAX_OBJECTS)) {
         for (auto i = 0u; i < count; i++)
             delete[] fonts[i];
         delete[] fonts;
         delete[] tree;
-        return Result::OutOfMemory;
+        return pImpl->fail(Result::OutOfMemory, SCENE_MEMORY);
     }
 
     // A color or width that differs from the default was set directly; remember that before
@@ -4314,12 +4346,11 @@ Result Scene::clone(Object* source, Object*& output, const CloneOptions& options
         if (from == to) continue;
         // A collapsed snapshot has no ink; a singular new reference uses pixelScale instead.
         if (from == 0.0f) { item.state.pixelScale = 0.0f; continue; }
-        auto size = item.state.size.x * static_cast<double>(from) / to;
-        if (!std::isfinite(size) || !(static_cast<float>(size) > 0.0f)
-            || size > std::numeric_limits<float>::max()) {
+        float size;
+        if (!_billboardSize(item.state.size.x, from, to, size) || !(size > 0.0f)) {
             return impl.fail(Result::InvalidArguments, TARGET_INVALID);
         }
-        item.state.size = {static_cast<float>(size), static_cast<float>(size)};
+        item.state.size = {size, size};
     }
 
     // The ids: the given one, or the first number whose ids are all free.
@@ -4399,17 +4430,10 @@ Result Scene::clone(Object* source, Object*& output, const CloneOptions& options
             auto group = items.data[i].copy;
             auto passed = items.data[i].passed;
             if (!passed) continue;
-            auto heirCount = impl.heirs(group, passed, nullptr, 0u);
-            auto heirs = heirCount ? new (std::nothrow) Heir[heirCount] : nullptr;
-            if (heirCount && !heirs) return impl.fail(Result::OutOfMemory, SCENE_MEMORY);
-            impl.heirs(group, passed, heirs, heirCount);
-            for (auto j = 0u; j < heirCount; j++) {
-                auto& heir = heirs[j];
-                if (heir.properties & TARGET_STROKE) heir.object->style.stroke = group->style.stroke;
-                if (heir.properties & TARGET_FILL) heir.object->style.fill = group->style.fill;
-                if (heir.properties & TARGET_WIDTH) heir.object->style.width = group->style.width;
-            }
-            delete[] heirs;
+            Inheritance heirs;
+            if (!_heirs(impl, group, passed, heirs)) return impl.fail(Result::OutOfMemory, SCENE_MEMORY);
+            for (auto j = 0u; j < heirs.count; j++)
+                _take(heirs.heirs[j], group);
         }
     }
 
@@ -4651,36 +4675,29 @@ Result Scene::update(Object* object) noexcept
         if (entry->base.width != object->style.width) passed |= TARGET_WIDTH;
     }
     if (passed) {
-        auto heirCount = pImpl->heirs(object, passed, nullptr, 0u);
-        auto heirs = heirCount ? new (std::nothrow) Heir[heirCount] : nullptr;
-        if (heirCount && !heirs) return pImpl->fail(Result::OutOfMemory, SCENE_MEMORY);
-        pImpl->heirs(object, passed, heirs, heirCount);
-        for (auto i = 0u; i < heirCount; i++) {
-            auto& heir = heirs[i];
+        Inheritance heirs;
+        if (!_heirs(*pImpl, object, passed, heirs)) return pImpl->fail(Result::OutOfMemory, SCENE_MEMORY);
+        for (auto i = 0u; i < heirs.count; i++) {
+            auto& heir = heirs.heirs[i];
             if (!heir.entry || heir.entry->dead >= 0.0f) continue;
-            auto reason = heir.entry->fingerprint != fingerprint(heir.object) ? TARGET_HEIR_CHANGED : nullptr;
-            for (auto j = 0u; !reason && j < pImpl->clipCnt; j++) {
-                auto& clip = pImpl->clips[j];
-                if (clip.object == heir.object || clip.related == heir.object) reason = LAYOUT_HEIR_ANIMATED;
+            if (heir.entry->fingerprint != fingerprint(heir.object)) {
+                return pImpl->fail(Result::InvalidArguments, TARGET_HEIR_CHANGED);
             }
-            if (reason) {
-                delete[] heirs;
-                return pImpl->fail(reason == TARGET_HEIR_CHANGED ? Result::InvalidArguments : Result::InsufficientCondition, reason);
+            for (auto j = 0u; j < pImpl->clipCnt; j++) {
+                auto& clip = pImpl->clips[j];
+                if (clip.object == heir.object || clip.related == heir.object) {
+                    return pImpl->fail(Result::InsufficientCondition, LAYOUT_HEIR_ANIMATED);
+                }
             }
         }
-        for (auto i = 0u; i < heirCount; i++) {
-            auto& heir = heirs[i];
+        for (auto i = 0u; i < heirs.count; i++) {
+            auto& heir = heirs.heirs[i];
             if (!heir.entry || heir.entry->dead >= 0.0f) continue;
-            if (heir.properties & TARGET_STROKE) heir.object->style.stroke = object->style.stroke;
-            if (heir.properties & TARGET_FILL) heir.object->style.fill = object->style.fill;
-            if (heir.properties & TARGET_WIDTH) heir.object->style.width = object->style.width;
+            _take(heir, object);
             _rebase(*heir.entry, _state(heir.object));
             _commit(*heir.entry);
         }
-        delete[] heirs;
-        if (passed & TARGET_STROKE) object->objStrokeAuthored = true;
-        if (passed & TARGET_FILL) object->objFillAuthored = true;
-        if (passed & TARGET_WIDTH) object->objWidthAuthored = true;
+        Impl::authored(object, passed);
     }
     _rebase(*entry, _state(object));
     _commit(*entry);
@@ -4892,13 +4909,13 @@ Result Scene::transition(Scene* const* scenes, uint32_t count, const Viewport& v
     };
 
     auto sequence = new (std::nothrow) SceneSequence;
-    if (!sequence) return Result::OutOfMemory;
+    if (!sequence) return pImpl->fail(Result::OutOfMemory, SCENE_MEMORY);
     sequence->stages = new (std::nothrow) SceneStage[count];
     sequence->transitions = new (std::nothrow) SceneTransition[count - 1u];
     sequence->count = count;
     if (!sequence->stages || !sequence->transitions) {
         delete sequence;
-        return Result::OutOfMemory;
+        return pImpl->fail(Result::OutOfMemory, SCENE_MEMORY);
     }
 
     auto cursor = pImpl->cursor;
@@ -4942,7 +4959,7 @@ Result Scene::transition(Scene* const* scenes, uint32_t count, const Viewport& v
             transition.matches = new (std::nothrow) uint32_t[objects];
             if (!transition.matches) {
                 delete sequence;
-                return Result::OutOfMemory;
+                return pImpl->fail(Result::OutOfMemory, SCENE_MEMORY);
             }
             for (auto j = 0u; j < objects; j++) {
                 transition.matches[j] = UINT32_MAX;
@@ -5282,6 +5299,15 @@ static bool _moved(const Object* object, const Vector64& by, Mat4& output)
     return _affine(output);
 }
 
+// The pieces of source and target that a match pairs; false when either has more than a call
+// animates.
+static bool _matchCounts(Object* source, Object* target, uint32_t& sourceCount, uint32_t& targetCount)
+{
+    sourceCount = _pieces(source, nullptr);
+    targetCount = _pieces(target, nullptr);
+    return sourceCount <= MAX_ANIMATION_GROUP && targetCount <= MAX_ANIMATION_GROUP;
+}
+
 static Object* _counterpart(Object* source, Object* copy, const Object* object)
 {
     if (object == source) return copy;
@@ -5301,11 +5327,9 @@ static Result _matchCopy(Scene& scene, Impl& impl, Object* source, Object* targe
     if (options.pairCount > MAX_ANIMATION_GROUP || (options.pairCount && !options.pairs)) {
         return impl.fail(Result::InvalidArguments, MATCH_PAIRS);
     }
-    auto sourceCount = _pieces(source, nullptr);
-    auto targetCount = _pieces(target, nullptr);
-    if (sourceCount > MAX_ANIMATION_GROUP || targetCount > MAX_ANIMATION_GROUP) {
-        return impl.fail(Result::InvalidArguments, MATCH_PIECES);
-    }
+    uint32_t sourceCount;
+    uint32_t targetCount;
+    if (!_matchCounts(source, target, sourceCount, targetCount)) return impl.fail(Result::InvalidArguments, MATCH_PIECES);
     auto copyCount = 0u;
     if (!_treeCount(source, copyCount, 0u)) return impl.fail(Result::InsufficientCondition, ADD_DEPTH);
     // Room for the match contacts, their original counterparts, and the clone contacts.
@@ -5395,11 +5419,9 @@ Result Scene::matchTransform(Object* source, Object* target, float duration,
         return impl.fail(Result::InsufficientCondition, MATCH_FRESH);
     }
 
-    auto sourceCount = _pieces(source, nullptr);
-    auto targetCount = _pieces(target, nullptr);
-    if (sourceCount > MAX_ANIMATION_GROUP || targetCount > MAX_ANIMATION_GROUP) {
-        return impl.fail(Result::InvalidArguments, MATCH_PIECES);
-    }
+    uint32_t sourceCount;
+    uint32_t targetCount;
+    if (!_matchCounts(source, target, sourceCount, targetCount)) return impl.fail(Result::InvalidArguments, MATCH_PIECES);
     if (!sourceCount && !targetCount) return impl.fail(Result::InvalidArguments, PLAY_EMPTY);
     if (options.pairCount > (sourceCount < targetCount ? sourceCount : targetCount)
         || (options.pairCount && !options.pairs)) {
@@ -5518,11 +5540,11 @@ Result Scene::matchTransform(Object* source, Object* target, float duration,
                 auto from = billboardScale(impl.billboardReference(other), thereState.model, thereState.pixelScale);
                 auto to = billboardScale(impl.billboardReference(piece.object), hereState.model, hereState.pixelScale);
                 if (from != to) {
-                    auto size = thereState.size.x * static_cast<double>(from) / to;
-                    if (!std::isfinite(size) || size < 0.0 || size > std::numeric_limits<float>::max()) {
+                    float size;
+                    if (!_billboardSize(thereState.size.x, from, to, size)) {
                         return impl.fail(Result::InvalidArguments, MATCH_SPACE);
                     }
-                    start.size = {static_cast<float>(size), static_cast<float>(size)};
+                    start.size = {size, size};
                 }
             }
             piece.channels |= CHANNEL_SIZE;
@@ -5568,10 +5590,8 @@ Result Scene::matchTransform(Object* source, Object* target, float duration,
             continue;
         }
         auto index = outgoing ? i : i - sourceCount;
-        auto begin = static_cast<float>(static_cast<double>(time)
-                     + static_cast<double>(duration) * options.lag * index);
-        auto end = static_cast<float>(static_cast<double>(time)
-                   + static_cast<double>(duration) * (1.0 + static_cast<double>(options.lag) * index));
+        auto begin = _begin(time, duration, options.lag, index);
+        auto end = _end(time, duration, options.lag, index);
         // An unpaired piece fades in its share of the time: out at the start, in at the end.
         if (piece.partner == UINT32_MAX && options.fade < 1.0f) {
             auto share = static_cast<float>(static_cast<double>(duration) * options.fade);
@@ -6722,14 +6742,6 @@ struct Passing
     uint32_t properties = 0;
 };
 
-// The heirs a play call animates along with their groups.
-struct Inheritance
-{
-    Heir* heirs = nullptr;
-    uint32_t count = 0;
-    ~Inheritance() { delete[] heirs; }
-};
-
 // Collects the heirs of the groups whose colors a play call of count targets animates.
 // passing(i) gives what target i passes, and named(i, object) the colors target i animates on
 // object itself; those, and the colors a nearer group in the call passes, win. Impl is the
@@ -6902,6 +6914,211 @@ static Result _connectorCycle(const Impl& impl, const Animation* animations, uin
     return cyclic ? Result::InvalidArguments : Result::Success;
 }
 
+// Whether the animation moves its target, which then must be one the scene can move: a
+// transform, a turn, a scale, a travel, a growth, an indication and a wiggle do, and a fade does
+// when it shifts or scales, once its shift and scale are valid.
+static bool _moves(const Animation& animation)
+{
+    switch (animation.kind) {
+        case AnimationKind::FadeIn:
+        case AnimationKind::FadeOut:
+            return _finite(animation.offset) && std::isfinite(animation.scale) && animation.scale > 0.0f
+                   && (animation.offset.length() > 0.0f || animation.scale != 1.0f);
+        case AnimationKind::Morph: return false;
+        default: return _layerable(animation);
+    }
+}
+
+// Checks animation i of the count a play call adds from begin to end: what its kind takes, that
+// no later animation of the call plays its objects, and that the timeline has room for it then.
+// The checks of each kind keep their order, which picks the error of an animation with several
+// faults. Impl is the scene's implementation, which only scene members may name.
+template<typename Impl>
+static Result _validate(Impl& impl, const Animation* animations, uint32_t count, uint32_t i, float begin, float end)
+{
+    auto& animation = animations[i];
+    auto kind = animation.kind;
+    auto target = animation.target;
+    auto related = animation.related;
+    if (kind != AnimationKind::Morph && (animation.pairs || animation.pairCount)) {
+        return impl.fail(Result::InvalidArguments, "only a morph takes piece pairs");
+    }
+    auto entry = target ? impl.entry(target) : nullptr;
+    if (auto reason = _unplayable(entry, target)) return impl.fail(Result::InvalidArguments, reason);
+    if (static_cast<uint8_t>(kind) > static_cast<uint8_t>(AnimationKind::Wiggle)) {
+        return impl.fail(Result::InvalidArguments, PLAY_KIND);
+    }
+    // Only a turn or a scale (about a pivot), a travel (along a path) and a morph (into another
+    // shape) take a second object; a travel checks its path before the target it moves.
+    auto relatedEntry = related ? impl.entry(related) : nullptr;
+    if (kind == AnimationKind::MoveAlong) {
+        if (!related) return impl.fail(Result::InvalidArguments, MOTION_PATH);
+        if (related == target) return impl.fail(Result::InvalidArguments, MOTION_SELF);
+        if (auto reason = _unplayable(relatedEntry, related, true)) return impl.fail(Result::InvalidArguments, reason);
+    } else if (related && kind != AnimationKind::Rotate && kind != AnimationKind::Scale
+               && kind != AnimationKind::Morph) {
+        return impl.fail(Result::InvalidArguments, PLAY_RELATED);
+    }
+    if (_moves(animation) && !_transformable(target)) return impl.fail(Result::InvalidArguments, TARGET_FIXED);
+    Mat4 effect;
+    switch (kind) {
+        case AnimationKind::Transform:
+            if (!_affine(animation.model)) return impl.fail(Result::InvalidArguments, TARGET_MATRIX);
+            if (!_arc(animation.arc)) return impl.fail(Result::InvalidArguments, MOTION_ARC);
+            if (animation.arc != 0.0f && !_axis(animation.axis)) {
+                return impl.fail(Result::InvalidArguments, MOTION_AXIS);
+            }
+            break;
+        case AnimationKind::Rotate:
+        case AnimationKind::Scale:
+            if (!_finite(animation.pivot) || !_finite(animation.offset) || !std::isfinite(animation.angle)
+                || !_finite(animation.stretch)) {
+                return impl.fail(Result::InvalidArguments, MOTION_VALUES);
+            }
+            if (!_arc(animation.arc)) return impl.fail(Result::InvalidArguments, MOTION_ARC);
+            if (!_axis(animation.axis)) return impl.fail(Result::InvalidArguments, MOTION_AXIS);
+            if (related) {
+                if (auto reason = _unplayable(relatedEntry, related, true)) {
+                    return impl.fail(Result::InvalidArguments, reason);
+                }
+            }
+            break;
+        case AnimationKind::MoveAlong: {
+            auto closed = false;
+            if (!std::isfinite(animation.from) || !std::isfinite(animation.to)
+                || animation.from < 0.0f || animation.from > 1.0f
+                || animation.to < 0.0f || animation.to > 1.0f) {
+                return impl.fail(Result::InvalidArguments, MOTION_FRACTION);
+            }
+            if (related->type() == Type::Connector) {
+                auto connector = static_cast<const Connector*>(related);
+                if (_inside(connector->from(), target) || _inside(connector->to(), target)) {
+                    return impl.fail(Result::InvalidArguments, "an endpoint cannot move along its connector");
+                }
+                auto result = _connectorCycle(impl, animations, count, animation);
+                if (result != Result::Success) {
+                    return impl.fail(result, result == Result::OutOfMemory ? SCENE_MEMORY
+                                     : "moving along a connector cannot depend on the target");
+                }
+            } else if (outline(related, nullptr, 0u, closed) < 2u) {
+                return impl.fail(Result::InvalidArguments, MOTION_OUTLINE);
+            }
+            break;
+        }
+        case AnimationKind::Create:
+        case AnimationKind::Uncreate:
+        case AnimationKind::DrawBorderThenFill:
+        case AnimationKind::Write:
+            if (static_cast<uint8_t>(animation.direction) > static_cast<uint8_t>(DrawDirection::CounterClockwise)) {
+                return impl.fail(Result::InvalidArguments, DRAW_DIRECTION);
+            }
+            break;
+        case AnimationKind::FillReveal: break;
+        case AnimationKind::Stroke:
+        case AnimationKind::Fill: {
+            Targeted values;
+            values.properties = kind == AnimationKind::Stroke ? TARGET_STROKE : TARGET_FILL;
+            values.stroke = animation.color;
+            values.fill = animation.color;
+            if (auto reason = _unanimatable(target, values)) return impl.fail(Result::InvalidArguments, reason);
+            break;
+        }
+        case AnimationKind::Fade:
+            if (!std::isfinite(animation.value) || animation.value < 0.0f || animation.value > 1.0f) {
+                return impl.fail(Result::InvalidArguments, VALUE_OPACITY);
+            }
+            break;
+        case AnimationKind::FadeIn:
+        case AnimationKind::FadeOut:
+            if (!_finite(animation.offset)) return impl.fail(Result::InvalidArguments, MOTION_VALUES);
+            if (!std::isfinite(animation.scale) || animation.scale <= 0.0f) {
+                return impl.fail(Result::InvalidArguments, EFFECT_SCALE);
+            }
+            if (_moves(animation) && !_effectModel(target, target->model, animation.scale, animation.offset, effect)) {
+                return impl.fail(Result::InvalidArguments, EFFECT_BOUNDS);
+            }
+            break;
+        case AnimationKind::Grow:
+        case AnimationKind::GrowFromEdge:
+        case AnimationKind::Shrink:
+            if (kind == AnimationKind::GrowFromEdge ? !_growthModel(target, target->model, animation.growthEdge, effect)
+                                                    : !_effectModel(target, target->model, 0.0f, {}, effect)) {
+                return impl.fail(Result::InvalidArguments, EFFECT_BOUNDS);
+            }
+            break;
+        case AnimationKind::Indicate:
+            if (!std::isfinite(animation.scale) || animation.scale <= 1.0f) {
+                return impl.fail(Result::InvalidArguments, EFFECT_INDICATE);
+            }
+            if (!_effectModel(target, target->model, animation.scale, {}, effect)) {
+                return impl.fail(Result::InvalidArguments, EFFECT_BOUNDS);
+            }
+            break;
+        case AnimationKind::Wiggle:
+            if (!std::isfinite(animation.scale) || animation.scale <= 0.0f || !std::isfinite(animation.angle)
+                || !std::isfinite(animation.value) || animation.value <= 0.0f) {
+                return impl.fail(Result::InvalidArguments, EFFECT_WIGGLE);
+            }
+            if (!_effectModel(target, target->model, animation.scale, {}, effect)) {
+                return impl.fail(Result::InvalidArguments, EFFECT_BOUNDS);
+            }
+            break;
+        case AnimationKind::Morph: {
+            if (!related || related == target) return impl.fail(Result::InvalidArguments, MORPH_TARGET);
+            if (auto reason = _unplayable(relatedEntry, related)) return impl.fail(Result::InvalidArguments, reason);
+            if (auto reason = _morphGeometry(target, related)) return impl.fail(Result::NonSupport, reason);
+            if (!validMorphPairs(animation)) return impl.fail(Result::InvalidArguments, MORPH_PAIRS);
+            if (animation.sourceColors || animation.targetColors || animation.colorSteps
+                || animation.colorCount) {
+                auto surface = target->type() == Type::SurfaceMesh ? static_cast<const SurfaceMesh*>(target)
+                                                                   : nullptr;
+                auto points = surface ? static_cast<uint64_t>(surface->columns()) * surface->rows() : 0u;
+                if (!surface || (!animation.sourceColors && !animation.targetColors)
+                    || animation.colorSteps < 1u || animation.colorSteps > MAX_MORPH_COLOR_STEPS
+                    || animation.colorCount != (animation.colorSteps + 1ull) * points) {
+                    return impl.fail(Result::InvalidArguments, MORPH_COLORS);
+                }
+            }
+            if (target->childCount() || related->childCount()) {
+                return impl.fail(Result::InsufficientCondition, MORPH_CHILDREN);
+            }
+            if (target->parent() != related->parent()) return impl.fail(Result::InsufficientCondition, MORPH_PARENT);
+            if (relatedEntry->born != impl.cursor || _hasClip(*relatedEntry)) {
+                return impl.fail(Result::InsufficientCondition, MORPH_FRESH);
+            }
+            if (_connectorReferences(impl.objects, impl.objectCnt, target)
+                || _connectorReferences(impl.objects, impl.objectCnt, related)) {
+                return impl.fail(Result::InsufficientCondition, MORPH_CONNECTED);
+            }
+            break;
+        }
+    }
+    for (auto j = i + 1; j < count; j++) {
+        if (_sameAnimationObject(animation, animations[j])) return impl.fail(Result::InvalidArguments, PLAY_TWICE);
+    }
+    if (begin < entry->born) return impl.fail(Result::InsufficientCondition, TIMELINE_UNBORN);
+    auto channels = _channels(animation);
+    // A shift, turn, scale, travel, transform, morph or effect may begin while another clip
+    // moves the target; only a shift adds to it without an inverse of the model it starts
+    // from. A morph must not end first, since the shape it becomes takes no part in that clip.
+    if ((channels & CHANNEL_MODEL) && begin < _channelEnd(*entry, CHANNEL_MODEL) && _layerable(animation)) {
+        auto morph = kind == AnimationKind::Morph;
+        if (morph && end < _channelEnd(*entry, CHANNEL_MODEL)) {
+            return _overlap(impl, *entry, CHANNEL_MODEL, begin, MORPH_EARLY);
+        }
+        Mat4 inverse;
+        Mat4 change;
+        auto whole = morph ? &related->model : kind == AnimationKind::Transform ? &animation.model : nullptr;
+        auto shifts = whole && _shifts(target->model, *whole, change);
+        if (!shifts && !_inverse(target->model, inverse)) {
+            return impl.fail(Result::InsufficientCondition, TIMELINE_FLAT);
+        }
+        channels &= ~CHANNEL_MODEL;
+    }
+    if (begin < _channelEnd(*entry, channels)) return _overlap(impl, *entry, channels, begin);
+    return Result::Success;
+}
+
 // ---------- Playing animations ----------
 
 Result Scene::play(const Animation* animations, uint32_t count, float duration,
@@ -6929,206 +7146,9 @@ Result Scene::play(const Animation* animations, uint32_t count, float duration,
     }
     if (copies) return _playCopies(*this, impl, animations, count, copies, duration, curve, lag);
     for (auto i = 0u; i < count; i++) {
-        if (animations[i].kind != AnimationKind::Morph && (animations[i].pairs || animations[i].pairCount)) {
-            return impl.fail(Result::InvalidArguments, "only a morph takes piece pairs");
-        }
-        auto target = animations[i].target;
-        auto entry = target ? impl.entry(target) : nullptr;
-        if (auto reason = _unplayable(entry, target)) return impl.fail(Result::InvalidArguments, reason);
-        auto& animation = animations[i];
-        auto related = animation.related;
-        auto relatedEntry = related ? impl.entry(related) : nullptr;
-        switch (animation.kind) {
-            case AnimationKind::Transform:
-                if (related) return impl.fail(Result::InvalidArguments, PLAY_RELATED);
-                if (!_transformable(target)) return impl.fail(Result::InvalidArguments, TARGET_FIXED);
-                if (!_affine(animation.model)) return impl.fail(Result::InvalidArguments, TARGET_MATRIX);
-                if (!_arc(animation.arc)) return impl.fail(Result::InvalidArguments, MOTION_ARC);
-                if (animation.arc != 0.0f && !_axis(animation.axis)) {
-                    return impl.fail(Result::InvalidArguments, MOTION_AXIS);
-                }
-                break;
-            case AnimationKind::Rotate:
-            case AnimationKind::Scale: {
-                if (!_transformable(target)) return impl.fail(Result::InvalidArguments, TARGET_FIXED);
-                if (!_finite(animation.pivot) || !_finite(animation.offset) || !std::isfinite(animation.angle)
-                    || !_finite(animation.stretch)) {
-                    return impl.fail(Result::InvalidArguments, MOTION_VALUES);
-                }
-                if (!_arc(animation.arc)) return impl.fail(Result::InvalidArguments, MOTION_ARC);
-                if (!_axis(animation.axis)) return impl.fail(Result::InvalidArguments, MOTION_AXIS);
-                if (related) {
-                    if (auto reason = _unplayable(relatedEntry, related, true)) {
-                        return impl.fail(Result::InvalidArguments, reason);
-                    }
-                }
-                break;
-            }
-            case AnimationKind::MoveAlong: {
-                auto closed = false;
-                if (!related) return impl.fail(Result::InvalidArguments, MOTION_PATH);
-                if (related == target) return impl.fail(Result::InvalidArguments, MOTION_SELF);
-                if (auto reason = _unplayable(relatedEntry, related, true)) {
-                    return impl.fail(Result::InvalidArguments, reason);
-                }
-                if (!_transformable(target)) return impl.fail(Result::InvalidArguments, TARGET_FIXED);
-                if (!std::isfinite(animation.from) || !std::isfinite(animation.to)
-                    || animation.from < 0.0f || animation.from > 1.0f
-                    || animation.to < 0.0f || animation.to > 1.0f) {
-                    return impl.fail(Result::InvalidArguments, MOTION_FRACTION);
-                }
-                if (related->type() == Type::Connector) {
-                    auto connector = static_cast<const Connector*>(related);
-                    if (_inside(connector->from(), target) || _inside(connector->to(), target)) {
-                        return impl.fail(Result::InvalidArguments, "an endpoint cannot move along its connector");
-                    }
-                    auto result = _connectorCycle(impl, animations, count, animation);
-                    if (result != Result::Success) {
-                        return impl.fail(result, result == Result::OutOfMemory ? SCENE_MEMORY
-                                         : "moving along a connector cannot depend on the target");
-                    }
-                } else if (outline(related, nullptr, 0u, closed) < 2u) {
-                    return impl.fail(Result::InvalidArguments, MOTION_OUTLINE);
-                }
-                break;
-            }
-            case AnimationKind::Create:
-            case AnimationKind::Uncreate:
-            case AnimationKind::DrawBorderThenFill:
-            case AnimationKind::Write:
-                if (related) return impl.fail(Result::InvalidArguments, PLAY_RELATED);
-                if (static_cast<uint8_t>(animation.direction) > static_cast<uint8_t>(DrawDirection::CounterClockwise)) {
-                    return impl.fail(Result::InvalidArguments, DRAW_DIRECTION);
-                }
-                break;
-            case AnimationKind::FillReveal:
-                if (related) return impl.fail(Result::InvalidArguments, PLAY_RELATED);
-                break;
-            case AnimationKind::Stroke:
-            case AnimationKind::Fill: {
-                if (related) return impl.fail(Result::InvalidArguments, PLAY_RELATED);
-                Targeted values;
-                values.properties = animation.kind == AnimationKind::Stroke ? TARGET_STROKE : TARGET_FILL;
-                values.stroke = animation.color;
-                values.fill = animation.color;
-                if (auto reason = _unanimatable(target, values)) return impl.fail(Result::InvalidArguments, reason);
-                break;
-            }
-            case AnimationKind::Fade:
-                if (related) return impl.fail(Result::InvalidArguments, PLAY_RELATED);
-                if (!std::isfinite(animation.value) || animation.value < 0.0f || animation.value > 1.0f) {
-                    return impl.fail(Result::InvalidArguments, VALUE_OPACITY);
-                }
-                break;
-            case AnimationKind::FadeIn:
-            case AnimationKind::FadeOut: {
-                if (related) return impl.fail(Result::InvalidArguments, PLAY_RELATED);
-                if (!_finite(animation.offset)) return impl.fail(Result::InvalidArguments, MOTION_VALUES);
-                if (!std::isfinite(animation.scale) || animation.scale <= 0.0f) {
-                    return impl.fail(Result::InvalidArguments, EFFECT_SCALE);
-                }
-                auto moves = animation.offset.length() > 0.0f || animation.scale != 1.0f;
-                Mat4 effect;
-                if (moves && !_transformable(target)) return impl.fail(Result::InvalidArguments, TARGET_FIXED);
-                if (moves && !_effectModel(target, target->model, animation.scale, animation.offset, effect)) {
-                    return impl.fail(Result::InvalidArguments, EFFECT_BOUNDS);
-                }
-                break;
-            }
-            case AnimationKind::Grow:
-            case AnimationKind::GrowFromEdge:
-            case AnimationKind::Shrink: {
-                Mat4 effect;
-                if (related) return impl.fail(Result::InvalidArguments, PLAY_RELATED);
-                if (!_transformable(target)) return impl.fail(Result::InvalidArguments, TARGET_FIXED);
-                if (animation.kind == AnimationKind::GrowFromEdge
-                        ? !_growthModel(target, target->model, animation.growthEdge, effect)
-                        : !_effectModel(target, target->model, 0.0f, {}, effect)) {
-                    return impl.fail(Result::InvalidArguments, EFFECT_BOUNDS);
-                }
-                break;
-            }
-            case AnimationKind::Indicate: {
-                Mat4 effect;
-                if (related) return impl.fail(Result::InvalidArguments, PLAY_RELATED);
-                if (!_transformable(target)) return impl.fail(Result::InvalidArguments, TARGET_FIXED);
-                if (!std::isfinite(animation.scale) || animation.scale <= 1.0f) {
-                    return impl.fail(Result::InvalidArguments, EFFECT_INDICATE);
-                }
-                if (!_effectModel(target, target->model, animation.scale, {}, effect)) {
-                    return impl.fail(Result::InvalidArguments, EFFECT_BOUNDS);
-                }
-                break;
-            }
-            case AnimationKind::Wiggle: {
-                Mat4 effect;
-                if (related) return impl.fail(Result::InvalidArguments, PLAY_RELATED);
-                if (!_transformable(target)) return impl.fail(Result::InvalidArguments, TARGET_FIXED);
-                if (!std::isfinite(animation.scale) || animation.scale <= 0.0f || !std::isfinite(animation.angle)
-                    || !std::isfinite(animation.value) || animation.value <= 0.0f) {
-                    return impl.fail(Result::InvalidArguments, EFFECT_WIGGLE);
-                }
-                if (!_effectModel(target, target->model, animation.scale, {}, effect)) {
-                    return impl.fail(Result::InvalidArguments, EFFECT_BOUNDS);
-                }
-                break;
-            }
-            case AnimationKind::Morph: {
-                if (!related || related == target) return impl.fail(Result::InvalidArguments, MORPH_TARGET);
-                if (auto reason = _unplayable(relatedEntry, related)) return impl.fail(Result::InvalidArguments, reason);
-                if (auto reason = _morphGeometry(target, related)) return impl.fail(Result::NonSupport, reason);
-                if (!validMorphPairs(animation)) return impl.fail(Result::InvalidArguments, MORPH_PAIRS);
-                if (animation.sourceColors || animation.targetColors || animation.colorSteps
-                    || animation.colorCount) {
-                    auto surface = target->type() == Type::SurfaceMesh ? static_cast<const SurfaceMesh*>(target)
-                                                                       : nullptr;
-                    auto points = surface ? static_cast<uint64_t>(surface->columns()) * surface->rows() : 0u;
-                    if (!surface || (!animation.sourceColors && !animation.targetColors)
-                        || animation.colorSteps < 1u || animation.colorSteps > MAX_MORPH_COLOR_STEPS
-                        || animation.colorCount != (animation.colorSteps + 1ull) * points) {
-                        return impl.fail(Result::InvalidArguments, MORPH_COLORS);
-                    }
-                }
-                if (target->childCount() || related->childCount()) {
-                    return impl.fail(Result::InsufficientCondition, MORPH_CHILDREN);
-                }
-                if (target->parent() != related->parent()) return impl.fail(Result::InsufficientCondition, MORPH_PARENT);
-                if (relatedEntry->born != impl.cursor || _hasClip(*relatedEntry)) {
-                    return impl.fail(Result::InsufficientCondition, MORPH_FRESH);
-                }
-                if (_connectorReferences(impl.objects, impl.objectCnt, target)
-                    || _connectorReferences(impl.objects, impl.objectCnt, related)) {
-                    return impl.fail(Result::InsufficientCondition, MORPH_CONNECTED);
-                }
-                break;
-            }
-            default: return impl.fail(Result::InvalidArguments, PLAY_KIND);
-        }
-        for (auto j = i + 1; j < count; j++) {
-            if (_sameAnimationObject(animation, animations[j])) return impl.fail(Result::InvalidArguments, PLAY_TWICE);
-        }
-        auto begin = _begin(pImpl->cursor, duration, lag, i);
-        if (begin < entry->born) return pImpl->fail(Result::InsufficientCondition, TIMELINE_UNBORN);
-        auto channels = _channels(animation);
-        // A shift, turn, scale, travel, transform, morph or effect may begin while another clip
-        // moves the target; only a shift adds to it without an inverse of the model it starts
-        // from. A morph must not end first, since the shape it becomes takes no part in that clip.
-        if ((channels & CHANNEL_MODEL) && begin < _channelEnd(*entry, CHANNEL_MODEL) && _layerable(animation)) {
-            auto morph = animation.kind == AnimationKind::Morph;
-            auto end = _end(pImpl->cursor, duration, lag, i);
-            if (morph && end < _channelEnd(*entry, CHANNEL_MODEL)) {
-                return _overlap(impl, *entry, CHANNEL_MODEL, begin, MORPH_EARLY);
-            }
-            Mat4 inverse;
-            Mat4 change;
-            auto whole = morph ? &related->model : animation.kind == AnimationKind::Transform ? &animation.model : nullptr;
-            auto shifts = whole && _shifts(target->model, *whole, change);
-            if (!shifts && !_inverse(target->model, inverse)) {
-                return impl.fail(Result::InsufficientCondition, TIMELINE_FLAT);
-            }
-            channels &= ~CHANNEL_MODEL;
-        }
-        if (begin < _channelEnd(*entry, channels)) return _overlap(impl, *entry, channels, begin);
+        auto result = _validate(impl, animations, count, i, _begin(impl.cursor, duration, lag, i),
+                                _end(impl.cursor, duration, lag, i));
+        if (result != Result::Success) return result;
     }
     // A group's stroke and fill animate the shapes that take those colors from it.
     auto passing = [animations](uint32_t i) -> Passing {
@@ -7166,164 +7186,9 @@ Result Scene::play(const Animation* animations, uint32_t count, float duration,
             return result;
         }
     }
-
     for (auto i = 0u; i < count; i++) {
-        auto& animation = animations[i];
-        auto entry = pImpl->entry(animation.target);
-        auto from = _state(animation.target);
-        auto to = from;
-        auto begin = _begin(pImpl->cursor, duration, lag, i);
-        auto end = _end(pImpl->cursor, duration, lag, i);
-        auto authored = from.model;
-        auto layered = (_channels(animation) & CHANNEL_MODEL) && begin < _channelEnd(*entry, CHANNEL_MODEL);
-        switch (animation.kind) {
-            // A layered shift leaves the authored model shifted, its turn and scale those it had;
-            // any other transform leaves its matrix, which the object has once every motion ends.
-            case AnimationKind::Transform: {
-                Mat4 change;
-                to.model = layered && _shifts(authored, animation.model, change) ? change * authored : animation.model;
-                break;
-            }
-            case AnimationKind::Create: {
-                from.progress = 0.0f;
-                to.progress = 1.0f;
-                from.direction = animation.direction;
-                to.direction = animation.direction;
-                _hideBefore(*entry, pImpl->clips, previousClipCount, true);
-                break;
-            }
-            case AnimationKind::Uncreate:
-                to.progress = 0.0f;
-                from.direction = animation.direction;
-                to.direction = animation.direction;
-                entry->revealScheduled = true;
-                break;
-            case AnimationKind::FillReveal:
-                from.fillProgress = 0.0f;
-                to.fillProgress = 1.0f;
-                _hideFillBefore(*entry, pImpl->clips, previousClipCount);
-                break;
-            case AnimationKind::DrawBorderThenFill:
-                from.progress = 0.0f;
-                from.fillProgress = 0.0f;
-                to.progress = 1.0f;
-                to.fillProgress = 1.0f;
-                from.direction = animation.direction;
-                to.direction = animation.direction;
-                _hideBefore(*entry, pImpl->clips, previousClipCount, true);
-                _hideFillBefore(*entry, pImpl->clips, previousClipCount);
-                break;
-            case AnimationKind::Write:
-                from.progress = 0.0f;
-                to.progress = 1.0f;
-                from.traceFill = true;
-                to.traceFill = true;
-                from.direction = animation.direction;
-                to.direction = animation.direction;
-                _hideBefore(*entry, pImpl->clips, previousClipCount, true);
-                break;
-            case AnimationKind::Fade:
-                to.opacity = animation.value;
-                entry->revealScheduled = true;
-                break;
-            case AnimationKind::FadeIn:
-                from.opacity = 0.0f;
-                to.opacity = 1.0f;
-                if (animation.scale != 1.0f || animation.offset.length() > 0.0f) {
-                    _effectModel(animation.target, to.model, animation.scale, animation.offset, from.model);
-                    from.pixelScale = animation.scale;
-                }
-                _hideBefore(*entry, pImpl->clips, previousClipCount, false);
-                break;
-            case AnimationKind::FadeOut:
-                to.opacity = 0.0f;
-                if (animation.scale != 1.0f || animation.offset.length() > 0.0f) {
-                    _effectModel(animation.target, from.model, animation.scale, animation.offset, to.model);
-                    to.pixelScale = animation.scale;
-                }
-                entry->revealScheduled = true;
-                break;
-            case AnimationKind::Grow:
-            case AnimationKind::GrowFromEdge:
-                if (animation.kind == AnimationKind::GrowFromEdge) {
-                    _growthModel(animation.target, to.model, animation.growthEdge, from.model);
-                } else {
-                    _effectModel(animation.target, to.model, 0.0f, {}, from.model);
-                }
-                from.opacity = 0.0f;
-                from.pixelScale = 0.0f;
-                to.opacity = 1.0f;
-                _hideBefore(*entry, pImpl->clips, previousClipCount, false);
-                break;
-            case AnimationKind::Shrink:
-                _effectModel(animation.target, from.model, 0.0f, {}, to.model);
-                to.opacity = 0.0f;
-                to.pixelScale = 0.0f;
-                entry->revealScheduled = true;
-                break;
-            // A wiggle ends where it began; its sampler adds the growth and the turns.
-            case AnimationKind::Wiggle: entry->revealScheduled = true; break;
-            case AnimationKind::Indicate:
-                _effectModel(animation.target, from.model, animation.scale, {}, to.model);
-                to.pixelScale = animation.scale;
-                if (from.stroke.a) {
-                    to.stroke = animation.color;
-                    to.stroke.a = from.stroke.a;
-                }
-                if (from.fill.a) {
-                    to.fill = animation.color;
-                    to.fill.a = from.fill.a;
-                }
-                entry->revealScheduled = true;
-                break;
-            case AnimationKind::Morph: {
-                auto targetEntry = pImpl->entry(animation.related);
-                if (animation.related->objThemeColor
-                    || animation.related->objThemeGradient) {
-                    _inherit(*targetEntry, pImpl->clips, animation.target->style,
-                             animation.related->objThemeColor,
-                             animation.related->objThemeGradient);
-                }
-                to = _state(animation.related);
-                // A target cloned from a warped object shows its warp once it takes over; until
-                // then the source draws the shape between them, which already ends in that warp.
-                to.warp = nullptr;
-                to.warpProgress = 0.0f;
-                targetEntry->born = end;
-                targetEntry->revealScheduled = true;
-                entry->dead = end;
-                break;
-            }
-            case AnimationKind::Stroke: to.stroke = animation.color; break;
-            case AnimationKind::Fill: to.fill = animation.color; break;
-            case AnimationKind::Rotate:
-            case AnimationKind::Scale:
-            case AnimationKind::MoveAlong: to.model = pImpl->clips[pImpl->clipCnt].to.model; break;
-        }
-
-        // The clip keeps the motion prepare() gave it.
-        auto& clip = pImpl->append(animation.target, _channels(animation), begin, end, curve, true);
-        clip.from = from;
-        clip.to = to;
-        clip.kind = animation.kind;
-        clip.progressReveal = animation.kind == AnimationKind::Create
-                              || animation.kind == AnimationKind::Uncreate
-                              || animation.kind == AnimationKind::Write
-                              || animation.kind == AnimationKind::DrawBorderThenFill;
-        clip.related = animation.related;
-        if (layered) _layered(clip, animation, authored);
-        if (animation.kind == AnimationKind::Indicate || animation.kind == AnimationKind::Morph) continue;
-        if (animation.kind == AnimationKind::FadeOut || animation.kind == AnimationKind::Shrink) {
-            auto authored = from;
-            authored.opacity = 0.0f;
-            Impl::store(animation.target, authored);
-        } else {
-            Impl::store(animation.target, to);
-        }
-        _commit(*entry);
-        // The object now sets the color itself; below a group, shapes added later inherit it.
-        if (animation.kind == AnimationKind::Stroke) animation.target->objStrokeAuthored = true;
-        if (animation.kind == AnimationKind::Fill) animation.target->objFillAuthored = true;
+        impl.emit(animations[i], _begin(impl.cursor, duration, lag, i), _end(impl.cursor, duration, lag, i), curve,
+                  previousClipCount);
     }
     _inheritClips(impl, inheritance, duration, lag, curve, [animations](uint32_t i, uint32_t properties, VisualState& to) {
         if (properties & TARGET_STROKE) to.stroke = animations[i].color;
@@ -7346,9 +7211,182 @@ Result Scene::play(const Animation* animations, uint32_t count, float duration,
     return Result::Success;
 }
 
+void Scene::Impl::emit(const Animation& animation, float begin, float end, const AnimCurve& curve,
+                       uint32_t previous) noexcept
+{
+    auto& impl = *this;
+    auto entry = impl.entry(animation.target);
+    auto from = _state(animation.target);
+    auto to = from;
+    auto authored = from.model;
+    auto layered = (_channels(animation) & CHANNEL_MODEL) && begin < _channelEnd(*entry, CHANNEL_MODEL);
+    // A drawing shows or hides the object along its outline, in the direction it names.
+    auto drawn = animation.kind == AnimationKind::Create || animation.kind == AnimationKind::Uncreate
+                 || animation.kind == AnimationKind::Write || animation.kind == AnimationKind::DrawBorderThenFill;
+    if (drawn) {
+        from.direction = animation.direction;
+        to.direction = animation.direction;
+    }
+    switch (animation.kind) {
+        // A layered shift leaves the authored model shifted, its turn and scale those it had;
+        // any other transform leaves its matrix, which the object has once every motion ends.
+        case AnimationKind::Transform: {
+            Mat4 change;
+            to.model = layered && _shifts(authored, animation.model, change) ? change * authored : animation.model;
+            break;
+        }
+        case AnimationKind::Create:
+            from.progress = 0.0f;
+            to.progress = 1.0f;
+            _hideBefore(*entry, impl.clips, previous, true);
+            break;
+        case AnimationKind::Uncreate:
+            to.progress = 0.0f;
+            entry->revealScheduled = true;
+            break;
+        case AnimationKind::FillReveal:
+            from.fillProgress = 0.0f;
+            to.fillProgress = 1.0f;
+            _hideFillBefore(*entry, impl.clips, previous);
+            break;
+        case AnimationKind::DrawBorderThenFill:
+            from.progress = 0.0f;
+            from.fillProgress = 0.0f;
+            to.progress = 1.0f;
+            to.fillProgress = 1.0f;
+            _hideBefore(*entry, impl.clips, previous, true);
+            _hideFillBefore(*entry, impl.clips, previous);
+            break;
+        case AnimationKind::Write:
+            from.progress = 0.0f;
+            to.progress = 1.0f;
+            from.traceFill = true;
+            to.traceFill = true;
+            _hideBefore(*entry, impl.clips, previous, true);
+            break;
+        case AnimationKind::Fade:
+            to.opacity = animation.value;
+            entry->revealScheduled = true;
+            break;
+        case AnimationKind::FadeIn:
+            from.opacity = 0.0f;
+            to.opacity = 1.0f;
+            if (animation.scale != 1.0f || animation.offset.length() > 0.0f) {
+                _effectModel(animation.target, to.model, animation.scale, animation.offset, from.model);
+                from.pixelScale = animation.scale;
+            }
+            _hideBefore(*entry, impl.clips, previous, false);
+            break;
+        case AnimationKind::FadeOut:
+            to.opacity = 0.0f;
+            if (animation.scale != 1.0f || animation.offset.length() > 0.0f) {
+                _effectModel(animation.target, from.model, animation.scale, animation.offset, to.model);
+                to.pixelScale = animation.scale;
+            }
+            entry->revealScheduled = true;
+            break;
+        case AnimationKind::Grow:
+        case AnimationKind::GrowFromEdge:
+            if (animation.kind == AnimationKind::GrowFromEdge) {
+                _growthModel(animation.target, to.model, animation.growthEdge, from.model);
+            } else {
+                _effectModel(animation.target, to.model, 0.0f, {}, from.model);
+            }
+            from.opacity = 0.0f;
+            from.pixelScale = 0.0f;
+            to.opacity = 1.0f;
+            _hideBefore(*entry, impl.clips, previous, false);
+            break;
+        case AnimationKind::Shrink:
+            _effectModel(animation.target, from.model, 0.0f, {}, to.model);
+            to.opacity = 0.0f;
+            to.pixelScale = 0.0f;
+            entry->revealScheduled = true;
+            break;
+        // A wiggle ends where it began; its sampler adds the growth and the turns.
+        case AnimationKind::Wiggle: entry->revealScheduled = true; break;
+        case AnimationKind::Indicate:
+            _effectModel(animation.target, from.model, animation.scale, {}, to.model);
+            to.pixelScale = animation.scale;
+            if (from.stroke.a) {
+                to.stroke = animation.color;
+                to.stroke.a = from.stroke.a;
+            }
+            if (from.fill.a) {
+                to.fill = animation.color;
+                to.fill.a = from.fill.a;
+            }
+            entry->revealScheduled = true;
+            break;
+        case AnimationKind::Morph: {
+            auto targetEntry = impl.entry(animation.related);
+            if (animation.related->objThemeColor
+                || animation.related->objThemeGradient) {
+                _inherit(*targetEntry, impl.clips, animation.target->style,
+                         animation.related->objThemeColor,
+                         animation.related->objThemeGradient);
+            }
+            to = _state(animation.related);
+            // A target cloned from a warped object shows its warp once it takes over; until
+            // then the source draws the shape between them, which already ends in that warp.
+            to.warp = nullptr;
+            to.warpProgress = 0.0f;
+            targetEntry->born = end;
+            targetEntry->revealScheduled = true;
+            entry->dead = end;
+            break;
+        }
+        case AnimationKind::Stroke: to.stroke = animation.color; break;
+        case AnimationKind::Fill: to.fill = animation.color; break;
+        case AnimationKind::Rotate:
+        case AnimationKind::Scale:
+        case AnimationKind::MoveAlong: to.model = impl.clips[impl.clipCnt].to.model; break;
+    }
+
+    // The clip keeps the motion prepare() gave it.
+    auto& clip = impl.append(animation.target, _channels(animation), begin, end, curve, true);
+    clip.from = from;
+    clip.to = to;
+    clip.kind = animation.kind;
+    clip.progressReveal = drawn;
+    clip.related = animation.related;
+    if (layered) _layered(clip, animation, authored);
+    if (animation.kind == AnimationKind::Indicate || animation.kind == AnimationKind::Morph) return;
+    if (animation.kind == AnimationKind::FadeOut || animation.kind == AnimationKind::Shrink) {
+        auto authored = from;
+        authored.opacity = 0.0f;
+        Impl::store(animation.target, authored);
+    } else {
+        Impl::store(animation.target, to);
+    }
+    _commit(*entry);
+    // The object now sets the color itself; below a group, shapes added later inherit it.
+    if (animation.kind == AnimationKind::Stroke) animation.target->objStrokeAuthored = true;
+    if (animation.kind == AnimationKind::Fill) animation.target->objFillAuthored = true;
+}
+
 Result Scene::play(const AnimationTarget& target, float duration, const AnimCurve& curve) noexcept
 {
     return play(&target, 1u, duration, curve, 0.0f);
+}
+
+Result Scene::Impl::fits(const ObjectEntry& entry, const AnimationTarget& target, float begin) noexcept
+{
+    if (begin < entry.born) return fail(Result::InsufficientCondition, TIMELINE_UNBORN);
+    auto object = target.target;
+    auto channels = _channels(target.properties, object->type());
+    // A change of the transform may begin while another clip moves the object, and then adds to
+    // that motion; only a shift does so without an inverse of the model it starts from.
+    if ((channels & CHANNEL_MODEL) && begin < _channelEnd(entry, CHANNEL_MODEL)) {
+        Mat4 change;
+        Mat4 inverse;
+        if (!_shifts(object->model, target.targetModel, change) && !_inverse(object->model, inverse)) {
+            return fail(Result::InsufficientCondition, TIMELINE_FLAT);
+        }
+        channels &= ~CHANNEL_MODEL;
+    }
+    if (begin < _channelEnd(entry, channels)) return _overlap(*this, entry, channels, begin);
+    return Result::Success;
 }
 
 // Points state at the geometry its object has now: the scene's copy of it.
@@ -7433,20 +7471,8 @@ Result Scene::play(const AnimationTarget* targets, uint32_t count, float duratio
         for (auto j = i + 1u; j < count; j++) {
             if (target.target == targets[j].target) return impl.fail(Result::InvalidArguments, PLAY_TWICE);
         }
-        auto begin = _begin(pImpl->cursor, duration, lag, i);
-        if (begin < entry->born) return pImpl->fail(Result::InsufficientCondition, TIMELINE_UNBORN);
-        auto channels = _channels(target.properties, target.target->type());
-        // A change of the transform may begin while another clip moves the target; only a shift
-        // adds to it without an inverse of the model it starts from.
-        if ((channels & CHANNEL_MODEL) && begin < _channelEnd(*entry, CHANNEL_MODEL)) {
-            Mat4 change;
-            Mat4 inverse;
-            if (!_shifts(target.target->model, target.targetModel, change) && !_inverse(target.target->model, inverse)) {
-                return impl.fail(Result::InsufficientCondition, TIMELINE_FLAT);
-            }
-            channels &= ~CHANNEL_MODEL;
-        }
-        if (begin < _channelEnd(*entry, channels)) return _overlap(impl, *entry, channels, begin);
+        auto fits = impl.fits(*entry, target, _begin(impl.cursor, duration, lag, i));
+        if (fits != Result::Success) return fits;
     }
     for (auto i = 0u; i < count; i++) {
         auto& target = targets[i];
@@ -7456,6 +7482,25 @@ Result Scene::play(const AnimationTarget* targets, uint32_t count, float duratio
         auto result = plot->reserveLabels(shape.points, shape.count, shape.ends, shape.pieces);
         if (result != Result::Success) return impl.fail(result, "could not reserve contour labels");
     }
+    auto result = impl.animate(targets, count, duration, lag, curve);
+    if (result != Result::Success) return result;
+    pImpl->advance(nextCursor);
+    pImpl->definitionsSealed = true;
+    return Result::Success;
+}
+
+void Scene::Impl::authored(Object* object, uint32_t properties) noexcept
+{
+    if (properties & TARGET_STROKE) object->objStrokeAuthored = true;
+    if (properties & TARGET_FILL) object->objFillAuthored = true;
+    if (properties & TARGET_WIDTH) object->objWidthAuthored = true;
+    if (properties & TARGET_EFFECTS) object->objEffects = true;
+}
+
+Result Scene::Impl::animate(const AnimationTarget* targets, uint32_t count, float duration, float lag,
+                            const AnimCurve& curve) noexcept
+{
+    auto& impl = *this;
     // A group's stroke, fill and width animate the shapes that take them from it.
     auto passing = [targets](uint32_t i) -> Passing {
         if (targets[i].target->type() != Type::Group) return {};
@@ -7467,18 +7512,18 @@ Result Scene::play(const AnimationTarget* targets, uint32_t count, float duratio
     Inheritance inheritance;
     auto inherited = _inherit(impl, count, duration, lag, passing, named, inheritance);
     if (inherited != Result::Success) return inherited;
-    if (!pImpl->growClips(count + inheritance.count)) return pImpl->fail(Result::OutOfMemory, SCENE_MEMORY);
+    if (!impl.growClips(count + inheritance.count)) return impl.fail(Result::OutOfMemory, SCENE_MEMORY);
     // Geometry changes keep copies of their points before any clip points at them.
     const GeometryShape** shaped = nullptr;
     auto reshapes = 0u;
     for (auto i = 0u; i < count; i++) {
         if (targets[i].properties & TARGET_GEOMETRY) reshapes++;
     }
-    auto previousGeometryCount = pImpl->geometryCnt;
-    auto previousGeometryPoints = pImpl->geometryPoints;
+    auto previousGeometryCount = impl.geometryCnt;
+    auto previousGeometryPoints = impl.geometryPoints;
     if (reshapes) {
         shaped = new (std::nothrow) const GeometryShape*[count]();
-        if (!shaped) return pImpl->fail(Result::OutOfMemory, SCENE_MEMORY);
+        if (!shaped) return impl.fail(Result::OutOfMemory, SCENE_MEMORY);
         auto result = impl.reshape(targets, count, shaped, previousGeometryCount, previousGeometryPoints);
         if (result != Result::Success) {
             delete[] shaped;
@@ -7510,24 +7555,24 @@ Result Scene::play(const AnimationTarget* targets, uint32_t count, float duratio
     if (!stored) {
         delete[] kept;
         delete[] shaped;
-        pImpl->dropGeometries(previousGeometryCount, previousGeometryPoints);
-        return pImpl->fail(Result::OutOfMemory, SCENE_MEMORY);
+        impl.dropGeometries(previousGeometryCount, previousGeometryPoints);
+        return impl.fail(Result::OutOfMemory, SCENE_MEMORY);
     }
 
     for (auto i = 0u; i < count; i++) {
         auto& target = targets[i];
-        auto entry = pImpl->entry(target.target);
+        auto entry = impl.entry(target.target);
         auto from = _state(target.target);
         if (target.properties & TARGET_GEOMETRY) _reshaped(from, entry->geometry);
         auto to = Impl::targeted(target, from, kept ? kept[i].text : nullptr, shaped ? shaped[i] : nullptr);
-        auto begin = _begin(pImpl->cursor, duration, lag, i);
+        auto begin = _begin(impl.cursor, duration, lag, i);
         // A layered change holds only itself; a layered shift leaves the authored model shifted.
         Mat4 change;
         auto layered = (target.properties & TARGET_MODEL) && begin < _channelEnd(*entry, CHANNEL_MODEL);
         if (layered && _shifts(from.model, to.model, change)) to.model = change * from.model;
 
-        auto& clip = pImpl->append(target.target, _channels(target.properties, target.target->type()), begin,
-                                   _end(pImpl->cursor, duration, lag, i), curve);
+        auto& clip = impl.append(target.target, _channels(target.properties, target.target->type()), begin,
+                                 _end(impl.cursor, duration, lag, i), curve);
         if ((target.properties & TARGET_MODEL) && target.targetArc != 0.0f) {
             clip.motion = ClipMotion::Arc;
             clip.arc = target.targetArc;
@@ -7538,11 +7583,7 @@ Result Scene::play(const AnimationTarget* targets, uint32_t count, float duratio
         Impl::store(target.target, to);
         if (target.properties & TARGET_GEOMETRY) entry->geometry = to.geometry;
         _commit(*entry);
-        // The object now sets these itself; below a group, shapes added later inherit them.
-        if (target.properties & TARGET_STROKE) target.target->objStrokeAuthored = true;
-        if (target.properties & TARGET_FILL) target.target->objFillAuthored = true;
-        if (target.properties & TARGET_WIDTH) target.target->objWidthAuthored = true;
-        if (target.properties & TARGET_EFFECTS) target.target->objEffects = true;
+        authored(target.target, target.properties);
     }
     delete[] kept;
     delete[] shaped;
@@ -7551,8 +7592,6 @@ Result Scene::play(const AnimationTarget* targets, uint32_t count, float duratio
         if (properties & TARGET_FILL) to.fill = targets[i].targetFill;
         if (properties & TARGET_WIDTH) to.width = targets[i].targetWidth;
     });
-    pImpl->advance(nextCursor);
-    pImpl->definitionsSealed = true;
     return Result::Success;
 }
 
@@ -7678,72 +7717,15 @@ Result Scene::update(const AnimationTarget& target) noexcept
         delete[] ends;
         delete[] samplePoints;
         if ((target.properties & TARGET_LAYER) && moved) _carry(impl, object, moved);
-    } else {
-        // Afterwards a clip of zero length at the cursor switches the values, for the object and
-        // for the shapes that take a group's stroke, fill or width from it.
-        if (auto reason = _unplayable(entry, object)) return impl.fail(Result::InvalidArguments, reason);
-        auto time = impl.cursor;
-        if (time < entry->born) return impl.fail(Result::InsufficientCondition, TIMELINE_UNBORN);
-        auto channels = _channels(target.properties, object->type());
-        // A change of the transform may land while another clip moves the object, and then adds
-        // to that motion; only a shift does so without an inverse of the model it starts from.
-        Mat4 change;
-        auto layered = (channels & CHANNEL_MODEL) && time < _channelEnd(*entry, CHANNEL_MODEL);
-        auto shifts = layered && _shifts(object->model, target.targetModel, change);
-        Mat4 inverse;
-        if (layered && !shifts && !_inverse(object->model, inverse)) {
-            return impl.fail(Result::InsufficientCondition, TIMELINE_FLAT);
-        }
-        auto waits = layered ? channels & ~CHANNEL_MODEL : channels;
-        if (time < _channelEnd(*entry, waits)) return _overlap(impl, *entry, waits, time);
-        auto passing = [&target](uint32_t) -> Passing {
-            if (target.target->type() != Type::Group) return {};
-            return {target.target, target.properties & TARGET_INHERITED};
-        };
-        auto named = [&target](uint32_t, const Object* candidate) -> uint32_t {
-            return target.target == candidate ? target.properties : 0u;
-        };
-        Inheritance inheritance;
-        auto inherited = _inherit(impl, 1u, 0.0f, 0.0f, passing, named, inheritance);
-        if (inherited != Result::Success) return inherited;
-        if (!impl.growClips(1u + inheritance.count)) return impl.fail(Result::OutOfMemory, SCENE_MEMORY);
-        const GeometryShape* shaped = nullptr;
-        auto previousGeometryCount = impl.geometryCnt;
-        auto previousGeometryPoints = impl.geometryPoints;
-        if (target.properties & TARGET_GEOMETRY) {
-            auto reshaped = impl.reshape(&target, 1u, &shaped, previousGeometryCount, previousGeometryPoints);
-            if (reshaped != Result::Success) return reshaped;
-        }
-        const char* kept = nullptr;
-        auto added = false;
-        if ((target.properties & TARGET_TEXT)
-            && !(kept = Impl::keep(static_cast<Text*>(object), target.targetText, added))) {
-            impl.dropGeometries(previousGeometryCount, previousGeometryPoints);
-            return impl.fail(Result::OutOfMemory, SCENE_MEMORY);
-        }
-        auto& clip = impl.append(object, channels, time, time, AnimCurve::preset(AnimCurvePreset::Smooth));
-        clip.from = _state(object);
-        if (shaped) _reshaped(clip.from, entry->geometry);
-        clip.to = Impl::targeted(target, clip.from, kept, shaped);
-        if (shifts) clip.to.model = change * clip.from.model;
-        auto state = clip.to;
-        auto authored = clip.from.model;
-        if (layered) _layered(clip, object, authored, target.targetModel);
-        Impl::store(object, state);
-        if (shaped) entry->geometry = shaped;
-        _commit(*entry);
-        _inheritClips(impl, inheritance, 0.0f, 0.0f, clip.curve, [&target](uint32_t, uint32_t properties, VisualState& to) {
-            if (properties & TARGET_STROKE) to.stroke = target.targetStroke;
-            if (properties & TARGET_FILL) to.fill = target.targetFill;
-            if (properties & TARGET_WIDTH) to.width = target.targetWidth;
-        });
+        Impl::authored(object, target.properties);
+        return Result::Success;
     }
-    // The object now sets these itself; below a group, shapes added later inherit them.
-    if (target.properties & TARGET_STROKE) object->objStrokeAuthored = true;
-    if (target.properties & TARGET_FILL) object->objFillAuthored = true;
-    if (target.properties & TARGET_WIDTH) object->objWidthAuthored = true;
-    if (target.properties & TARGET_EFFECTS) object->objEffects = true;
-    return Result::Success;
+    // Afterwards a clip of zero length at the cursor switches the values, for the object and for
+    // the shapes that take a group's stroke, fill or width from it.
+    if (auto reason = _unplayable(entry, object)) return impl.fail(Result::InvalidArguments, reason);
+    auto fits = impl.fits(*entry, target, impl.cursor);
+    if (fits != Result::Success) return fits;
+    return impl.animate(&target, 1u, 0.0f, 0.0f, AnimCurve::preset(AnimCurvePreset::Smooth));
 }
 
 // ---------- Saving and restoring ----------
@@ -8357,6 +8339,36 @@ Result Scene::cameraInput(const CameraInput& input) noexcept
 
 // ---------- Cameras and views ----------
 
+// Adds to track a move of its camera from the pose its moves leave to camera and view, from the
+// cursor to end, where the cursor goes; an orbit turns by angle about axis (see CameraClip). Impl
+// is the scene's implementation, which only scene members may name.
+template<typename Impl>
+static Result _moveCamera(Impl& impl, const CameraTrack& track, const Camera& camera, CameraView view, float end,
+                          const AnimCurve& curve, bool layered, const Vec3& axis = {}, float angle = 0.0f)
+{
+    if (!grow(track.clips, track.count, track.capacity, 1u, 4u)) return impl.fail(Result::OutOfMemory, SCENE_MEMORY);
+    if (!track.count) {
+        track.initial = track.camera;
+        track.initialView = track.view;
+    }
+    auto& clip = track.clips[track.count++];
+    clip.from = track.camera;
+    clip.to = camera;
+    clip.fromView = track.view;
+    clip.toView = view;
+    clip.begin = impl.cursor;
+    clip.end = end;
+    clip.curve = curve;
+    clip.axis = axis;
+    clip.orbit = angle;
+    clip.layered = layered;
+    track.camera = camera;
+    track.view = view;
+    impl.advance(end);
+    impl.definitionsSealed = true;
+    return Result::Success;
+}
+
 Result Scene::look(const Camera& camera, CameraView view, float duration,
                    const AnimCurve& curve) noexcept
 {
@@ -8412,25 +8424,7 @@ Result Scene::Impl::look(const CameraTrack& track, const Camera& camera, CameraV
             if (planar >= 0.0f) return fail(Result::InsufficientCondition, _planarReason(reason, planar));
         }
     }
-    if (!grow(track.clips, track.count, track.capacity, 1u, 4u)) return fail(Result::OutOfMemory, SCENE_MEMORY);
-    if (!track.count) {
-        track.initial = track.camera;
-        track.initialView = track.view;
-    }
-    auto& clip = track.clips[track.count++];
-    clip.from = track.camera;
-    clip.to = camera;
-    clip.fromView = track.view;
-    clip.toView = view;
-    clip.begin = cursor;
-    clip.end = nextCursor;
-    clip.curve = curve;
-    clip.layered = layered;
-    track.camera = camera;
-    track.view = view;
-    advance(nextCursor);
-    definitionsSealed = true;
-    return Result::Success;
+    return _moveCamera(*this, track, camera, view, nextCursor, curve, layered);
 }
 
 Result Scene::orbit(float angle, const Vec3& axis, float duration, const AnimCurve& curve) noexcept
@@ -8476,26 +8470,7 @@ Result Scene::Impl::orbit(const CameraTrack& track, float angle, const Vec3& axi
                                    std::numeric_limits<float>::infinity());
         if (planar >= 0.0f) return fail(Result::InsufficientCondition, _planarReason(reason, planar));
     }
-    if (!grow(track.clips, track.count, track.capacity, 1u, 4u)) return fail(Result::OutOfMemory, SCENE_MEMORY);
-    if (!track.count) {
-        track.initial = track.camera;
-        track.initialView = track.view;
-    }
-    auto& clip = track.clips[track.count++];
-    clip.from = track.camera;
-    clip.to = config.camera;
-    clip.fromView = track.view;
-    clip.toView = track.view;
-    clip.begin = cursor;
-    clip.end = nextCursor;
-    clip.curve = curve;
-    clip.axis = axis;
-    clip.orbit = angle;
-    clip.layered = layered;
-    track.camera = config.camera;
-    advance(nextCursor);
-    definitionsSealed = true;
-    return Result::Success;
+    return _moveCamera(*this, track, config.camera, track.view, nextCursor, curve, layered, axis, angle);
 }
 
 Result Scene::view(const SceneView& view, uint32_t* index) noexcept

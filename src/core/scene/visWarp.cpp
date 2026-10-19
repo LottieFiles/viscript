@@ -8,79 +8,27 @@
 namespace vis
 {
 
-// The fewest points a warp samples a circle and a rounded corner with, as many as the renderer
-// draws them with.
-static constexpr uint32_t WARP_CIRCLE_POINTS = 64;
-static constexpr uint32_t WARP_CORNER_POINTS = 8;
-// The most numbers a space writes, as the renderer counts them.
-static constexpr uint32_t WARP_SPACE_NUMBERS = 256;
-
-// Calls tick with each value along range where a space draws a grid line or writes a number,
-// stepping as the renderer does, until tick returns false.
-template<typename Tick>
-static void _ticks(const Range& range, Tick tick)
-{
-    auto index = 0u;
-    for (auto value = std::ceil(range.min / range.step) * range.step;
-         value <= range.max + range.step * 0.001f && index++ < 4096; value += range.step) {
-        if (std::fabs(value) < range.step * 0.001f) continue;
-        if (!tick(value)) return;
-    }
-}
-
-// The geometry of a space as runs: its grid lines, those of the 3D view, its axes, its ticks, each
-// as its point and one a little along its axis, which tell where the tick stands and which way
-// its axis runs there once warped, and the points where it writes numbers, in the order the
-// renderer draws them.
+// The geometry of a space as runs, in the order the renderer draws its parts (see spaceParts()),
+// those of the 3D view among them: two points for a line, a tick as its point and one a little
+// along its axis, which tell where it stands and which way its axis runs there once warped, and
+// the point of a number.
 static void _gatherSpace(const Space* space, WarpDraft& draft)
 {
-    auto line = [&draft](const Vec3& from, const Vec3& to, WarpPart part) {
+    auto written = 0u;
+    auto line = [&draft](WarpPart part, const Vec3& from, const Vec3& to) {
         draft.add(from);
         draft.add(to);
         draft.end(part);
+        return true;
     };
-    auto& x = space->x;
-    auto& y = space->y;
-    auto& z = space->z;
-    _ticks(x, [&](float value) { line({value, y.min, 0.0f}, {value, y.max, 0.0f}, WarpPart::Grid); return true; });
-    _ticks(y, [&](float value) { line({x.min, value, 0.0f}, {x.max, value, 0.0f}, WarpPart::Grid); return true; });
-    _ticks(x, [&](float value) { line({value, 0.0f, z.min}, {value, 0.0f, z.max}, WarpPart::DepthGrid); return true; });
-    _ticks(z, [&](float value) { line({x.min, 0.0f, value}, {x.max, 0.0f, value}, WarpPart::DepthGrid); return true; });
-    _ticks(y, [&](float value) { line({0.0f, value, z.min}, {0.0f, value, z.max}, WarpPart::DepthGrid); return true; });
-    _ticks(z, [&](float value) { line({0.0f, y.min, value}, {0.0f, y.max, value}, WarpPart::DepthGrid); return true; });
-    line({x.min, 0.0f, 0.0f}, {x.max, 0.0f, 0.0f}, WarpPart::AxisX);
-    line({0.0f, y.min, 0.0f}, {0.0f, y.max, 0.0f}, WarpPart::AxisY);
-    line({0.0f, 0.0f, z.min}, {0.0f, 0.0f, z.max}, WarpPart::AxisZ);
-    auto ticks = [&](const Range& range, float step, uint8_t axis, WarpPart part) {
-        spaceTicks(range, step, [&](float value) {
-            auto ahead = value + spaceTickLead(value, step);
-            line(axis == 0u ? Vec3{value, 0.0f, 0.0f} : axis == 1u ? Vec3{0.0f, value, 0.0f} : Vec3{0.0f, 0.0f, value},
-                 axis == 0u ? Vec3{ahead, 0.0f, 0.0f} : axis == 1u ? Vec3{0.0f, ahead, 0.0f} : Vec3{0.0f, 0.0f, ahead},
-                 part);
-            return true;
-        });
+    auto number = [&](WarpPart part, const Vec3& point, float value) {
+        if (written >= MAX_SPACE_NUMBERS) return false;
+        draft.add(point);
+        draft.end(part, value);
+        written++;
+        return true;
     };
-    ticks(x, space->ticks.x, 0u, WarpPart::TickX);
-    ticks(y, space->ticks.y, 1u, WarpPart::TickY);
-    ticks(z, space->ticks.z, 2u, WarpPart::TickZ);
-    if (!space->numbers) return;
-    auto written = 0u;
-    auto numbers = [&](const Range& range, uint8_t axis, WarpPart part) {
-        _ticks(range, [&](float value) {
-            if (written >= WARP_SPACE_NUMBERS) return false;
-            auto point = Vec3{};
-            if (axis == 0u) point.x = value;
-            else if (axis == 1u) point.y = value;
-            else point.z = value;
-            draft.add(point);
-            draft.end(part, value);
-            written++;
-            return true;
-        });
-    };
-    numbers(x, 0u, WarpPart::NumberX);
-    numbers(y, 1u, WarpPart::NumberY);
-    numbers(z, 2u, WarpPart::NumberZ);
+    spaceParts(space, true, line, number);
 }
 
 // The geometry of object in its local space, as runs that a warp cuts and maps: outlines and
@@ -184,10 +132,10 @@ void WarpDraft::gather(const Object* object, const Mat4& space, float step)
                 return circle->center + Vec3{static_cast<float>(std::cos(turn * PI2)) * circle->radius,
                                              static_cast<float>(std::sin(turn * PI2)) * circle->radius, 0.0f};
             };
-            Vec3 coarse[WARP_CIRCLE_POINTS + 1u];
-            for (auto i = 0u; i <= WARP_CIRCLE_POINTS; i++)
-                coarse[i] = ring(static_cast<double>(i) / WARP_CIRCLE_POINTS);
-            auto count = samples(mappedLength(coarse, WARP_CIRCLE_POINTS + 1u), WARP_CIRCLE_POINTS);
+            Vec3 coarse[CIRCLE_POINTS + 1u];
+            for (auto i = 0u; i <= CIRCLE_POINTS; i++)
+                coarse[i] = ring(static_cast<double>(i) / CIRCLE_POINTS);
+            auto count = samples(mappedLength(coarse, CIRCLE_POINTS + 1u), CIRCLE_POINTS);
             for (auto i = 0u; i < count && !draft.full && !draft.failed; i++)
                 draft.add(ring(static_cast<double>(i) / count));
             draft.closed = true;
@@ -219,10 +167,10 @@ void WarpDraft::gather(const Object* object, const Mat4& space, float step)
                     return center + Vec3{corners[corner].x + static_cast<float>(std::cos(turn * PI2)) * radius,
                                          corners[corner].y + static_cast<float>(std::sin(turn * PI2)) * radius, 0.0f};
                 };
-                Vec3 coarse[WARP_CORNER_POINTS + 1u];
-                for (auto i = 0u; i <= WARP_CORNER_POINTS; i++)
-                    coarse[i] = arc(static_cast<double>(i) / WARP_CORNER_POINTS);
-                auto count = samples(mappedLength(coarse, WARP_CORNER_POINTS + 1u), WARP_CORNER_POINTS);
+                Vec3 coarse[CORNER_POINTS + 1u];
+                for (auto i = 0u; i <= CORNER_POINTS; i++)
+                    coarse[i] = arc(static_cast<double>(i) / CORNER_POINTS);
+                auto count = samples(mappedLength(coarse, CORNER_POINTS + 1u), CORNER_POINTS);
                 for (auto i = 0u; i <= count && !draft.full && !draft.failed; i++)
                     draft.add(arc(static_cast<double>(i) / count));
             }

@@ -19,8 +19,6 @@
 namespace vis
 {
 
-static constexpr uint32_t MAX_SPACE_NUMBERS = 256;
-
 static Color _shade(Color color, float factor, float opacity)
 {
     factor = _clamp(factor);
@@ -774,82 +772,98 @@ static Result _tick(DisplayList& list, const Vec2& pixel, const Vec2& ahead, flo
     return _line(list, pixel - half, pixel + half, Pen{state.progress, state.direction, style, layer, depth, ends});
 }
 
-// The ticks of a space across its axes (see Space::ticks), in the colors of the axes. In 3D
-// both ends of a tick, which lies flat on the screen, keep the depth of its point, as a number
-// keeps its anchor, so that split() treats it as it treats the axis it crosses.
-static Result _spaceTicks(DisplayList& list, const Space* space, const VisualState& state, const Config& config,
-                          Style style, int32_t layer)
+// How a space draws over its grid, which draws in the space's style and layer: its axes and
+// ticks one layer up, in the axis width, and its numbers another layer up.
+struct SpacePens
 {
-    auto length = space->tickLength * state.pixelScale;
-    if (!(length > 0.0f)) return Result::Success;
-    const Range* ranges[] = {&space->x, &space->y, &space->z};
-    const float steps[] = {space->ticks.x, space->ticks.y, space->ticks.z};
-    const Color colors[] = {space->axisX, space->axisY, space->axisZ};
-    auto axes = config.cameraView == CameraView::ThreeD ? 3u : 2u;
-    auto spatial = _spatial(config);
-    auto result = Result::Success;
-    for (auto axis = 0u; axis < axes && result == Result::Success; axis++) {
-        auto on = [axis](float value) {
-            return axis == 0u ? Vec3{value, 0.0f, 0.0f} : axis == 1u ? Vec3{0.0f, value, 0.0f} : Vec3{0.0f, 0.0f, value};
-        };
-        style.stroke = _opacity(colors[axis], state.opacity);
-        spaceTicks(*ranges[axis], steps[axis], [&](float value) {
-            Vec2 pixel;
-            Vec2 ahead;
-            float depth;
-            float aheadDepth;
-            if (!_point(on(value), state.model, config, pixel, depth)
-                || !_point(on(value + spaceTickLead(value, steps[axis])), state.model, config, ahead, aheadDepth)) {
-                return true;
-            }
-            auto anchor = _screenDepth(depth, config);
-            float ends[2] = {anchor, anchor};
-            result = _tick(list, pixel, ahead, length, state, style, layer, depth, spatial ? ends : nullptr);
-            return result == Result::Success;
-        });
-    }
-    return result;
+    Style axis;
+    int32_t axisLayer = 0;
+    Style number;
+    float numberSize = 0.0f;
+    int32_t numberLayer = 0;
+};
+
+static SpacePens _spacePens(const Space* space, const VisualState& state, const Style& style)
+{
+    SpacePens pens;
+    pens.axis = style;
+    pens.axis.width = space->axisWidth < 0.0f ? std::fmax(style.width, 1.5f) : space->axisWidth * state.pixelScale;
+    pens.axisLayer = state.layer == std::numeric_limits<int32_t>::max() ? state.layer : state.layer + 1;
+    pens.number.stroke.a = 0;
+    pens.number.fill = _opacity(space->numberColor, state.opacity * state.progress);
+    pens.numberSize = space->numberSize * state.pixelScale;
+    pens.numberLayer = pens.axisLayer == std::numeric_limits<int32_t>::max() ? pens.axisLayer : pens.axisLayer + 1;
+    return pens;
 }
 
-static Result _spaceNumbers(DisplayList& list, const Space* space, const VisualState& state,
-                            const Config& config, int32_t layer)
+// The color an axis of a space and its ticks draw in.
+static Color _axisColor(const Space* space, uint8_t axis, float opacity)
 {
-    if (!space->numbers) return Result::Success;
-    auto style = Style{};
-    style.stroke.a = 0;
-    style.fill = _opacity(space->numberColor, state.opacity * state.progress);
-    auto numberSize = space->numberSize * state.pixelScale;
-    if (numberSize <= 0.0f) return Result::Success;
-    auto count = 0u;
-    auto addAxis = [&](const Range& range, uint8_t axis, const Vec2& offset) {
-        auto scale = space->numberMode == NumberMode::Relative ? _basisLength(state.model, axis) : 1.0f;
-        if (scale <= 0.0f) return Result::Success;
-        auto index = 0u;
-        for (auto value = std::ceil(range.min / range.step) * range.step;
-             value <= range.max + range.step * 0.001f && index++ < 4096 && count < MAX_SPACE_NUMBERS;
-             value += range.step) {
-            if (std::fabs(value) < range.step * 0.001f) continue;
-            auto point = Vec3{};
-            if (axis == 0u) point.x = value;
-            else if (axis == 1u) point.y = value;
-            else point.z = value;
-            Vec2 pixel;
-            float depth;
-            if (!_point(point, state.model, config, pixel, depth)) continue;
-            auto anchor = _screenDepth(depth, config);
-            auto result = list.number(pixel + offset * state.pixelScale, value * scale, numberSize,
-                                      {0.5f, 0.5f}, style, layer, depth,
-                                      _spatial(config) ? &anchor : nullptr);
-            if (result != Result::Success) return result;
-            count++;
+    return _opacity(axis == 0u ? space->axisX : axis == 1u ? space->axisY : space->axisZ, opacity);
+}
+
+// Where a number of a space stands from the point of its value on axis, at a pixel scale of one.
+static Vec2 _numberOffset(const Space* space, uint8_t axis)
+{
+    return axis == 0u ? Vec2{0.0f, space->numberSize * 0.9f}
+         : axis == 1u ? Vec2{-space->numberSize * 0.9f, 0.0f}
+                      : Vec2{space->numberSize * 0.75f, -space->numberSize * 0.55f};
+}
+
+// A space: its grid, its axes and the ticks across them in the colors of the axes, and its
+// numbers (see spaceParts()). The axes and numbers draw over the grid; split() lowers the parts
+// that a surface in the grid's layer hides. In 3D both ends of a tick, which lies flat on the
+// screen, keep the depth of its point, as a number keeps its anchor, so that split() treats it
+// as it treats the axis it crosses.
+static Result _space(DisplayList& list, const Space* space, const VisualState& state, const Config& config,
+                     const Style& style)
+{
+    auto pens = _spacePens(space, state, style);
+    auto spatial = _spatial(config);
+    auto tickLength = space->tickLength * state.pixelScale;
+    auto numbers = 0u;
+    auto result = Result::Success;
+    auto line = [&](WarpPart part, const Vec3& from, const Vec3& to) {
+        if (part == WarpPart::Grid || part == WarpPart::DepthGrid) {
+            result = _gridLine(list, from, to, state, config, style, state.layer);
+            return result == Result::Success;
         }
-        return Result::Success;
+        list.lift = static_cast<uint8_t>(pens.axisLayer - state.layer);
+        pens.axis.stroke = _axisColor(space, spaceAxis(part), state.opacity);
+        if (part == WarpPart::AxisX || part == WarpPart::AxisY || part == WarpPart::AxisZ) {
+            result = _gridLine(list, from, to, state, config, pens.axis, pens.axisLayer);
+            return result == Result::Success;
+        }
+        Vec2 pixel;
+        Vec2 ahead;
+        float depth;
+        float aheadDepth;
+        if (!(tickLength > 0.0f) || !_point(from, state.model, config, pixel, depth)
+            || !_point(to, state.model, config, ahead, aheadDepth)) {
+            return true;
+        }
+        auto anchor = _screenDepth(depth, config);
+        float ends[2] = {anchor, anchor};
+        result = _tick(list, pixel, ahead, tickLength, state, pens.axis, pens.axisLayer, depth,
+                       spatial ? ends : nullptr);
+        return result == Result::Success;
     };
-    auto result = addAxis(space->x, 0u, {0.0f, space->numberSize * 0.9f});
-    if (result != Result::Success) return result;
-    result = addAxis(space->y, 1u, {-space->numberSize * 0.9f, 0.0f});
-    if (result != Result::Success || config.cameraView != CameraView::ThreeD) return result;
-    return addAxis(space->z, 2u, {space->numberSize * 0.75f, -space->numberSize * 0.55f});
+    auto number = [&](WarpPart part, const Vec3& point, float value) {
+        if (pens.numberSize <= 0.0f) return false;
+        auto axis = spaceAxis(part);
+        auto scale = space->numberMode == NumberMode::Relative ? _basisLength(state.model, axis) : 1.0f;
+        Vec2 pixel;
+        float depth;
+        if (scale <= 0.0f || !_point(point, state.model, config, pixel, depth)) return true;
+        auto anchor = _screenDepth(depth, config);
+        list.lift = static_cast<uint8_t>(pens.numberLayer - state.layer);
+        result = list.number(pixel + _numberOffset(space, axis) * state.pixelScale, value * scale, pens.numberSize,
+                             {0.5f, 0.5f}, pens.number, pens.numberLayer, depth, spatial ? &anchor : nullptr);
+        return result == Result::Success && ++numbers < MAX_SPACE_NUMBERS;
+    };
+    spaceParts(space, config.cameraView == CameraView::ThreeD, line, number);
+    list.lift = 0u;
+    return result;
 }
 
 // Points begin to end of a warp at the progress state has reached, projected into output; false
@@ -917,15 +931,7 @@ static Result _warpedSpace(DisplayList& list, const Space* space, const VisualSt
     auto depthView = config.cameraView == CameraView::ThreeD;
     auto lineStyle = style;
     lineStyle.fill.a = 0;
-    auto axisStyle = lineStyle;
-    axisStyle.width = space->axisWidth < 0.0f ? std::fmax(style.width, 1.5f)
-                    : space->axisWidth * state.pixelScale;
-    auto axisLayer = state.layer == std::numeric_limits<int32_t>::max() ? state.layer : state.layer + 1;
-    auto numberLayer = axisLayer == std::numeric_limits<int32_t>::max() ? axisLayer : axisLayer + 1;
-    auto numberStyle = Style{};
-    numberStyle.stroke.a = 0;
-    numberStyle.fill = _opacity(space->numberColor, state.opacity * state.progress);
-    auto numberSize = space->numberSize * state.pixelScale;
+    auto pens = _spacePens(space, state, lineStyle);
     auto numbers = 0u;
     auto result = Result::Success;
     auto begin = 0u;
@@ -950,38 +956,32 @@ static Result _warpedSpace(DisplayList& list, const Space* space, const VisualSt
                 break;
             case WarpPart::AxisX:
             case WarpPart::AxisY:
-            case WarpPart::AxisZ: {
-                auto color = part == WarpPart::AxisX ? space->axisX : part == WarpPart::AxisY ? space->axisY : space->axisZ;
-                axisStyle.stroke = _opacity(color, state.opacity);
+            case WarpPart::AxisZ:
+                pens.axis.stroke = _axisColor(space, spaceAxis(part), state.opacity);
                 if (count >= 2u) {
                     result = _path(list, projected, count, false,
-                                   Pen{state.progress, state.direction, axisStyle, axisLayer, depth});
+                                   Pen{state.progress, state.direction, pens.axis, pens.axisLayer, depth});
                 }
                 break;
-            }
             case WarpPart::TickX:
             case WarpPart::TickY:
-            case WarpPart::TickZ: {
-                auto color = part == WarpPart::TickX ? space->axisX : part == WarpPart::TickY ? space->axisY : space->axisZ;
-                axisStyle.stroke = _opacity(color, state.opacity);
+            case WarpPart::TickZ:
+                pens.axis.stroke = _axisColor(space, spaceAxis(part), state.opacity);
                 if (count >= 2u) {
                     result = _tick(list, projected[0], projected[1], space->tickLength * state.pixelScale, state,
-                                   axisStyle, axisLayer, depth);
+                                   pens.axis, pens.axisLayer, depth);
                 }
                 break;
-            }
             case WarpPart::NumberX:
             case WarpPart::NumberY:
             case WarpPart::NumberZ: {
-                if (numberSize <= 0.0f || numbers >= MAX_SPACE_NUMBERS) break;
-                auto axis = static_cast<uint8_t>(part == WarpPart::NumberX ? 0u : part == WarpPart::NumberY ? 1u : 2u);
+                if (pens.numberSize <= 0.0f || numbers >= MAX_SPACE_NUMBERS) break;
+                auto axis = spaceAxis(part);
                 auto scale = space->numberMode == NumberMode::Relative ? _basisLength(state.model, axis) : 1.0f;
                 if (scale <= 0.0f) break;
-                auto offset = axis == 0u ? Vec2{0.0f, space->numberSize * 0.9f}
-                            : axis == 1u ? Vec2{-space->numberSize * 0.9f, 0.0f}
-                                         : Vec2{space->numberSize * 0.75f, -space->numberSize * 0.55f};
-                result = list.number(projected[0] + offset * state.pixelScale, warp.runs[run].value * scale,
-                                     numberSize, {0.5f, 0.5f}, numberStyle, numberLayer, depth);
+                result = list.number(projected[0] + _numberOffset(space, axis) * state.pixelScale,
+                                     warp.runs[run].value * scale, pens.numberSize, {0.5f, 0.5f}, pens.number,
+                                     pens.numberLayer, depth);
                 numbers++;
                 break;
             }
@@ -2604,76 +2604,7 @@ Result Scene::Impl::build(float time, DisplayList& list, bool sort, const ViewFr
                 delete[] written;
                 break;
             }
-            case Type::Space: {
-                auto space = static_cast<Space*>(object);
-                {
-                    auto index = 0u;
-                    for (auto x = std::ceil(space->x.min / space->x.step) * space->x.step; x <= space->x.max + space->x.step * 0.001f && index++ < 4096; x += space->x.step) {
-                        if (std::fabs(x) < space->x.step * 0.001f) continue;
-                        result = _gridLine(list, {x, space->y.min, 0.0f}, {x, space->y.max, 0.0f}, state, config, style, state.layer);
-                        if (result != Result::Success) return result;
-                    }
-                    index = 0;
-                    for (auto y = std::ceil(space->y.min / space->y.step) * space->y.step; y <= space->y.max + space->y.step * 0.001f && index++ < 4096; y += space->y.step) {
-                        if (std::fabs(y) < space->y.step * 0.001f) continue;
-                        result = _gridLine(list, {space->x.min, y, 0.0f}, {space->x.max, y, 0.0f}, state, config, style, state.layer);
-                        if (result != Result::Success) return result;
-                    }
-                }
-                if (config.cameraView == CameraView::ThreeD) {
-                    auto index = 0u;
-                    for (auto x = std::ceil(space->x.min / space->x.step) * space->x.step; x <= space->x.max + space->x.step * 0.001f && index++ < 4096; x += space->x.step) {
-                        if (std::fabs(x) < space->x.step * 0.001f) continue;
-                        result = _gridLine(list, {x, 0.0f, space->z.min}, {x, 0.0f, space->z.max}, state, config, style, state.layer);
-                        if (result != Result::Success) return result;
-                    }
-                    index = 0;
-                    for (auto z = std::ceil(space->z.min / space->z.step) * space->z.step; z <= space->z.max + space->z.step * 0.001f && index++ < 4096; z += space->z.step) {
-                        if (std::fabs(z) < space->z.step * 0.001f) continue;
-                        result = _gridLine(list, {space->x.min, 0.0f, z}, {space->x.max, 0.0f, z}, state, config, style, state.layer);
-                        if (result != Result::Success) return result;
-                    }
-                }
-                if (config.cameraView == CameraView::ThreeD) {
-                    auto index = 0u;
-                    for (auto y = std::ceil(space->y.min / space->y.step) * space->y.step; y <= space->y.max + space->y.step * 0.001f && index++ < 4096; y += space->y.step) {
-                        if (std::fabs(y) < space->y.step * 0.001f) continue;
-                        result = _gridLine(list, {0.0f, y, space->z.min}, {0.0f, y, space->z.max}, state, config, style, state.layer);
-                        if (result != Result::Success) return result;
-                    }
-                    index = 0;
-                    for (auto z = std::ceil(space->z.min / space->z.step) * space->z.step; z <= space->z.max + space->z.step * 0.001f && index++ < 4096; z += space->z.step) {
-                        if (std::fabs(z) < space->z.step * 0.001f) continue;
-                        result = _gridLine(list, {0.0f, space->y.min, z}, {0.0f, space->y.max, z}, state, config, style, state.layer);
-                        if (result != Result::Success) return result;
-                    }
-                }
-                auto axisStyle = style;
-                auto axisLayer = state.layer == std::numeric_limits<int32_t>::max() ? state.layer : state.layer + 1;
-                axisStyle.width = space->axisWidth < 0.0f ? std::fmax(style.width, 1.5f)
-                    : space->axisWidth * state.pixelScale;
-                axisStyle.stroke = _opacity(space->axisX, state.opacity);
-                // The axes and numbers draw over the grid; split() lowers the parts that a
-                // surface in the grid's layer hides.
-                list.lift = static_cast<uint8_t>(axisLayer - state.layer);
-                result = _gridLine(list, {space->x.min, 0.0f, 0.0f}, {space->x.max, 0.0f, 0.0f}, state, config, axisStyle, axisLayer);
-                if (result == Result::Success) {
-                    axisStyle.stroke = _opacity(space->axisY, state.opacity);
-                    result = _gridLine(list, {0.0f, space->y.min, 0.0f}, {0.0f, space->y.max, 0.0f}, state, config, axisStyle, axisLayer);
-                }
-                if (result == Result::Success && config.cameraView == CameraView::ThreeD) {
-                    axisStyle.stroke = _opacity(space->axisZ, state.opacity);
-                    result = _gridLine(list, {0.0f, 0.0f, space->z.min}, {0.0f, 0.0f, space->z.max}, state, config, axisStyle, axisLayer);
-                }
-                if (result == Result::Success) result = _spaceTicks(list, space, state, config, axisStyle, axisLayer);
-                if (result == Result::Success) {
-                    auto numberLayer = axisLayer == std::numeric_limits<int32_t>::max() ? axisLayer : axisLayer + 1;
-                    list.lift = static_cast<uint8_t>(numberLayer - state.layer);
-                    result = _spaceNumbers(list, space, state, config, numberLayer);
-                }
-                list.lift = 0u;
-                break;
-            }
+            case Type::Space: result = _space(list, static_cast<Space*>(object), state, config, style); break;
             case Type::Arc:
             case Type::Angle: {
                 auto arc = arcGeometry(object, &state);
@@ -2688,16 +2619,12 @@ Result Scene::Impl::build(float time, DisplayList& list, bool sort, const ViewFr
             }
             case Type::Circle: {
                 auto circle = static_cast<Circle*>(object);
-                constexpr auto count = 64u;
-                auto at = [&](uint32_t j) {
-                    auto angle = TWO_PI * static_cast<float>(j) / static_cast<float>(count);
-                    return circle->center + Vec3{std::cos(angle) * state.size.x, std::sin(angle) * state.size.x, 0.0f};
-                };
-                Vec2 points[count];
-                float depths[count];
-                if (_project(count, at, state.model, config, points, spatial ? depths : nullptr, pen.depth)) {
+                auto at = [&](uint32_t j) { return circlePoint(circle->center, state.size.x, j); };
+                Vec2 points[CIRCLE_POINTS];
+                float depths[CIRCLE_POINTS];
+                if (_project(CIRCLE_POINTS, at, state.model, config, points, spatial ? depths : nullptr, pen.depth)) {
                     pen.depths = spatial ? depths : nullptr;
-                    result = _path(list, points, count, true, pen);
+                    result = _path(list, points, CIRCLE_POINTS, true, pen);
                 }
                 break;
             }
@@ -2917,37 +2844,14 @@ Result Scene::Impl::build(float time, DisplayList& list, bool sort, const ViewFr
             case Type::Group: break;
             case Type::Rectangle: {
                 auto rectangle = static_cast<Rectangle*>(object);
-                constexpr auto segments = 8u;
-                Vec3 local[segments * 4u];
-                auto count = 0u;
                 auto half = Vec2{state.size.x * 0.5f, state.size.y * 0.5f};
                 // Size and corner animate on their own channels, so the corner may outgrow a
                 // shrinking side for a moment.
                 auto radius = std::fmin(state.corner, std::fmin(half.x, half.y));
-                if (radius <= 0.0f) {
-                    local[0] = rectangle->center + Vec3{-half.x, -half.y, 0.0f};
-                    local[1] = rectangle->center + Vec3{half.x, -half.y, 0.0f};
-                    local[2] = rectangle->center + Vec3{half.x, half.y, 0.0f};
-                    local[3] = rectangle->center + Vec3{-half.x, half.y, 0.0f};
-                    count = 4u;
-                } else {
-                    Vec2 centers[4] = {
-                        {half.x - radius, half.y - radius},
-                        {-half.x + radius, half.y - radius},
-                        {-half.x + radius, -half.y + radius},
-                        {half.x - radius, -half.y + radius}};
-                    for (auto corner = 0u; corner < 4u; corner++) {
-                        for (auto j = 0u; j < segments; j++) {
-                            auto angle = TWO_PI * (static_cast<float>(corner) * 0.25f
-                                               + static_cast<float>(j) / (segments * 4.0f));
-                            local[count++] = rectangle->center + Vec3{
-                                centers[corner].x + std::cos(angle) * radius,
-                                centers[corner].y + std::sin(angle) * radius, 0.0f};
-                        }
-                    }
-                }
-                Vec2 points[segments * 4u];
-                float depths[segments * 4u];
+                Vec3 local[CORNER_POINTS * 4u];
+                auto count = rectangleOutline(rectangle->center, half, radius, local);
+                Vec2 points[CORNER_POINTS * 4u];
+                float depths[CORNER_POINTS * 4u];
                 if (_project(local, count, state.model, config, points, spatial ? depths : nullptr, pen.depth)) {
                     pen.depths = spatial ? depths : nullptr;
                     result = _path(list, points, count, true, pen);

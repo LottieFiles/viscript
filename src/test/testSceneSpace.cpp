@@ -179,6 +179,50 @@ void spaceTicks(Renderer* renderer)
     delete invalid;
 }
 
+// A space draws a grid line and writes a number at each multiple of the step of a range, a whole
+// count of the step as written. Added up as floats, the ninth step of 0.1 came to 0.9000001, which
+// it wrote out in full, wider than 0.9, and a warp did the same; 9 * 0.1f would be 0.90000004. Now
+// the numbers of a space from 0 to 0.9 end where those of one with the single step of 0.9 end,
+// warped or not.
+void spaceSteps(Renderer* renderer)
+{
+    Config config;
+    config.width = 320;
+    config.height = 120;
+    config.camera.orthoHeight = 2.0f;
+    auto linear = AnimCurve::preset(AnimCurvePreset::Linear);
+    // The right edge of the space with step along x, and that of the same space once a warp that
+    // moves nothing has taken it.
+    auto edges = [&](float step, float& warped) {
+        warped = -1.0f;
+        auto scene = Scene::gen(config);
+        auto space = Space::gen({0.0f, 0.9f, step}, {-0.5f, 0.5f, 1.0f}, {-1.0f, 1.0f, 1.0f});
+        if (space) {
+            space->numbers = true;
+            space->numberSize = 12.0f;
+        }
+        if (!scene || !space || scene->add(space) != Result::Success) {
+            delete space;
+            delete scene;
+            return -1.0f;
+        }
+        BBox box;
+        auto plain = renderer->bounds(scene, space, 0.0f, box) == Result::Success ? box.x + box.width : -1.0f;
+        Object* targets[] = {space};
+        auto still = Vec3{};
+        if (scene->warp(targets, 1u, _moved, &still, 1.0f, linear) == Result::Success
+            && renderer->bounds(scene, space, 1.0f, box) == Result::Success) {
+            warped = box.x + box.width;
+        }
+        delete scene;
+        return plain;
+    };
+    float warped, single;
+    auto stepped = edges(0.1f, warped);
+    auto whole = edges(0.9f, single);
+    CHECK(whole > 0.0f && near(stepped, whole) && single > 0.0f && near(warped, single));
+}
+
 // A space places a label beside the tick at a value: its bounds center on the line from the
 // tick, below the x axis and left of the y axis unless told otherwise, with the side that faces
 // the tick tickLength / 2 + gap pixels from the axis, through the transforms of the space and of
@@ -657,5 +701,28 @@ void cursorDecimals(Renderer* renderer)
     Animation fades[] = {Animation::fade(dots[0], 0.5f), Animation::fade(dots[1], 0.5f), Animation::fade(dots[2], 0.5f)};
     CHECK(scene->play(fades, 3u, 0.3f, AnimCurve::preset(AnimCurvePreset::Linear), 0.4f) == Result::Success);
     CHECK(scene->cursor() == 9.74f);
+    delete scene;
+}
+
+// A match reckons when its pieces begin and end from the decimals a script writes, as a play does,
+// so the last of them ends where the cursor goes: one of 0.3 from 0.05 ends at the float nearest
+// 0.35. Added up as floats, its pieces ended an ulp past the cursor, and a fade of the target from
+// there found the target still fading.
+void matchDecimals()
+{
+    auto scene = Scene::gen();
+    auto from = Circle::gen({-1.0f, 0.0f, 0.0f}, 0.5f);
+    auto to = Circle::gen({1.0f, 0.0f, 0.0f}, 0.5f);
+    CHECK(scene && from && to);
+    if (!scene || !from || !to) {
+        delete to;
+        delete from;
+        delete scene;
+        return;
+    }
+    CHECK(scene->add(from) == Result::Success && scene->wait(0.05f) == Result::Success);
+    CHECK(scene->add(to) == Result::Success && scene->matchTransform(from, to, 0.3f) == Result::Success);
+    CHECK(scene->cursor() == 0.35f);
+    CHECK(scene->play(Animation::fade(to, 0.5f), 0.5f) == Result::Success);
     delete scene;
 }

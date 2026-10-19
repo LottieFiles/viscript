@@ -2104,11 +2104,13 @@ int main()
         morphAnimations(renderer);
         warpedGeometry(renderer);
         spaceTicks(renderer);
+        spaceSteps(renderer);
         spaceLabels();
         spaceScreenLabels(renderer);
         spaceScreenLabelWarps(renderer);
         spaceLabelOpacity(renderer);
         cursorDecimals(renderer);
+        matchDecimals();
         scene3D(renderer);
         assetsAndCells(renderer);
         voxelSamples(renderer);

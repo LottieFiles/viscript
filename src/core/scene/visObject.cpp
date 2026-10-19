@@ -1907,6 +1907,37 @@ uint32_t arcOutline(const ArcGeometry& arc, Vec3* points, uint32_t capacity) noe
     return count;
 }
 
+Vec3 circlePoint(const Vec3& center, float radius, uint32_t index) noexcept
+{
+    auto angle = TWO_PI * static_cast<float>(index) / static_cast<float>(CIRCLE_POINTS);
+    return center + Vec3{std::cos(angle) * radius, std::sin(angle) * radius, 0.0f};
+}
+
+uint32_t rectangleOutline(const Vec3& center, const Vec2& half, float radius, Vec3* points) noexcept
+{
+    if (radius <= 0.0f) {
+        points[0] = center + Vec3{-half.x, -half.y, 0.0f};
+        points[1] = center + Vec3{half.x, -half.y, 0.0f};
+        points[2] = center + Vec3{half.x, half.y, 0.0f};
+        points[3] = center + Vec3{-half.x, half.y, 0.0f};
+        return 4u;
+    }
+    Vec2 centers[4] = {
+        {half.x - radius, half.y - radius},
+        {-half.x + radius, half.y - radius},
+        {-half.x + radius, -half.y + radius},
+        {half.x - radius, -half.y + radius}};
+    auto count = 0u;
+    for (auto corner = 0u; corner < 4u; corner++) {
+        for (auto j = 0u; j < CORNER_POINTS; j++) {
+            auto angle = TWO_PI * (static_cast<float>(corner) * 0.25f + static_cast<float>(j) / (CORNER_POINTS * 4.0f));
+            points[count++] = center + Vec3{centers[corner].x + std::cos(angle) * radius,
+                                            centers[corner].y + std::sin(angle) * radius, 0.0f};
+        }
+    }
+    return count;
+}
+
 bool arcBounds(const ArcGeometry& arc, Bounds& bounds) noexcept
 {
     auto defined = false;
@@ -2117,48 +2148,19 @@ uint32_t outline(const Object* object, Vec3* points, uint32_t capacity, bool& cl
             return arcOutline(arc, points, capacity);
         }
         case Type::Circle: {
-            // Same tessellation as the renderer: 64 points counterclockwise from +x.
             auto circle = static_cast<const Circle*>(object);
-            constexpr auto count = 64u;
-            for (auto i = 0u; i < count && i < capacity; i++) {
-                auto angle = TWO_PI * static_cast<float>(i) / static_cast<float>(count);
-                points[i] = circle->center + Vec3{std::cos(angle) * circle->radius,
-                                                  std::sin(angle) * circle->radius, 0.0f};
-            }
+            for (auto i = 0u; i < CIRCLE_POINTS && i < capacity; i++)
+                points[i] = circlePoint(circle->center, circle->radius, i);
             closed = true;
-            return count;
+            return CIRCLE_POINTS;
         }
         case Type::Rectangle: {
             auto rectangle = static_cast<const Rectangle*>(object);
-            auto half = Vec2{rectangle->size.x * 0.5f, rectangle->size.y * 0.5f};
+            Vec3 corners[CORNER_POINTS * 4u];
+            auto count = rectangleOutline(rectangle->center, {rectangle->size.x * 0.5f, rectangle->size.y * 0.5f},
+                                          rectangle->corner, corners);
             closed = true;
-            if (rectangle->corner <= 0.0f) {
-                Vec3 corners[] = {
-                    rectangle->center + Vec3{-half.x, -half.y, 0.0f},
-                    rectangle->center + Vec3{half.x, -half.y, 0.0f},
-                    rectangle->center + Vec3{half.x, half.y, 0.0f},
-                    rectangle->center + Vec3{-half.x, half.y, 0.0f}};
-                return _outline(corners, 4u, points, capacity);
-            }
-            constexpr auto segments = 8u;
-            auto radius = rectangle->corner;
-            Vec2 centers[4] = {
-                {half.x - radius, half.y - radius},
-                {-half.x + radius, half.y - radius},
-                {-half.x + radius, -half.y + radius},
-                {half.x - radius, -half.y + radius}};
-            auto count = 0u;
-            for (auto corner = 0u; corner < 4u; corner++) {
-                for (auto j = 0u; j < segments; j++, count++) {
-                    if (count >= capacity) continue;
-                    auto angle = TWO_PI * (static_cast<float>(corner) * 0.25f
-                                       + static_cast<float>(j) / (segments * 4.0f));
-                    points[count] = rectangle->center + Vec3{
-                        centers[corner].x + std::cos(angle) * radius,
-                        centers[corner].y + std::sin(angle) * radius, 0.0f};
-                }
-            }
-            return count;
+            return _outline(corners, count, points, capacity);
         }
         case Type::Polygon: {
             auto polygon = static_cast<const Polygon*>(object);

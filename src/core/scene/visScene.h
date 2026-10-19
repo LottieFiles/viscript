@@ -6,6 +6,7 @@
 #include <cmath>
 
 #include "vis.h"
+#include "visTimeline.h"
 
 namespace vis
 {
@@ -35,20 +36,32 @@ Color colormapColor(Colormap map, float share) noexcept;
 // Where a local point falls in a surface colormap: 0 at its min and 1 at its max, unclamped.
 float colormapShare(const SurfaceColormap& colormap, const Vec3& point) noexcept;
 
+// The most numbers a space writes.
+static constexpr uint32_t MAX_SPACE_NUMBERS = 256;
+// The points a circle draws with, counterclockwise from +x, and each corner of a rounded
+// rectangle (see circlePoint() and rectangleOutline()); a warp samples them with no fewer.
+static constexpr uint32_t CIRCLE_POINTS = 64;
+static constexpr uint32_t CORNER_POINTS = 8;
+
 // Calls tick with each multiple of step inside range but zero, where a space draws a tick across
-// that axis (see Space::ticks), at most 4096 of them, until tick returns false.
+// that axis (see Space::ticks) or, with the step of the range, a grid line or a number; at most
+// 4096 of them, counting zero, and false once tick returns false, which stops it. Each is a whole
+// count of the step as a script writes it (see _decimal()), so no rounding piles up along the
+// range and a step of 0.1 gives 0.9 where 9 * 0.1f gives 0.90000004.
 template<typename Tick>
-inline void spaceTicks(const Range& range, float step, Tick tick)
+inline bool spaceTicks(const Range& range, float step, Tick tick)
 {
-    if (!(step > 0.0f)) return;
-    auto first = std::ceil(static_cast<double>(range.min) / step - 1.0e-4);
-    auto last = std::floor(static_cast<double>(range.max) / step + 1.0e-4);
-    if (!(first <= last)) return;
+    if (!(step > 0.0f)) return true;
+    auto unit = _decimal(step);
+    auto first = std::ceil(static_cast<double>(range.min) / unit - 1.0e-4);
+    auto last = std::floor(static_cast<double>(range.max) / unit + 1.0e-4);
+    if (!(first <= last)) return true;
     if (last - first > 4095.0) last = first + 4095.0;
     for (auto k = first; k <= last; k += 1.0) {
         if (k == 0.0) continue;
-        if (!tick(static_cast<float>(k * step))) return;
+        if (!tick(static_cast<float>(k * unit))) return false;
     }
+    return true;
 }
 
 // How far past the tick at value a space looks along its axis to tell which way the axis runs.
@@ -89,6 +102,61 @@ inline bool spaceMark(WarpPart part) noexcept
 {
     return part == WarpPart::Origin || part == WarpPart::NumberX || part == WarpPart::NumberY || part == WarpPart::NumberZ
            || part == WarpPart::TickX || part == WarpPart::TickY || part == WarpPart::TickZ;
+}
+
+// The axis, 0 for x to 2 for z, that an axis, a tick or a number of a space stands for.
+inline uint8_t spaceAxis(WarpPart part) noexcept
+{
+    if (part == WarpPart::AxisY || part == WarpPart::TickY || part == WarpPart::NumberY) return 1u;
+    if (part == WarpPart::AxisZ || part == WarpPart::TickZ || part == WarpPart::NumberZ) return 2u;
+    return 0u;
+}
+
+// Calls line(part, from, to) with each line of a space in the order the renderer draws them, then
+// number(part, point, value) with each point where the space writes a number, until a call
+// returns false: the grid lines in the xy plane and, with depth, those in the xz and yz planes;
+// the axes, z only with depth; the ticks across each axis, from the point of a tick to one a
+// little along its axis, which give the way the axis runs there; and the numbers of each axis.
+template<typename Line, typename Number>
+inline void spaceParts(const Space* space, bool depth, Line line, Number number)
+{
+    const Range* ranges[] = {&space->x, &space->y, &space->z};
+    const float steps[] = {space->ticks.x, space->ticks.y, space->ticks.z};
+    const WarpPart axes[] = {WarpPart::AxisX, WarpPart::AxisY, WarpPart::AxisZ};
+    const WarpPart ticks[] = {WarpPart::TickX, WarpPart::TickY, WarpPart::TickZ};
+    const WarpPart numbers[] = {WarpPart::NumberX, WarpPart::NumberY, WarpPart::NumberZ};
+    // The point at value along axis and at across along other, zero along the third axis.
+    auto point = [](uint32_t axis, float value, uint32_t other, float across) {
+        float at[3] = {0.0f, 0.0f, 0.0f};
+        at[other] = across;
+        at[axis] = value;
+        return Vec3{at[0], at[1], at[2]};
+    };
+    auto on = [&point](uint32_t axis, float value) { return point(axis, value, axis, value); };
+    // The grid lines at the values along axis, across other from its min to its max.
+    auto grid = [&](WarpPart part, uint32_t axis, uint32_t other) {
+        auto& across = *ranges[other];
+        return spaceTicks(*ranges[axis], ranges[axis]->step, [&](float value) {
+            return line(part, point(axis, value, other, across.min), point(axis, value, other, across.max));
+        });
+    };
+    auto going = grid(WarpPart::Grid, 0u, 1u) && grid(WarpPart::Grid, 1u, 0u);
+    if (going && depth) {
+        going = grid(WarpPart::DepthGrid, 0u, 2u) && grid(WarpPart::DepthGrid, 2u, 0u)
+                && grid(WarpPart::DepthGrid, 1u, 2u) && grid(WarpPart::DepthGrid, 2u, 1u);
+    }
+    auto count = depth ? 3u : 2u;
+    for (auto axis = 0u; going && axis < count; axis++)
+        going = line(axes[axis], on(axis, ranges[axis]->min), on(axis, ranges[axis]->max));
+    for (auto axis = 0u; going && axis < count; axis++) {
+        going = spaceTicks(*ranges[axis], steps[axis], [&](float value) {
+            return line(ticks[axis], on(axis, value), on(axis, value + spaceTickLead(value, steps[axis])));
+        });
+    }
+    for (auto axis = 0u; going && space->numbers && axis < count; axis++) {
+        going = spaceTicks(*ranges[axis], ranges[axis]->step,
+                           [&](float value) { return number(numbers[axis], on(axis, value), value); });
+    }
 }
 
 struct WarpRun
@@ -337,6 +405,12 @@ struct ArcGeometry
 
 ArcGeometry arcGeometry(const Object* object, const VisualState* state = nullptr) noexcept;
 uint32_t arcOutline(const ArcGeometry& arc, Vec3* points, uint32_t capacity) noexcept;
+// Point index of the CIRCLE_POINTS a circle of radius about center draws with.
+Vec3 circlePoint(const Vec3& center, float radius, uint32_t index) noexcept;
+// The outline a rectangle about center draws, half its size across and with corners of radius:
+// its four corners, or CORNER_POINTS on each rounded one, counterclockwise from the right side.
+// Writes at most 4 * CORNER_POINTS points and returns how many.
+uint32_t rectangleOutline(const Vec3& center, const Vec2& half, float radius, Vec3* points) noexcept;
 bool arcBounds(const ArcGeometry& arc, Bounds& bounds) noexcept;
 Vec3 angleLabelPoint(const Angle* angle, const VisualState* state = nullptr) noexcept;
 
@@ -794,6 +868,10 @@ struct Scene::Impl
     // changes nothing the plot shows. Other shapes keep their point counts.
     static bool room(Object* object, const GeometryShape& shape) noexcept;
     Result prepare(const Animation& animation, Clip& clip, float begin, float end) noexcept;
+    // Adds the clip of a checked animation from begin to end, with the motion prepare() gave its
+    // slot, and leaves its object in the state it ends in. A reveal hides the object in its
+    // clips before previous, the count of clips before the call.
+    void emit(const Animation& animation, float begin, float end, const AnimCurve& curve, uint32_t previous) noexcept;
     void advance(float time) noexcept;
     Result fail(Result result, const char* reason) noexcept;
     ObjectEntry* entry(const Object* object) const noexcept;
@@ -827,6 +905,17 @@ struct Scene::Impl
     // drop() lets go of the copy added last.
     static const char* keep(Text* text, const char* value, bool& added) noexcept;
     static void drop(Text* text) noexcept;
+    // Marks the stroke, fill and width that properties name as object's own, which the shapes
+    // added below it later then inherit, and object as a layer when they name an effect.
+    static void authored(Object* object, uint32_t properties) noexcept;
+    // Fails a clip of target from begin that would begin before its object is added or inside an
+    // earlier clip of the object, but for a change of the transform that may add to another.
+    Result fits(const ObjectEntry& entry, const AnimationTarget& target, float begin) noexcept;
+    // Adds the clips of count targets that passed the checks of play(): one for each target, from
+    // its begin to its end in the group lagged from the cursor, and one for each shape that takes
+    // a stroke, fill or width that a target animates on a group. The cursor stays where it is.
+    Result animate(const AnimationTarget* targets, uint32_t count, float duration, float lag,
+                   const AnimCurve& curve) noexcept;
     bool sample(const ObjectEntry& entry, float time, VisualState& state) const noexcept;
     bool plotEndpoint(const Object* object, float time, const VisualState& state) const noexcept;
     Result contourPlacements(const Plot* plot, float time, ContourPlacement* output,
