@@ -1,7 +1,6 @@
 // The retained Lua runtime: keeps a scene's VM alive after loading so that update callbacks
 // move overlays, answer input and start sounds each frame, in fixed steps.
 #include <cmath>
-#include <cstdio>
 #include <cstring>
 #include <new>
 
@@ -114,10 +113,29 @@ struct Runtime::Impl
         delete actions;
     }
 
-    Entry* find(Entry* entries, uint32_t count, uint32_t object) noexcept
+    // update() and clear() take any object of the scene but the runtime itself.
+    bool accepts(const Object* object, const Runtime* runtime) const noexcept
     {
-        for (auto i = 0u; i < count; i++) {
-            if (entries[i].object == object) return entries + i;
+        return scene && object && object != runtime && object->id()
+            && scene->object(object->id()) == object;
+    }
+
+    // Calls inside a callback change the staged entries, which commit when it succeeds.
+    Entry* entries() noexcept
+    {
+        return running ? staged : states;
+    }
+
+    uint32_t& count() noexcept
+    {
+        return running ? stagedCount : stateCount;
+    }
+
+    Entry* entry(uint32_t object) noexcept
+    {
+        auto current = entries();
+        for (auto i = 0u; i < count(); i++) {
+            if (current[i].object == object) return current + i;
         }
         return nullptr;
     }
@@ -319,13 +337,10 @@ Scene* Runtime::scene() const noexcept
 
 Result Runtime::update(Object* object, const ObjectState& state) noexcept
 {
-    if (!pImpl || !pImpl->scene || !object || object == this || !_valid(state)
-        || !object->id() || pImpl->scene->object(object->id()) != object) {
+    if (!pImpl || !pImpl->accepts(object, this) || !_valid(state)) {
         return Result::InvalidArguments;
     }
-    auto entries = pImpl->running ? pImpl->staged : pImpl->states;
-    auto& count = pImpl->running ? pImpl->stagedCount : pImpl->stateCount;
-    auto entry = pImpl->find(entries, count, object->id());
+    auto entry = pImpl->entry(object->id());
     auto resolved = state;
     if (!resolved.originEnabled) {
         if (entry && entry->state.originEnabled) {
@@ -338,8 +353,9 @@ Result Runtime::update(Object* object, const ObjectState& state) noexcept
         resolved.originEnabled = true;
     }
     if (!entry) {
+        auto& count = pImpl->count();
         if (count == ObjectLimit) return Result::InsufficientCondition;
-        entry = entries + count++;
+        entry = pImpl->entries() + count++;
         entry->object = object->id();
     }
     entry->state = resolved;
@@ -348,25 +364,17 @@ Result Runtime::update(Object* object, const ObjectState& state) noexcept
 
 Result Runtime::clear(Object* object) noexcept
 {
-    if (!pImpl || !pImpl->scene || !object || object == this || !object->id()
-        || pImpl->scene->object(object->id()) != object) {
-        return Result::InvalidArguments;
-    }
-    auto entries = pImpl->running ? pImpl->staged : pImpl->states;
-    auto& count = pImpl->running ? pImpl->stagedCount : pImpl->stateCount;
-    for (auto i = 0u; i < count; i++) {
-        if (entries[i].object != object->id()) continue;
-        entries[i] = entries[--count];
-        return Result::Success;
-    }
-    return Result::InsufficientCondition;
+    if (!pImpl || !pImpl->accepts(object, this)) return Result::InvalidArguments;
+    auto entry = pImpl->entry(object->id());
+    if (!entry) return Result::InsufficientCondition;
+    auto& count = pImpl->count();
+    *entry = pImpl->entries()[--count];
+    return Result::Success;
 }
 
 void Runtime::clear() noexcept
 {
-    if (!pImpl) return;
-    if (pImpl->running) pImpl->stagedCount = 0u;
-    else pImpl->stateCount = 0u;
+    if (pImpl) pImpl->count() = 0u;
 }
 
 Result Runtime::sound(const SoundEvent& event) noexcept
@@ -483,7 +491,7 @@ float Runtime::fixedStep() const noexcept
 
 float Runtime::interpolation() const noexcept
 {
-    if (!pImpl || pImpl->config.fixedStep <= 0.0f) return 0.0f;
+    if (!pImpl) return 0.0f;
     auto value = static_cast<float>(pImpl->accumulator / pImpl->config.fixedStep);
     if (value < 0.0f) return 0.0f;
     if (value > 1.0f) return 1.0f;
@@ -604,7 +612,7 @@ static Vec2 _vec2(lua_State* lua, int index, const char* name)
     return {x, y};
 }
 
-static Vec3 _vec3(lua_State* lua, int index, const char* name)
+static Vec3 _vec3(lua_State* lua, int index, const char* name, float z = 0.0f)
 {
     luaL_checktype(lua, index, LUA_TTABLE);
     index = lua_absindex(lua, index);
@@ -618,7 +626,6 @@ static Vec3 _vec3(lua_State* lua, int index, const char* name)
     lua_rawgeti(lua, index, 2);
     auto y = _number(lua, -1, name);
     lua_pop(lua, 1);
-    auto z = 0.0f;
     if (count == 3u) {
         lua_rawgeti(lua, index, 3);
         z = _number(lua, -1, name);
@@ -636,7 +643,7 @@ static Vec3 _fieldVec3(lua_State* lua, int index, const char* name,
         lua_pop(lua, 1);
         return fallback;
     }
-    auto value = _vec3(lua, -1, name);
+    auto value = _vec3(lua, -1, name, fallback.z);
     lua_pop(lua, 1);
     return value;
 }

@@ -431,6 +431,46 @@ return scene
 }
 #endif
 
+// A two-component scale keeps z at 1, as the states module reads it: tilted about a pivot off
+// the object's plane, the object lands where an explicit z of 1 puts it.
+static void flatScale()
+{
+    static constexpr char source[] = R"lua(
+local scene = vis.scene {width = 320, height = 180, camera = {view = "2d", height = 18}}
+local flat = scene:rectangle {center = {0, 0}, size = {2, 2}, id = "flat"}
+local full = scene:rectangle {center = {0, 0}, size = {2, 2}, id = "full"}
+vis.runtime(scene, {
+    fixed_step = 0.1,
+    update = function(ctx)
+        ctx:update(flat, {origin = {0, 0, 1}, rotation = {0.5, 0, 0}, scale = {2, 2}})
+        ctx:update(full, {origin = {0, 0, 1}, rotation = {0.5, 0, 0}, scale = {2, 2, 1}})
+    end,
+})
+return scene
+)lua";
+    Scene* scene = nullptr;
+    char error[1024] = {};
+    detail::LuaHostContext context;
+    auto result = load(source, scene, context, error, sizeof(error));
+    CHECK(result == Result::Success && scene);
+    auto runtime = context.runtime.runtime;
+    auto renderer = Renderer::gen();
+    auto flat = scene ? scene->object("flat") : nullptr;
+    auto full = scene ? scene->object("full") : nullptr;
+    BBox flatBounds;
+    BBox fullBounds;
+    CHECK(runtime && runtime->advance(0.1f) == Result::Success);
+    CHECK(renderer && flat
+          && renderer->bounds(scene, flat, 0.0f, flatBounds) == Result::Success);
+    CHECK(renderer && full
+          && renderer->bounds(scene, full, 0.0f, fullBounds) == Result::Success);
+    CHECK(near(flatBounds.x, fullBounds.x) && near(flatBounds.y, fullBounds.y)
+          && near(flatBounds.width, fullBounds.width)
+          && near(flatBounds.height, fullBounds.height));
+    delete renderer;
+    delete scene;
+}
+
 int main()
 {
     fixedStep();
@@ -444,5 +484,6 @@ int main()
 #if defined(VIS_INPUT)
     inputActions();
 #endif
+    flatScale();
     return failures ? 1 : 0;
 }
