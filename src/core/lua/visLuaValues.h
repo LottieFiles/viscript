@@ -1,6 +1,6 @@
 // Reads Lua values and table fields for the bindings: numbers and vectors with their checks,
-// option lists, colors and points. The core binding and the optional modules share these;
-// a module keeps only the readers of shapes it alone accepts.
+// option lists, colors, points, regions and objects. The core binding and the optional modules
+// share these; a module keeps only the readers of shapes it alone accepts.
 #ifndef _VIS_LUA_VALUES_H_
 #define _VIS_LUA_VALUES_H_
 
@@ -17,6 +17,7 @@ extern "C" {
 
 #include "vis.h"
 #include "visLuaBudget.h"
+#include "visLuaExtension.h"
 
 namespace vis
 {
@@ -142,6 +143,66 @@ static inline Vec3 _fieldWorld(lua_State* lua, int index, const char* name, cons
     return _field<_world>(lua, index, name, fallback);
 }
 
+// A vector as the modules take it: x, y and z keys, or two or three numbers with z for a missing
+// third.
+static inline Vec3 _vec3(lua_State* lua, int index, const char* name, float z = 0.0f)
+{
+    luaL_checktype(lua, index, LUA_TTABLE);
+    index = lua_absindex(lua, index);
+    auto keyed = _has(lua, index, "x") || _has(lua, index, "y") || _has(lua, index, "z");
+    if (keyed && (!_has(lua, index, "x") || !_has(lua, index, "y") || !_has(lua, index, "z"))) {
+        luaL_error(lua, "%s must contain x, y and z", name);
+    }
+    auto count = keyed ? 3u : lua_rawlen(lua, index);
+    if (count != 2u && count != 3u) luaL_error(lua, "%s must contain two or three numbers", name);
+    Vec3 value = {0.0f, 0.0f, z};
+    const char* keys[] = {"x", "y", "z"};
+    float* components[] = {&value.x, &value.y, &value.z};
+    for (auto i = 0u; i < count; i++) {
+        if (keyed) lua_getfield(lua, index, keys[i]);
+        else lua_rawgeti(lua, index, i + 1);
+        *components[i] = _number(lua, -1, name);
+        lua_pop(lua, 1);
+    }
+    return value;
+}
+
+// The vector field name read as _vec3 reads it, or fallback without it; two numbers keep the z of
+// fallback.
+static inline Vec3 _fieldVec3(lua_State* lua, int index, const char* name, const Vec3& fallback = {})
+{
+    index = lua_absindex(lua, index);
+    lua_getfield(lua, index, name);
+    auto value = lua_isnil(lua, -1) ? fallback : _vec3(lua, -1, name, fallback.z);
+    lua_pop(lua, 1);
+    return value;
+}
+
+// Reads the origin, shift, rotation, scale, opacity and progress of a states or runtime overlay
+// table into state, which keeps what the table leaves out: an origin sets originEnabled, and a
+// number as rotation turns about z.
+template<typename State>
+static inline void _overlay(lua_State* lua, int index, State& state)
+{
+    index = lua_absindex(lua, index);
+    lua_getfield(lua, index, "origin");
+    if (!lua_isnil(lua, -1)) {
+        state.origin = _vec3(lua, -1, "origin");
+        state.originEnabled = true;
+    }
+    lua_pop(lua, 1);
+    state.shift = _fieldVec3(lua, index, "shift", state.shift);
+    state.scale = _fieldVec3(lua, index, "scale", state.scale);
+    lua_getfield(lua, index, "rotation");
+    if (!lua_isnil(lua, -1)) {
+        if (lua_isnumber(lua, -1)) state.rotation.z = _number(lua, -1, "rotation");
+        else state.rotation = _vec3(lua, -1, "rotation");
+    }
+    lua_pop(lua, 1);
+    state.opacity = _fieldNumber(lua, index, "opacity", state.opacity);
+    state.progress = _fieldNumber(lua, index, "progress", state.progress);
+}
+
 static inline Range _range(lua_State* lua, int index, const char* name)
 {
     luaL_checktype(lua, index, LUA_TTABLE);
@@ -202,6 +263,35 @@ static inline CellRegion _fieldRegion(lua_State* lua, int index, const char* nam
     return _field<_region>(lua, index, name, CellRegion{});
 }
 
+// The region field in which a UI control or an input follow takes the pointer: x, y, width and
+// height keys or four numbers, of a positive size.
+static inline BBox _fieldPointerRegion(lua_State* lua, int index)
+{
+    index = lua_absindex(lua, index);
+    lua_getfield(lua, index, "region");
+    if (lua_isnil(lua, -1)) luaL_error(lua, "missing field 'region'");
+    luaL_checktype(lua, -1, LUA_TTABLE);
+    auto region = lua_absindex(lua, -1);
+    auto keyed = _has(lua, region, "x") || _has(lua, region, "y") || _has(lua, region, "width") || _has(lua, region, "height");
+    if (!keyed && lua_rawlen(lua, region) != 4u) luaL_error(lua, "region must contain x, y, width and height");
+    BBox bounds;
+    const char* keys[] = {"x", "y", "width", "height"};
+    float* values[] = {&bounds.x, &bounds.y, &bounds.width, &bounds.height};
+    for (auto i = 0u; i < 4u; i++) {
+        if (keyed) {
+            lua_getfield(lua, region, keys[i]);
+            if (lua_isnil(lua, -1)) luaL_error(lua, "region requires %s", keys[i]);
+        } else {
+            lua_rawgeti(lua, region, i + 1u);
+        }
+        *values[i] = _number(lua, -1, keyed ? keys[i] : "region component");
+        lua_pop(lua, 1);
+    }
+    lua_pop(lua, 1);
+    if (bounds.width <= 0.0f || bounds.height <= 0.0f) luaL_error(lua, "region width and height must be positive");
+    return bounds;
+}
+
 static inline void _size(lua_State* lua, int index, uint32_t& columns, uint32_t& rows)
 {
     luaL_checktype(lua, index, LUA_TTABLE);
@@ -260,6 +350,17 @@ static inline const char* _fieldOptionalString(lua_State* lua, int index, const 
     return value;
 }
 
+// The object of field name, a handle of scene.
+static inline Object* _fieldObject(lua_State* lua, int index, const char* name, Scene* scene)
+{
+    index = lua_absindex(lua, index);
+    lua_getfield(lua, index, name);
+    if (lua_isnil(lua, -1)) luaL_error(lua, "missing field '%s'", name);
+    auto object = detail::luaObject(lua, scene, -1);
+    lua_pop(lua, 1);
+    return object;
+}
+
 // A name a string option takes and the value it stands for.
 template<typename Value>
 struct LuaName
@@ -315,6 +416,15 @@ static inline Value _fieldEnum(lua_State* lua, int index, const char* name, Valu
     lua_pop(lua, 1);
     return fallback;
 }
+
+// The views a look table, the camera of vis.scene and a UI panel's camera_view name.
+static constexpr LuaName<CameraView> CAMERA_VIEWS[] = {{"2d", CameraView::TwoD}, {"3d", CameraView::ThreeD}};
+// The roles a text, a part of a spans row and a tex formula take, and the orientations of a text
+// and a formula.
+static constexpr LuaName<TextRole> TEXT_ROLES[] = {{"h1", TextRole::H1}, {"h2", TextRole::H2}, {"h3", TextRole::H3},
+                                                   {"text", TextRole::Text}, {"code", TextRole::Code}};
+static constexpr LuaName<TextOrientation> TEXT_ORIENTATIONS[] = {
+    {"billboard", TextOrientation::Billboard}, {"plane", TextOrientation::Plane}};
 
 static inline bool _option(const char* name, std::initializer_list<const char*> fields, bool style)
 {
@@ -450,6 +560,15 @@ static inline Vec3* _points(lua_State* lua, int index, uint32_t minimum, uint32_
         lua_pop(lua, 1);
     }
     return points;
+}
+
+// Ends a method of a module's handle: stops the script with the message of a result other than
+// Success, or returns the handle at 1.
+static inline int _result(lua_State* lua, Result result)
+{
+    if (result != Result::Success) luaL_error(lua, "%s", vis::result(result));
+    lua_settop(lua, 1);
+    return 1;
 }
 
 }  // namespace vis

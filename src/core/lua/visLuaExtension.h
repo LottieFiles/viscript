@@ -31,6 +31,16 @@ struct LuaHookSpan
     uint32_t count = 0;
 };
 
+// The loaded hook of a module whose Context keeps the one object a script made, at Owner, and
+// the scene it made it on: the load fails when the script returns another scene.
+template<typename Context, auto Owner>
+Result luaLoadedScene(lua_State*, Scene* scene, void* data) noexcept
+{
+    auto context = static_cast<Context*>(data);
+    if (context->*Owner && context->scene != scene) return Result::InvalidArguments;
+    return Result::Success;
+}
+
 Result luaLoad(const char* source, uint32_t size, const char* name, Scene** output,
                char* error, uint32_t errorSize, Lua::AssetResolver resolver,
                void* resolverData, const char* sourcePath, size_t sourceRoot,

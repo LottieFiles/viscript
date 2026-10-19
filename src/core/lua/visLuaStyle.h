@@ -188,15 +188,9 @@ static BlendMode _blendMode(lua_State* lua, int index)
     return _enum(lua, index, "blend", MODES);
 }
 
-// The roles a text and a part of a spans row take.
-static constexpr LuaName<TextRole> TEXT_ROLES[] = {{"h1", TextRole::H1}, {"h2", TextRole::H2}, {"h3", TextRole::H3},
-                                                   {"text", TextRole::Text}, {"code", TextRole::Code}};
-
 static TextOrientation _textOrientation(lua_State* lua, int index)
 {
-    static constexpr LuaName<TextOrientation> ORIENTATIONS[] = {
-        {"billboard", TextOrientation::Billboard}, {"plane", TextOrientation::Plane}};
-    return _fieldEnum(lua, index, "orientation", TextOrientation::Billboard, ORIENTATIONS, "text orientation");
+    return _fieldEnum(lua, index, "orientation", TextOrientation::Billboard, TEXT_ORIENTATIONS, "text orientation");
 }
 
 static void _textFont(lua_State* lua, int index, Text* object)

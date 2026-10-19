@@ -46,17 +46,9 @@ struct LuaBuilt
     Group* root = nullptr;
 };
 
-static int32_t _fieldInteger(lua_State* lua, int index, const char* name,
-                             int32_t fallback)
+static int32_t _int32(lua_State* lua, int index, const char* name)
 {
-    index = lua_absindex(lua, index);
-    lua_getfield(lua, index, name);
-    if (lua_isnil(lua, -1)) {
-        lua_pop(lua, 1);
-        return fallback;
-    }
-    auto value = luaL_checkinteger(lua, -1);
-    lua_pop(lua, 1);
+    auto value = luaL_checkinteger(lua, index);
     if (value < INT32_MIN || value > INT32_MAX) luaL_error(lua, "%s is out of range", name);
     return static_cast<int32_t>(value);
 }
@@ -81,7 +73,7 @@ static const char* _fieldString(lua_State* lua, int index, const char* name,
 }
 
 // Reads {x, y} or {x = , y = } like the core's _vec2, but refuses other keys and keeps the
-// diagram's error wording. _fieldPair reads one from a field, or returns the fallback.
+// diagram's error wording.
 static Vec2 _vec2(lua_State* lua, int index, const char* name)
 {
     luaL_checktype(lua, index, LUA_TTABLE);
@@ -112,92 +104,26 @@ static Vec2 _vec2(lua_State* lua, int index, const char* name)
     return value;
 }
 
-static Vec2 _fieldPair(lua_State* lua, int index, const char* name,
-                       const Vec2& fallback)
-{
-    index = lua_absindex(lua, index);
-    lua_getfield(lua, index, name);
-    if (lua_isnil(lua, -1)) {
-        lua_pop(lua, 1);
-        return fallback;
-    }
-    auto value = _vec2(lua, -1, name);
-    lua_pop(lua, 1);
-    return value;
-}
-
-static Direction _direction(lua_State* lua, int index)
-{
-    auto value = luaL_checkstring(lua, index);
-    if (std::strcmp(value, "lr") == 0 || std::strcmp(value, "left_to_right") == 0) {
-        return Direction::LeftToRight;
-    }
-    if (std::strcmp(value, "tb") == 0 || std::strcmp(value, "top_to_bottom") == 0) {
-        return Direction::TopToBottom;
-    }
-    luaL_error(lua, "diagram direction must be 'lr' or 'tb'");
-    return Direction::LeftToRight;
-}
-
-static Layout _layout(lua_State* lua, int index)
-{
-    auto value = luaL_checkstring(lua, index);
-    if (std::strcmp(value, "ranked") == 0) return Layout::Ranked;
-    if (std::strcmp(value, "manual") == 0) return Layout::Manual;
-    if (std::strcmp(value, "grid") == 0) return Layout::Grid;
-    if (std::strcmp(value, "timeline") == 0) return Layout::Timeline;
-    luaL_error(lua, "diagram layout must be ranked, manual, grid or timeline");
-    return Layout::Ranked;
-}
-
-static NodeKind _nodeKind(lua_State* lua, int index)
-{
-    auto value = luaL_checkstring(lua, index);
-    if (std::strcmp(value, "default") == 0) return NodeKind::Default;
-    if (std::strcmp(value, "state") == 0) return NodeKind::State;
-    if (std::strcmp(value, "decision") == 0) return NodeKind::Decision;
-    if (std::strcmp(value, "terminal") == 0) return NodeKind::Terminal;
-    if (std::strcmp(value, "entity") == 0) return NodeKind::Entity;
-    if (std::strcmp(value, "cell") == 0) return NodeKind::Cell;
-    if (std::strcmp(value, "task") == 0) return NodeKind::Task;
-    if (std::strcmp(value, "evidence") == 0) return NodeKind::Evidence;
-    luaL_error(lua, "invalid diagram node kind");
-    return NodeKind::Default;
-}
-
-static EdgeKind _edgeKind(lua_State* lua, int index)
-{
-    auto value = luaL_checkstring(lua, index);
-    if (std::strcmp(value, "directed") == 0) return EdgeKind::Directed;
-    if (std::strcmp(value, "relation") == 0) return EdgeKind::Relation;
-    if (std::strcmp(value, "return") == 0) return EdgeKind::Return;
-    if (std::strcmp(value, "error") == 0) return EdgeKind::Error;
-    if (std::strcmp(value, "optional") == 0) return EdgeKind::Optional;
-    luaL_error(lua, "invalid diagram edge kind");
-    return EdgeKind::Directed;
-}
-
-static Port _port(lua_State* lua, int index)
-{
-    auto value = luaL_checkstring(lua, index);
-    if (std::strcmp(value, "auto") == 0) return Port::Auto;
-    if (std::strcmp(value, "left") == 0) return Port::Left;
-    if (std::strcmp(value, "right") == 0) return Port::Right;
-    if (std::strcmp(value, "top") == 0) return Port::Top;
-    if (std::strcmp(value, "bottom") == 0) return Port::Bottom;
-    luaL_error(lua, "diagram port must be auto, left, right, top or bottom");
-    return Port::Auto;
-}
-
-static Route _route(lua_State* lua, int index)
-{
-    auto value = luaL_checkstring(lua, index);
-    if (std::strcmp(value, "auto") == 0) return Route::Auto;
-    if (std::strcmp(value, "straight") == 0) return Route::Straight;
-    if (std::strcmp(value, "orthogonal") == 0) return Route::Orthogonal;
-    luaL_error(lua, "diagram route must be auto, straight or orthogonal");
-    return Route::Auto;
-}
+// The names of a diagram's layout and direction, of its node and edge kinds, and of an edge's
+// ports and route; lr and tb also go by left_to_right and top_to_bottom.
+static constexpr LuaName<Layout> LAYOUTS[] = {
+    {"ranked", Layout::Ranked}, {"manual", Layout::Manual}, {"grid", Layout::Grid},
+    {"timeline", Layout::Timeline}};
+static constexpr LuaName<Direction> DIRECTIONS[] = {
+    {"lr", Direction::LeftToRight}, {"tb", Direction::TopToBottom},
+    {"left_to_right", Direction::LeftToRight}, {"top_to_bottom", Direction::TopToBottom}};
+static constexpr LuaName<NodeKind> NODE_KINDS[] = {
+    {"default", NodeKind::Default}, {"state", NodeKind::State}, {"decision", NodeKind::Decision},
+    {"terminal", NodeKind::Terminal}, {"entity", NodeKind::Entity}, {"cell", NodeKind::Cell},
+    {"task", NodeKind::Task}, {"evidence", NodeKind::Evidence}};
+static constexpr LuaName<EdgeKind> EDGE_KINDS[] = {
+    {"directed", EdgeKind::Directed}, {"relation", EdgeKind::Relation},
+    {"return", EdgeKind::Return}, {"error", EdgeKind::Error}, {"optional", EdgeKind::Optional}};
+static constexpr LuaName<Port> PORTS[] = {
+    {"auto", Port::Auto}, {"left", Port::Left}, {"right", Port::Right}, {"top", Port::Top},
+    {"bottom", Port::Bottom}};
+static constexpr LuaName<Route> ROUTES[] = {
+    {"auto", Route::Auto}, {"straight", Route::Straight}, {"orthogonal", Route::Orthogonal}};
 
 static LuaDiagram* _diagram(lua_State* lua, int index = 1)
 {
@@ -261,10 +187,10 @@ static Layers _fieldLayers(lua_State* lua, int index, const Layers& fallback)
     };
     _options(lua, layerIndex, "diagram layers", options);
     auto layers = fallback;
-    layers.zones = _fieldInteger(lua, layerIndex, "zones", layers.zones);
-    layers.routes = _fieldInteger(lua, layerIndex, "routes", layers.routes);
-    layers.nodes = _fieldInteger(lua, layerIndex, "nodes", layers.nodes);
-    layers.annotations = _fieldInteger(lua, layerIndex, "annotations", layers.annotations);
+    layers.zones = _field<_int32>(lua, layerIndex, "zones", layers.zones);
+    layers.routes = _field<_int32>(lua, layerIndex, "routes", layers.routes);
+    layers.nodes = _field<_int32>(lua, layerIndex, "nodes", layers.nodes);
+    layers.annotations = _field<_int32>(lua, layerIndex, "annotations", layers.annotations);
     lua_pop(lua, 1);
     return layers;
 }
@@ -281,18 +207,11 @@ static int _newDiagram(lua_State* lua)
     _options(lua, 2, "diagram config", options);
     Config config;
     if (_has(lua, 2, "id")) config.id = _fieldString(lua, 2, "id", true);
-    if (_has(lua, 2, "layout")) {
-        lua_getfield(lua, 2, "layout");
-        config.layout = _layout(lua, -1);
-        lua_pop(lua, 1);
-    }
-    if (_has(lua, 2, "direction")) {
-        lua_getfield(lua, 2, "direction");
-        config.direction = _direction(lua, -1);
-        lua_pop(lua, 1);
-    }
-    config.origin = _fieldPair(lua, 2, "origin", config.origin);
-    config.nodeSize = _fieldPair(lua, 2, "node_size", config.nodeSize);
+    config.layout = _fieldEnum(lua, 2, "layout", config.layout, LAYOUTS, "diagram layout");
+    config.direction = _fieldEnum(lua, 2, "direction", config.direction, DIRECTIONS,
+                                  "diagram direction");
+    config.origin = _field<_vec2>(lua, 2, "origin", config.origin);
+    config.nodeSize = _field<_vec2>(lua, 2, "node_size", config.nodeSize);
     config.rankGap = _fieldNumber(lua, 2, "rank_gap", config.rankGap);
     config.nodeGap = _fieldNumber(lua, 2, "node_gap", config.nodeGap);
     config.timeUnit = _fieldNumber(lua, 2, "time_unit", config.timeUnit);
@@ -341,19 +260,15 @@ static int _addNode(lua_State* lua)
     spec.id = _fieldString(lua, 2, "id", true);
     spec.label = _fieldString(lua, 2, "label");
     spec.detail = _fieldString(lua, 2, "detail");
-    if (_has(lua, 2, "kind")) {
-        lua_getfield(lua, 2, "kind");
-        spec.kind = _nodeKind(lua, -1);
-        lua_pop(lua, 1);
-    }
-    spec.rank = _fieldInteger(lua, 2, "rank", spec.rank);
-    spec.row = _fieldInteger(lua, 2, "row", spec.row);
-    spec.column = _fieldInteger(lua, 2, "column", spec.column);
+    spec.kind = _fieldEnum(lua, 2, "kind", spec.kind, NODE_KINDS, "diagram node kind");
+    spec.rank = _field<_int32>(lua, 2, "rank", spec.rank);
+    spec.row = _field<_int32>(lua, 2, "row", spec.row);
+    spec.column = _field<_int32>(lua, 2, "column", spec.column);
     spec.start = _fieldNumber(lua, 2, "start", spec.start);
     spec.span = _fieldNumber(lua, 2, "span", spec.span);
     spec.manualPosition = _has(lua, 2, "position");
-    spec.position = _fieldPair(lua, 2, "position", spec.position);
-    spec.size = _fieldPair(lua, 2, "size", spec.size);
+    spec.position = _field<_vec2>(lua, 2, "position", spec.position);
+    spec.size = _field<_vec2>(lua, 2, "size", spec.size);
     Node node;
     auto result = owner->diagram->add(spec, node);
     if (result != Result::Success) {
@@ -381,26 +296,10 @@ static int _addEdge(lua_State* lua)
     lua_getfield(lua, 2, "to");
     spec.to = _handle<Node>(lua, -1, NODE_METATABLE, owner)->value;
     lua_pop(lua, 1);
-    if (_has(lua, 2, "from_port")) {
-        lua_getfield(lua, 2, "from_port");
-        spec.fromPort = _port(lua, -1);
-        lua_pop(lua, 1);
-    }
-    if (_has(lua, 2, "to_port")) {
-        lua_getfield(lua, 2, "to_port");
-        spec.toPort = _port(lua, -1);
-        lua_pop(lua, 1);
-    }
-    if (_has(lua, 2, "route")) {
-        lua_getfield(lua, 2, "route");
-        spec.route = _route(lua, -1);
-        lua_pop(lua, 1);
-    }
-    if (_has(lua, 2, "kind")) {
-        lua_getfield(lua, 2, "kind");
-        spec.kind = _edgeKind(lua, -1);
-        lua_pop(lua, 1);
-    }
+    spec.fromPort = _fieldEnum(lua, 2, "from_port", spec.fromPort, PORTS, "diagram port");
+    spec.toPort = _fieldEnum(lua, 2, "to_port", spec.toPort, PORTS, "diagram port");
+    spec.route = _fieldEnum(lua, 2, "route", spec.route, ROUTES, "diagram route");
+    spec.kind = _fieldEnum(lua, 2, "kind", spec.kind, EDGE_KINDS, "diagram edge kind");
     spec.flow = _fieldBool(lua, 2, "flow", spec.flow);
     spec.flowOffset = _fieldNumber(lua, 2, "flow_offset", spec.flowOffset);
     if (_has(lua, 2, "waypoints")) {
@@ -569,16 +468,6 @@ static int _zone(lua_State* lua) { return _zoneObject(lua, 0); }
 static int _zoneBody(lua_State* lua) { return _zoneObject(lua, 1); }
 static int _zoneLabel(lua_State* lua) { return _zoneObject(lua, 2); }
 
-static void _plainMetatable(lua_State* lua, const char* name)
-{
-    luaL_newmetatable(lua, name);
-    lua_pushstring(lua, name);
-    lua_setfield(lua, -2, "__name");
-    lua_pushliteral(lua, "protected");
-    lua_setfield(lua, -2, "__metatable");
-    lua_pop(lua, 1);
-}
-
 static int _open(lua_State* lua, void*)
 {
     static const luaL_Reg diagramMethods[] = {
@@ -593,32 +482,11 @@ static int _open(lua_State* lua, void*)
         {"edge_label", _edgeLabel}, {"zone", _zone}, {"zone_body", _zoneBody},
         {"zone_label", _zoneLabel}, {nullptr, nullptr},
     };
-    luaL_newmetatable(lua, DIAGRAM_METATABLE);
-    lua_pushcfunction(lua, _diagramGc);
-    lua_setfield(lua, -2, "__gc");
-    lua_pushliteral(lua, "vis.diagram.Diagram");
-    lua_setfield(lua, -2, "__name");
-    lua_pushliteral(lua, "protected");
-    lua_setfield(lua, -2, "__metatable");
-    lua_newtable(lua);
-    luaL_setfuncs(lua, diagramMethods, 0);
-    lua_setfield(lua, -2, "__index");
-    lua_pop(lua, 1);
-    _plainMetatable(lua, NODE_METATABLE);
-    _plainMetatable(lua, EDGE_METATABLE);
-    _plainMetatable(lua, ZONE_METATABLE);
-
-    luaL_newmetatable(lua, BUILT_METATABLE);
-    lua_pushcfunction(lua, _builtGc);
-    lua_setfield(lua, -2, "__gc");
-    lua_pushliteral(lua, "vis.diagram.Built");
-    lua_setfield(lua, -2, "__name");
-    lua_pushliteral(lua, "protected");
-    lua_setfield(lua, -2, "__metatable");
-    lua_newtable(lua);
-    luaL_setfuncs(lua, builtMethods, 0);
-    lua_setfield(lua, -2, "__index");
-    lua_pop(lua, 1);
+    detail::luaMetatable(lua, DIAGRAM_METATABLE, _diagramGc, {diagramMethods});
+    detail::luaMetatable(lua, NODE_METATABLE, nullptr);
+    detail::luaMetatable(lua, EDGE_METATABLE, nullptr);
+    detail::luaMetatable(lua, ZONE_METATABLE, nullptr);
+    detail::luaMetatable(lua, BUILT_METATABLE, _builtGc, {builtMethods});
 
     lua_getglobal(lua, "vis");
     lua_pushcfunction(lua, _newDiagram);

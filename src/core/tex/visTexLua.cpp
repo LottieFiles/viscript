@@ -11,6 +11,7 @@ extern "C" {
 }
 
 #include "../lua/visLuaBudget.h"
+#include "../lua/visLuaValues.h"
 #include "vis_tex.h"
 #include "visTex.h"
 #include "visTexLuaExtension.h"
@@ -128,6 +129,7 @@ static void _check(lua_State* lua, int index, LuaOptions kind)
     }
 }
 
+// A finite number; unlike the shared _number, it refuses a string that reads as one.
 static float _number(lua_State* lua, int index, const char* name)
 {
     if (lua_type(lua, index) != LUA_TNUMBER) luaL_error(lua, "%s must be a number", name);
@@ -142,6 +144,22 @@ static void _boolean(lua_State* lua, int index, const char* name, bool& value)
     if (_get(lua, index, name) != LUA_TNIL) {
         if (!lua_isboolean(lua, -1)) luaL_error(lua, "%s must be a boolean", name);
         value = lua_toboolean(lua, -1);
+    }
+    lua_pop(lua, 1);
+}
+
+// Reads the name the table at index sets as option into value, as _enum reads it among names; a
+// value that is not a string is none of them.
+template<typename Value, size_t N>
+static void _choice(lua_State* lua, int index, const char* option, const char* what,
+                    const LuaName<Value> (&names)[N], Value& value)
+{
+    if (_get(lua, index, option) != LUA_TNIL) {
+        if (lua_type(lua, -1) != LUA_TSTRING) {
+            lua_pushliteral(lua, "");
+            lua_replace(lua, -2);
+        }
+        value = _enum(lua, -1, what, names);
     }
     lua_pop(lua, 1);
 }
@@ -191,23 +209,8 @@ static Options _options(lua_State* lua, int index)
         if (options.size <= 0.0f) luaL_error(lua, "size must be positive");
     }
     lua_pop(lua, 1);
-    if (_get(lua, index, "role") != LUA_TNIL) {
-        auto role = lua_type(lua, -1) == LUA_TSTRING ? lua_tostring(lua, -1) : "";
-        if (std::strcmp(role, "h1") == 0) options.role = TextRole::H1;
-        else if (std::strcmp(role, "h2") == 0) options.role = TextRole::H2;
-        else if (std::strcmp(role, "h3") == 0) options.role = TextRole::H3;
-        else if (std::strcmp(role, "text") == 0) options.role = TextRole::Text;
-        else if (std::strcmp(role, "code") == 0) options.role = TextRole::Code;
-        else luaL_error(lua, "text role must be 'h1', 'h2', 'h3', 'text' or 'code'");
-    }
-    lua_pop(lua, 1);
-    if (_get(lua, index, "orientation") != LUA_TNIL) {
-        auto orientation = lua_type(lua, -1) == LUA_TSTRING ? lua_tostring(lua, -1) : "";
-        if (std::strcmp(orientation, "billboard") == 0) options.orientation = TextOrientation::Billboard;
-        else if (std::strcmp(orientation, "plane") == 0) options.orientation = TextOrientation::Plane;
-        else luaL_error(lua, "text orientation must be 'billboard' or 'plane'");
-    }
-    lua_pop(lua, 1);
+    _choice(lua, index, "role", "text role", TEXT_ROLES, options.role);
+    _choice(lua, index, "orientation", "text orientation", TEXT_ORIENTATIONS, options.orientation);
     _boolean(lua, index, "display", options.display);
     _boolean(lua, index, "baseline", options.baseline);
     if (_get(lua, index, "font") != LUA_TNIL) {
@@ -907,12 +910,7 @@ static int _matchTransform(lua_State* lua)
 
 static int _open(lua_State* lua, void*)
 {
-    luaL_newmetatable(lua, FORMULA_METATABLE);
-    lua_pushcfunction(lua, _formulaGc);
-    lua_setfield(lua, -2, "__gc");
-    lua_pushliteral(lua, "protected");
-    lua_setfield(lua, -2, "__metatable");
-    lua_pop(lua, 1);
+    core::luaMetatable(lua, FORMULA_METATABLE, _formulaGc);
     lua_newtable(lua);
     lua_setfield(lua, LUA_REGISTRYINDEX, FORMULA_REGISTRY);
 

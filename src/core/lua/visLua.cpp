@@ -485,6 +485,8 @@ static LuaObject* _knownHandle(lua_State* lua, LuaScene* scene, int sceneIndex, 
     return handle;
 }
 
+// ---------- Styles, charges and attaching ----------
+
 // The id of the options at index, which no object of scene has yet, or nullptr. An id is left on
 // the stack for the caller to pop once it is copied, since an id given as a number becomes a
 // string that only the stack holds.
@@ -512,8 +514,6 @@ static const char* _fieldId(lua_State* lua, Scene* scene, int index)
 
 // Applies the style options at index other than the id, leaving what they do not name.
 static void _looks(lua_State* lua, Scene* scene, Object* object, int index);
-
-// ---------- Styles, charges and attaching ----------
 
 static void _style(lua_State* lua, Scene* scene, Object* object, int index)
 {
@@ -1819,14 +1819,14 @@ static int _spans(lua_State* lua)
     return 1;
 }
 
+// ---------- Code blocks ----------
+
 // The token classes as the colors option names them, in CodeClass order, and the Theme roles
 // they take unless the script sets them, so that a block reads on every theme.
 static constexpr const char* CODE_CLASSES[] = {
     "plain", "keyword", "string", "number", "comment", "function", "type", "operator"};
 static constexpr const char* CODE_COLORS[] = {
     "foreground", "secondary", "success", "danger", "muted", "accent", "warning", "foreground"};
-
-// ---------- Code blocks ----------
 
 // One token of a code block, measured in world units before it attaches.
 struct LuaCodeToken
@@ -4315,11 +4315,11 @@ static int _exclusion(lua_State* lua)
     return _region(lua, PathOperation::Exclusion, "exclusion");
 }
 
+// ---------- Riemann sums, contours and fields ----------
+
 // The colors and the layer of a Riemann sum reach each of its rectangles.
 static constexpr const char* RIEMANN_SHAPE_STYLES[] = {
     "color", "stroke", "fill", "gradient", "width", "dash", "dash_offset", "layer"};
-
-// ---------- Riemann sums, contours and fields ----------
 
 // scene:riemann{fn = f, x_range = {a, b, dx}, sample = "left"}: the rectangles of a Riemann sum
 // of fn, one for each step of x_range and as tall as fn at the left end, the right end, or the
@@ -6112,6 +6112,8 @@ static int _charge(lua_State* lua, LuaScene* box, uint32_t before, size_t string
     return _evaluate(lua, box);
 }
 
+// ---------- Braces ----------
+
 // World units a pixel spans at the camera as authored so far, at its target for a perspective
 // camera, as Scene::measure converts the sizes of billboard text.
 static float _pixelWorld(const Config& config)
@@ -6123,8 +6125,6 @@ static float _pixelWorld(const Config& config)
     }
     return camera.orthoHeight / height;
 }
-
-// ---------- Braces ----------
 
 // Where a brace stands: its ends lie on the line from start along across, width apart, and its
 // tip points along out, across and out being unit vectors in the xy plane of its space.
@@ -8193,6 +8193,8 @@ static int _matchTransform(lua_State* lua)
     return _charge(lua, box, before);
 }
 
+// ---------- Code edits, highlights and group transitions ----------
+
 // The kinds of edit, each named by a key of its edit table, and the keys each kind takes.
 static constexpr const char* CODE_EDITS[] = {"replace", "insert", "remove", "append", "prepend"};
 static constexpr const char* CODE_EDIT_KEYS[][6] = {
@@ -8201,8 +8203,6 @@ static constexpr const char* CODE_EDIT_KEYS[][6] = {
     {"remove", "match", "lines", "whole", nullptr, nullptr},
     {"append", nullptr, nullptr, nullptr, nullptr, nullptr},
     {"prepend", nullptr, nullptr, nullptr, nullptr, nullptr}};
-
-// ---------- Code edits, highlights and group transitions ----------
 
 // Pushes text with value set in front of line number, counting from 1, or after the last line
 // when number is one past it, as whole lines: a line feed at the end of value opens none.
@@ -8773,8 +8773,7 @@ static int _measure(lua_State* lua)
 
 // ---------- Cameras ----------
 
-// The views and projections a look table and the camera of vis.scene name.
-static constexpr LuaName<CameraView> CAMERA_VIEWS[] = {{"2d", CameraView::TwoD}, {"3d", CameraView::ThreeD}};
+// The projections a look table and the camera of vis.scene name, besides their CAMERA_VIEWS.
 static constexpr LuaName<Projection> PROJECTIONS[] = {
     {"perspective", Projection::Perspective}, {"orthographic", Projection::Orthographic}};
 

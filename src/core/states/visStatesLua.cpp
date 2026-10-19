@@ -34,43 +34,6 @@ static Controller* _controller(lua_State* lua)
     return handle->controller;
 }
 
-static Vec3 _vec3(lua_State* lua, int index, const char* name,
-                  float z = 0.0f)
-{
-    luaL_checktype(lua, index, LUA_TTABLE);
-    index = lua_absindex(lua, index);
-    auto count = lua_rawlen(lua, index);
-    if (count != 2u && count != 3u) {
-        luaL_error(lua, "%s must contain two or three numbers", name);
-    }
-    Vec3 value = {0.0f, 0.0f, z};
-    lua_rawgeti(lua, index, 1);
-    value.x = _number(lua, -1, name);
-    lua_pop(lua, 1);
-    lua_rawgeti(lua, index, 2);
-    value.y = _number(lua, -1, name);
-    lua_pop(lua, 1);
-    if (count == 3u) {
-        lua_rawgeti(lua, index, 3);
-        value.z = _number(lua, -1, name);
-        lua_pop(lua, 1);
-    }
-    return value;
-}
-
-static Vec3 _fieldVec3(lua_State* lua, int index, const char* name, const Vec3& fallback)
-{
-    index = lua_absindex(lua, index);
-    lua_getfield(lua, index, name);
-    if (lua_isnil(lua, -1)) {
-        lua_pop(lua, 1);
-        return fallback;
-    }
-    auto value = _vec3(lua, -1, name, fallback.z);
-    lua_pop(lua, 1);
-    return value;
-}
-
 static const char* _text(lua_State* lua, int index, const char* name)
 {
     size_t size = 0u;
@@ -90,22 +53,7 @@ static State _state(lua_State* lua, int index)
     };
     _options(lua, index, "state", options);
     State state;
-    lua_getfield(lua, index, "origin");
-    if (!lua_isnil(lua, -1)) {
-        state.origin = _vec3(lua, -1, "origin");
-        state.originEnabled = true;
-    }
-    lua_pop(lua, 1);
-    state.shift = _fieldVec3(lua, index, "shift", state.shift);
-    state.scale = _fieldVec3(lua, index, "scale", state.scale);
-    lua_getfield(lua, index, "rotation");
-    if (!lua_isnil(lua, -1)) {
-        if (lua_isnumber(lua, -1)) state.rotation.z = _number(lua, -1, "rotation");
-        else state.rotation = _vec3(lua, -1, "rotation");
-    }
-    lua_pop(lua, 1);
-    state.opacity = _fieldNumber(lua, index, "opacity", state.opacity);
-    state.progress = _fieldNumber(lua, index, "progress", state.progress);
+    _overlay(lua, index, state);
     return state;
 }
 
@@ -384,17 +332,7 @@ static int _open(lua_State* lua, void* data)
         {"clear_events", _clearEvents},
         {nullptr, nullptr},
     };
-    luaL_newmetatable(lua, StatesMetatable);
-    lua_pushcfunction(lua, _controllerGc);
-    lua_setfield(lua, -2, "__gc");
-    lua_pushliteral(lua, "vis.states.Controller");
-    lua_setfield(lua, -2, "__name");
-    lua_pushliteral(lua, "protected");
-    lua_setfield(lua, -2, "__metatable");
-    lua_newtable(lua);
-    luaL_setfuncs(lua, methods, 0);
-    lua_setfield(lua, -2, "__index");
-    lua_pop(lua, 1);
+    detail::luaMetatable(lua, StatesMetatable, _controllerGc, {methods});
 
     lua_getglobal(lua, "vis");
     lua_pushlightuserdata(lua, data);
@@ -404,18 +342,11 @@ static int _open(lua_State* lua, void* data)
     return 0;
 }
 
-static Result _loaded(lua_State*, Scene* scene, void* data) noexcept
-{
-    auto context = static_cast<lua_extension::LuaContext*>(data);
-    if (context->controller && context->scene != scene) return Result::InvalidArguments;
-    return Result::Success;
-}
-
 }  // namespace
 
 vis::detail::LuaHooks lua_extension::luaHooks(LuaContext& context) noexcept
 {
-    return {_open, _loaded, &context};
+    return {_open, detail::luaLoadedScene<LuaContext, &LuaContext::controller>, &context};
 }
 
 }  // namespace vis::states

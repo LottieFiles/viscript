@@ -15,6 +15,7 @@ extern "C" {
 #include "../lua/visLuaValues.h"
 #include "visLuaRuntimeExtension.h"
 #include "vis_input.h"
+#include "../input/visInputLuaExtension.h"
 
 namespace vis::lua_runtime
 {
@@ -612,42 +613,6 @@ static Vec2 _vec2(lua_State* lua, int index, const char* name)
     return {x, y};
 }
 
-static Vec3 _vec3(lua_State* lua, int index, const char* name, float z = 0.0f)
-{
-    luaL_checktype(lua, index, LUA_TTABLE);
-    index = lua_absindex(lua, index);
-    auto count = lua_rawlen(lua, index);
-    if (count != 2u && count != 3u) {
-        luaL_error(lua, "%s must contain two or three numbers", name);
-    }
-    lua_rawgeti(lua, index, 1);
-    auto x = _number(lua, -1, name);
-    lua_pop(lua, 1);
-    lua_rawgeti(lua, index, 2);
-    auto y = _number(lua, -1, name);
-    lua_pop(lua, 1);
-    if (count == 3u) {
-        lua_rawgeti(lua, index, 3);
-        z = _number(lua, -1, name);
-        lua_pop(lua, 1);
-    }
-    return {x, y, z};
-}
-
-static Vec3 _fieldVec3(lua_State* lua, int index, const char* name,
-                       const Vec3& fallback)
-{
-    index = lua_absindex(lua, index);
-    lua_getfield(lua, index, name);
-    if (lua_isnil(lua, -1)) {
-        lua_pop(lua, 1);
-        return fallback;
-    }
-    auto value = _vec3(lua, -1, name, fallback.z);
-    lua_pop(lua, 1);
-    return value;
-}
-
 static ObjectState _objectState(lua_State* lua, int index, const Theme& theme)
 {
     luaL_checktype(lua, index, LUA_TTABLE);
@@ -657,22 +622,7 @@ static ObjectState _objectState(lua_State* lua, int index, const Theme& theme)
     };
     _options(lua, index, "runtime config", options);
     ObjectState state;
-    lua_getfield(lua, index, "origin");
-    if (!lua_isnil(lua, -1)) {
-        state.origin = _vec3(lua, -1, "origin");
-        state.originEnabled = true;
-    }
-    lua_pop(lua, 1);
-    state.shift = _fieldVec3(lua, index, "shift", state.shift);
-    state.scale = _fieldVec3(lua, index, "scale", state.scale);
-    lua_getfield(lua, index, "rotation");
-    if (!lua_isnil(lua, -1)) {
-        if (lua_isnumber(lua, -1)) state.rotation.z = _number(lua, -1, "rotation");
-        else state.rotation = _vec3(lua, -1, "rotation");
-    }
-    lua_pop(lua, 1);
-    state.opacity = _fieldNumber(lua, index, "opacity", state.opacity);
-    state.progress = _fieldNumber(lua, index, "progress", state.progress);
+    _overlay(lua, index, state);
     lua_getfield(lua, index, "fill");
     if (!lua_isnil(lua, -1)) {
         state.fill = _color(lua, -1, "fill", &theme);
@@ -681,13 +631,6 @@ static ObjectState _objectState(lua_State* lua, int index, const Theme& theme)
     lua_pop(lua, 1);
     if (!_valid(state)) luaL_error(lua, "runtime Object state is invalid");
     return state;
-}
-
-static int _result(lua_State* lua, Result result)
-{
-    if (result != Result::Success) luaL_error(lua, "%s", vis::result(result));
-    lua_settop(lua, 1);
-    return 1;
 }
 
 static int _update(lua_State* lua)
@@ -708,6 +651,10 @@ static int _clear(lua_State* lua)
     auto object = vis::detail::luaObject(lua, runtime->scene(), 2);
     return _result(lua, runtime->clear(object));
 }
+
+// The buses a sound plays on.
+static constexpr LuaName<SoundBus> SoundBuses[] = {
+    {"music", SoundBus::Music}, {"effect", SoundBus::Effect}, {"ui", SoundBus::Ui}};
 
 static int _sound(lua_State* lua)
 {
@@ -732,17 +679,7 @@ static int _sound(lua_State* lua)
         _options(lua, 3, "runtime config", options);
         event.gain = _fieldNumber(lua, 3, "gain", event.gain);
         event.rate = _fieldNumber(lua, 3, "rate", event.rate);
-        lua_getfield(lua, 3, "bus");
-        if (!lua_isnil(lua, -1)) {
-            auto bus = luaL_checkstring(lua, -1);
-            if (std::strcmp(bus, "music") == 0) event.bus = SoundBus::Music;
-            else if (std::strcmp(bus, "effect") == 0) event.bus = SoundBus::Effect;
-            else if (std::strcmp(bus, "ui") == 0) event.bus = SoundBus::Ui;
-            else {
-                return luaL_error(lua, "sound bus must be music, effect, or ui");
-            }
-        }
-        lua_pop(lua, 1);
+        event.bus = _fieldEnum(lua, 3, "bus", event.bus, SoundBuses, "sound bus");
         lua_getfield(lua, 3, "loop");
         if (!lua_isnil(lua, -1)) {
             if (!lua_isboolean(lua, -1)) {
@@ -765,38 +702,6 @@ static int _sound(lua_State* lua)
     return 1;
 }
 
-static input::Key _key(lua_State* lua, int index)
-{
-    auto name = luaL_checkstring(lua, index);
-    if (std::strcmp(name, "ArrowLeft") == 0) return input::Key::ArrowLeft;
-    if (std::strcmp(name, "ArrowRight") == 0) return input::Key::ArrowRight;
-    if (std::strcmp(name, "ArrowUp") == 0) return input::Key::ArrowUp;
-    if (std::strcmp(name, "ArrowDown") == 0) return input::Key::ArrowDown;
-    if (std::strcmp(name, "Space") == 0) return input::Key::Space;
-    if (std::strcmp(name, "Enter") == 0) return input::Key::Enter;
-    if (std::strcmp(name, "Escape") == 0) return input::Key::Escape;
-    if (std::strcmp(name, "Plus") == 0) return input::Key::Plus;
-    if (std::strcmp(name, "Minus") == 0) return input::Key::Minus;
-    if (std::strcmp(name, "Shift") == 0) return input::Key::Shift;
-    if (std::strcmp(name, "Tab") == 0) return input::Key::Tab;
-    if (name[0] && !name[1]) {
-        if (name[0] >= 'A' && name[0] <= 'Z') {
-            return static_cast<input::Key>(static_cast<uint8_t>(input::Key::A)
-                                           + name[0] - 'A');
-        }
-        if (name[0] >= 'a' && name[0] <= 'z') {
-            return static_cast<input::Key>(static_cast<uint8_t>(input::Key::A)
-                                           + name[0] - 'a');
-        }
-        if (name[0] >= '0' && name[0] <= '9') {
-            return static_cast<input::Key>(static_cast<uint8_t>(input::Key::Number0)
-                                           + name[0] - '0');
-        }
-    }
-    luaL_error(lua, "unsupported input key '%s'", name);
-    return input::Key::Unknown;
-}
-
 static void _vec2Table(lua_State* lua, const Vec2& value)
 {
     lua_createtable(lua, 2, 2);
@@ -817,7 +722,7 @@ static int _bindKey(lua_State* lua)
         return luaL_error(lua, "runtime bindings are immutable after loading");
     }
     auto action = luaL_checkstring(lua, 2);
-    auto key = _key(lua, 3);
+    auto key = input::lua_extension::luaKey(lua, 3);
     auto value = lua_isnoneornil(lua, 4) ? Vec2{1.0f, 0.0f}
                                          : _vec2(lua, 4, "action value");
     return _result(lua, detail::RuntimeAccess::key(runtime, action, key, value));
@@ -875,7 +780,8 @@ static int _keyState(lua_State* lua)
 {
     auto runtime = _running(lua);
     input::DigitalState state;
-    auto result = detail::RuntimeAccess::key(runtime, _key(lua, 2), state);
+    auto key = input::lua_extension::luaKey(lua, 2);
+    auto result = detail::RuntimeAccess::key(runtime, key, state);
     if (result != Result::Success) {
         return luaL_error(lua, "runtime key state is unavailable: %s",
                           vis::result(result));
@@ -1014,17 +920,7 @@ static int _open(lua_State* lua, void* data)
         {"pointer", _pointerState},
         {nullptr, nullptr},
     };
-    luaL_newmetatable(lua, RuntimeMetatable);
-    lua_pushcfunction(lua, _runtimeGc);
-    lua_setfield(lua, -2, "__gc");
-    lua_pushliteral(lua, "vis.lua_runtime.Runtime");
-    lua_setfield(lua, -2, "__name");
-    lua_pushliteral(lua, "protected");
-    lua_setfield(lua, -2, "__metatable");
-    lua_newtable(lua);
-    luaL_setfuncs(lua, methods, 0);
-    lua_setfield(lua, -2, "__index");
-    lua_pop(lua, 1);
+    vis::detail::luaMetatable(lua, RuntimeMetatable, _runtimeGc, {methods});
 
     lua_getglobal(lua, "vis");
     lua_pushlightuserdata(lua, data);
@@ -1034,18 +930,11 @@ static int _open(lua_State* lua, void* data)
     return 0;
 }
 
-static Result _loaded(lua_State*, Scene* scene, void* data) noexcept
-{
-    auto context = static_cast<lua_extension::LuaContext*>(data);
-    if (context->runtime && context->scene != scene) return Result::InvalidArguments;
-    return Result::Success;
-}
-
 }  // namespace
 
 vis::detail::LuaHooks lua_extension::luaHooks(LuaContext& context) noexcept
 {
-    return {_open, _loaded, &context};
+    return {_open, vis::detail::luaLoadedScene<LuaContext, &LuaContext::runtime>, &context};
 }
 
 Result lua_extension::retain(LuaContext& context, lua_State* lua) noexcept

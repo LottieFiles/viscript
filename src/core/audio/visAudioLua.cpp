@@ -42,23 +42,9 @@ static void _fieldAsset(lua_State* lua, int index,
     lua_pop(lua, 1);
 }
 
-static Bus _fieldBus(lua_State* lua, int index)
-{
-    index = lua_absindex(lua, index);
-    lua_getfield(lua, index, "bus");
-    if (lua_isnil(lua, -1)) {
-        lua_pop(lua, 1);
-        return Bus::Effect;
-    }
-    auto value = luaL_checkstring(lua, -1);
-    auto bus = Bus::Effect;
-    if (std::strcmp(value, "music") == 0) bus = Bus::Music;
-    else if (std::strcmp(value, "effect") == 0) bus = Bus::Effect;
-    else if (std::strcmp(value, "ui") == 0) bus = Bus::Ui;
-    else luaL_error(lua, "audio bus must be music, effect or ui");
-    lua_pop(lua, 1);
-    return bus;
-}
+// The buses a cue plays on.
+static constexpr LuaName<Bus> BUSES[] = {
+    {"music", Bus::Music}, {"effect", Bus::Effect}, {"ui", Bus::Ui}};
 
 static LuaCue* _cue(lua_State* lua)
 {
@@ -103,7 +89,7 @@ static int _newCue(lua_State* lua)
     _fieldAsset(lua, 2, asset);
     CueConfig config;
     config.asset = asset;
-    config.bus = _fieldBus(lua, 2);
+    config.bus = _fieldEnum(lua, 2, "bus", Bus::Effect, BUSES, "audio bus");
     config.begin = _fieldNumber(lua, 2, "begin", 0.0f);
     config.end = _fieldNumber(lua, 2, "end", 0.0f);
     config.gain = _fieldNumber(lua, 2, "gain", 1.0f);
@@ -138,15 +124,7 @@ static int _open(lua_State* lua, void* data)
         {"gain", _gain},
         {nullptr, nullptr},
     };
-    luaL_newmetatable(lua, CUE_METATABLE);
-    lua_pushliteral(lua, "vis.audio.Cue");
-    lua_setfield(lua, -2, "__name");
-    lua_pushliteral(lua, "protected");
-    lua_setfield(lua, -2, "__metatable");
-    lua_newtable(lua);
-    luaL_setfuncs(lua, methods, 0);
-    lua_setfield(lua, -2, "__index");
-    lua_pop(lua, 1);
+    detail::luaMetatable(lua, CUE_METATABLE, nullptr, {methods});
 
     lua_getglobal(lua, "vis");
     lua_newtable(lua);
@@ -158,18 +136,11 @@ static int _open(lua_State* lua, void* data)
     return 0;
 }
 
-static Result _loaded(lua_State*, Scene* scene, void* data) noexcept
-{
-    auto context = static_cast<lua_extension::LuaContext*>(data);
-    if (context->soundscape && context->scene != scene) return Result::InvalidArguments;
-    return Result::Success;
-}
-
 }  // namespace
 
 vis::detail::LuaHooks lua_extension::luaHooks(LuaContext& context) noexcept
 {
-    return {_open, _loaded, &context};
+    return {_open, detail::luaLoadedScene<LuaContext, &LuaContext::soundscape>, &context};
 }
 
 }  // namespace vis::audio
