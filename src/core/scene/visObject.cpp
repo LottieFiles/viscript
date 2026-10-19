@@ -8,6 +8,7 @@
 #include "vis.h"
 #include "../common/visFinite.h"
 #include "../common/visString.h"
+#include "../common/visConstants.h"
 #include "visRendererBackend.h"
 #include "visScene.h"
 
@@ -2143,7 +2144,6 @@ static uint32_t _outline(const Vec3* source, uint32_t count, Vec3* points, uint3
 
 uint32_t outline(const Object* object, Vec3* points, uint32_t capacity, bool& closed) noexcept
 {
-    constexpr auto PI2 = 6.28318530718f;
     closed = false;
     if (!object) return 0u;
     if (!points) capacity = 0u;
@@ -2173,7 +2173,7 @@ uint32_t outline(const Object* object, Vec3* points, uint32_t capacity, bool& cl
             auto circle = static_cast<const Circle*>(object);
             constexpr auto count = 64u;
             for (auto i = 0u; i < count && i < capacity; i++) {
-                auto angle = PI2 * static_cast<float>(i) / static_cast<float>(count);
+                auto angle = TWO_PI * static_cast<float>(i) / static_cast<float>(count);
                 points[i] = circle->center + Vec3{std::cos(angle) * circle->radius,
                                                   std::sin(angle) * circle->radius, 0.0f};
             }
@@ -2203,7 +2203,7 @@ uint32_t outline(const Object* object, Vec3* points, uint32_t capacity, bool& cl
             for (auto corner = 0u; corner < 4u; corner++) {
                 for (auto j = 0u; j < segments; j++, count++) {
                     if (count >= capacity) continue;
-                    auto angle = PI2 * (static_cast<float>(corner) * 0.25f
+                    auto angle = TWO_PI * (static_cast<float>(corner) * 0.25f
                                        + static_cast<float>(j) / (segments * 4.0f));
                     points[count] = rectangle->center + Vec3{
                         centers[corner].x + std::cos(angle) * radius,

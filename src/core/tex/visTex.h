@@ -1,5 +1,5 @@
-#ifndef VIS_TEX_INTERNAL_H
-#define VIS_TEX_INTERNAL_H
+#ifndef _VIS_TEX_PRIVATE_H_
+#define _VIS_TEX_PRIVATE_H_
 
 #include <cstdint>
 

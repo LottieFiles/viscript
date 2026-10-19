@@ -1,5 +1,5 @@
-#ifndef VIS_TEST_LUA_COLLECTOR_H
-#define VIS_TEST_LUA_COLLECTOR_H
+#ifndef _VIS_TEST_LUA_COLLECTOR_H_
+#define _VIS_TEST_LUA_COLLECTOR_H_
 
 #include <cstring>
 

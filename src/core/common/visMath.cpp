@@ -5,11 +5,12 @@
 #include "vis.h"
 #include "visFinite.h"
 
+#include "visConstants.h"
+
 namespace vis
 {
 
 static constexpr auto _epsilon = 1.0e-6f;
-static constexpr auto _pi = 3.14159265358979323846f;
 
 static float _narrow(double value) noexcept
 {
@@ -427,7 +428,7 @@ bool Camera::project(const Vec3& world, float aspect, Vec3& ndc) const noexcept
 
     auto halfHeight = static_cast<double>(orthoHeight) * 0.5;
     if (projection == Projection::Perspective) {
-        if (near <= 0.0f || !std::isfinite(fov) || fov <= 0.0f || fov >= _pi) return false;
+        if (near <= 0.0f || !std::isfinite(fov) || fov <= 0.0f || fov >= PI) return false;
         halfHeight = std::tan(static_cast<double>(fov) * 0.5) * depth;
     } else if (!std::isfinite(orthoHeight) || orthoHeight <= 0.0f) {
         return false;
@@ -493,7 +494,7 @@ Ray3 Camera::ray(const Vec2& ndc, float aspect) const noexcept
     if (!_basis(*this, forward, right, correctedUp)) return ray;
 
     if (projection == Projection::Perspective) {
-        if (near <= 0.0f || !std::isfinite(fov) || fov <= 0.0f || fov >= _pi) return ray;
+        if (near <= 0.0f || !std::isfinite(fov) || fov <= 0.0f || fov >= PI) return ray;
         auto halfHeight = std::tan(static_cast<double>(fov) * 0.5);
         auto horizontal = static_cast<double>(ndc.x) * halfHeight * aspect;
         auto vertical = static_cast<double>(ndc.y) * halfHeight;
@@ -636,7 +637,7 @@ float ease(const AnimCurve& curve, float progress) noexcept
         case AnimCurvePreset::Bounce: value = _bounce(sample); break;
         case AnimCurvePreset::Elastic:
             value = std::pow(2.0, -10.0 * sample)
-                  * std::sin((10.0 * sample - 0.75) * (2.0 * _pi / 3.0)) + 1.0;
+                  * std::sin((10.0 * sample - 0.75) * (2.0 * PI / 3.0)) + 1.0;
             break;
         case AnimCurvePreset::Custom: value = _bezier(curve, sample); break;
         default: break;

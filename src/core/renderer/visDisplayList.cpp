@@ -7,14 +7,13 @@
 
 #include "vis.h"
 #include "../common/visFinite.h"
+#include "../common/visConstants.h"
 #include "visDisplayColor.h"
 #include "visDisplayList.h"
 #include "visScene.h"
 
 namespace vis
 {
-
-static constexpr float PI2 = 6.28318530718f;
 static constexpr uint32_t MAX_SPACE_NUMBERS = 256;
 
 static Color _shade(Color color, float factor, float opacity)
@@ -132,7 +131,7 @@ static void _project(Gradient& gradient, const Mat4& model, const Config& config
     auto anchor = gradient.centered ? gradient.center : Vec3{};
     auto anchored = _point(anchor, model, config, center, depth);
     if (gradient.type == GradientType::Conic && anchored) {
-        constexpr auto RADIANS = 3.14159265358979f / 180.0f;
+        constexpr auto RADIANS = PI / 180.0f;
         auto angle = gradient.angle * RADIANS;
         Vec2 direction;
         // Clockwise as seen on screen: negate the local y component of the start direction.
@@ -2413,7 +2412,7 @@ static bool _placed(const DisplayList& list, int32_t layer, int32_t& placed)
     return true;
 }
 
-Result Scene::Impl::build(float time, DisplayList& list, bool sorted, const ViewFrame* frame) const noexcept
+Result Scene::Impl::build(float time, DisplayList& list, bool sort, const ViewFrame* frame) const noexcept
 {
     if (!std::isfinite(time) || time < 0.0f) return Result::InvalidArguments;
     auto config = cfg;
@@ -2707,7 +2706,7 @@ Result Scene::Impl::build(float time, DisplayList& list, bool sorted, const View
                 auto depth = 0.0;
                 auto visible = true;
                 for (auto j = 0u; j < count; j++) {
-                    auto angle = PI2 * static_cast<float>(j) / static_cast<float>(count);
+                    auto angle = TWO_PI * static_cast<float>(j) / static_cast<float>(count);
                     auto point = circle->center + Vec3{std::cos(angle) * state.size.x, std::sin(angle) * state.size.x, 0.0f};
                     auto pointDepth = 0.0f;
                     if (!_point(point, state.model, config, points[j], pointDepth)) {
@@ -3010,7 +3009,7 @@ Result Scene::Impl::build(float time, DisplayList& list, bool sorted, const View
                         {half.x - radius, -half.y + radius}};
                     for (auto corner = 0u; corner < 4u; corner++) {
                         for (auto j = 0u; j < segments; j++) {
-                            auto angle = PI2 * (static_cast<float>(corner) * 0.25f
+                            auto angle = TWO_PI * (static_cast<float>(corner) * 0.25f
                                                + static_cast<float>(j) / (segments * 4.0f));
                             local[count++] = rectangle->center + Vec3{
                                 centers[corner].x + std::cos(angle) * radius,
@@ -3068,7 +3067,7 @@ Result Scene::Impl::build(float time, DisplayList& list, bool sorted, const View
     }
     list.object = nullptr;
     list.composite = 0u;
-    if (!sorted) return Result::Success;
+    if (!sort) return Result::Success;
     auto result = list.split(config);
     if (result != Result::Success) return result;
     list.sort();

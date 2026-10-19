@@ -10,6 +10,8 @@ extern "C" {
 #include "vis_diagram.h"
 #include "visDiagramLuaExtension.h"
 
+#include "../lua/visLuaValues.h"
+
 namespace vis::diagram
 {
 
@@ -43,58 +45,6 @@ struct LuaBuilt
     Group* root = nullptr;
 };
 
-static bool _has(lua_State* lua, int index, const char* name)
-{
-    index = lua_absindex(lua, index);
-    lua_getfield(lua, index, name);
-    auto found = !lua_isnil(lua, -1);
-    lua_pop(lua, 1);
-    return found;
-}
-
-static void _options(lua_State* lua, int index, const char* kind,
-                     const char* const* names)
-{
-    index = lua_absindex(lua, index);
-    lua_pushnil(lua);
-    while (lua_next(lua, index)) {
-        if (lua_type(lua, -2) != LUA_TSTRING) {
-            luaL_error(lua, "%s keys must be strings", kind);
-        }
-        auto key = lua_tostring(lua, -2);
-        auto known = false;
-        for (auto cursor = names; *cursor; cursor++) {
-            if (std::strcmp(key, *cursor) == 0) {
-                known = true;
-                break;
-            }
-        }
-        if (!known) luaL_error(lua, "unknown %s field '%s'", kind, key);
-        lua_pop(lua, 1);
-    }
-}
-
-static float _number(lua_State* lua, int index, const char* name)
-{
-    auto value = static_cast<float>(luaL_checknumber(lua, index));
-    if (!std::isfinite(value)) luaL_error(lua, "%s must be finite", name);
-    return value;
-}
-
-static float _fieldNumber(lua_State* lua, int index, const char* name,
-                          float fallback)
-{
-    index = lua_absindex(lua, index);
-    lua_getfield(lua, index, name);
-    if (lua_isnil(lua, -1)) {
-        lua_pop(lua, 1);
-        return fallback;
-    }
-    auto value = _number(lua, -1, name);
-    lua_pop(lua, 1);
-    return value;
-}
-
 static int32_t _fieldInteger(lua_State* lua, int index, const char* name,
                              int32_t fallback)
 {
@@ -108,20 +58,6 @@ static int32_t _fieldInteger(lua_State* lua, int index, const char* name,
     lua_pop(lua, 1);
     if (value < INT32_MIN || value > INT32_MAX) luaL_error(lua, "%s is out of range", name);
     return static_cast<int32_t>(value);
-}
-
-static bool _fieldBool(lua_State* lua, int index, const char* name, bool fallback)
-{
-    index = lua_absindex(lua, index);
-    lua_getfield(lua, index, name);
-    if (lua_isnil(lua, -1)) {
-        lua_pop(lua, 1);
-        return fallback;
-    }
-    if (!lua_isboolean(lua, -1)) luaL_error(lua, "%s must be boolean", name);
-    auto value = lua_toboolean(lua, -1) != 0;
-    lua_pop(lua, 1);
-    return value;
 }
 
 // The text of field name of the table at index, or nullptr when it is nil. The text is left on
@@ -173,7 +109,7 @@ static Vec2 _vec2(lua_State* lua, int index, const char* name)
     return value;
 }
 
-static Vec2 _fieldVec2(lua_State* lua, int index, const char* name,
+static Vec2 _fieldPair(lua_State* lua, int index, const char* name,
                        const Vec2& fallback)
 {
     index = lua_absindex(lua, index);
@@ -352,8 +288,8 @@ static int _newDiagram(lua_State* lua)
         config.direction = _direction(lua, -1);
         lua_pop(lua, 1);
     }
-    config.origin = _fieldVec2(lua, 2, "origin", config.origin);
-    config.nodeSize = _fieldVec2(lua, 2, "node_size", config.nodeSize);
+    config.origin = _fieldPair(lua, 2, "origin", config.origin);
+    config.nodeSize = _fieldPair(lua, 2, "node_size", config.nodeSize);
     config.rankGap = _fieldNumber(lua, 2, "rank_gap", config.rankGap);
     config.nodeGap = _fieldNumber(lua, 2, "node_gap", config.nodeGap);
     config.timeUnit = _fieldNumber(lua, 2, "time_unit", config.timeUnit);
@@ -413,8 +349,8 @@ static int _addNode(lua_State* lua)
     spec.start = _fieldNumber(lua, 2, "start", spec.start);
     spec.span = _fieldNumber(lua, 2, "span", spec.span);
     spec.manualPosition = _has(lua, 2, "position");
-    spec.position = _fieldVec2(lua, 2, "position", spec.position);
-    spec.size = _fieldVec2(lua, 2, "size", spec.size);
+    spec.position = _fieldPair(lua, 2, "position", spec.position);
+    spec.size = _fieldPair(lua, 2, "size", spec.size);
     Node node;
     auto result = owner->diagram->add(spec, node);
     if (result != Result::Success) {

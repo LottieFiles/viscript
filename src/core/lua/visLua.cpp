@@ -16,6 +16,7 @@ extern "C" {
 }
 
 #include "vis.h"
+#include "../common/visConstants.h"
 #include "visCode.h"
 #include "visLuaExtension.h"
 #include "visLuaApi.h"
@@ -3424,9 +3425,9 @@ static int _arc(lua_State* lua)
     auto center = _fieldWorld(lua, 2, "center", {});
     auto radius = _fieldNumber(lua, 2, "radius", 1.0f);
     auto start = _fieldNumber(lua, 2, "start", 0.0f);
-    auto angle = _fieldNumber(lua, 2, "angle", 1.57079632679f);
+    auto angle = _fieldNumber(lua, 2, "angle", HALF_PI);
     if (radius <= 0.0f) return luaL_error(lua, "radius must be positive");
-    if (std::fabs(angle) > 6.28318530718f) return luaL_error(lua, "angle must be between -2 pi and 2 pi");
+    if (std::fabs(angle) > TWO_PI) return luaL_error(lua, "angle must be between -2 pi and 2 pi");
     auto sector = _fieldBool(lua, 2, "sector", false);
     auto owner = _owner(lua, space.scene);
     auto object = Arc::gen(center, radius, start, angle);
@@ -6388,7 +6389,7 @@ static GrowthEdge _growthEdge(lua_State* lua, int index)
 static float _fieldArc(lua_State* lua, int index)
 {
     auto arc = _fieldNumber(lua, index, "arc", 0.0f);
-    if (std::fabs(arc) >= 6.2831853f) {
+    if (std::fabs(arc) >= TWO_PI) {
         luaL_error(lua, "arc must be greater than -2*pi and less than 2*pi radians");
     }
     return arc;
@@ -10677,7 +10678,7 @@ static int _sceneGen(lua_State* lua)
     if (config.camera.near <= 0.0f || config.camera.far <= config.camera.near) {
         return luaL_error(lua, "camera requires 0 < near < far");
     }
-    if (config.camera.fov <= 0.0f || config.camera.fov >= 3.14159265359f) {
+    if (config.camera.fov <= 0.0f || config.camera.fov >= PI) {
         return luaL_error(lua, "camera fov must be in radians between 0 and pi");
     }
     if (config.camera.orthoHeight <= 0.0f) return luaL_error(lua, "camera height must be positive");

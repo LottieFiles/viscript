@@ -1,5 +1,5 @@
-#ifndef VIS_TEST_GL_CONTEXT_H
-#define VIS_TEST_GL_CONTEXT_H
+#ifndef _VIS_TEST_GL_CONTEXT_H_
+#define _VIS_TEST_GL_CONTEXT_H_
 
 #include <cstdint>
 #include <dlfcn.h>

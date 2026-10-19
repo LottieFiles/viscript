@@ -1,5 +1,5 @@
-#ifndef VIS_DIAGRAM_LUA_EXTENSION_H
-#define VIS_DIAGRAM_LUA_EXTENSION_H
+#ifndef _VIS_DIAGRAM_LUA_EXTENSION_H_
+#define _VIS_DIAGRAM_LUA_EXTENSION_H_
 
 #include "../lua/visLuaExtension.h"
 

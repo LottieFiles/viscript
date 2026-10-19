@@ -1,5 +1,5 @@
-#ifndef VIS_TEX_SCENE_H
-#define VIS_TEX_SCENE_H
+#ifndef _VIS_TEX_SCENE_H_
+#define _VIS_TEX_SCENE_H_
 
 #include "vis_tex.h"
 

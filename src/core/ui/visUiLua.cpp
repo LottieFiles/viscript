@@ -8,6 +8,7 @@ extern "C" {
 
 #include "vis_ui.h"
 #include "../lua/visLuaExtension.h"
+#include "../lua/visLuaValues.h"
 #include "visUiLuaExtension.h"
 
 namespace vis::ui
@@ -28,70 +29,6 @@ static Panel* _panel(lua_State* lua)
     auto handle = static_cast<LuaPanel*>(luaL_checkudata(lua, 1, PANEL_METATABLE));
     if (!handle->panel) luaL_error(lua, "panel is no longer available");
     return handle->panel;
-}
-
-static bool _has(lua_State* lua, int index, const char* name)
-{
-    index = lua_absindex(lua, index);
-    lua_getfield(lua, index, name);
-    auto found = !lua_isnil(lua, -1);
-    lua_pop(lua, 1);
-    return found;
-}
-
-static void _options(lua_State* lua, int index, const char* const* names)
-{
-    index = lua_absindex(lua, index);
-    lua_pushnil(lua);
-    while (lua_next(lua, index)) {
-        if (lua_type(lua, -2) != LUA_TSTRING) {
-            luaL_error(lua, "UI config keys must be strings");
-        }
-        auto key = lua_tostring(lua, -2);
-        auto known = false;
-        for (auto cursor = names; *cursor; cursor++) {
-            if (std::strcmp(key, *cursor) == 0) {
-                known = true;
-                break;
-            }
-        }
-        if (!known) luaL_error(lua, "unknown UI config field '%s'", key);
-        lua_pop(lua, 1);
-    }
-}
-
-static float _number(lua_State* lua, int index, const char* name)
-{
-    auto value = static_cast<float>(luaL_checknumber(lua, index));
-    if (!std::isfinite(value)) luaL_error(lua, "%s must be finite", name);
-    return value;
-}
-
-static float _fieldNumber(lua_State* lua, int index, const char* name, float fallback)
-{
-    index = lua_absindex(lua, index);
-    lua_getfield(lua, index, name);
-    if (lua_isnil(lua, -1)) {
-        lua_pop(lua, 1);
-        return fallback;
-    }
-    auto value = _number(lua, -1, name);
-    lua_pop(lua, 1);
-    return value;
-}
-
-static bool _fieldBool(lua_State* lua, int index, const char* name, bool fallback)
-{
-    index = lua_absindex(lua, index);
-    lua_getfield(lua, index, name);
-    if (lua_isnil(lua, -1)) {
-        lua_pop(lua, 1);
-        return fallback;
-    }
-    if (!lua_isboolean(lua, -1)) luaL_error(lua, "%s must be a boolean", name);
-    auto value = lua_toboolean(lua, -1) != 0;
-    lua_pop(lua, 1);
-    return value;
 }
 
 static Vec2 _vec2(lua_State* lua, int index, const char* name)
@@ -253,7 +190,7 @@ static UITransform _transform(lua_State* lua, int index, const char* name)
     static const char* const options[] = {
         "shift", "scale", "rotation", "opacity", "progress", nullptr,
     };
-    _options(lua, index, options);
+    _options(lua, index, "UI config", options);
     lua_getfield(lua, index, "shift");
     value.shift = _vec3(lua, -1, "shift", value.shift);
     lua_pop(lua, 1);
@@ -311,7 +248,7 @@ static int _button(lua_State* lua)
         "visual", "hover_visual", "pressed_visual", "region", "camera", "target",
         "delta", "transform", "duration", nullptr,
     };
-    _options(lua, 2, options);
+    _options(lua, 2, "UI config", options);
     auto scene = panel->scene();
     auto visual = _fieldObject(lua, 2, "visual", scene);
     auto hover = _fieldOptionalObject(lua, 2, "hover_visual", scene);
@@ -370,7 +307,7 @@ static int _slider(lua_State* lua)
         "visual", "target", "region", "axis", "value", "from", "to", "bindings",
         nullptr,
     };
-    _options(lua, 2, options);
+    _options(lua, 2, "UI config", options);
     auto scene = panel->scene();
     auto visual = _fieldObject(lua, 2, "visual", scene);
     auto region = _fieldRegion(lua, 2);
@@ -417,7 +354,7 @@ static int _slider(lua_State* lua)
             lua_rawgeti(lua, list, i + 1u);
             luaL_checktype(lua, -1, LUA_TTABLE);
             auto binding = lua_absindex(lua, -1);
-            _options(lua, binding, bindingOptions);
+            _options(lua, binding, "UI config", bindingOptions);
             bindings[i].target = _fieldObject(lua, binding, "target", scene);
             bindings[i].from = _fieldTransform(lua, binding, "from");
             bindings[i].to = _fieldTransform(lua, binding, "to");
@@ -452,7 +389,7 @@ static int _toggleButton(lua_State* lua)
         "visual", "hover_visual", "pressed_visual", "region", "target",
         "off", "on", "value", "duration", nullptr,
     };
-    _options(lua, 2, options);
+    _options(lua, 2, "UI config", options);
     if (!_has(lua, 2, "off") || !_has(lua, 2, "on")) {
         return luaL_error(lua, "toggle_button requires off and on transforms");
     }
@@ -492,7 +429,7 @@ static int _sampleArea(lua_State* lua)
         "region", "targets", "marker", "marker_origin", "marker_x", "marker_y",
         "swatch", nullptr,
     };
-    _options(lua, 2, options);
+    _options(lua, 2, "UI config", options);
     auto scene = panel->scene();
     auto region = _fieldRegion(lua, 2);
     lua_getfield(lua, 2, "targets");

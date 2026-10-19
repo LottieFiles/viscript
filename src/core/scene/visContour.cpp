@@ -10,6 +10,8 @@
 #include "vis.h"
 #include "visScene.h"
 
+#include "../common/visConstants.h"
+
 namespace vis
 {
 
@@ -321,7 +323,7 @@ Result Scene::Impl::contourPlacements(const Plot* plot, float time, ContourPlace
                     auto left = at(distance - half.x), right = at(distance + half.x);
                     auto tangent = right - left;
                     auto angle = std::atan2(tangent.y, tangent.x);
-                    if (options->upright && (angle > 1.57079632679f || angle < -1.57079632679f)) angle += angle > 0 ? -3.14159265359f : 3.14159265359f;
+                    if (options->upright && (angle > HALF_PI || angle < -HALF_PI)) angle += angle > 0 ? -PI : PI;
                     auto model = Mat4::translate(point) * Mat4::rotateZ(angle);
                     Bounds bounds;
                     auto fits = true;

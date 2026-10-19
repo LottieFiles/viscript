@@ -1,5 +1,5 @@
-#ifndef VIS_LUA_HOST_H
-#define VIS_LUA_HOST_H
+#ifndef _VIS_LUA_HOST_H_
+#define _VIS_LUA_HOST_H_
 
 #include "visLuaExtension.h"
 
@@ -56,8 +56,11 @@ inline void luaHostResetFailedLoad(LuaHostContext& context) noexcept
 #endif
 }
 
+// One set of hooks for each optional module.
+constexpr uint32_t LUA_HOST_HOOK_LIMIT = 7u;
+
 inline LuaHookSpan luaHostHooks(LuaHostContext& context,
-                                LuaHooks (&storage)[7]) noexcept
+                                LuaHooks (&storage)[LUA_HOST_HOOK_LIMIT]) noexcept
 {
     uint32_t count = 0u;
 #if defined(VIS_AUDIO)
@@ -94,7 +97,7 @@ inline Result luaHostLoad(const char* source, uint32_t size, const char* name,
                           const Theme* adaptiveTheme, bool* adaptiveThemeUsed,
                           LuaHostContext& context) noexcept
 {
-    LuaHooks storage[7];
+    LuaHooks storage[LUA_HOST_HOOK_LIMIT];
     auto hooks = luaHostHooks(context, storage);
 #if defined(VIS_LUA_RUNTIME)
     lua_State* retained = nullptr;
@@ -128,7 +131,7 @@ inline Result luaHostLoad(const char* source, uint32_t size, const char* name,
 inline Result luaHostLoadFile(const char* path, Scene** output, char* error,
                               uint32_t errorSize, LuaHostContext& context) noexcept
 {
-    LuaHooks storage[7];
+    LuaHooks storage[LUA_HOST_HOOK_LIMIT];
     auto hooks = luaHostHooks(context, storage);
 #if defined(VIS_LUA_RUNTIME)
     lua_State* retained = nullptr;

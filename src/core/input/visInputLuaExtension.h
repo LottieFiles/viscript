@@ -1,5 +1,5 @@
-#ifndef VIS_INPUT_LUA_EXTENSION_H
-#define VIS_INPUT_LUA_EXTENSION_H
+#ifndef _VIS_INPUT_LUA_EXTENSION_H_
+#define _VIS_INPUT_LUA_EXTENSION_H_
 
 #include "../lua/visLuaExtension.h"
 

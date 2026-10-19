@@ -1,5 +1,5 @@
-#ifndef VIS_LUA_EXTENSION_H
-#define VIS_LUA_EXTENSION_H
+#ifndef _VIS_LUA_EXTENSION_H_
+#define _VIS_LUA_EXTENSION_H_
 
 #include <cstddef>
 #include <cstdint>

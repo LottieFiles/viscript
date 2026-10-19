@@ -9,6 +9,7 @@
 #include "vis.h"
 #include "visAudit.h"
 #include "visLuaHost.h"
+#include "visCliCommon.h"
 #include "visSaver.h"
 #ifdef VIS_DIAGRAM
 #include "vis_diagram.h"
@@ -442,36 +443,6 @@ static void _usage()
                          "              [--allow-viewport-stretch]\n");
 }
 
-static bool _uint(const char* value, uint32_t& output)
-{
-    if (!value || !value[0])
-        return false;
-    for (auto cursor = value; *cursor; cursor++)
-    {
-        if (*cursor < '0' || *cursor > '9')
-            return false;
-    }
-    errno = 0;
-    char* end = nullptr;
-    auto number = std::strtoull(value, &end, 10);
-    if (errno == ERANGE || !end || *end || !number || number > UINT32_MAX)
-        return false;
-    output = static_cast<uint32_t>(number);
-    return true;
-}
-
-static bool _float(const char* value, float& output)
-{
-    if (!value || !value[0])
-        return false;
-    char* end = nullptr;
-    auto number = std::strtof(value, &end);
-    if (!end || *end || !std::isfinite(number) || number < 0.0f)
-        return false;
-    output = number;
-    return true;
-}
-
 static bool _equal(Slice first, Slice second)
 {
     return first.size == second.size && (!first.size || std::memcmp(first.data, second.data, first.size) == 0);
@@ -531,87 +502,9 @@ static bool _appendContainment(Options& options, const Containment& containment)
 }
 #endif
 
-static uint32_t _utf8(const unsigned char* value, size_t remaining)
-{
-    auto continuation = [](unsigned char byte) { return byte >= 0x80 && byte <= 0xbf; };
-    if (remaining >= 2 && value[0] >= 0xc2 && value[0] <= 0xdf && continuation(value[1]))
-        return 2;
-    if (remaining >= 3 && value[0] == 0xe0 && value[1] >= 0xa0 && value[1] <= 0xbf && continuation(value[2]))
-        return 3;
-    if (remaining < 3)
-        return 0;
-    if (((value[0] >= 0xe1 && value[0] <= 0xec) || (value[0] >= 0xee && value[0] <= 0xef)) && continuation(value[1]) &&
-        continuation(value[2]))
-        return 3;
-    if (value[0] == 0xed && value[1] >= 0x80 && value[1] <= 0x9f && continuation(value[2]))
-        return 3;
-    if (remaining < 4)
-        return 0;
-    if (value[0] == 0xf0 && value[1] >= 0x90 && value[1] <= 0xbf && continuation(value[2]) && continuation(value[3]))
-        return 4;
-    if (value[0] >= 0xf1 && value[0] <= 0xf3 && continuation(value[1]) && continuation(value[2]) &&
-        continuation(value[3]))
-        return 4;
-    if (value[0] == 0xf4 && value[1] >= 0x80 && value[1] <= 0x8f && continuation(value[2]) && continuation(value[3]))
-        return 4;
-    return 0;
-}
-
 static void _json(Slice value)
 {
-    std::putchar('"');
-    auto cursor = reinterpret_cast<const unsigned char*>(value.data);
-    auto end = cursor + value.size;
-    while (cursor < end)
-    {
-        auto byte = *cursor;
-        switch (byte)
-        {
-        case '"':
-            std::fputs("\\\"", stdout);
-            cursor++;
-            break;
-        case '\\':
-            std::fputs("\\\\", stdout);
-            cursor++;
-            break;
-        case '\n':
-            std::fputs("\\n", stdout);
-            cursor++;
-            break;
-        case '\r':
-            std::fputs("\\r", stdout);
-            cursor++;
-            break;
-        case '\t':
-            std::fputs("\\t", stdout);
-            cursor++;
-            break;
-        default:
-            if (byte < 0x20)
-            {
-                std::printf("\\u%04x", byte);
-                cursor++;
-            }
-            else if (byte < 0x80)
-            {
-                std::putchar(byte);
-                cursor++;
-            }
-            else if (auto size = _utf8(cursor, static_cast<size_t>(end - cursor)))
-            {
-                std::fwrite(cursor, 1, size, stdout);
-                cursor += size;
-            }
-            else
-            {
-                std::printf("\\u%04x", byte);
-                cursor++;
-            }
-            break;
-        }
-    }
-    std::putchar('"');
+    _jsonString(value.data, value.size);
 }
 
 static void _json(const char* value)
@@ -620,29 +513,6 @@ static void _json(const char* value)
         _json(_slice(value));
     else
         std::fputs("null", stdout);
-}
-
-static Scene* _load(const char* path)
-{
-    char error[2048] = {};
-    Scene* scene = nullptr;
-    detail::LuaHostContext context;
-    auto status = detail::luaHostLoadFile(path, &scene, error, sizeof(error), context);
-    if (status == Result::Success)
-    {
-        // Text in a font that is not loaded is drawn, and audited, in the default font.
-        const char* fonts[16];
-        auto count = scene->missingFonts(fonts, 16u);
-        for (auto i = 0u; i < count; i++)
-            std::fprintf(stderr, "viscript: the font '%s' is not loaded, so its text is drawn in the default "
-                         "font; pass its file, such as %s.ttf, with --font\n", fonts[i], fonts[i]);
-        return scene;
-    }
-    if (error[0])
-        std::fprintf(stderr, "viscript: %s\n", error);
-    else
-        std::fprintf(stderr, "viscript: could not load %s\n", path);
-    return nullptr;
 }
 
 static const char* _code(IssueCode code)

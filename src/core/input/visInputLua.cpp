@@ -8,6 +8,7 @@ extern "C" {
 
 #include "vis_input.h"
 #include "../lua/visLuaExtension.h"
+#include "../lua/visLuaValues.h"
 #include "visInputLuaExtension.h"
 
 namespace vis::input
@@ -29,70 +30,6 @@ static Controller* _controller(lua_State* lua)
         luaL_checkudata(lua, 1, CONTROLLER_METATABLE));
     if (!handle->controller) luaL_error(lua, "input controller is no longer available");
     return handle->controller;
-}
-
-static bool _has(lua_State* lua, int index, const char* name)
-{
-    index = lua_absindex(lua, index);
-    lua_getfield(lua, index, name);
-    auto found = !lua_isnil(lua, -1);
-    lua_pop(lua, 1);
-    return found;
-}
-
-static void _options(lua_State* lua, int index, const char* const* names)
-{
-    index = lua_absindex(lua, index);
-    lua_pushnil(lua);
-    while (lua_next(lua, index)) {
-        if (lua_type(lua, -2) != LUA_TSTRING) {
-            luaL_error(lua, "Input config keys must be strings");
-        }
-        auto key = lua_tostring(lua, -2);
-        auto known = false;
-        for (auto cursor = names; *cursor; cursor++) {
-            if (std::strcmp(key, *cursor) == 0) {
-                known = true;
-                break;
-            }
-        }
-        if (!known) luaL_error(lua, "unknown Input config field '%s'", key);
-        lua_pop(lua, 1);
-    }
-}
-
-static float _number(lua_State* lua, int index, const char* name)
-{
-    auto value = static_cast<float>(luaL_checknumber(lua, index));
-    if (!std::isfinite(value)) luaL_error(lua, "%s must be finite", name);
-    return value;
-}
-
-static float _fieldNumber(lua_State* lua, int index, const char* name, float fallback)
-{
-    index = lua_absindex(lua, index);
-    lua_getfield(lua, index, name);
-    if (lua_isnil(lua, -1)) {
-        lua_pop(lua, 1);
-        return fallback;
-    }
-    auto value = _number(lua, -1, name);
-    lua_pop(lua, 1);
-    return value;
-}
-
-static bool _fieldBool(lua_State* lua, int index, const char* name, bool fallback)
-{
-    index = lua_absindex(lua, index);
-    lua_getfield(lua, index, name);
-    if (lua_isnil(lua, -1)) {
-        lua_pop(lua, 1);
-        return fallback;
-    }
-    if (!lua_isboolean(lua, -1)) luaL_error(lua, "%s must be a boolean", name);
-    auto value = lua_toboolean(lua, -1) != 0;
-    lua_pop(lua, 1);
-    return value;
 }
 
 static Vec3 _vec3(lua_State* lua, int index, const char* name)
@@ -237,7 +174,7 @@ static int _pointerFollow(lua_State* lua)
         "target", "region", "target_origin", "map_origin", "map_x", "map_y",
         "period", "rotate", "angle_offset", "reset_on_leave", nullptr,
     };
-    _options(lua, 2, options);
+    _options(lua, 2, "Input config", options);
     if (!_has(lua, 2, "map_origin") || !_has(lua, 2, "map_x")
         || !_has(lua, 2, "map_y")) {
         return luaL_error(lua, "pointer_follow requires map_origin, map_x and map_y");
@@ -263,7 +200,7 @@ static int _keyMove(lua_State* lua)
     static const char* const options[] = {
         "target", "key", "shift", "period", nullptr,
     };
-    _options(lua, 2, options);
+    _options(lua, 2, "Input config", options);
     if (!_has(lua, 2, "key") || !_has(lua, 2, "shift")) {
         return luaL_error(lua, "key_move requires key and shift");
     }

@@ -18,7 +18,7 @@ extern "C" {
 namespace vis
 {
 
-static float _number(lua_State* lua, int index, const char* name)
+static inline float _number(lua_State* lua, int index, const char* name)
 {
     auto value = luaL_checknumber(lua, index);
     if (!std::isfinite(value) || value < -FLT_MAX || value > FLT_MAX) {
@@ -28,7 +28,7 @@ static float _number(lua_State* lua, int index, const char* name)
 }
 
 template<auto Read, typename Value>
-static Value _field(lua_State* lua, int index, const char* name, const Value& fallback)
+static inline Value _field(lua_State* lua, int index, const char* name, const Value& fallback)
 {
     index = lua_absindex(lua, index);
     lua_getfield(lua, index, name);
@@ -37,12 +37,12 @@ static Value _field(lua_State* lua, int index, const char* name, const Value& fa
     return value;
 }
 
-static float _fieldNumber(lua_State* lua, int index, const char* name, float fallback)
+static inline float _fieldNumber(lua_State* lua, int index, const char* name, float fallback)
 {
     return _field<_number>(lua, index, name, fallback);
 }
 
-static bool _fieldBool(lua_State* lua, int index, const char* name, bool fallback)
+static inline bool _fieldBool(lua_State* lua, int index, const char* name, bool fallback)
 {
     index = lua_absindex(lua, index);
     lua_getfield(lua, index, name);
@@ -56,18 +56,18 @@ static bool _fieldBool(lua_State* lua, int index, const char* name, bool fallbac
     return value;
 }
 
-static lua_Integer _integer(lua_State* lua, int index, const char* name)
+static inline lua_Integer _integer(lua_State* lua, int index, const char* name)
 {
     if (!lua_isinteger(lua, index)) luaL_error(lua, "%s must be an integer", name);
     return lua_tointeger(lua, index);
 }
 
-static lua_Integer _fieldInteger(lua_State* lua, int index, const char* name, lua_Integer fallback)
+static inline lua_Integer _fieldInteger(lua_State* lua, int index, const char* name, lua_Integer fallback)
 {
     return _field<_integer>(lua, index, name, fallback);
 }
 
-static bool _has(lua_State* lua, int index, const char* name)
+static inline bool _has(lua_State* lua, int index, const char* name)
 {
     index = lua_absindex(lua, index);
     lua_getfield(lua, index, name);
@@ -76,7 +76,7 @@ static bool _has(lua_State* lua, int index, const char* name)
     return found;
 }
 
-static float _component(lua_State* lua, int index, const char* key, int item)
+static inline float _component(lua_State* lua, int index, const char* key, int item)
 {
     index = lua_absindex(lua, index);
     if (key) lua_getfield(lua, index, key);
@@ -86,7 +86,7 @@ static float _component(lua_State* lua, int index, const char* key, int item)
     return value;
 }
 
-static Vec2 _vec2(lua_State* lua, int index, const char* name)
+static inline Vec2 _vec2(lua_State* lua, int index, const char* name)
 {
     luaL_checktype(lua, index, LUA_TTABLE);
     index = lua_absindex(lua, index);
@@ -101,7 +101,7 @@ static Vec2 _vec2(lua_State* lua, int index, const char* name)
     return {_component(lua, index, nullptr, 1), _component(lua, index, nullptr, 2)};
 }
 
-static Vec3 _world(lua_State* lua, int index, const char* name)
+static inline Vec3 _world(lua_State* lua, int index, const char* name)
 {
     luaL_checktype(lua, index, LUA_TTABLE);
     index = lua_absindex(lua, index);
@@ -119,12 +119,12 @@ static Vec3 _world(lua_State* lua, int index, const char* name)
             size == 3 ? _component(lua, index, nullptr, 3) : 0.0f};
 }
 
-static Vec2 _fieldVec2(lua_State* lua, int index, const char* name, const Vec2& fallback)
+static inline Vec2 _fieldVec2(lua_State* lua, int index, const char* name, const Vec2& fallback)
 {
     return _field<_vec2>(lua, index, name, fallback);
 }
 
-static Vec3 _fieldWorld(lua_State* lua, int index, const char* name)
+static inline Vec3 _fieldWorld(lua_State* lua, int index, const char* name)
 {
     index = lua_absindex(lua, index);
     lua_getfield(lua, index, name);
@@ -134,12 +134,12 @@ static Vec3 _fieldWorld(lua_State* lua, int index, const char* name)
     return value;
 }
 
-static Vec3 _fieldWorld(lua_State* lua, int index, const char* name, const Vec3& fallback)
+static inline Vec3 _fieldWorld(lua_State* lua, int index, const char* name, const Vec3& fallback)
 {
     return _field<_world>(lua, index, name, fallback);
 }
 
-static Range _range(lua_State* lua, int index, const char* name)
+static inline Range _range(lua_State* lua, int index, const char* name)
 {
     luaL_checktype(lua, index, LUA_TTABLE);
     index = lua_absindex(lua, index);
@@ -162,12 +162,12 @@ static Range _range(lua_State* lua, int index, const char* name)
     return range;
 }
 
-static Range _fieldRange(lua_State* lua, int index, const char* name, const Range& fallback)
+static inline Range _fieldRange(lua_State* lua, int index, const char* name, const Range& fallback)
 {
     return _field<_range>(lua, index, name, fallback);
 }
 
-static CellRegion _region(lua_State* lua, int index, const char* name)
+static inline CellRegion _region(lua_State* lua, int index, const char* name)
 {
     luaL_checktype(lua, index, LUA_TTABLE);
     index = lua_absindex(lua, index);
@@ -194,12 +194,12 @@ static CellRegion _region(lua_State* lua, int index, const char* name)
             static_cast<uint32_t>(values[2]), static_cast<uint32_t>(values[3])};
 }
 
-static CellRegion _fieldRegion(lua_State* lua, int index, const char* name)
+static inline CellRegion _fieldRegion(lua_State* lua, int index, const char* name)
 {
     return _field<_region>(lua, index, name, CellRegion{});
 }
 
-static void _size(lua_State* lua, int index, uint32_t& columns, uint32_t& rows)
+static inline void _size(lua_State* lua, int index, uint32_t& columns, uint32_t& rows)
 {
     luaL_checktype(lua, index, LUA_TTABLE);
     if (lua_rawlen(lua, index) != 2u) luaL_error(lua, "size must contain columns and rows");
@@ -216,7 +216,7 @@ static void _size(lua_State* lua, int index, uint32_t& columns, uint32_t& rows)
     rows = static_cast<uint32_t>(height);
 }
 
-static void _matrix(lua_State* lua, int index, float* values, uint32_t count, const char* name)
+static inline void _matrix(lua_State* lua, int index, float* values, uint32_t count, const char* name)
 {
     luaL_checktype(lua, index, LUA_TTABLE);
     index = lua_absindex(lua, index);
@@ -228,7 +228,7 @@ static void _matrix(lua_State* lua, int index, float* values, uint32_t count, co
     }
 }
 
-static const char* _fieldString(lua_State* lua, int index, const char* name, size_t* size = nullptr)
+static inline const char* _fieldString(lua_State* lua, int index, const char* name, size_t* size = nullptr)
 {
     index = lua_absindex(lua, index);
     lua_getfield(lua, index, name);
@@ -240,7 +240,7 @@ static const char* _fieldString(lua_State* lua, int index, const char* name, siz
     return value;
 }
 
-static const char* _fieldOptionalString(lua_State* lua, int index, const char* name, const char* fallback)
+static inline const char* _fieldOptionalString(lua_State* lua, int index, const char* name, const char* fallback)
 {
     index = lua_absindex(lua, index);
     lua_getfield(lua, index, name);
@@ -255,7 +255,7 @@ static const char* _fieldOptionalString(lua_State* lua, int index, const char* n
     return value;
 }
 
-static bool _option(const char* name, std::initializer_list<const char*> fields, bool style)
+static inline bool _option(const char* name, std::initializer_list<const char*> fields, bool style)
 {
     if (style) {
         static constexpr const char* shared[] = {
@@ -271,7 +271,7 @@ static bool _option(const char* name, std::initializer_list<const char*> fields,
     return false;
 }
 
-static void _options(lua_State* lua, int index, std::initializer_list<const char*> fields,
+static inline void _options(lua_State* lua, int index, std::initializer_list<const char*> fields,
                      bool style = true)
 {
     index = lua_absindex(lua, index);
@@ -284,7 +284,28 @@ static void _options(lua_State* lua, int index, std::initializer_list<const char
     }
 }
 
-static bool _hex(const char* value, size_t size)
+// Raises an error for a key of the table at index that is not in names, a nullptr-terminated
+// list; kind names the table in the message, as "unknown diagram node field 'x'".
+static inline void _options(lua_State* lua, int index, const char* kind, const char* const* names)
+{
+    index = lua_absindex(lua, index);
+    lua_pushnil(lua);
+    while (lua_next(lua, index)) {
+        if (lua_type(lua, -2) != LUA_TSTRING) luaL_error(lua, "%s keys must be strings", kind);
+        auto key = lua_tostring(lua, -2);
+        auto known = false;
+        for (auto cursor = names; *cursor; cursor++) {
+            if (std::strcmp(key, *cursor) == 0) {
+                known = true;
+                break;
+            }
+        }
+        if (!known) luaL_error(lua, "unknown %s field '%s'", kind, key);
+        lua_pop(lua, 1);
+    }
+}
+
+static inline bool _hex(const char* value, size_t size)
 {
     if (size && *value == '#') {
         value++;
@@ -298,7 +319,7 @@ static bool _hex(const char* value, size_t size)
     return true;
 }
 
-static bool _themeColorRole(const char* value, size_t size, ThemeColorRole& role)
+static inline bool _themeColorRole(const char* value, size_t size, ThemeColorRole& role)
 {
     struct Entry { const char* name; ThemeColorRole role; };
     static constexpr Entry entries[] = {
@@ -325,7 +346,7 @@ static bool _themeColorRole(const char* value, size_t size, ThemeColorRole& role
     return false;
 }
 
-static Color _color(lua_State* lua, int index, const char* name, const Theme* theme = nullptr)
+static inline Color _color(lua_State* lua, int index, const char* name, const Theme* theme = nullptr)
 {
     size_t size;
     auto value = luaL_checklstring(lua, index, &size);
@@ -338,7 +359,7 @@ static Color _color(lua_State* lua, int index, const char* name, const Theme* th
     return {};
 }
 
-static bool _fieldColor(lua_State* lua, int index, const char* name, Color& color,
+static inline bool _fieldColor(lua_State* lua, int index, const char* name, Color& color,
                         const Theme* theme = nullptr)
 {
     index = lua_absindex(lua, index);
@@ -352,7 +373,7 @@ static bool _fieldColor(lua_State* lua, int index, const char* name, Color& colo
     return true;
 }
 
-static Vec3* _points(lua_State* lua, int index, uint32_t minimum, uint32_t& count)
+static inline Vec3* _points(lua_State* lua, int index, uint32_t minimum, uint32_t& count)
 {
     luaL_checktype(lua, index, LUA_TTABLE);
     index = lua_absindex(lua, index);

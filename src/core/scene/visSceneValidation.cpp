@@ -1,6 +1,8 @@
 #include "visScene.h"
 #include "visSceneValidation.h"
 
+#include "../common/visConstants.h"
+
 namespace vis
 {
 
@@ -15,7 +17,7 @@ bool valid(const Config& config) noexcept
     if (!std::isfinite(camera.near) || !std::isfinite(camera.far) || camera.near <= 0.0f || camera.far <= camera.near) {
         return false;
     }
-    if (!std::isfinite(camera.fov) || camera.fov <= 0.0f || camera.fov >= 3.14159265359f) return false;
+    if (!std::isfinite(camera.fov) || camera.fov <= 0.0f || camera.fov >= PI) return false;
     if (!std::isfinite(camera.orthoHeight) || camera.orthoHeight <= 0.0f) return false;
     if (config.cameraView == CameraView::TwoD && (camera.projection != Projection::Orthographic || camera.eye.x != camera.target.x || camera.eye.y != camera.target.y || camera.eye.z <= camera.target.z || camera.up.x != 0.0f || camera.up.y <= 0.0f || camera.up.z != 0.0f)) {
         return false;
@@ -109,7 +111,7 @@ bool valid(const Object* object) noexcept
         case Type::Arc: {
             auto value = static_cast<const Arc*>(object);
             return _finite(value->center) && std::isfinite(value->radius) && value->radius > 0.0f
-                   && std::isfinite(value->start) && std::isfinite(value->angle) && std::fabs(value->angle) <= 6.28318530718f;
+                   && std::isfinite(value->start) && std::isfinite(value->angle) && std::fabs(value->angle) <= TWO_PI;
         }
         case Type::Angle: {
             auto value = static_cast<const Angle*>(object);

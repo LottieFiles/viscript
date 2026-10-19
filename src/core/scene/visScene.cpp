@@ -14,6 +14,7 @@
 #include "visGeometry64.h"
 #include "visTimeline.h"
 #include "../common/visHash.h"
+#include "../common/visConstants.h"
 #include "../common/visString.h"
 #include "visSceneValidation.h"
 #include "visWarp.h"
@@ -2775,7 +2776,7 @@ static void _wiggle(const Clip& clip, float t, VisualState& state)
     t = _clamp(t);
     auto there = smooth(t < 0.5f ? 2.0f * t : 2.0f - 2.0f * t);
     auto grow = 1.0f + (clip.stretch.x - 1.0f) * there;
-    auto turn = clip.angle * there * std::sin(clip.swings * 3.14159265359f * t);
+    auto turn = clip.angle * there * std::sin(clip.swings * PI * t);
     state.model = Mat4::translate(clip.pivot) * Mat4::rotateZ(turn) * Mat4::scale({grow, grow, grow})
                 * Mat4::translate(clip.pivot * -1.0f) * state.model;
     state.pixelScale *= grow;
@@ -2806,7 +2807,7 @@ bool Scene::Impl::sample(const ObjectEntry& entry, float time, VisualState& stat
         }
         auto progress = (time - clip.begin) / (clip.end - clip.begin);
         auto eased = ease(clip.curve, progress);
-        if (clip.kind == AnimationKind::Indicate) eased = std::sin(3.14159265359f * _clamp(eased));
+        if (clip.kind == AnimationKind::Indicate) eased = std::sin(PI * _clamp(eased));
         auto sampled = _lerp(clip.from, clip.to, eased);
         if (clip.motion != ClipMotion::Linear && !motion(clip, eased, time, sampled.model)) return false;
         if (clip.kind == AnimationKind::Wiggle) _wiggle(clip, eased, sampled);
@@ -3747,14 +3748,14 @@ Result Scene::attach(Object* object, Object* parent) noexcept
             }
         }
     }
-    auto shaderSpan = 0.0f;
+    auto longestSpan = 0.0f;
     for (auto i = 0u; i < count; i++) {
         auto span = sampleDuration(tree[i]);
-        if (span > shaderSpan) shaderSpan = span;
+        if (span > longestSpan) longestSpan = span;
     }
     auto nextCursor = pImpl->cursor;
-    if (shaderSpan > 0.0f) {
-        auto next = _decimal(pImpl->cursor) + _decimal(shaderSpan);
+    if (longestSpan > 0.0f) {
+        auto next = _decimal(pImpl->cursor) + _decimal(longestSpan);
         if (!std::isfinite(next) || next > std::numeric_limits<float>::max()) {
             delete[] tree;
             return pImpl->fail(Result::InvalidArguments, TIMELINE_RANGE);
@@ -3947,7 +3948,7 @@ Result Scene::attach(Object* object, Object* parent) noexcept
         above += item->clipCount;
     }
     pImpl->work += above * count;
-    if (shaderSpan > 0.0f) {
+    if (longestSpan > 0.0f) {
         pImpl->advance(nextCursor);
         pImpl->definitionsSealed = true;
     }
@@ -6033,7 +6034,7 @@ static uint32_t _frame(const Bounds& bounds, float padding, EmphasisShape shape,
     }
     constexpr auto segments = 64u;
     for (auto i = 0u; i <= segments; i++) {
-        auto angle = 6.28318530718f * static_cast<float>(i % segments) / static_cast<float>(segments);
+        auto angle = TWO_PI * static_cast<float>(i % segments) / static_cast<float>(segments);
         points[i] = {center.x + 1.41421356f * x * std::cos(angle), center.y + 1.41421356f * y * std::sin(angle),
                      center.z};
     }
@@ -6281,7 +6282,7 @@ Result Scene::emphasize(const Emphasis& emphasis, float duration, const AnimCurv
         } else if (emphasis.kind == EmphasisKind::Flash) {
             for (; count < emphasis.count; count++) {
                 Vec3 line[2];
-                auto angle = 6.28318530718f * static_cast<float>(count) / static_cast<float>(emphasis.count);
+                auto angle = TWO_PI * static_cast<float>(count) / static_cast<float>(emphasis.count);
                 _burst(bounds, emphasis.padding, emphasis.size, angle, line);
                 shapes[count] = Plot::gen(line, 2u);
                 windows[count] = 2.0f;

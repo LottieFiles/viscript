@@ -1,5 +1,5 @@
-#ifndef VIS_CODE_H
-#define VIS_CODE_H
+#ifndef _VIS_CODE_H_
+#define _VIS_CODE_H_
 
 #include <cstdint>
 

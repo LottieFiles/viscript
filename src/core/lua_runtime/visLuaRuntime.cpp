@@ -11,6 +11,7 @@ extern "C" {
 #include "vis_lua_runtime.h"
 #include "../common/visFinite.h"
 #include "../lua/visLuaExtension.h"
+#include "../lua/visLuaValues.h"
 #include "visLuaRuntimeExtension.h"
 #if defined(VIS_INPUT)
 #include "vis_input.h"
@@ -608,47 +609,6 @@ static Runtime* _running(lua_State* lua)
     return runtime;
 }
 
-static void _options(lua_State* lua, int index, const char* const* names)
-{
-    index = lua_absindex(lua, index);
-    lua_pushnil(lua);
-    while (lua_next(lua, index)) {
-        if (lua_type(lua, -2) != LUA_TSTRING) {
-            luaL_error(lua, "runtime config keys must be strings");
-        }
-        auto key = lua_tostring(lua, -2);
-        auto known = false;
-        for (auto cursor = names; *cursor; cursor++) {
-            if (std::strcmp(key, *cursor) != 0) continue;
-            known = true;
-            break;
-        }
-        if (!known) luaL_error(lua, "unknown runtime config field '%s'", key);
-        lua_pop(lua, 1);
-    }
-}
-
-static float _number(lua_State* lua, int index, const char* name)
-{
-    auto value = static_cast<float>(luaL_checknumber(lua, index));
-    if (!std::isfinite(value)) luaL_error(lua, "%s must be finite", name);
-    return value;
-}
-
-static float _fieldNumber(lua_State* lua, int index, const char* name,
-                          float fallback)
-{
-    index = lua_absindex(lua, index);
-    lua_getfield(lua, index, name);
-    if (lua_isnil(lua, -1)) {
-        lua_pop(lua, 1);
-        return fallback;
-    }
-    auto value = _number(lua, -1, name);
-    lua_pop(lua, 1);
-    return value;
-}
-
 #if defined(VIS_INPUT)
 static Vec2 _vec2(lua_State* lua, int index, const char* name)
 {
@@ -704,62 +664,6 @@ static Vec3 _fieldVec3(lua_State* lua, int index, const char* name,
     return value;
 }
 
-static bool _hex(const char* value, size_t size) noexcept
-{
-    if (size && *value == '#') {
-        value++;
-        size--;
-    }
-    if (size != 3u && size != 4u && size != 6u && size != 8u) return false;
-    for (auto i = 0u; i < size; i++) {
-        auto c = value[i];
-        if ((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')
-            || (c >= 'A' && c <= 'F')) {
-            continue;
-        }
-        return false;
-    }
-    return true;
-}
-
-static bool _role(const char* value, ThemeColorRole& role) noexcept
-{
-    struct Entry { const char* name; ThemeColorRole role; };
-    static constexpr Entry entries[] = {
-        {"background", ThemeColorRole::Background},
-        {"foreground", ThemeColorRole::Foreground},
-        {"muted", ThemeColorRole::Muted},
-        {"accent", ThemeColorRole::Accent},
-        {"secondary", ThemeColorRole::Secondary},
-        {"success", ThemeColorRole::Success},
-        {"warning", ThemeColorRole::Warning},
-        {"danger", ThemeColorRole::Danger},
-        {"info", ThemeColorRole::Info},
-        {"surface", ThemeColorRole::Surface},
-        {"border", ThemeColorRole::Border},
-        {"result", ThemeColorRole::Result},
-        {"focus", ThemeColorRole::Focus},
-    };
-    for (auto& entry : entries) {
-        if (std::strcmp(value, entry.name) != 0) continue;
-        role = entry.role;
-        return true;
-    }
-    return false;
-}
-
-static Color _color(lua_State* lua, int index, const Theme& theme)
-{
-    size_t size;
-    auto value = luaL_checklstring(lua, index, &size);
-    if (std::strlen(value) != size) luaL_error(lua, "fill cannot contain zero bytes");
-    if (_hex(value, size)) return Color::hex(value);
-    ThemeColorRole role;
-    if (_role(value, role)) return theme.color(role);
-    luaL_error(lua, "fill must be a hex color or Theme color role");
-    return {};
-}
-
 static ObjectState _objectState(lua_State* lua, int index, const Theme& theme)
 {
     luaL_checktype(lua, index, LUA_TTABLE);
@@ -767,7 +671,7 @@ static ObjectState _objectState(lua_State* lua, int index, const Theme& theme)
         "origin", "shift", "rotation", "scale", "opacity", "progress", "fill",
         nullptr,
     };
-    _options(lua, index, options);
+    _options(lua, index, "runtime config", options);
     ObjectState state;
     lua_getfield(lua, index, "origin");
     if (!lua_isnil(lua, -1)) {
@@ -787,7 +691,7 @@ static ObjectState _objectState(lua_State* lua, int index, const Theme& theme)
     state.progress = _fieldNumber(lua, index, "progress", state.progress);
     lua_getfield(lua, index, "fill");
     if (!lua_isnil(lua, -1)) {
-        state.fill = _color(lua, -1, theme);
+        state.fill = _color(lua, -1, "fill", &theme);
         state.fillEnabled = true;
     }
     lua_pop(lua, 1);
@@ -841,7 +745,7 @@ static int _sound(lua_State* lua)
         static const char* const options[] = {
             "bus", "gain", "rate", "loop", nullptr,
         };
-        _options(lua, 3, options);
+        _options(lua, 3, "runtime config", options);
         event.gain = _fieldNumber(lua, 3, "gain", event.gain);
         event.rate = _fieldNumber(lua, 3, "rate", event.rate);
         lua_getfield(lua, 3, "bus");
@@ -1070,7 +974,7 @@ static int _newRuntime(lua_State* lua)
     static const char* const options[] = {
         "fixed_step", "max_steps", "update", nullptr,
     };
-    _options(lua, 2, options);
+    _options(lua, 2, "runtime config", options);
     Config config;
     config.fixedStep = _fieldNumber(lua, 2, "fixed_step", config.fixedStep);
     lua_getfield(lua, 2, "max_steps");

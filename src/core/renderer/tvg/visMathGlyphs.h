@@ -1,6 +1,6 @@
 // Outlines from Noto Sans Math, SIL OFL 1.1; see NotoSansMath-OFL.txt.
-#ifndef VIS_MATH_GLYPHS_H
-#define VIS_MATH_GLYPHS_H
+#ifndef _VIS_MATH_GLYPHS_H_
+#define _VIS_MATH_GLYPHS_H_
 
 struct MathGlyph
 {

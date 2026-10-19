@@ -9,6 +9,8 @@ extern "C" {
 #include "vis_audio.h"
 #include "visAudioLuaExtension.h"
 
+#include "../lua/visLuaValues.h"
+
 namespace vis::audio
 {
 
@@ -22,62 +24,6 @@ struct LuaCue
     Soundscape* soundscape = nullptr;
     Cue cue;
 };
-
-static void _options(lua_State* lua, int index, const char* kind,
-                     const char* const* names)
-{
-    index = lua_absindex(lua, index);
-    lua_pushnil(lua);
-    while (lua_next(lua, index)) {
-        if (lua_type(lua, -2) != LUA_TSTRING) {
-            luaL_error(lua, "%s keys must be strings", kind);
-        }
-        auto key = lua_tostring(lua, -2);
-        auto known = false;
-        for (auto cursor = names; *cursor; cursor++) {
-            if (std::strcmp(key, *cursor) != 0) continue;
-            known = true;
-            break;
-        }
-        if (!known) luaL_error(lua, "unknown %s field '%s'", kind, key);
-        lua_pop(lua, 1);
-    }
-}
-
-static float _number(lua_State* lua, int index, const char* name)
-{
-    auto value = static_cast<float>(luaL_checknumber(lua, index));
-    if (!std::isfinite(value)) luaL_error(lua, "%s must be finite", name);
-    return value;
-}
-
-static float _fieldNumber(lua_State* lua, int index, const char* name,
-                          float fallback)
-{
-    index = lua_absindex(lua, index);
-    lua_getfield(lua, index, name);
-    if (lua_isnil(lua, -1)) {
-        lua_pop(lua, 1);
-        return fallback;
-    }
-    auto value = _number(lua, -1, name);
-    lua_pop(lua, 1);
-    return value;
-}
-
-static bool _fieldBool(lua_State* lua, int index, const char* name, bool fallback)
-{
-    index = lua_absindex(lua, index);
-    lua_getfield(lua, index, name);
-    if (lua_isnil(lua, -1)) {
-        lua_pop(lua, 1);
-        return fallback;
-    }
-    if (!lua_isboolean(lua, -1)) luaL_error(lua, "%s must be boolean", name);
-    auto value = lua_toboolean(lua, -1) != 0;
-    lua_pop(lua, 1);
-    return value;
-}
 
 static void _fieldAsset(lua_State* lua, int index,
                         char (&asset)[Soundscape::AssetNameLimit + 1u])
