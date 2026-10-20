@@ -741,6 +741,20 @@ static Result _samples(const Range& range, float& first, uint32_t& count) noexce
     return Result::Success;
 }
 
+Result spaceSamples(const Space& space, bool spatial, float starts[3], uint32_t counts[3]) noexcept
+{
+    const Range* ranges[] = {&space.x, &space.y, &space.z};
+    starts[2] = 0.0f;
+    counts[2] = 1u;
+    for (auto i = 0u; i < (spatial ? 3u : 2u); i++) {
+        auto result = _samples(*ranges[i], starts[i], counts[i]);
+        if (result != Result::Success) return result;
+    }
+    auto slice = static_cast<uint64_t>(counts[0]) * counts[1];
+    if (slice > 16384u || slice * counts[2] > 65536u) return Result::InsufficientCondition;
+    return Result::Success;
+}
+
 struct CellSample
 {
     CellSampler callback = nullptr;
@@ -800,20 +814,10 @@ Result Space::sample(VoxelSampler callback, Group*& output, void* data,
     }
     float starts[3];
     uint32_t counts[3];
-    auto result = _samples(x, starts[0], counts[0]);
+    auto result = spaceSamples(*this, spatial, starts, counts);
     if (result != Result::Success) return result;
-    result = _samples(y, starts[1], counts[1]);
-    if (result != Result::Success) return result;
-    if (spatial) {
-        result = _samples(z, starts[2], counts[2]);
-        if (result != Result::Success) return result;
-    } else {
-        starts[2] = 0.0f;
-        counts[2] = 1u;
-    }
     auto slice = static_cast<uint64_t>(counts[0]) * counts[1];
     auto volume = slice * counts[2];
-    if (slice > 16384u || volume > 65536u) return Result::InsufficientCondition;
     uint32_t frames;
     result = timeFrames(time, volume, frames);
     if (result != Result::Success) return result;
@@ -1694,9 +1698,7 @@ Vec2 BBox::size() const noexcept
 
 bool BBox::intersects(const BBox& other, float padding) const noexcept
 {
-    if (!std::isfinite(x) || !std::isfinite(y) || !std::isfinite(width) || !std::isfinite(height)
-        || !std::isfinite(other.x) || !std::isfinite(other.y) || !std::isfinite(other.width)
-        || !std::isfinite(other.height) || !std::isfinite(padding) || width <= 0.0f
+    if (!_finite(*this) || !_finite(other) || !std::isfinite(padding) || width <= 0.0f
         || height <= 0.0f || other.width <= 0.0f || other.height <= 0.0f || padding < 0.0f) {
         return false;
     }

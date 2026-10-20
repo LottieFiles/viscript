@@ -949,9 +949,15 @@ return s
            "cell-morph.lua");
     _error("local s=vis.scene{}; local g=s:group{}; "
            "g:voxel(function() return '#fff' end); return s", "voxel-space.lua");
-    _error("local s=vis.scene{}; "
-           "local g=s:space{x={-100,100,1},y={-100,100,1},z={0,0,1}}; "
-           "g:voxel(function() return '#fff' end); return s", "voxel-limit.lua");
+    _scriptError("local s=vis.scene{}; "
+                 "local g=s:space{x={-100,100,1},y={-100,100,1},z={0,0,1}}; "
+                 "g:voxel(function() return '#fff' end); return s", "voxel-limit.lua",
+                 "voxel-limit.lua:1: could not sample voxel: the ranges give no sample or more than 4096 "
+                 "on an axis, or more than 16384 in a slice or 65536 in all");
+    _scriptError("local s=vis.scene{}; local g=s:space{x={0,5000,1},y={0,0,1}}; "
+                 "g:cell(function() return '#fff' end); return s", "cell-axis-limit.lua",
+                 "cell-axis-limit.lua:1: could not sample cell: the ranges give no sample or more than "
+                 "4096 on an axis");
     _error("local s=vis.scene{}; s:space{number_mode='screen'}; return s", "number-mode.lua");
     _error("local s=vis.scene{}; local r=s:rectangle{}; "
            "s:grow_from_edge(r,'center'); return s", "growth-edge.lua");

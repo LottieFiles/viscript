@@ -529,6 +529,18 @@ return scene
     if (scene) CHECK(pixel(scene->config().background) == pixel(Color::hex("#ffffff")));
     delete scene;
 
+    // A host theme the scene refuses stops the script with the scene's reason.
+    adaptive.objectCount = 0u;
+    scene = nullptr;
+    status = Lua::load(adaptiveSource, static_cast<uint32_t>(std::strlen(adaptiveSource)),
+                       "theme-adaptive-invalid.lua", &scene, error, sizeof(error), nullptr,
+                       nullptr, &adaptive, nullptr);
+    CHECK(status == Result::ScriptError);
+    CHECK(scene == nullptr);
+    CHECK(std::strstr(error, "theme-adaptive-invalid.lua:2: could not apply scene theme: the theme "
+                             "needs named fonts, finite positive text sizes and object width, a "
+                             "roundness from 0 to 0.5 and 1 to 10 object colors"));
+
     static constexpr auto namedSource = R"lua(
 local named = vis.scene {theme = "pro_black"}
 named:point {point = {0, 0}, id = "named-point"}

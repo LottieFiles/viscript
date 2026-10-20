@@ -28,6 +28,11 @@ float sampleDuration(const Object* object) noexcept;
 // a negative or unbounded duration or no fps, InsufficientCondition past 4096 frames or 262144
 // colors in all.
 Result timeFrames(const SampleTime& time, uint64_t volume, uint32_t& frames) noexcept;
+// The samples a cell or voxel field takes on each axis of space, from the first multiple of the
+// axis's step, and where they start; a cell field takes one sample at zero on z. InvalidArguments
+// for a range that is not finite, reversed or without a positive step, InsufficientCondition for
+// no sample or more than 4096 on an axis, or more than 16384 in a slice or 65536 in all.
+Result spaceSamples(const Space& space, bool spatial, float starts[3], uint32_t counts[3]) noexcept;
 Gradient mix(const Gradient& from, const Gradient& to, float progress) noexcept;
 uint64_t fingerprint(const Object* object) noexcept;
 bool localBounds(const Object* object, Bounds& bounds) noexcept;

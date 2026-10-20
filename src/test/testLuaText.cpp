@@ -1,4 +1,5 @@
 #include "testLuaChecks.h"
+#include "../core/scene/visScene.h"
 
 // A text measures in its loaded font, and the box it reports holds the glyphs the renderer
 // paints for it.
@@ -28,7 +29,7 @@ return s
         CHECK(extent.lines == 1u && extent.ascent > 0.0f && extent.descent > 0.0f);
         CHECK(std::fabs(extent.height - extent.ascent - extent.descent) < 0.01f);
         // Billboard text is measured in pixels; the script sees world units at its camera.
-        auto pixelWorld = scene->config().camera.orthoHeight / static_cast<float>(scene->config().height);
+        auto pixelWorld = vis::pixelWorld(scene->config());
         CHECK(box && std::fabs(box->size.x - extent.width * pixelWorld) < 1.0e-4f);
         CHECK(box && std::fabs(box->size.y - extent.height * pixelWorld) < 1.0e-4f);
         // Plane text is measured in world units, in proportion to its size.
@@ -67,7 +68,7 @@ return s
 )lua";
     scene = _loaded(boxed, "boxed.lua");
     if (scene) {
-        auto pixelWorld = scene->config().camera.orthoHeight / static_cast<float>(scene->config().height);
+        auto pixelWorld = vis::pixelWorld(scene->config());
         auto wide = static_cast<Text*>(scene->object("wide"));
         auto narrow = static_cast<Text*>(scene->object("narrow"));
         auto corner = static_cast<Text*>(scene->object("corner"));
@@ -252,7 +253,7 @@ return s
 )lua";
     auto scene = _loaded(source, "slanted.lua");
     if (!scene) return;
-    auto pixels = 1.0f / (scene->config().camera.orthoHeight / static_cast<float>(scene->config().height));
+    auto pixels = 1.0f / pixelWorld(scene->config());
     BBox upright;
     BBox leaning;
     BBox flat;

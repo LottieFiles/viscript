@@ -30,6 +30,7 @@ extern "C" {
 
 #include "vis.h"
 #include "../common/visConstants.h"
+#include "../common/visFinite.h"
 #include "../common/visSort.h"
 #include "visCode.h"
 #include "visLuaExtension.h"
@@ -2637,7 +2638,7 @@ static Vec2 _fieldSpacing(lua_State* lua, const char* name, Vec2 fallback)
     if (lua_type(lua, -1) == LUA_TNUMBER) fallback.x = fallback.y = static_cast<float>(lua_tonumber(lua, -1));
     else if (!lua_isnil(lua, -1)) fallback = _vec2(lua, -1, name);
     lua_pop(lua, 1);
-    if (!std::isfinite(fallback.x) || !std::isfinite(fallback.y) || fallback.x < 0.0f || fallback.y < 0.0f) {
+    if (!_finite(fallback) || fallback.x < 0.0f || fallback.y < 0.0f) {
         luaL_error(lua, "%s must be a number or {x, y} of zero or more", name);
     }
     return fallback;
@@ -3424,14 +3425,9 @@ static bool _surround(const Object* object, const Object* ancestor, Bounds& outp
     Bounds own;
     if (!object->bounds(own)) return true;
     for (auto corner = 0u; corner < 8u; corner++) {
-        auto point = model * Vec3{corner & 1u ? own.max.x : own.min.x, corner & 2u ? own.max.y : own.min.y,
-                                  corner & 4u ? own.max.z : own.min.z};
-        if (!defined) output.min = output.max = point;
-        output.min = {std::fmin(output.min.x, point.x), std::fmin(output.min.y, point.y),
-                      std::fmin(output.min.z, point.z)};
-        output.max = {std::fmax(output.max.x, point.x), std::fmax(output.max.y, point.y),
-                      std::fmax(output.max.z, point.z)};
-        defined = true;
+        include(output, defined, model * Vec3{corner & 1u ? own.max.x : own.min.x,
+                                              corner & 2u ? own.max.y : own.min.y,
+                                              corner & 4u ? own.max.z : own.min.z});
     }
     return true;
 }
@@ -4467,11 +4463,6 @@ static uint32_t _samples(lua_State* lua, const Range& range, uint32_t limit, con
     return samples;
 }
 
-static float _sampleAt(const Range& range, uint32_t i)
-{
-    return static_cast<float>(static_cast<double>(range.min) + static_cast<double>(range.step) * i);
-}
-
 static Colormap _colormapName(const char* name);
 
 struct LuaContour
@@ -4583,7 +4574,7 @@ static int _contour(lua_State* lua)
     for (auto range : {xRange, yRange}) {
         auto n = _samples(lua, range, 65536u, "range");
         for (auto i = 1u; i < n; i++) {
-            if (_sampleAt(range, i) <= _sampleAt(range, i - 1u)) {
+            if (range.sampleAt(i) <= range.sampleAt(i - 1u)) {
                 return luaL_error(lua, "contour grid samples must have distinct coordinates");
             }
         }
@@ -4627,7 +4618,7 @@ static int _contour(lua_State* lua)
     auto values = static_cast<double*>(lua_newuserdatauv(lua, sizeof(double) * count, 0));
     LuaContour context{lua, space.scene, fn};
     for (auto i = 0u; i < count; i++) {
-        auto x = _sampleAt(xRange, i % columns), y = _sampleAt(yRange, i / columns);
+        auto x = xRange.sampleAt(i % columns), y = yRange.sampleAt(i / columns);
         if (sampled) {
             lua_rawgeti(lua, table, i + 1u);
             if (lua_type(lua, -1) != LUA_TNUMBER || !(std::fabs(lua_tonumber(lua, -1)) <= FLT_MAX)) {
@@ -5651,36 +5642,6 @@ static int _connector(lua_State* lua)
     return _add(lua, space, owner, object, 2, "connector");
 }
 
-static Result _sampleDimensions(const Space* space, uint32_t* counts, bool spatial)
-{
-    const Range* ranges[] = {&space->x, &space->y, &space->z};
-    auto dimensions = spatial ? 3u : 2u;
-    for (auto i = 0u; i < dimensions; i++) {
-        auto& range = *ranges[i];
-        if (!std::isfinite(range.min) || !std::isfinite(range.max)
-            || !std::isfinite(range.step) || range.min > range.max || range.step <= 0.0f) {
-            return Result::InvalidArguments;
-        }
-        auto step = static_cast<double>(range.step);
-        auto start = std::ceil(static_cast<double>(range.min) / step) * step;
-        auto tolerance = step * 0.001;
-        if (!std::isfinite(start) || start > static_cast<double>(range.max) + tolerance) {
-            return Result::InsufficientCondition;
-        }
-        auto samples = std::floor((static_cast<double>(range.max) + tolerance - start) / step) + 1.0;
-        if (!std::isfinite(samples) || samples < 1.0 || samples > 4096.0) {
-            return Result::InsufficientCondition;
-        }
-        counts[i] = static_cast<uint32_t>(samples);
-    }
-    if (!spatial) counts[2] = 1u;
-    auto slice = static_cast<uint64_t>(counts[0]) * counts[1];
-    if (slice > 16384u || slice * counts[2] > 65536u) {
-        return Result::InsufficientCondition;
-    }
-    return Result::Success;
-}
-
 // The color function of a cell or voxel field. Nothing may raise through the core, so the
 // sampler leaves what the function raises on the stack, or names the color it did not return,
 // for _sampleGen to raise once the core call returns.
@@ -5749,13 +5710,15 @@ static int _sampleGen(lua_State* lua, bool spatial)
     }
 
     auto space = static_cast<Space*>(object);
+    float starts[3];
     uint32_t counts[3];
-    auto status = _sampleDimensions(space, counts, spatial);
+    auto status = spaceSamples(*space, spatial, starts, counts);
     if (status != Result::Success) {
         return luaL_error(lua, "could not sample %s: %s", name,
                           status == Result::InvalidArguments
-                              ? "the space needs finite ranges with positive steps and at most 4096 samples per axis"
-                              : _explain(status));
+                              ? "the space needs finite ranges with positive steps"
+                              : "the ranges give no sample or more than 4096 on an axis, or more than "
+                                "16384 in a slice or 65536 in all");
     }
     auto volume = static_cast<uint64_t>(counts[0]) * counts[1] * counts[2];
     uint32_t frames;
@@ -6410,7 +6373,7 @@ static bool _recontour(lua_State* lua, LuaScene* box, int index, const Plot* plo
     for (auto range : {xRange, yRange}) {
         auto n = _samples(lua, range, 65536u, "range");
         for (auto i = 1u; i < n; i++) {
-            if (_sampleAt(range, i) <= _sampleAt(range, i - 1u)) {
+            if (range.sampleAt(i) <= range.sampleAt(i - 1u)) {
                 luaL_error(lua, "contour grid samples must have distinct coordinates");
             }
         }
@@ -6434,7 +6397,7 @@ static bool _recontour(lua_State* lua, LuaScene* box, int index, const Plot* plo
     auto values = static_cast<double*>(lua_newuserdatauv(lua, sizeof(double) * count, 0));
     LuaContour context{lua, box, source};
     for (auto i = 0u; i < count; i++) {
-        auto x = _sampleAt(xRange, i % columns), y = _sampleAt(yRange, i / columns);
+        auto x = xRange.sampleAt(i % columns), y = yRange.sampleAt(i / columns);
         if (sampled) {
             lua_rawgeti(lua, source, i + 1u);
             if (lua_type(lua, -1) != LUA_TNUMBER || !(std::fabs(lua_tonumber(lua, -1)) <= FLT_MAX)) {
@@ -7606,7 +7569,7 @@ static int _warp(lua_State* lua)
             return luaL_error(lua, "scene point limit exceeded; raise the warp step or warp fewer objects");
         case LuaWarpFailure::Outside: {
             auto last = [](const Range& range, uint32_t count) {
-                return static_cast<lua_Number>(_sampleAt(range, count - 1u));
+                return static_cast<lua_Number>(range.sampleAt(count - 1u));
             };
             return luaL_error(lua, "the warp point (%f, %f, %f) lies outside its samples, "
                                    "x from %f to %f and y from %f to %f",
@@ -9910,13 +9873,7 @@ static int _sceneGen(lua_State* lua)
     box->scene = Scene::gen(config);
     if (!box->scene) return luaL_error(lua, "could not create scene: invalid configuration or out of memory");
     if (hasTheme) {
-        auto result = box->scene->theme(theme);
-        if (result != Result::Success) {
-            return luaL_error(lua, "could not apply scene theme: %s",
-                              result == Result::InvalidArguments
-                                  ? "the theme needs valid colors, positive sizes and at least one object color"
-                                  : _explain(result));
-        }
+        _check(lua, box->scene, box->scene->theme(theme), "could not apply scene theme");
         if (backgroundAuthored) box->scene->config().background = config.background;
     }
     box->nativeUsed = LUA_SCENE_CHARGE;
