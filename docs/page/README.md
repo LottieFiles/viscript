@@ -16,7 +16,7 @@ npm ci --prefix docs/page && npm ci --prefix tools/player
 node scripts/build-page.mjs   # content/**/*.mdx -> build/*.js, and the player -> build/player/
 npm run check --prefix docs/page  # render every scene and validate interactive playback ranges
 node --test scripts/page-resources.test.mjs  # the fonts and images the page offers
-python3 -m http.server -d docs/page
+npm start --prefix docs/page  # build, then serve the page at http://localhost:8000
 ```
 
 Scenes play through the shared player in [`tools/player`](../../tools/player): one render
