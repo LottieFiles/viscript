@@ -20,7 +20,7 @@ The first frame shows the subject itself, not a title. The last beat holds on th
 - **Continuous relationships.** When one quantity drives others (a point on a curve, a slope, a sweep angle, a weight), make it a `scene:tracker` and `bind` every dependent to it, then `track` the value. The viewer sees the relation hold at every instant instead of a jump between two snapshots.
 - **Show, don't print.** Encode quantities as length, area, position, angle, thickness, or color intensity. Show only the few numbers the viewer must read, next to what they measure.
 - **Guide attention with opacity.** Focus at 1.0, supporting context near 0.4, background structure near 0.15. Move the focus each beat by fading, not by removing.
-- **Use the camera.** Outside plates, in a 2D scene with more than one region, plan a camera column in the beat table and use `scene:focus` (`focus` on a JS builder) at least for these moments: zoom on the part that changes when it is small relative to the frame (`scene:focus(part)`), then pull back to the whole system (`scene:focus(nil)`) to show how it fits. Keep the camera still while the viewer compares positions.
+- **Use the camera.** A plate, or a short clip whose whole subject reads at once, keeps the camera still. Otherwise, in a 2D scene with more than one region, plan a camera column in the beat table and use `scene:focus` (`focus` on a JS builder) at least for these moments: zoom on the part that changes when it is small relative to the frame (`scene:focus(part)`), then pull back to the whole system (`scene:focus(nil)`) to show how it fits. While zoomed, set the labels in the shot as plane text and hide what the frame cuts ([readme-demo motion](profiles/readme-demo.md#motion)). Keep the camera still while the viewer compares positions.
 - **One change at a time.** Each beat has one dominant motion; everything else is quiet.
 - **One thing, one shape.** Each actor or value appears once and shows its changing state on that one shape. Connect related things with `connector` so lines touch both ends.
 - **Familiar conventions.** Standard axis directions, left-to-right time and reading order, the usual textbook picture for the topic.
@@ -51,7 +51,7 @@ A visual metaphor must keep the relation it claims: incidence, equal area, proje
 
 ## Pace
 
-Starting ranges, then tune at 1×: supporting reveal 0.35–0.7 s; main construction 0.7–1.4 s; transform or tracked change 1–2.5 s; hold after a key result 1.5–2.5 s; final hold 2–3 s. No single `wait` over 3 s; in a plate, a section that holds while another plays is being read, so the limit applies to its final hold. Typical total: 15–40 s. A requested duration is not a quota.
+Starting ranges, then tune at 1×: supporting reveal 0.35–0.7 s; main construction 0.7–1.4 s; transform or tracked change 1–2.5 s; hold after a key result 1.5–2.5 s; final hold 2–3 s. No single `wait` over 3 s; in a plate, a section that holds while another plays is being read, so the limit applies to its final hold. Typical total: 15–40 s, or 5–12 s for a [readme-demo](profiles/readme-demo.md) clip beside prose. A requested duration is not a quota.
 
 ## Review the movie
 

@@ -41,6 +41,18 @@ Words in a Lua embed's alias or after a fence's language adjust that player:
 
 Replay follows these embed options or **At the end** in the plugin settings (replay by default), rather than the Scene's `loop` flag. `interactive` gives input to the scene and holds its authored timeline at the first frame while retained interaction runs.
 
+## Write scenes for the note
+
+The note's paragraphs explain and its scenes show. Write each scene with vis-skills in the [readme-demo](../vis-skills/references/profiles/readme-demo.md) format, with `theme` left unset:
+
+- **One section, one short scene.** Show only that section's core, before the paragraph it illustrates. Split a long explanation into a scene per section instead of one figure of the whole system.
+- **Simple pictures.** A few boxes, short labels, and one highlighted path. A flow that differs by type is one diagram in which clicking a type highlights its path: build it with vis-interactive and embed it with `interactive`.
+- **No repeated text.** Each sentence lives in the note or in the scene, never both.
+- **Readable at the column width.** With **Readable line length** on, the player is about 700 px wide and scales the scene to fit, so author a note's scene 720 px wide and derive its height from the content. A 1200 px scene shows its labels at 60%.
+- **viscript instead of Mermaid.** Draw diagrams as scenes; do not add a Mermaid fence beside or instead of one.
+
+The plugin's runtime includes the tex module, so a scene can set formulas with `tex`.
+
 ## Source and playback
 
 Open **Settings → Viscript**:
@@ -67,4 +79,4 @@ The settings preview shows the rendered fonts. **Look for fonts again** rescans 
 
 ## Verify and deliver
 
-Review the scene through vis-skills, then check its embed in Obsidian's reading view and Live Preview. Confirm fonts, source visibility, and playback with the intended settings. For sound, put the `.wav` file in the vault, reference it as a link relative to the note or scene, and press play to start audio. Deliver the note path, scene path, and any relevant setting; keep API and animation guidance in the authoring skills above.
+Review the scene through vis-skills, then check its embed in Obsidian's reading view and Live Preview; without Obsidian at hand, say that the embed was not checked. Keep review renders, probes, and variant copies in a scratch directory outside the vault, since Obsidian lists every image and `.lua` file in it, and report review results to the user rather than in the note. Confirm fonts, source visibility, and playback with the intended settings. For sound, put the `.wav` file in the vault, reference it as a link relative to the note or scene, and press play to start audio. Deliver the note path, scene path, and any relevant setting; keep API and animation guidance in the authoring skills above.

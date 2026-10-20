@@ -23,7 +23,7 @@ local ok = TEXT {text = "wrote scene.gif", point = {TX - TW / 2 + 0.35, 0.4}, al
 
 -- Effect: a white panel with thick ink border; the subject inside moves, not the text.
 local RX, RW = 4.4, 4.6
-local out = scene:rectangle {center = {RX, 0}, size = {RW, TH}, fill = "#ffffff", stroke = INK, width = 2.5, layer = 0, id = "output"}
+local out = scene:rectangle {center = {RX, 0}, size = {RW, TH}, fill = "background", stroke = INK, width = 2.5, layer = 0, id = "output"}
 local outTitle = TEXT {text = "SCENE.GIF", point = {RX - RW / 2, TH / 2 + 0.3}, align = {0, 0.5}, size = 12, role = "code", fill = INK, id = "output:title"}
 local slot = scene:rectangle {center = {RX, 0}, size = {RW - 0.8, TH - 0.8}, stroke = "border", width = 1.5, dash = {6, 5}, layer = 1, id = "slot"}
 local dot = scene:circle {center = {RX - 1.2, -0.6}, radius = 0.4, fill = "accent", stroke = INK, width = 2.5, layer = 2, opacity = 0, id = "dot"}
@@ -43,7 +43,7 @@ local CAM = {duration = 0.7, curve = "ease_in_out"}
 scene:wait(0.4)
 scene:set({target = cmd, opacity = 1})
 scene:write(cmd, 1.0)
-scene:parallel(function() scene:focus({term, termTitle, out, outTitle}, {padding = 0.06, duration = 0.7, curve = "ease_in_out"}) end, function() scene:wait(0.3); fade({out, outTitle, slot}, 1, 0.4) end)
+scene:parallel(function() scene:focus({term, termTitle, out, outTitle}, {padding = 0.06, duration = 0.7, curve = "ease_in_out"}) end, function() scene:wait(0.45); fade({out, outTitle, slot}, 1, 0.4) end)
 scene:set({target = wire, opacity = 1})
 scene:create(wire, {duration = 0.4, curve = "ease_out"})
 scene:set({target = dot, opacity = 1})

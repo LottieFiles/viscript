@@ -1,6 +1,6 @@
 # README demo format
 
-Use this profile for short looping clips that sit above a paragraph in a README, landing page, or docs section and show what one feature does: a command and its output, an input and the picture it becomes, a host embedding a Scene. The clip comes first and the paragraph explains it, so the clip carries the claim without a title or caption. This is a format profile: combine it with the subject profile that owns the truth (an algorithm trace takes [algorithm-and-code](algorithm-and-code.md), a curve takes [math-shortform](math-shortform.md)).
+Use this profile for short looping clips that sit above a paragraph in a README, landing page, docs section, or note and show what one feature or mechanism does: a command and its output, an input and the picture it becomes, a host embedding a Scene. The clip comes first and the paragraph explains it, so the clip carries the claim without a title or caption. This is a format profile: combine it with the subject profile that owns the truth (an algorithm trace takes [algorithm-and-code](algorithm-and-code.md), a curve takes [math-shortform](math-shortform.md)).
 
 Start from [command-to-result.lua](../../templates/readme-demo/command-to-result.lua). The viscript README clips under `docs/assets/` (hero, steps, ai, embed, render, browser, skills, build) are full examples of this style.
 
@@ -17,11 +17,11 @@ Most clips are two to four beats: a close-up on the cause, a widen to show the e
 
 ## Look
 
-- **Theme.** `pro_white` on a white canvas. Set it explicitly: the README background is white on GitHub's light theme, and the clip must not look like a dark box there.
+- **Theme.** In a README or landing page, `pro_white` on a white canvas. Set it explicitly: the README background is white on GitHub's light theme, and the clip must not look like a dark box there. In a host that supplies the theme (an Obsidian note, the VS Code Viewer, the docs site), leave `theme` unset so the clip follows light and dark modes, and paint panels with roles such as `background` instead of `#ffffff`.
 - **Ink.** Structure is `foreground` ink: square corners, thick borders (2.5–3 px), no shadows or rounded cards. A dark `foreground`-filled panel stands for a terminal; a white panel with an ink border stands for an output, window, or canvas.
 - **One hue.** `accent` (or a light tint such as `#e8f0fb`, `#0a66c233`) marks the subject, and `success` marks completion (a finished build, a written file). Everything else is ink, `muted`, or `border`.
 - **No gradient or TeX titles.** Plain text only. Gradients read as decoration, and TeX distorts when the export size differs from the authored size.
-- **Labels.** Panel labels are mono caps (`role = "code"`, size 11–12) above the panel's top-left corner: `TERMINAL`, `SCENE.GIF`, `MODULES`. Code and commands use `role = "code"`; prose labels are rare and `muted`.
+- **Labels.** Panel labels are mono caps in ink (`role = "code"`, `fill = "foreground"`, size 11–12) above the panel's top-left corner: `TERMINAL`, `SCENE.GIF`, `MODULES`. Code and commands use `role = "code"`; prose labels are rare and `muted`.
 - **Placeholders.** Something that does not exist yet is a dashed `border` slot (`dash = {5, 4}`); it becomes a solid tile when it arrives. Dash itself cannot animate, so cross-fade a solid tile over the slot.
 
 ## Motion
@@ -37,7 +37,7 @@ Most clips are two to four beats: a close-up on the cause, a widen to show the e
 
 ## Layout
 
-- Canvas 1200 wide; height 336–480 for a strip under a paragraph, 600 for a hero. Fix the width and derive the height from the content.
+- Canvas 1200 wide; height 336–480 for a strip under a paragraph, 600 for a hero. Fix the width and derive the height from the content. An Obsidian note shows the clip about 700 px wide, so a clip for a note is 720 wide with labels at 12 pt.
 - Cause on the left and effect on the right, joined by a straight ink arrow or wire. Keep equal margins to the outermost ink, labels included.
 - Code shown in a clip is real: every call exists in the API, or it is plain Lua the reader could write. Never invent a scene method to make a line shorter; split it over lines instead.
 - Hand-set data (attention weights, timings) must look plausible and sum correctly. Say in the paragraph when values are illustrative.

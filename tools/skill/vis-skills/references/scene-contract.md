@@ -15,7 +15,7 @@ Leave out every option that equals its default; write a default only beside vari
 
 - A Scene is 960×540 at 30 fps, has `loop = false`, takes the `adaptive` theme, and looks at the origin through a fixed 2D camera 6 units tall: `camera = {height = 8}` names only what differs. A host can override replay behavior; Obsidian uses its player settings or embed options.
 - A `3d` camera looks at the origin in perspective with +y up, and a 2D one is orthographic. `look` keeps every field it does not name, so it names only what moves: `scene:look({eye = {-6, 4.5, 8}}, 2)`. A `look` that turns a 2D camera to `3d` therefore stays orthographic unless it names `projection = "perspective"`.
-- A shape has no fill until given one, so an outline needs only `stroke`; a circle sits on the origin with radius 1, and a rectangle on the origin.
+- A shape has no fill until given one, so an outline needs only `stroke`. A filled shape without `stroke` still gets an outline in a Theme color, so a fill-only shape sets `width = 0`. A circle sits on the origin with radius 1, and a rectangle on the origin.
 - Text sits on the origin, centered (`align = {0.5, 0.5}`), in the `text` role.
 
 ## Coordinates and identity
@@ -44,7 +44,7 @@ The default look is a printed technical figure: ink structure, square corners, a
 - **Ink structure.** Frames, axes, slots, nodes, and routes use `foreground`, `muted`, or `border` with no fill, or a `background` fill that masks routes behind a node. No card fills, `surface` panels, shadows, gradients, or glows unless they mark a real region. Give every structural object explicit paint: omitted paint cycles the Theme's object colors.
 - **Color budget.** One hue carries the subject or the finding (`danger` for a failure, `result` for an answer, `accent` for the active path); `focus` may appear for one beat. Add a second hue only for a second named state the reader must compare. Color by category only when color is the data or identities must be told apart, and then keep one small palette.
 - **Weights.** 1 px for grids, rules, slots, and idle routes; 1.25–1.5 px for outlines and the subject; 2 px for a moving head, cursor, or result curve. Arrow `tip` near 7. A dash marks something implied, missing, constructed, or repeating, never ordinary structure.
-- **Type.** Hierarchy comes from role, size, and `muted`, not hue. Keep labels at 11–16 pt; a title uses `h3`, or `h2` on a poster-sized plate. Values, identifiers, and indices use the `code` role.
+- **Type.** Hierarchy comes from role, size, and `muted`, not hue. Keep labels at 11–16 pt; a title uses `h3`, or `h2` on a poster-sized plate. Values, identifiers, and indices use the `code` role in ink (`fill = "foreground"` or `muted`): the role's own color is a hue, not ink.
 - **Code fragments.** Use `code {language = "plain"}` in ink and recolor only the decisive tokens (`search`) in the finding's hue; syntax colors compete with the evidence.
 - **Context.** Dim context by swapping it to `muted`/`border` or to opacity near 0.4; keep it when it explains an invariant.
 
@@ -54,10 +54,12 @@ The default look is a printed technical figure: ink structure, square corners, a
 - Put words beside their evidence: a label next to its mark, a caption beside the figure it explains, the finding in its hue and the reason in `muted`.
 - A motion explainer has no title unless requested; it labels values and ends on a short answer caption beside the result, so a paused or exported final frame explains itself.
 - A plate ([cheatsheet](profiles/cheatsheet.md), [pipeline plate](profiles/pipeline-plate.md)) is read as a figure: a title that states the question, one answer line, and a caption per section.
+- Beside prose (a note, a README, a docs page), the prose carries the sentences. The Scene keeps names, values, and code, drops the answer caption when the paragraph states the answer, and repeats no sentence of the prose, usage hints included.
 
 ## Layout and draw order
 
 - Build the settled layout before timeline calls. Measure text with `text:measure()` in the font its role names (a Text that appears later starts at `opacity = 0`, so it can be measured and placed first), reserve regions for the subject, its labels and captions, and a title when the format has one, and size boxes from contents plus insets. Recompose or split before shrinking text.
+- Size the canvas for where it is shown. A host scales the Scene to its column (about 700 px in an Obsidian note), and the labels shrink with it: author near the display width, and split a figure whose labels would show below 11 pt there.
 - Render the skeleton at delivery size before animating; reject empty, off-camera, mirrored, or wrong-scale frames.
 - Use explicit `layer` bands: background < regions < routes/guides < subjects < labels < transient focus. Creation order is not draw order.
 - `Object::bounds()` is approximate; final containment and gaps come from `viscript layout`/`audit` and the raster.
@@ -68,7 +70,7 @@ The default look is a printed technical figure: ink structure, square corners, a
 - One beat = one claim and one dominant change. Animate the semantic thing (value, owner, route, trace step, result); decorative dots, sweeps, and pulses are not evidence. Camera moves frame the evidence (overview, zoom, emphasis); a plate keeps its camera still because the reader compares everything at once.
 - Continue identities: transform the existing object into its next state rather than removing it and drawing a replacement.
 - Keep finished structure as quieter context; hold conclusions. Linear for uniform rate, ease-out for construction, ease-in-out for reversible change.
-- `loop=false` unless recurrence is requested or a plate profile loops; a loop must return every object, label, and color to its `t=0` state.
+- `loop=false` unless recurrence is requested or a format profile loops (a plate, a readme-demo clip); a loop must return every object, label, and color to its `t=0` state.
 - Use `morph` for retained outlines and `match_transform` for text or formulas. Use `scene:clone(source, options)` or JS `definition.clone(source, options)` to snapshot a family at the cursor. Read API comments for ownership and geometry contracts.
 - Timelines are deterministic at any sample time. For dependents of a changing value use `scene:tracker`/`bind`/`track`, or `tracker`/`bind`/`track` on a JS builder (baked at construction). Cell/Voxel `time` callbacks run at construction.
 
@@ -76,4 +78,4 @@ The default look is a printed technical figure: ink structure, square corners, a
 
 Use [review.md](review.md) for each review round: one `viscript audit` over every frame, `viscript layout` at each meaningful animation's start/end, `t=0`, and the exact final time from `viscript inspect`, plus the interior peaks or closest-contact times that expose a transient effect, and a small image set. Missing glyphs, unexpected null bounds for a visible object, overflow, unintended overlap, and clipping fail even when commands succeed. Use the same selected times for JS/TS runtime reports. For composed or Diagram scenes preserve the relevant audit policies from `viscript audit --help`.
 
-Look at the selected original-size frames: name the focal evidence and the tightest clearance in each, fix, and re-render using the same filenames. Use existing normal-speed host playback when needed; do not create an extra video for review. Keep probes and review renders under `temp/` next to the scene, or outside `.vscode/vis` in a VS Code workspace, and retain concise findings instead of full per-frame reports. Deliver source, requested export, reviewed times, and checks run.
+Look at the selected original-size frames: name the focal evidence and the tightest clearance in each, fix, and re-render using the same filenames. Use existing normal-speed host playback when needed; do not create an extra video for review. Keep probes, review renders, and reports in a scratch directory outside the user's project or vault ([review.md](review.md)), never beside the scene, and retain concise findings instead of full per-frame reports. Deliver source, requested export, reviewed times, and checks run.

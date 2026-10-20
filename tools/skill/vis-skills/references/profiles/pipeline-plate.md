@@ -2,7 +2,7 @@
 
 Use this profile when the reader needs a code path's stages and the evidence for each stage in one view: why a value goes wrong between load, update, and draw; how a request crosses layers; what each pass of a renderer contributes. The stage spine runs down the left and one section per stage, or per group of stages, explains it on the right. This is a format profile: combine it with the subject profile that owns the truth, usually [algorithm-and-code](algorithm-and-code.md). One temporal mechanism is an ordinary animation, and several independent claims are a series.
 
-When both a plate and an animation fit, look at what the answer names. If it names a stage (where a value is fixed, lost, or ignored), make the plate, because the reader must see every stage at once. If every step happens in one place and only the order of states explains it, make an animation.
+When both a plate and an animation fit, look at what the answer names. If it names a stage (where a value is fixed, lost, or ignored), make the plate, because the reader must see every stage at once. If every step happens in one place and only the order of states explains it, make an animation. A plate needs a wide display: in an Obsidian note, about 700 px wide, give each stage its own short clip ([readme-demo](readme-demo.md)) instead.
 
 Start from [pipeline-plate.lua](../../templates/pipeline-plate/pipeline-plate.lua).
 

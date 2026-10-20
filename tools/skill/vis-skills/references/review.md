@@ -16,7 +16,7 @@ Check layout across the timeline with CLI reports, then inspect selected frames 
 viscript inspect scene.lua --font "$VIS_FONT"
 viscript audit scene.lua --font "$VIS_FONT" --canvas-inset 4 --text-gap 4 --format text
 viscript layout scene.lua --time "$VIS_TIME" --padding 4 --font "$VIS_FONT"
-viscript render scene.lua --time "$VIS_TIME" --font "$VIS_FONT" -o temp/review.png
+viscript render scene.lua --time "$VIS_TIME" --font "$VIS_FONT" -o "$REVIEW_DIR/review.png"
 ```
 
 Add `--font "$VIS_CODE_FONT"` to each command when the scene sets code. Without
@@ -32,11 +32,16 @@ occlusion policies that apply.
 `typeset` is true (a code block's tokens, a formula's parts), and keep the IDs
 of colliding, `clipped`, or `outside` Text as the result for that time.
 
-Review renders and probes go under `temp/` next to the scene. In a VS Code
-workspace keep them outside `.vscode/vis`, which holds only Scenes and their
-assets. A Scene for the VS Code Viewer also gets the vis-vscode host review: the
-CLI sets `adaptive` in Pretendard, while the Viewer sets headings and body
-text in Source Serif 4, Korean in Pretendard, and takes the editor's colors.
+Review renders, probes, variant copies, layout reports, and helper scripts go in
+`$REVIEW_DIR`, a scratch directory outside the user's project or vault (the
+session scratchpad, or one from `mktemp -d`). Never write them beside the Scene:
+an Obsidian vault lists every image and `.lua` file in it, and `.vscode/vis`
+holds only Scenes and their assets. The delivered folder ends with the Scenes
+and nothing else.
+
+A Scene for the VS Code Viewer also gets the vis-vscode host review: the CLI
+sets `adaptive` in Pretendard, while the Viewer sets headings and body text in
+Source Serif 4, Korean in Pretendard, and takes the editor's colors.
 
 A successful command is not proof of correct layout. Check labels against their
 owners' own paint bounds, and tell intended contacts from unrelated collisions. A
