@@ -148,10 +148,8 @@ void WarpDraft::gather(const Object* object, const Mat4& space, float step)
             auto& center = rectangle->center;
             draft.closed = true;
             if (radius <= 0.0f) {
-                draft.add(center + Vec3{-half.x, -half.y, 0.0f});
-                draft.add(center + Vec3{half.x, -half.y, 0.0f});
-                draft.add(center + Vec3{half.x, half.y, 0.0f});
-                draft.add(center + Vec3{-half.x, half.y, 0.0f});
+                Vec3 square[4];
+                points(square, rectangleOutline(center, half, radius, square));
                 break;
             }
             // Each corner from where its side ends to where the next side begins, counterclockwise

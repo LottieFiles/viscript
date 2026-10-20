@@ -30,9 +30,7 @@ static inline float clamp01(float value) noexcept
 
 static inline bool validRegion(const BBox& bounds) noexcept
 {
-    return std::isfinite(bounds.x) && std::isfinite(bounds.y)
-           && std::isfinite(bounds.width) && std::isfinite(bounds.height)
-           && bounds.width > 0.0f && bounds.height > 0.0f;
+    return _finite(bounds) && bounds.width > 0.0f && bounds.height > 0.0f;
 }
 
 static inline bool contains(const BBox& bounds, const Vec2& point) noexcept

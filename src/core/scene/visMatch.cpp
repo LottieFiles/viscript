@@ -54,7 +54,7 @@ static bool _textKeys(MatchPiece* pieces, uint32_t count)
         if (pieces[i].object->type() != Type::Text) continue;
         auto text = static_cast<const Text*>(pieces[i].object)->text();
         if (!text) continue;
-        auto hash = uint64_t{14695981039346656037ull};
+        auto hash = HASH_BASIS;
         _hash(hash, text, strlen(text));
         for (auto slot = static_cast<uint32_t>(hash) & (size - 1u);; slot = (slot + 1u) & (size - 1u)) {
             auto other = slots.data[slot];
@@ -97,7 +97,7 @@ static bool _lineKeys(MatchLine* lines, uint32_t count, const MatchPiece* pieces
     if (!slots.data) return false;
     for (auto i = 0u; i < size; i++) slots.data[i] = UINT32_MAX;
     for (auto i = 0u; i < count; i++) {
-        auto hash = uint64_t{14695981039346656037ull};
+        auto hash = HASH_BASIS;
         for (auto at = _nextText(pieces, lines[i], lines[i].begin); at < lines[i].end;
              at = _nextText(pieces, lines[i], at + 1u)) {
             _hash(hash, pieces[at].key);

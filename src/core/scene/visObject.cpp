@@ -14,6 +14,7 @@
 #include "../common/visGrow.h"
 #include "visRendererBackend.h"
 #include "visScene.h"
+#include "visSceneValidation.h"
 
 namespace vis
 {
@@ -741,10 +742,7 @@ Object* Space::objectAt(uint32_t index) const noexcept
 
 static Result _samples(const Range& range, float& first, uint32_t& count) noexcept
 {
-    if (!std::isfinite(range.min) || !std::isfinite(range.max)
-        || !std::isfinite(range.step) || range.min > range.max || range.step <= 0.0f) {
-        return Result::InvalidArguments;
-    }
+    if (!_finite(range)) return Result::InvalidArguments;
     auto step = static_cast<double>(range.step);
     auto start = std::ceil(static_cast<double>(range.min) / step) * step;
     auto tolerance = step * 0.001;
@@ -941,7 +939,7 @@ bool Space::w2c(const Vec3& world, Vec3& coordinate) const noexcept
         static_cast<float>(((e * i - f * h) * x + (c * h - b * i) * y + (b * f - c * e) * z) * inv),
         static_cast<float>(((f * g - d * i) * x + (a * i - c * g) * y + (c * d - a * f) * z) * inv),
         static_cast<float>(((d * h - e * g) * x + (b * g - a * h) * y + (a * e - b * d) * z) * inv)};
-    if (!std::isfinite(result.x) || !std::isfinite(result.y) || !std::isfinite(result.z)) return false;
+    if (!_finite(result)) return false;
     coordinate = result;
     return true;
 }
@@ -1667,7 +1665,7 @@ Rectangle::Rectangle(const Vec3& center, const Vec2& size, float corner) noexcep
 
 Rectangle* Rectangle::gen(const Vec3& center, const Vec2& size, float corner) noexcept
 {
-    if (!std::isfinite(size.x) || !std::isfinite(size.y) || size.x <= 0.0f || size.y <= 0.0f
+    if (!_finite(size) || size.x <= 0.0f || size.y <= 0.0f
         || !std::isfinite(corner) || corner < 0.0f || corner > std::fmin(size.x, size.y) * 0.5f) {
         return nullptr;
     }
@@ -1728,7 +1726,7 @@ bool BBox::intersects(const BBox& other, float padding) const noexcept
         && y < other.y + other.height + padding && other.y < y + height + padding;
 }
 
-static void _include(Bounds& bounds, bool& defined, const Vec3& point)
+void include(Bounds& bounds, bool& defined, const Vec3& point) noexcept
 {
     if (!defined) {
         bounds.min = point;
@@ -1742,6 +1740,26 @@ static void _include(Bounds& bounds, bool& defined, const Vec3& point)
     bounds.max.x = std::fmax(bounds.max.x, point.x);
     bounds.max.y = std::fmax(bounds.max.y, point.y);
     bounds.max.z = std::fmax(bounds.max.z, point.z);
+}
+
+void include(Bounds& bounds, bool& defined, const Bounds& local, const Mat4& model) noexcept
+{
+    for (auto x = 0u; x < 2u; x++) {
+        for (auto y = 0u; y < 2u; y++) {
+            for (auto z = 0u; z < 2u; z++) {
+                include(bounds, defined, model * Vec3{
+                    x ? local.max.x : local.min.x,
+                    y ? local.max.y : local.min.y,
+                    z ? local.max.z : local.min.z});
+            }
+        }
+    }
+}
+
+float reach(const Bounds& bounds, const Vec3& axis) noexcept
+{
+    auto half = bounds.size() * 0.5f;
+    return std::fabs(axis.x) * half.x + std::fabs(axis.y) * half.y + std::fabs(axis.z) * half.z;
 }
 
 const WarpShape* warped(const Object* object) noexcept
@@ -1832,7 +1850,7 @@ bool localBounds(const Object* object, const WarpShape* warp, float progress, Bo
     for (auto run = 0u; run < warp->runCount; run++) {
         auto marks = spaceMark(warp->runs[run].part);
         for (auto i = begin; i < warp->runs[run].end && !marks; i++)
-            _include(bounds, defined, warp->at(i, progress));
+            include(bounds, defined, warp->at(i, progress));
         begin = warp->runs[run].end;
     }
     return defined;
@@ -1946,17 +1964,17 @@ bool arcBounds(const ArcGeometry& arc, Bounds& bounds) noexcept
     if (arc.square) {
         Vec3 points[3];
         auto count = arcOutline(arc, points, 3u);
-        for (auto i = 0u; i < count; i++) _include(bounds, defined, points[i]);
+        for (auto i = 0u; i < count; i++) include(bounds, defined, points[i]);
         return defined;
     }
-    _include(bounds, defined, at(arc.start));
-    _include(bounds, defined, at(arc.start + arc.angle));
-    if (arc.sector) _include(bounds, defined, arc.center);
+    include(bounds, defined, at(arc.start));
+    include(bounds, defined, at(arc.start + arc.angle));
+    if (arc.sector) include(bounds, defined, arc.center);
     for (auto i = 0u; i < 4u; i++) {
         auto direction = static_cast<float>(i) * ARC_TURN * 0.25f;
         auto distance = std::fmod((arc.angle < 0.0f ? arc.start - direction : direction - arc.start), ARC_TURN);
         if (distance < 0.0f) distance += ARC_TURN;
-        if (distance <= std::fabs(arc.angle)) _include(bounds, defined, at(direction));
+        if (distance <= std::fabs(arc.angle)) include(bounds, defined, at(direction));
     }
     return defined;
 }
@@ -1967,14 +1985,14 @@ static bool _ownBounds(const Object* object, Bounds& bounds)
     switch (object->type()) {
         case Type::Group:
         case Type::Connector: return false;
-        case Type::Point: _include(bounds, defined, static_cast<const Point*>(object)->point); break;
+        case Type::Point: include(bounds, defined, static_cast<const Point*>(object)->point); break;
         case Type::Line:
         case Type::Arrow:
         case Type::Vector: {
             Vec3 ends[2];
             if (!segment(object, nullptr, ends)) return false;
-            _include(bounds, defined, ends[0]);
-            _include(bounds, defined, ends[1]);
+            include(bounds, defined, ends[0]);
+            include(bounds, defined, ends[1]);
             break;
         }
         case Type::Arc:
@@ -1982,103 +2000,89 @@ static bool _ownBounds(const Object* object, Bounds& bounds)
         case Type::Circle: {
             auto circle = static_cast<const Circle*>(object);
             auto radius = Vec3{circle->radius, circle->radius, 0.0f};
-            _include(bounds, defined, circle->center - radius);
-            _include(bounds, defined, circle->center + radius);
+            include(bounds, defined, circle->center - radius);
+            include(bounds, defined, circle->center + radius);
             break;
         }
         case Type::Rectangle: {
             auto rectangle = static_cast<const Rectangle*>(object);
             auto half = Vec3{rectangle->size.x * 0.5f, rectangle->size.y * 0.5f, 0.0f};
-            _include(bounds, defined, rectangle->center - half);
-            _include(bounds, defined, rectangle->center + half);
+            include(bounds, defined, rectangle->center - half);
+            include(bounds, defined, rectangle->center + half);
             break;
         }
         case Type::Polygon: {
             auto polygon = static_cast<const Polygon*>(object);
             for (auto i = 0u; i < polygon->count(); i++)
-                _include(bounds, defined, polygon->points()[i]);
+                include(bounds, defined, polygon->points()[i]);
             break;
         }
         case Type::Plot: {
             auto plot = static_cast<const Plot*>(object);
             for (auto i = 0u; i < plot->count(); i++)
-                _include(bounds, defined, plot->points()[i]);
+                include(bounds, defined, plot->points()[i]);
             break;
         }
         case Type::Route: {
             auto route = static_cast<const DirectedRoute*>(object);
             for (auto i = 0u; i < route->count(); i++)
-                _include(bounds, defined, route->points()[i]);
+                include(bounds, defined, route->points()[i]);
             break;
         }
         case Type::Path: {
             auto path = static_cast<const Path*>(object);
             for (auto i = 0u; i < path->count(); i++)
-                _include(bounds, defined, path->points()[i]);
+                include(bounds, defined, path->points()[i]);
             break;
         }
         case Type::Curve: {
             auto curve = static_cast<const Curve*>(object);
             for (auto i = 0u; i < curve->count(); i++)
-                _include(bounds, defined, curve->points()[i]);
+                include(bounds, defined, curve->points()[i]);
             break;
         }
         case Type::SurfaceMesh: {
             auto surface = static_cast<const SurfaceMesh*>(object);
             auto count = surface->columns() * surface->rows();
             for (auto i = 0u; i < count; i++)
-                _include(bounds, defined, surface->points()[i]);
+                include(bounds, defined, surface->points()[i]);
             break;
         }
         case Type::Text: {
             auto text = static_cast<const Text*>(object);
             if (text->box.x <= 0.0f && text->box.y <= 0.0f) {
-                _include(bounds, defined, text->point);
+                include(bounds, defined, text->point);
                 break;
             }
             auto left = text->point.x - text->align.x * text->box.x + text->boxOffset.x;
             auto top = text->point.y + text->align.y * text->box.y + text->boxOffset.y;
-            _include(bounds, defined, {left, top - text->box.y, text->point.z});
-            _include(bounds, defined, {left + text->box.x, top, text->point.z});
+            include(bounds, defined, {left, top - text->box.y, text->point.z});
+            include(bounds, defined, {left + text->box.x, top, text->point.z});
             break;
         }
         case Type::Space: {
             auto space = static_cast<const Space*>(object);
-            _include(bounds, defined, {space->x.min, space->y.min, space->z.min});
-            _include(bounds, defined, {space->x.max, space->y.max, space->z.max});
+            include(bounds, defined, {space->x.min, space->y.min, space->z.min});
+            include(bounds, defined, {space->x.max, space->y.max, space->z.max});
             break;
         }
         case Type::Picture: {
             auto image = static_cast<const Picture*>(object);
             auto height = image->width * static_cast<float>(image->pixelHeight()) / image->pixelWidth();
             auto half = Vec3{image->width * 0.5f, height * 0.5f, 0.0f};
-            _include(bounds, defined, image->center - half);
-            _include(bounds, defined, image->center + half);
+            include(bounds, defined, image->center - half);
+            include(bounds, defined, image->center + half);
             break;
         }
         case Type::Cell: {
             auto cell = static_cast<const Cell*>(object);
-            _include(bounds, defined, cell->origin);
-            _include(bounds, defined,
-                     cell->origin + Vec3{static_cast<float>(cell->columns()), static_cast<float>(cell->rows()), cell->depth});
+            include(bounds, defined, cell->origin);
+            include(bounds, defined,
+                    cell->origin + Vec3{static_cast<float>(cell->columns()), static_cast<float>(cell->rows()), cell->depth});
             break;
         }
     }
     return defined;
-}
-
-static void _transform(const Bounds& source, const Mat4& matrix, Bounds& output, bool& defined)
-{
-    for (auto x = 0u; x < 2u; x++) {
-        for (auto y = 0u; y < 2u; y++) {
-            for (auto z = 0u; z < 2u; z++) {
-                _include(output, defined, matrix * Vec3{
-                    x ? source.max.x : source.min.x,
-                    y ? source.max.y : source.min.y,
-                    z ? source.max.z : source.min.z});
-            }
-        }
-    }
 }
 
 static bool _bounds(const Object* object, const Mat4& parent, Bounds& output, bool& defined)
@@ -2086,7 +2090,7 @@ static bool _bounds(const Object* object, const Mat4& parent, Bounds& output, bo
     if (!valid(object)) return false;
     auto model = parent * object->model;
     Bounds local;
-    if (localBounds(object, local)) _transform(local, model, output, defined);
+    if (localBounds(object, local)) include(output, defined, local, model);
     for (auto i = 0u; i < object->childCount(); i++) {
         auto childModel = model;
         if (object->type() == Type::Angle) childModel = model * Mat4::translate(static_cast<const Angle*>(object)->labelPoint());
@@ -2101,7 +2105,7 @@ bool localFamilyBounds(const Object* object, Bounds& output) noexcept
     auto defined = false;
     Bounds local;
     if (localBounds(object, local)) {
-        _transform(local, Mat4::identity(), output, defined);
+        include(output, defined, local, Mat4::identity());
     }
     auto childModel = object->type() == Type::Angle
                           ? Mat4::translate(static_cast<const Angle*>(object)->labelPoint()) : Mat4::identity();
@@ -2273,8 +2277,7 @@ bool PlotSamples::valid() const noexcept
     auto& samples = *this;
     if (!samples.count) return true;
     if (!samples.points || samples.count < 2u || samples.count > 1000000u) return false;
-    if (samples.band && (!std::isfinite(samples.yRange.x) || !std::isfinite(samples.yRange.y)
-                         || samples.yRange.x >= samples.yRange.y)) return false;
+    if (samples.band && (!_finite(samples.yRange) || samples.yRange.x >= samples.yRange.y)) return false;
     auto previous = -std::numeric_limits<float>::infinity();
     for (auto i = 0u; i < samples.count; i++) {
         auto& point = samples.points[i];
@@ -2494,18 +2497,10 @@ Result Object::layout(const Mat4& value) noexcept
 
 Result Object::moveTo(const Vec3& point) noexcept
 {
-    if (!std::isfinite(point.x) || !std::isfinite(point.y) || !std::isfinite(point.z)) {
-        return fail(Result::InvalidArguments, LAYOUT_POINT);
-    }
+    if (!_finite(point)) return fail(Result::InvalidArguments, LAYOUT_POINT);
     Bounds box;
     if (!bounds(box)) return fail(Result::InsufficientCondition, LAYOUT_BOUNDS);
     return layout(Mat4::translate(point - box.center()) * model);
-}
-
-static float _support(const Bounds& bounds, const Vec3& direction)
-{
-    auto half = bounds.size() * 0.5f;
-    return std::fabs(direction.x) * half.x + std::fabs(direction.y) * half.y + std::fabs(direction.z) * half.z;
 }
 
 Result Object::nextTo(const Object* target, const Vec3& direction, float gap) noexcept
@@ -2521,7 +2516,7 @@ Result Object::nextTo(const Object* target, const Vec3& direction, float gap) no
     if (!bounds(own)) return fail(Result::InsufficientCondition, LAYOUT_BOUNDS);
     if (!target->bounds(other)) return fail(Result::InsufficientCondition, LAYOUT_REFERENCE_BOUNDS);
     auto axis = direction / length;
-    auto point = other.center() + axis * (_support(other, axis) + gap + _support(own, axis));
+    auto point = other.center() + axis * (reach(other, axis) + gap + reach(own, axis));
     return layout(Mat4::translate(point - own.center()) * model);
 }
 
@@ -2530,8 +2525,7 @@ Result Object::alignTo(const Object* target, const Vec3& direction) noexcept
     if (!target || target == this || target->objParent != objParent || target->objOwner != objOwner) {
         return fail(Result::InvalidArguments, LAYOUT_REFERENCE);
     }
-    if (!std::isfinite(direction.x) || !std::isfinite(direction.y) || !std::isfinite(direction.z)
-        || (direction.x == 0.0f && direction.y == 0.0f && direction.z == 0.0f)) {
+    if (!_finite(direction) || (direction.x == 0.0f && direction.y == 0.0f && direction.z == 0.0f)) {
         return fail(Result::InvalidArguments, LAYOUT_DIRECTION);
     }
     Bounds own;
@@ -2579,7 +2573,7 @@ Result Group::arrange(const Vec3& direction, float gap) noexcept
     auto axis = direction / length;
     auto cursor = 0.0f;
     for (auto i = 0u; i < count; i++) {
-        auto radius = _support(boxes[i], axis);
+        auto radius = reach(boxes[i], axis);
         positions[i] = cursor + radius;
         cursor += radius * 2.0f + gap;
     }

@@ -1391,6 +1391,8 @@ static void videoCadence(Renderer* renderer)
         CHECK(Saver::save(voiced, *cpu, "voiced.mp4", 30, "") == Result::InvalidArguments);
         CHECK(Saver::save(voiced, *cpu, "unvoiced.mp4", 30, missingPath) == Result::IoError);
         CHECK(std::fopen("unvoiced.mp4", "rb") == nullptr);
+        // An extension in capitals names the same format, so the missing track is what fails.
+        CHECK(Saver::save(voiced, *cpu, "unvoiced.MP4", 30, missingPath) == Result::IoError);
     }
     delete voiced;
     delete cpu;

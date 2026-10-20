@@ -13,20 +13,6 @@ namespace vis
 
 static constexpr long MAX_ASSET_BYTES = 268435456;
 
-static bool _ends(const char* path, const char* suffix)
-{
-    auto pathSize = std::strlen(path);
-    auto suffixSize = std::strlen(suffix);
-    if (pathSize < suffixSize) return false;
-    path += pathSize - suffixSize;
-    for (size_t i = 0; i < suffixSize; ++i) {
-        auto c = path[i];
-        if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
-        if (c != suffix[i]) return false;
-    }
-    return true;
-}
-
 static const char* _mime(const char* path)
 {
     if (_ends(path, ".svg")) return "svg";

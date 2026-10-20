@@ -12,6 +12,7 @@
 #include "visCliCommon.h"
 #include "visSaver.h"
 #include "../core/common/visGrow.h"
+#include "../core/common/visLayout.h"
 #include "../core/renderer/visLayoutJson.h"
 #ifdef VIS_DIAGRAM
 #include "vis_diagram.h"
@@ -523,15 +524,6 @@ static float _viewHeight(const Camera& camera)
     return 2.0f * distance * std::tan(0.5f * camera.fov);
 }
 
-static float _clearance(const BBox& inner, const BBox& outer)
-{
-    auto left = inner.x - outer.x;
-    auto top = inner.y - outer.y;
-    auto right = outer.x + outer.width - inner.x - inner.width;
-    auto bottom = outer.y + outer.height - inner.y - inner.height;
-    return std::fmin(std::fmin(left, top), std::fmin(right, bottom));
-}
-
 static void _overflow(const BBox& inner, const BBox& outer, float inset, Issue& issue)
 {
     issue.overflowLeft = std::fmax(0.0f, outer.x + inset - inner.x);
@@ -539,31 +531,6 @@ static void _overflow(const BBox& inner, const BBox& outer, float inset, Issue& 
     issue.overflowRight = std::fmax(0.0f, inner.x + inner.width - outer.x - outer.width + inset);
     issue.overflowBottom = std::fmax(0.0f, inner.y + inner.height - outer.y - outer.height + inset);
     issue.hasOverflow = true;
-}
-
-static float _axisClearance(float first, float firstSize, float second, float secondSize)
-{
-    auto firstEnd = first + firstSize;
-    auto secondEnd = second + secondSize;
-    if (firstEnd <= second) return second - firstEnd;
-    if (secondEnd <= first) return first - secondEnd;
-    return -std::fmin(firstEnd, secondEnd) + std::fmax(first, second);
-}
-
-static float _gap(const BBox& first, const BBox& second, Vec2& separation, float required)
-{
-    Vec2 clearance = {
-        _axisClearance(first.x, first.width, second.x, second.width),
-        _axisClearance(first.y, first.height, second.y, second.height),
-    };
-    auto horizontal = required - clearance.x;
-    auto vertical = required - clearance.y;
-    if (horizontal <= vertical) {
-        separation.x = second.center().x < first.center().x ? -horizontal : horizontal;
-    } else {
-        separation.y = second.center().y < first.center().y ? -vertical : vertical;
-    }
-    return std::fmax(clearance.x, clearance.y);
 }
 
 static bool _endpoint(Slice allowedPath, Slice allowedId, const char* path, const Object* object)
@@ -768,11 +735,6 @@ static bool _evidence(const LayoutReport& report, const ScenePathList& paths, co
     return true;
 }
 
-static bool _visualApplies(const LayoutVisual* visual, uint32_t object)
-{
-    return visual->object == object || (visual->kind == LayoutVisualKind::Morph && visual->counterpart == object);
-}
-
 static bool _markPainted(const LayoutReport& report, const ScenePathList& paths, uint32_t object, TextList& texts)
 {
     if (object >= report.objectCount()) return false;
@@ -791,7 +753,7 @@ static const LayoutVisual* _visualFor(const LayoutReport& report, uint32_t objec
     const LayoutVisual* found = nullptr;
     for (auto i = 0u; i < report.visualCount(); i++) {
         auto visual = report.visualAt(i);
-        if (_visualApplies(visual, object)) {
+        if (_applies(*visual, object)) {
             if (_painted(visual) && visual->visible) return visual;
             if (!found || (_painted(visual) && !_painted(found))) found = visual;
         }
@@ -1326,7 +1288,8 @@ static bool _auditSample(const LayoutReport& report, Options& options, const Sam
             auto otherScope = _scope(report, paths, other->scene);
             if (!otherScope.path) return false;
             Vec2 separation;
-            auto actual = _gap(visual->paintBounds, otherVisual->paintBounds, separation, options.textGap);
+            auto clearance = _clearance(visual->paintBounds, otherVisual->paintBounds, options.textGap, separation);
+            auto actual = std::fmax(clearance.x, clearance.y);
             auto issue = _record(issues, IssueCode::TextGap, scope, _subject(object), otherScope,
                                  _subject(other->object), sample, actual, options.textGap, options.textGap - actual);
             if (!issue) return false;

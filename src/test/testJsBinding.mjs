@@ -4342,6 +4342,10 @@ return root
     copyFileSync(font, secondFont);
     const bothFonts = ["--font", font, "--font", secondFont];
     cli(["render", textPath, "-o", textPng, ...bothFonts]);
+    // The output's extension may be in capitals.
+    const capitalPng = join(directory, "capital.PNG");
+    cli(["render", textPath, "-o", capitalPng, ...bothFonts]);
+    assert.ok(existsSync(capitalPng));
     for (const command of [["layout", textPath], ["benchmark", textPath, "--frames", "1", "--warmup", "0"]]) {
         cli([...command, ...bothFonts]);
     }

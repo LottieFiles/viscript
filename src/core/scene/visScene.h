@@ -32,6 +32,12 @@ Gradient mix(const Gradient& from, const Gradient& to, float progress) noexcept;
 uint64_t fingerprint(const Object* object) noexcept;
 bool localBounds(const Object* object, Bounds& bounds) noexcept;
 bool localFamilyBounds(const Object* object, Bounds& bounds) noexcept;
+// Grows bounds to hold point, or sets them to it while defined is false and makes defined true.
+void include(Bounds& bounds, bool& defined, const Vec3& point) noexcept;
+// Grows bounds, as above, to hold the eight corners of local that model places.
+void include(Bounds& bounds, bool& defined, const Bounds& local, const Mat4& model) noexcept;
+// How far bounds reach from their center along a unit axis.
+float reach(const Bounds& bounds, const Vec3& axis) noexcept;
 // Points the object's stroked outline passes through, in its local space and in drawing
 // order, tessellated like the renderer does. Writes at most capacity points and returns
 // the full count; zero means the object has no outline (text, groups, pictures, ...).

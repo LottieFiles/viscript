@@ -2413,12 +2413,12 @@ struct Saver
 {
     // Built-in savers sample scene time; interaction clocks must be advanced by the host.
     static Result png(const Surface& surface, const char* path) noexcept;
-    // Saves every frame of the timeline as a GIF or an MP4, by the path's extension, at fps
-    // frames per second (0: the scene's). Both run ffmpeg from the PATH, so neither is
-    // supported in WebAssembly or Windows builds. An MP4 takes soundtrack as its audio: any
-    // file ffmpeg reads, such as a WAV or MP3, played from Scene time 0. A longer track is cut
-    // where the video ends and a shorter one leaves the rest silent. Only .mp4 carries audio;
-    // nullptr saves no audio.
+    // Saves every frame of the timeline as a GIF or an MP4, by the path's extension in either
+    // case, at fps frames per second (0: the scene's). Both run ffmpeg from the PATH, so
+    // neither is supported in WebAssembly or Windows builds. An MP4 takes soundtrack as its
+    // audio: any file ffmpeg reads, such as a WAV or MP3, played from Scene time 0. A longer
+    // track is cut where the video ends and a shorter one leaves the rest silent. Only .mp4
+    // carries audio; nullptr saves no audio.
     static Result save(const Scene* scene, Renderer& renderer, const char* path,
                        uint32_t fps = 0, const char* soundtrack = nullptr) noexcept;
 };

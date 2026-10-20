@@ -8,6 +8,7 @@
 
 #include "visDiagram.h"
 #include "visDiagramGeometry.h"
+#include "../common/visLayout.h"
 
 namespace vis::diagram
 {
@@ -39,12 +40,6 @@ static bool _path(const LayoutReport& layout, uint32_t scene, const char* path) 
 {
     auto item = layout.sceneAt(scene);
     return item && item->path && path && std::strcmp(item->path, path) == 0;
-}
-
-static bool _applies(const LayoutVisual& visual, uint32_t object) noexcept
-{
-    return visual.object == object
-           || (visual.kind == LayoutVisualKind::Morph && visual.counterpart == object);
 }
 
 static PhysicalVisual _visual(const LayoutReport& layout, const char* scenePath,
@@ -440,15 +435,6 @@ static float _distance(const Lookup& lookup, uint32_t visual, const BBox& bounds
         distance = std::fmin(distance, _distance(*lookup.layout->pathAt(i), box));
     }
     return distance;
-}
-
-static float _clearance(const BBox& inner, const BBox& outer) noexcept
-{
-    auto left = inner.x - outer.x;
-    auto top = inner.y - outer.y;
-    auto right = outer.x + outer.width - inner.x - inner.width;
-    auto bottom = outer.y + outer.height - inner.y - inner.height;
-    return std::fmin(std::fmin(left, top), std::fmin(right, bottom));
 }
 
 // Whether the visual is missing or cannot be seen, so nothing collides with it.

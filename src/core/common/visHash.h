@@ -8,6 +8,9 @@
 namespace vis
 {
 
+// The FNV-1a offset basis, where a running hash starts.
+static constexpr uint64_t HASH_BASIS = 14695981039346656037ull;
+
 static inline void _hash(uint64_t& hash, const void* data, size_t size)
 {
     auto bytes = static_cast<const uint8_t*>(data);

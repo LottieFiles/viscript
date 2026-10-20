@@ -7,6 +7,7 @@
 #include <new>
 
 #include "vis.h"
+#include "visSceneValidation.h"
 
 namespace vis
 {
@@ -21,15 +22,9 @@ static constexpr uint32_t FIELD_COLOR_LIMIT = 8u;
 static constexpr uint32_t STREAM_STEP_LIMIT = 4096u;
 static constexpr uint32_t STREAM_POINT_LIMIT = 1048576u;
 
-static bool _valid(const Range& range)
-{
-    return std::isfinite(range.min) && std::isfinite(range.max) && std::isfinite(range.step)
-           && range.min <= range.max && range.step > 0.0f;
-}
-
 uint32_t Range::steps() const noexcept
 {
-    if (!_valid(*this)) return 0u;
+    if (!_finite(*this)) return 0u;
     auto steps = std::ceil((static_cast<double>(max) - min) / step - 1.0e-4);
     if (!(steps >= 1.0) || steps > static_cast<double>(UINT32_MAX)) return 0u;
     return static_cast<uint32_t>(steps);
@@ -90,7 +85,7 @@ static Result _riemann(const Range& x, uint32_t steps, const float* heights, Fun
 Result Group::riemann(const Range& x, const float* heights, uint32_t count, Group*& output) noexcept
 {
     output = nullptr;
-    if (!_valid(x)) return Result::InvalidArguments;
+    if (!_finite(x)) return Result::InvalidArguments;
     auto steps = x.steps();
     if (!steps || steps > RIEMANN_STEP_LIMIT) return Result::InsufficientCondition;
     if (!heights || count != steps) return Result::InvalidArguments;
@@ -104,7 +99,7 @@ Result Group::riemann(const Range& x, FunctionSampler fn, void* data, RiemannSam
                       Group*& output) noexcept
 {
     output = nullptr;
-    if (!fn || !_valid(x) || sample > RiemannSample::Midpoint) return Result::InvalidArguments;
+    if (!fn || !_finite(x) || sample > RiemannSample::Midpoint) return Result::InvalidArguments;
     auto steps = x.steps();
     if (!steps || steps > RIEMANN_STEP_LIMIT) return Result::InsufficientCondition;
     return _riemann(x, steps, nullptr, fn, data, sample, output);
@@ -112,7 +107,7 @@ Result Group::riemann(const Range& x, FunctionSampler fn, void* data, RiemannSam
 
 uint32_t Range::samples() const noexcept
 {
-    if (!_valid(*this)) return 0u;
+    if (!_finite(*this)) return 0u;
     auto intervals = std::floor((static_cast<double>(max) - min) / step + 1.0e-4);
     if (!(intervals >= 0.0) || intervals >= static_cast<double>(UINT32_MAX)) return 0u;
     return static_cast<uint32_t>(intervals) + 1u;
@@ -172,7 +167,7 @@ static bool _finite(double u, double v)
 // The samples of the grid of x and y, which must be within the limits of a field.
 static Result _grid(const Range& x, const Range& y, uint32_t& columns, uint32_t& rows)
 {
-    if (!_valid(x) || !_valid(y)) return Result::InvalidArguments;
+    if (!_finite(x) || !_finite(y)) return Result::InvalidArguments;
     columns = x.samples();
     rows = y.samples();
     if (!columns || !rows || columns > FIELD_AXIS_LIMIT || rows > FIELD_AXIS_LIMIT
@@ -204,7 +199,7 @@ static Result _vectorField(const Range& x, const Range& y, const Vec2* vectors, 
     if (vectors) {
         if (count != samples) return Result::InvalidArguments;
         for (auto k = 0u; k < samples; k++) {
-            if (!std::isfinite(vectors[k].x) || !std::isfinite(vectors[k].y)) return Result::InvalidArguments;
+            if (!_finite(vectors[k])) return Result::InvalidArguments;
         }
     } else if (!fn) {
         return Result::InvalidArguments;
@@ -520,7 +515,7 @@ Result Group::streamLines(const Vec2* seeds, uint32_t count, const Bounds* regio
     output = nullptr;
     if (!seeds || !count || !fn || !_validLines(options)) return Result::InvalidArguments;
     for (auto k = 0u; k < count; k++) {
-        if (!std::isfinite(seeds[k].x) || !std::isfinite(seeds[k].y)) return Result::InvalidArguments;
+        if (!_finite(seeds[k])) return Result::InvalidArguments;
     }
     if (region && !(std::isfinite(region->min.x) && std::isfinite(region->min.y) && std::isfinite(region->max.x)
                     && std::isfinite(region->max.y) && region->min.x <= region->max.x

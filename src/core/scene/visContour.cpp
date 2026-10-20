@@ -10,6 +10,7 @@
 
 #include "vis.h"
 #include "visScene.h"
+#include "visSceneValidation.h"
 #include "../common/visConstants.h"
 
 namespace vis
@@ -27,8 +28,7 @@ struct ContourEdge
 
 static Result _samples(const Range& range, uint32_t& count)
 {
-    if (!std::isfinite(range.min) || !std::isfinite(range.max) || !std::isfinite(range.step)
-        || range.min > range.max || range.step <= 0.0f) return Result::InvalidArguments;
+    if (!_finite(range)) return Result::InvalidArguments;
     auto steps = std::floor((static_cast<double>(range.max) - range.min) / range.step + 1.0e-4);
     if (steps < 1.0) return Result::InvalidArguments;
     if (steps >= CONTOUR_SAMPLE_LIMIT) return Result::NonSupport;
@@ -36,16 +36,11 @@ static Result _samples(const Range& range, uint32_t& count)
     // Adjacent grid points must still be distinct in the retained float coordinates.
     auto previous = range.min;
     for (auto i = 1u; i < count; i++) {
-        auto point = static_cast<float>(static_cast<double>(range.min) + i * static_cast<double>(range.step));
+        auto point = range.sampleAt(i);
         if (!std::isfinite(point) || point <= previous) return Result::InvalidArguments;
         previous = point;
     }
     return Result::Success;
-}
-
-static float _at(const Range& range, uint32_t i)
-{
-    return static_cast<float>(static_cast<double>(range.min) + static_cast<double>(range.step) * i);
 }
 
 Result Plot::contour(const Range& xRange, const Range& yRange, const double* values,
@@ -77,9 +72,9 @@ Result Plot::contour(const Range& xRange, const Range& yRange, const double* val
         auto b = a + (alongX ? 1u : columns);
         auto va = values[a], vb = values[b];
         if ((va >= level) == (vb >= level)) continue;
-        auto ax = static_cast<double>(_at(xRange, x)), ay = static_cast<double>(_at(yRange, y));
-        auto bx = static_cast<double>(_at(xRange, x + (alongX ? 1u : 0u)));
-        auto by = static_cast<double>(_at(yRange, y + (alongX ? 0u : 1u)));
+        auto ax = static_cast<double>(xRange.sampleAt(x)), ay = static_cast<double>(yRange.sampleAt(y));
+        auto bx = static_cast<double>(xRange.sampleAt(x + (alongX ? 1u : 0u)));
+        auto by = static_cast<double>(yRange.sampleAt(y + (alongX ? 0u : 1u)));
         auto low = 0.0, high = 1.0;
         if (va == level) high = 0.0;
         else if (vb == level) low = 1.0;

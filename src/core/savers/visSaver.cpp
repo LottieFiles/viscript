@@ -21,6 +21,7 @@
 
 #include "vis.h"
 #include "visSaver.h"
+#include "../common/visString.h"
 
 namespace vis
 {
@@ -416,13 +417,6 @@ Result saver::timeline(const Scene* scene, uint32_t& fps, uint32_t& frames) noex
     if (!std::isfinite(frameValue) || frameValue > UINT32_MAX) return Result::InvalidArguments;
     frames = frameValue < 1.0 ? 1u : static_cast<uint32_t>(frameValue);
     return Result::Success;
-}
-
-static bool _ends(const char* value, const char* suffix)
-{
-    auto valueSize = std::strlen(value);
-    auto suffixSize = std::strlen(suffix);
-    return valueSize >= suffixSize && std::strcmp(value + valueSize - suffixSize, suffix) == 0;
 }
 
 #if !defined(__EMSCRIPTEN__) && !defined(_WIN32)

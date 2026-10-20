@@ -16,6 +16,8 @@
 #include "visRendererData.h"
 #include "visScene.h"
 #include "visTvgRenderer.h"
+#include "../../common/visFinite.h"
+#include "../../common/visLayout.h"
 #include "../../common/visString.h"
 
 namespace vis
@@ -196,7 +198,7 @@ Result Renderer::sample(const Scene* scene, float time, const Vec2& position,
     renderer::TvgDiagnosis diagnosis(pImpl->diagnostic);
     if (!scene || !scene->pImpl || !candidates
         || !count || count > 64u || !pixelRatio || !std::isfinite(time) || time < 0.0f
-        || !std::isfinite(position.x) || !std::isfinite(position.y)) {
+        || !_finite(position)) {
         return Result::InvalidArguments;
     }
     auto& config = scene->pImpl->cfg;
@@ -350,9 +352,7 @@ static Result _paintBounds(const DisplayList& list, Pick pick, RasterPresence& p
     auto measured = found && renderer::tvgSuccess(root->bounds(&bounds.x, &bounds.y,
                                                                &bounds.width, &bounds.height));
     renderer::tvgRelease(root);
-    if (!measured || !std::isfinite(bounds.x) || !std::isfinite(bounds.y)
-        || !std::isfinite(bounds.width) || !std::isfinite(bounds.height)
-        || bounds.width <= 0.0f || bounds.height <= 0.0f) {
+    if (!measured || !_finite(bounds) || bounds.width <= 0.0f || bounds.height <= 0.0f) {
         return Result::InsufficientCondition;
     }
     output = bounds;
@@ -613,15 +613,6 @@ static bool _layoutVisual(const DrawCommand& first, const DrawCommand& second)
     return first.object == second.object && first.counterpart == second.counterpart
         && first.visualKind == second.visualKind
         && first.visualOpacity == second.visualOpacity;
-}
-
-static float _layoutClearance(float first, float firstSize, float second, float secondSize)
-{
-    auto firstEnd = first + firstSize;
-    auto secondEnd = second + secondSize;
-    if (firstEnd <= second) return second - firstEnd;
-    if (secondEnd <= first) return first - secondEnd;
-    return -std::fmin(firstEnd, secondEnd) + std::fmax(first, second);
 }
 
 // The path of a scene record: the path of its parent, then its kind and index there.
@@ -1124,27 +1115,12 @@ Result Renderer::layout(const Scene* scene, float time, LayoutReport& output,
                     LayoutCollision collision;
                     collision.first = first.object;
                     collision.second = second.object;
-                    collision.clearance = {
-                        _layoutClearance(first.visibleBounds.x, first.visibleBounds.width,
-                                         second.visibleBounds.x, second.visibleBounds.width),
-                        _layoutClearance(first.visibleBounds.y, first.visibleBounds.height,
-                                         second.visibleBounds.y, second.visibleBounds.height),
-                    };
+                    collision.clearance = _clearance(first.visibleBounds, second.visibleBounds,
+                                                     padding, collision.separation);
                     collision.overlapping = collision.clearance.x < 0.0f
                                          && collision.clearance.y < 0.0f;
                     if (collision.overlapping) {
                         _layoutClip(first.visibleBounds, second.visibleBounds, collision.overlap);
-                    }
-                    auto horizontal = padding - collision.clearance.x;
-                    auto vertical = padding - collision.clearance.y;
-                    if (horizontal <= vertical) {
-                        collision.separation.x = second.visibleBounds.center().x
-                                               < first.visibleBounds.center().x
-                                               ? -horizontal : horizontal;
-                    } else {
-                        collision.separation.y = second.visibleBounds.center().y
-                                               < first.visibleBounds.center().y
-                                               ? -vertical : vertical;
                     }
                     if (!report->add(collision)) return Result::OutOfMemory;
                 }

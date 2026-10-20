@@ -9,6 +9,7 @@
 
 #include "visTex.h"
 #include "visTexScene.h"
+#include "../common/visFinite.h"
 #include "../common/visSort.h"
 
 namespace vis::tex
@@ -752,9 +753,8 @@ bool prepare(Scene* scene, const char* const* sources, uint32_t count, bool spli
     if (!scene || !sources || !count || (!split && count != 1u) || output.laid || output.root) {
         return _fail(error, errorSize, "a formula needs a scene and its TeX");
     }
-    if (!std::isfinite(options.size) || options.size < 0.0f || !std::isfinite(options.point.x)
-        || !std::isfinite(options.point.y) || !std::isfinite(options.point.z) || !std::isfinite(options.align.x)
-        || !std::isfinite(options.align.y)) {
+    if (!std::isfinite(options.size) || options.size < 0.0f || !_finite(options.point)
+        || !_finite(options.align)) {
         return _fail(error, errorSize, "the size, point and align must be finite and the size not negative");
     }
 
@@ -853,9 +853,7 @@ bool draw(Built& output, const Vec3& origin, bool detached, char* error, uint32_
     if (error && errorSize) error[0] = '\0';
     auto laid = output.laid;
     if (!laid || output.root) return _fail(error, errorSize, "a formula is drawn once, once it is prepared");
-    if (!std::isfinite(origin.x) || !std::isfinite(origin.y) || !std::isfinite(origin.z)) {
-        return _fail(error, errorSize, "the point must be finite");
-    }
+    if (!_finite(origin)) return _fail(error, errorSize, "the point must be finite");
     auto& items = laid->laid;
     auto count = output.sourceCount;
     auto split = laid->split;

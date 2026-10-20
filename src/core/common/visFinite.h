@@ -24,6 +24,12 @@ static inline bool _finite(const Vec3& value) noexcept
     return std::isfinite(value.x) && std::isfinite(value.y) && std::isfinite(value.z);
 }
 
+static inline bool _finite(const BBox& value) noexcept
+{
+    return std::isfinite(value.x) && std::isfinite(value.y) && std::isfinite(value.width)
+        && std::isfinite(value.height);
+}
+
 static inline bool _finite(const Mat4& value) noexcept
 {
     for (auto item : value.e) {

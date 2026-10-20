@@ -13,6 +13,7 @@
 #endif
 #include "visLuaHost.h"
 #include "visCliCommon.h"
+#include "../core/common/visString.h"
 #include "../core/renderer/visLayoutJson.h"
 #if defined(VIS_AUDIO) && !defined(_WIN32)
 #include <unistd.h>
@@ -44,14 +45,6 @@ static void _usage()
                  "the engine's default font, with a warning.\n"
                  "--audio plays a sound file, such as a narration, from time 0 in an .mp4.\n"
     );
-}
-
-static bool _ends(const char* value, const char* suffix)
-{
-    auto valueSize = std::strlen(value);
-    auto suffixSize = std::strlen(suffix);
-    if (valueSize < suffixSize) return false;
-    return std::strcmp(value + valueSize - suffixSize, suffix) == 0;
 }
 
 // Reports a failed renderer call, preferring the renderer's own reason.

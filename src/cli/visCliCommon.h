@@ -13,7 +13,7 @@
 
 #include "vis.h"
 #include "visLuaHost.h"
-#include "../core/common/visJson.h"
+#include "../core/common/visString.h"
 
 // A positive decimal that fits uint32_t, or with allowZero a non-negative one.
 static inline bool _uint(const char* value, uint32_t& output, bool allowZero = false)

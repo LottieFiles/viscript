@@ -1,4 +1,5 @@
-// C strings: a copy in new storage, and the length of a UTF-8 sequence.
+// C strings: a copy in new storage, whether one ends in a file extension, and the length of a
+// UTF-8 sequence.
 #ifndef _VIS_STRING_H_
 #define _VIS_STRING_H_
 
@@ -18,6 +19,22 @@ static inline char* _duplicate(const char* text)
     auto copy = new (std::nothrow) char[size];
     if (copy) std::memcpy(copy, text, size);
     return copy;
+}
+
+// Whether text ends in suffix, a lower case extension such as ".png", which its letters match in
+// either case.
+static inline bool _ends(const char* text, const char* suffix)
+{
+    auto textSize = std::strlen(text);
+    auto suffixSize = std::strlen(suffix);
+    if (textSize < suffixSize) return false;
+    text += textSize - suffixSize;
+    for (auto i = 0u; i < suffixSize; i++) {
+        auto c = text[i];
+        if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
+        if (c != suffix[i]) return false;
+    }
+    return true;
 }
 
 // The length of the well-formed UTF-8 sequence of two to four bytes at value, or 0. The lead byte

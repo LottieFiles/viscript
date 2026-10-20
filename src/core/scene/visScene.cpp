@@ -257,7 +257,7 @@ static void _hash(uint64_t& hash, const char* value)
 
 uint64_t fingerprint(const Object* object) noexcept
 {
-    auto hash = uint64_t{14695981039346656037ull};
+    auto hash = HASH_BASIS;
     auto type = object->type();
     _hash(hash, type);
     _hash(hash, object->style.stroke);
@@ -4556,8 +4556,7 @@ Result Space::place(Object* label, uint8_t axis, float value, const Vec3& direct
     // Then the side of its bounds that faces the tick lies the distance past it, centered on the
     // line from the tick.
     auto normal = run / runLength;
-    auto half = own.size() * 0.5f;
-    auto support = std::fabs(normal.x) * half.x + std::fabs(normal.y) * half.y + std::fabs(normal.z) * half.z;
+    auto support = reach(own, normal);
     auto screenGap = text ? text->objScreenGap : -1.0f;
     if (text) text->objScreenGap = -1.0f;
     auto result = label->layout(Mat4::translate(to + normal * support - own.center()) * label->model);
@@ -5840,15 +5839,7 @@ static Result _emphasisBounds(Scene& scene, const Impl& impl, const Object* obje
     auto result = impl.world(object, time, state, alive);
     if (result != Result::Success) return result;
     Bounds local;
-    auto known = alive && _emphasisLocal(scene, object, state, local);
-    for (auto corner = 0u; known && corner < 8u; corner++) {
-        auto point = state.model * Vec3{corner & 1u ? local.max.x : local.min.x, corner & 2u ? local.max.y : local.min.y,
-                                        corner & 4u ? local.max.z : local.min.z};
-        if (!defined) bounds = {point, point};
-        bounds.min = {std::fmin(bounds.min.x, point.x), std::fmin(bounds.min.y, point.y), std::fmin(bounds.min.z, point.z)};
-        bounds.max = {std::fmax(bounds.max.x, point.x), std::fmax(bounds.max.y, point.y), std::fmax(bounds.max.z, point.z)};
-        defined = true;
-    }
+    if (alive && _emphasisLocal(scene, object, state, local)) include(bounds, defined, local, state.model);
     for (auto i = 0u; i < object->childCount(); i++) {
         result = _emphasisBounds(scene, impl, object->childAt(i), time, bounds, defined);
         if (result != Result::Success) return result;
@@ -6197,13 +6188,6 @@ Result Scene::emphasize(const Emphasis& emphasis, float duration, const AnimCurv
 
 // ---------- Arranging ----------
 
-// How far bounds reach from their center along a unit axis.
-static float _reach(const Bounds& bounds, const Vec3& axis)
-{
-    auto half = bounds.size() * 0.5f;
-    return std::fabs(axis.x) * half.x + std::fabs(axis.y) * half.y + std::fabs(axis.z) * half.z;
-}
-
 // An item that grows into its place, and the model it had before.
 struct ArrangedItem
 {
@@ -6254,15 +6238,15 @@ Result Scene::arrange(Object* const* items, uint32_t count, const Vec3& directio
     // The items follow one another along the axis, each as long as its bounds reach.
     auto axis = direction / length;
     auto total = 0.0f;
-    for (auto i = 0u; i < count; i++) total += _reach(boxes[i], axis) * 2.0f + (i ? gap : 0.0f);
+    for (auto i = 0u; i < count; i++) total += reach(boxes[i], axis) * 2.0f + (i ? gap : 0.0f);
     auto cursor = -total * 0.5f;
     auto moving = 0u;
     auto growing = 0u;
     for (auto i = 0u; i < count; i++) {
         auto item = items[i];
-        auto reach = _reach(boxes[i], axis);
-        auto offset = center + axis * (cursor + reach) - boxes[i].center();
-        cursor += reach * 2.0f + gap;
+        auto half = reach(boxes[i], axis);
+        auto offset = center + axis * (cursor + half) - boxes[i].center();
+        cursor += half * 2.0f + gap;
         auto entry = impl.entry(item);
         // An item attached at the cursor has not been seen yet: it starts in its place.
         if (entry->born == impl.cursor && !_hasClip(*entry)) {
@@ -6495,7 +6479,7 @@ static const char* _unanimatable(const Object* object, const Targeted& values)
     }
     if (properties & TARGET_SIZE) {
         auto& size = values.size;
-        if ((type != Type::Rectangle && type != Type::Text) || !std::isfinite(size.x) || !std::isfinite(size.y)
+        if ((type != Type::Rectangle && type != Type::Text) || !_finite(size)
             || size.x <= 0.0f || size.y <= 0.0f || (type == Type::Text && size.x != size.y)) {
             return VALUE_SIZE;
         }
@@ -8329,8 +8313,7 @@ Result Scene::cameraInput(const CameraInput& input) noexcept
     if (pImpl->cfg.cameraMode != CameraMode::Interactive) {
         return Result::InsufficientCondition;
     }
-    if (static_cast<uint8_t>(input.action) > static_cast<uint8_t>(CameraAction::View3D)
-        || !std::isfinite(input.delta.x) || !std::isfinite(input.delta.y)) {
+    if (static_cast<uint8_t>(input.action) > static_cast<uint8_t>(CameraAction::View3D) || !_finite(input.delta)) {
         return Result::InvalidArguments;
     }
     for (auto i = 0u; i < pImpl->runtimeModifierCnt; i++) {
@@ -8449,8 +8432,7 @@ Result Scene::Impl::orbit(const CameraTrack& track, float angle, const Vec3& axi
     if (track.view != CameraView::ThreeD) return fail(Result::InsufficientCondition, ORBIT_VIEW);
     if (!std::isfinite(angle) || angle == 0.0f) return fail(Result::InvalidArguments, ORBIT_ANGLE);
     Vector64 unit;
-    if (!std::isfinite(axis.x) || !std::isfinite(axis.y) || !std::isfinite(axis.z)
-        || !_normalize(axis.x, axis.y, axis.z, unit)) {
+    if (!_finite(axis) || !_normalize(axis.x, axis.y, axis.z, unit)) {
         return fail(Result::InvalidArguments, ORBIT_AXIS);
     }
     if (!std::isfinite(duration) || duration <= 0.0f) return fail(Result::InvalidArguments, PLAY_DURATION);

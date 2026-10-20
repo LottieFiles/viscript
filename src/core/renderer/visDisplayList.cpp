@@ -1984,36 +1984,6 @@ int32_t Scene::Impl::drawLayer(const Object* object, float time) const noexcept
     return static_cast<int32_t>(std::clamp<int64_t>(layer, INT32_MIN, INT32_MAX));
 }
 
-static void _include(Bounds& bounds, bool& defined, const Vec3& point)
-{
-    if (!defined) {
-        bounds.min = point;
-        bounds.max = point;
-        defined = true;
-        return;
-    }
-    bounds.min.x = std::fmin(bounds.min.x, point.x);
-    bounds.min.y = std::fmin(bounds.min.y, point.y);
-    bounds.min.z = std::fmin(bounds.min.z, point.z);
-    bounds.max.x = std::fmax(bounds.max.x, point.x);
-    bounds.max.y = std::fmax(bounds.max.y, point.y);
-    bounds.max.z = std::fmax(bounds.max.z, point.z);
-}
-
-static void _bounds(const Bounds& local, const Mat4& model, Bounds& bounds, bool& defined)
-{
-    for (auto x = 0u; x < 2u; x++) {
-        for (auto y = 0u; y < 2u; y++) {
-            for (auto z = 0u; z < 2u; z++) {
-                _include(bounds, defined, model * Vec3{
-                    x ? local.max.x : local.min.x,
-                    y ? local.max.y : local.min.y,
-                    z ? local.max.z : local.min.z});
-            }
-        }
-    }
-}
-
 static Result _morph(DisplayList& list, const Object* object, const VisualState& state, const Config& config,
                      const Style& style)
 {
@@ -2095,7 +2065,7 @@ static bool _localBounds(const Object* object, const VisualState& state, Bounds&
         }
         drawn(object, state, points);
         auto defined = false;
-        for (auto i = 0u; i < count; i++) _include(bounds, defined, points[i]);
+        for (auto i = 0u; i < count; i++) include(bounds, defined, points[i]);
         delete[] points;
         return defined;
     } else if ((state.geometry && object->type() == Type::Plot)
@@ -2112,8 +2082,8 @@ static bool _localBounds(const Object* object, const VisualState& state, Bounds&
         return localBounds(object, nullptr, 0.0f, bounds);
     }
     auto defined = false;
-    _include(bounds, defined, center - half);
-    _include(bounds, defined, center + half);
+    include(bounds, defined, center - half);
+    include(bounds, defined, center + half);
     return true;
 }
 
@@ -2129,7 +2099,7 @@ Result Scene::Impl::bounds(const Object* object, float time, Bounds& bounds, boo
             if (!shape || !shape->count) return Result::NonSupport;
             for (auto i = 0u; i < shape->count; i++) {
                 auto point = shape->from[i] + (shape->to[i] - shape->from[i]) * state.morphProgress;
-                _include(bounds, defined, state.model * point);
+                include(bounds, defined, state.model * point);
             }
         } else if (state.warp && _bends(object->type())) {
             // Each point the warp has reached, but where a space writes its numbers and ticks.
@@ -2138,13 +2108,13 @@ Result Scene::Impl::bounds(const Object* object, float time, Bounds& bounds, boo
             for (auto run = 0u; run < warp.runCount; run++) {
                 auto marks = spaceMark(warp.runs[run].part);
                 for (auto i = begin; i < warp.runs[run].end && !marks; i++)
-                    _include(bounds, defined, state.model * warp.at(i, state.warpProgress));
+                    include(bounds, defined, state.model * warp.at(i, state.warpProgress));
                 begin = warp.runs[run].end;
             }
         } else {
             Bounds local;
             auto failed = false;
-            if (_localBounds(object, state, local, failed)) _bounds(local, state.model, bounds, defined);
+            if (_localBounds(object, state, local, failed)) include(bounds, defined, local, state.model);
             if (failed) return Result::OutOfMemory;
         }
     }

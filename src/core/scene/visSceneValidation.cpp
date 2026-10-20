@@ -2,6 +2,7 @@
 #include "visScene.h"
 #include "visSceneValidation.h"
 #include "../common/visConstants.h"
+#include "../common/visControl.h"
 
 namespace vis
 {
@@ -10,45 +11,13 @@ bool valid(const Config& config) noexcept
 {
     if (!config.width || !config.height || !config.fps) return false;
     if (config.cameraMode != CameraMode::Fixed && config.cameraMode != CameraMode::Interactive) return false;
-    if (config.cameraView != CameraView::TwoD && config.cameraView != CameraView::ThreeD) return false;
-    auto& camera = config.camera;
-    if (!_finite(camera.eye) || !_finite(camera.target) || !_finite(camera.up)) return false;
-    if (camera.projection != Projection::Perspective && camera.projection != Projection::Orthographic) return false;
-    if (!std::isfinite(camera.near) || !std::isfinite(camera.far) || camera.near <= 0.0f || camera.far <= camera.near) {
-        return false;
-    }
-    if (!std::isfinite(camera.fov) || camera.fov <= 0.0f || camera.fov >= PI) return false;
-    if (!std::isfinite(camera.orthoHeight) || camera.orthoHeight <= 0.0f) return false;
-    if (config.cameraView == CameraView::TwoD && (camera.projection != Projection::Orthographic || camera.eye.x != camera.target.x || camera.eye.y != camera.target.y || camera.eye.z <= camera.target.z || camera.up.x != 0.0f || camera.up.y <= 0.0f || camera.up.z != 0.0f)) {
-        return false;
-    }
-    auto fx = static_cast<double>(camera.target.x) - camera.eye.x;
-    auto fy = static_cast<double>(camera.target.y) - camera.eye.y;
-    auto fz = static_cast<double>(camera.target.z) - camera.eye.z;
-    auto forwardScale = std::fmax(std::fmax(std::fabs(fx), std::fabs(fy)), std::fabs(fz));
-    auto upScale = std::fmax(std::fmax(std::fabs(camera.up.x), std::fabs(camera.up.y)), std::fabs(camera.up.z));
-    if (!std::isfinite(forwardScale) || !std::isfinite(upScale) || forwardScale == 0.0 || upScale == 0.0) return false;
-    fx /= forwardScale;
-    fy /= forwardScale;
-    fz /= forwardScale;
-    auto forwardLength = std::hypot(fx, fy, fz);
-    auto ux = static_cast<double>(camera.up.x) / upScale;
-    auto uy = static_cast<double>(camera.up.y) / upScale;
-    auto uz = static_cast<double>(camera.up.z) / upScale;
-    auto upLength = std::hypot(ux, uy, uz);
-    fx /= forwardLength;
-    fy /= forwardLength;
-    fz /= forwardLength;
-    ux /= upLength;
-    uy /= upLength;
-    uz /= upLength;
-    return std::hypot(fy * uz - fz * uy, fz * ux - fx * uz, fx * uy - fy * ux) > 1.0e-6;
+    return _validCamera(config.camera, config.cameraView);
 }
 
 bool valid(const Shadow& shadow) noexcept
 {
-    return std::isfinite(shadow.offset.x) && std::isfinite(shadow.offset.y) && std::isfinite(shadow.blur)
-           && shadow.blur >= 0.0f && shadow.blur <= EFFECT_SIGMA_LIMIT;
+    return _finite(shadow.offset) && std::isfinite(shadow.blur) && shadow.blur >= 0.0f
+           && shadow.blur <= EFFECT_SIGMA_LIMIT;
 }
 
 bool valid(const Object* object) noexcept

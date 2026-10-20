@@ -8,6 +8,7 @@
 #include <cstring>
 
 #include "vis.h"
+#include "../core/common/visHash.h"
 
 // The checks that failed in this test executable, in any of its sources.
 inline int failures = 0;
@@ -60,14 +61,11 @@ static inline uint32_t changed(const vis::Surface& surface, vis::Color backgroun
     return count;
 }
 
-// A hash of the pixels of a surface: 64-bit FNV-1a over its 32-bit pixels.
+// A hash of the pixels of a surface.
 static inline uint64_t checksum(const vis::Surface& surface)
 {
-    auto hash = 14695981039346656037ull;
-    for (auto i = 0u; i < surface.width() * surface.height(); i++) {
-        hash ^= surface.data()[i];
-        hash *= 1099511628211ull;
-    }
+    auto hash = vis::HASH_BASIS;
+    vis::_hash(hash, surface.data(), surface.width() * surface.height() * sizeof(uint32_t));
     return hash;
 }
 
