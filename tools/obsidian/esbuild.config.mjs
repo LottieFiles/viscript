@@ -3,9 +3,10 @@
 // scenes run in, the runtime binary and the bundled fonts go inside main.js, gzipped and
 // base64-encoded; src/embedded.ts unpacks them.
 //
-//   node esbuild.config.mjs [--watch] [--no-minify] [--vault <vault folder>]
+//   node esbuild.config.mjs [--watch] [--no-minify] [--vault <vault folder>] [--skill]
 //
 // --vault copies the plugin into <vault>/.obsidian/plugins/viscript after each build.
+// --skill bundles the installable plugin with the vis-obsidian skill.
 import {build, context} from "esbuild";
 import {copyFile, mkdir, readdir, readFile, stat} from "node:fs/promises";
 import {builtinModules} from "node:module";
@@ -63,7 +64,7 @@ const EXTERNAL = [
 
 async function banner() {
     const texts = await Promise.all(NOTICES.map(async ([name, path]) => {
-        const text = (await readFile(path, "utf8")).trim().replaceAll("*/", "* /");
+        const text = (await readFile(path, "utf8")).trim().replace(/[\t ]+$/gm, "").replaceAll("*/", "* /");
         return `${name}\n\n${text}`;
     }));
     return `/*\nviscript for Obsidian. This file includes the following, under these licenses.\n\n${
@@ -121,14 +122,12 @@ function embedded({minify}) {
     };
 }
 
-function copyToVault(vault) {
+function copyPlugin(dir) {
     return {
-        name: "copy-to-vault",
+        name: "copy-plugin",
         setup(build) {
             build.onEnd(async (result) => {
                 if (result.errors.length) return;
-                const {id} = JSON.parse(await readFile(join(here, "manifest.json"), "utf8"));
-                const dir = join(vault, ".obsidian/plugins", id);
                 await mkdir(dir, {recursive: true});
                 await Promise.all(["main.js", "manifest.json", "styles.css"].map((name) => copyFile(join(here, name), join(dir, name))));
                 console.log(`copied to ${dir}`);
@@ -142,6 +141,11 @@ const watch = args.includes("--watch");
 const minify = !args.includes("--no-minify") && !watch;
 const vaultAt = args.indexOf("--vault");
 const vault = vaultAt >= 0 ? resolve(args[vaultAt + 1] ?? "") : null;
+const {id} = JSON.parse(await readFile(join(here, "manifest.json"), "utf8"));
+const destinations = [
+    ...vault ? [join(vault, ".obsidian/plugins", id)] : [],
+    ...args.includes("--skill") ? [join(root, "tools/skill/vis-obsidian/assets/plugin")] : [],
+];
 
 const options = {
     entryPoints: [join(here, "src/main.ts")],
@@ -156,7 +160,7 @@ const options = {
     sourcemap: watch ? "inline" : false,
     banner: {js: await banner()},
     external: EXTERNAL,
-    plugins: [embedded({minify}), runtime(runtimeDir), ...vault ? [copyToVault(vault)] : []],
+    plugins: [embedded({minify}), runtime(runtimeDir), ...destinations.map(copyPlugin)],
     logLevel: "info",
 };
 

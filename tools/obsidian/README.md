@@ -7,6 +7,17 @@ The viscript WebAssembly runtime draws them in a render worker through the share
 
 ## Install
 
+The [vis-obsidian skill](../skill/vis-obsidian/SKILL.md) includes the built plugin,
+its WASM runtime and fonts. Install that bundle into an existing vault:
+
+```sh
+node tools/skill/vis-obsidian/scripts/install.mjs /path/to/vault
+```
+
+Add `--show-source` to show scripts below note players. The installer preserves
+existing notes and settings. Enable **viscript** in **Community plugins**, or
+reload it after an update.
+
 Build the plugin from the checkout and copy it into a vault:
 
 ```sh
@@ -15,6 +26,9 @@ npm ci && npm ci --prefix ../player
 npm run build                                  # main.js
 node esbuild.config.mjs --vault /path/to/vault # builds and copies it to the vault
 ```
+
+To refresh the plugin included with the skill, run
+`npm run bundle:skill --prefix tools/obsidian` from the repository root.
 
 The copy goes to `<vault>/.obsidian/plugins/viscript/` (`main.js`, `manifest.json`,
 `styles.css`). Turn it on under **Settings → Community plugins**. While working on the plugin,

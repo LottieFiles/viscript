@@ -1,0 +1,4 @@
+interface:
+  display_name: "viscript Obsidian"
+  short_description: "Install and embed viscript scenes in Obsidian"
+  default_prompt: "Use $vis-obsidian to install the bundled plugin, organize scenes under Animations/<note folder path>/<note name>/*.lua, embed them in my notes, and configure fonts and source visibility. Use vis-skills for the scene itself."

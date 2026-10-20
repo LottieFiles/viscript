@@ -83,6 +83,7 @@ endforeach
 node = find_program('node', required: false)
 if node.found()
     test('skill-static-check', node, args: [files('check.mjs'), meson.project_source_root()])
+    test('skill-obsidian-install', node, args: ['--test', files('vis-obsidian/test/install.test.mjs')])
     # The plate template, rendered with the bundled runtime as the VS Code Viewer renders it,
     # in Source Serif 4 and the runtime's light and dark host colors.
     test(

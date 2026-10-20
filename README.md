@@ -269,6 +269,7 @@ the agent writes it, checks it and renders it.
 | `vis-skills` | [`tools/skill/vis-skills/`](tools/skill/vis-skills) | Scenes in Lua or JS/TS: animations, diagrams, algorithm traces, 2D/3D graphics, math shorts, cheatsheets. |
 | `vis-interactive` | [`tools/skill/vis-interactive/`](tools/skill/vis-interactive) | Interactive scenes: UI, input, fixed-step runtime, audio. |
 | `vis-vscode` | [`tools/skill/vis-vscode/`](tools/skill/vis-vscode) | Linking scenes to product code in the VS Code extension (`.vscode/vis/`). |
+| `vis-obsidian` | [`tools/skill/vis-obsidian/`](tools/skill/vis-obsidian) | Installing the bundled Obsidian plugin, embedding scene files in notes, fonts and source display. |
 | `vis-animation-dev` | [`tools/skill/vis-animation-dev/`](tools/skill/vis-animation-dev) | Changing viscript itself: engine, bindings, builds, tests. |
 
 Link them into your agent's skill folder from the repository root, so they stay current
@@ -277,13 +278,13 @@ with the checkout:
 ```sh
 # Claude Code: this project only (.claude/skills), or every project (~/.claude/skills)
 mkdir -p .claude/skills
-for skill in vis-skills vis-interactive vis-vscode vis-animation-dev; do
+for skill in vis-skills vis-interactive vis-vscode vis-obsidian vis-animation-dev; do
     ln -s "$PWD/tools/skill/$skill" ".claude/skills/$skill"
 done
 
 # Codex
 mkdir -p ~/.codex/skills
-for skill in vis-skills vis-interactive vis-vscode vis-animation-dev; do
+for skill in vis-skills vis-interactive vis-vscode vis-obsidian vis-animation-dev; do
     ln -s "$PWD/tools/skill/$skill" ~/.codex/skills/$skill
 done
 ```
@@ -296,6 +297,19 @@ native build. Then ask, for example:
 ```text
 Use vis-skills to animate binary search on a sorted array of 16 numbers.
 ```
+
+`vis-obsidian` includes a ready-to-install plugin with its WASM runtime and fonts.
+It keeps longer scenes in `Animations/<note folder path>/<note name>/*.lua` and
+embeds them from notes: `Algorithms/Search.md` uses
+`Animations/Algorithms/Search/overview.lua`. Short examples can stay inline.
+Install into an existing vault without building:
+
+```sh
+node tools/skill/vis-obsidian/scripts/install.mjs /path/to/vault
+```
+
+Use `--show-source` to show scripts below note players. In Obsidian, enable
+**viscript** under **Community plugins**; the skill covers font and player settings.
 
 ## License
 

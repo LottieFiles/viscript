@@ -7,7 +7,7 @@ description: "Build interactive viscript scenes in retained Lua: UI, Input, Stat
 
 Build retained-Lua interactive scenes against the delivery host. Start with a deterministic, readable scene and verify every interaction.
 
-Route general authored animation to [vis-skills](../vis-skills/SKILL.md), VS Code hosts to [vis-vscode](../vis-vscode/SKILL.md), and engine, bindings, or build work to [vis-animation-dev](../vis-animation-dev/SKILL.md).
+Route general authored animation to [vis-skills](../vis-skills/SKILL.md), VS Code hosts to [vis-vscode](../vis-vscode/SKILL.md), Obsidian hosts to [vis-obsidian](../vis-obsidian/SKILL.md), and engine, bindings, or build work to [vis-animation-dev](../vis-animation-dev/SKILL.md).
 
 First apply the [viscript scene contract](../vis-skills/references/scene-contract.md) and [Lua API](../vis-skills/references/lua.md) to the authored base Scene. Then read [references/interaction-model.md](references/interaction-model.md) for UI/Input routing and coordinates and [references/review.md](references/review.md) for native input, retained Runtime, Audio, and delivery checks.
 

@@ -21,6 +21,7 @@ Templates under `templates/` are working API starting points for each profile. `
 
 - `vis-interactive`: UI/Input, retained runtime, audio, interactive state.
 - `vis-vscode`: Preview, manifests, CodeLens/hover, the VS Code host's `adaptive` theme.
+- [vis-obsidian](../vis-obsidian/SKILL.md): the bundled Obsidian plugin, scene-file embeds, fonts, and player source toggles.
 - `vis-animation-dev`: engine, bindings, builds, VS Code extension source.
 
 ## Author
