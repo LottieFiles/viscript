@@ -18,7 +18,7 @@ Lua-enabled hosts expose `vis.states(scene)`.
 ## Define and select states
 
 ```lua
-local scene = vis.scene {width = 960, height = 540}
+local scene = vis.scene {}
 local answer = scene:rectangle {id = "answer", size = {2, 0.8}}
 local states = vis.states(scene)
 

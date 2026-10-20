@@ -23,7 +23,7 @@ cue continues until its configured end or transport stop. Gain clips sample on t
 same Scene clock. `scene:wait` establishes the animation duration.
 
 ```lua
-local scene = vis.scene {width = 960, height = 540}
+local scene = vis.scene {}
 local music = vis.audio.cue(scene, {
     asset = "music.mp3", bus = "music", begin = 0, ["end"] = 18,
     gain = 0.7, loop = true,
@@ -114,7 +114,7 @@ preview connects these paths and synchronizes authored cues with its transport.
 The builder declares cues with `sound`:
 
 ```js
-const definition = vis.scene({width: 960, height: 540});
+const definition = vis.scene();
 const music = definition.sound({
     asset: "music.mp3", bus: "music", begin: 0, end: 18,
     gain: 0.7, loop: true,

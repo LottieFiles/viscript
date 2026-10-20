@@ -27,7 +27,7 @@ Font metrics determine glyph spacing, rules, scripts, and delimiters.
 ## Formulas and parts
 
 ```lua
-local scene = vis.scene {width = 960, height = 540}
+local scene = vis.scene {}
 local identity = scene:tex {
     tex = "e^{i\\pi} + 1 = 0",
     point = {0, 1.2}, role = "h2", id = "identity",

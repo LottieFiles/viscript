@@ -1,7 +1,7 @@
 -- README hero: the viscript title over a stage that cycles through what a scene can hold:
 -- math, geometry, motion and drawing. Each act slides in from the right and out to the left.
-local scene = vis.scene {width = 1200, height = 600, fps = 30, loop = true, theme = "pro_white",
-  camera = {view = "2d", target = {0, 0}, height = 10}}
+local scene = vis.scene {width = 1200, height = 600, loop = true, theme = "pro_white",
+  camera = {height = 10}}
 local INK = "foreground"
 
 -- Title (fixed).
@@ -17,7 +17,7 @@ local function act(name) local g = scene:group {id = "act-" .. name}; acts[#acts
 -- Act 1: MATH — a point on the unit circle traces sin θ.
 local A1 = act("math")
 local R, CX, WX0, WX1 = 1.7, -4.6, -2.2, 6.2
-A1:circle {center = {CX, SY}, radius = R, fill = "#00000000", stroke = INK, width = 2.5}
+A1:circle {center = {CX, SY}, radius = R, stroke = INK, width = 2.5}
 A1:line {from = {CX - R - 0.3, SY}, to = {WX1 + 0.3, SY}, stroke = "border", width = 1.5}
 A1:line {from = {CX, SY - R - 0.3}, to = {CX, SY + R + 0.3}, stroke = "border", width = 1.5}
 local K = (WX1 - WX0) / (2 * math.pi)
@@ -81,7 +81,7 @@ end
 local rose = A4:polygon {points = pts, fill = "#00000000", stroke = "accent", width = 3, progress = 0}
 local core = A4:circle {center = {0, SY}, radius = 0.32, fill = "warning", stroke = INK, width = 2.5}
 scene:set({target = core, opacity = 0})
-local ring = A4:circle {center = {0, SY}, radius = 2.75, fill = "#00000000", stroke = "border", width = 1.5, dash = {4, 6}}
+local ring = A4:circle {center = {0, SY}, radius = 2.75, stroke = "border", width = 1.5, dash = {4, 6}}
 
 -- Hidden off-stage to the right until their turn.
 for i = 2, #acts do scene:set({target = acts[i].g, shift = {SLIDE, 0}, opacity = 0}) end

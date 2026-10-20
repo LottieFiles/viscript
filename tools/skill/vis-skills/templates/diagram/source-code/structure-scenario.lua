@@ -10,10 +10,7 @@ local SPEC = {
     scenario = "main → detach(&divObserver) → setVal(20)",
 }
 
-local scene = vis.scene {
-    width = 1280, height = 720, fps = 30, loop = false,
-    camera = {mode = "fixed", view = "2d", target = {0, 0}, height = 720},
-}
+local scene = vis.scene {width = 1280, height = 720, camera = {height = 720}}
 
 local LAYER = {boundary = 0, route = 10, body = 20, text = 40, focus = 50}
 local root = scene:group {id = "structure-scenario:root"}
@@ -58,7 +55,7 @@ local scenarioPanel = panel(
 local function object_node(parent, id, titleText, detailText, center, size)
     local group = parent:group {id = id}
     local body = group:rectangle {
-        center = center, size = size, fill = "#00000000", stroke = "foreground",
+        center = center, size = size, stroke = "foreground",
         width = 1.25, layer = LAYER.body, id = id .. ":body",
     }
     local titleTextHandle = group:text {
@@ -85,7 +82,7 @@ local modObject = object_node(
 -- The field box holds the slots; its name sits above it as a label.
 local registry = structurePanel:group {id = "field:observers"}
 local registryBody = registry:rectangle {
-    center = {-272, 122}, size = {200, 64}, fill = "#00000000", stroke = "foreground",
+    center = {-272, 122}, size = {200, 64}, stroke = "foreground",
     width = 1.25, layer = LAYER.body, id = "field:observers:body",
 }
 local registryTitle = registry:text {
@@ -96,7 +93,7 @@ local slotCenters = {-322, -222}
 local slotBodies = {}
 for index, x in ipairs(slotCenters) do
     slotBodies[index] = registry:rectangle {
-        center = {x, 122}, size = {76, 40}, fill = "#00000000", stroke = "border",
+        center = {x, 122}, size = {76, 40}, stroke = "border",
         width = 1, layer = LAYER.body, id = "field:observers:slot:" .. index .. ":body",
     }
 end
@@ -111,7 +108,7 @@ slotInitial:text {
 }
 
 local stateBody = structurePanel:rectangle {
-    center = {-502, -204}, size = {196, 56}, fill = "#00000000", stroke = "foreground",
+    center = {-502, -204}, size = {196, 56}, stroke = "foreground",
     width = 1.25, layer = LAYER.body, id = "field:val:body",
 }
 local stateValue = structurePanel:text {
@@ -157,7 +154,7 @@ local actorHandles = {}
 for _, actor in ipairs(actors) do
     local group = scenarioPanel:group {id = "scenario:actor:" .. actor.id}
     local body = group:rectangle {
-        center = {actor.x, 154}, size = {actor.width, 44}, fill = "#00000000", stroke = "foreground",
+        center = {actor.x, 154}, size = {actor.width, 44}, stroke = "foreground",
         width = 1.25, layer = LAYER.body, id = "scenario:actor:" .. actor.id .. ":body",
     }
     local label = group:text {

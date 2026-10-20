@@ -1,14 +1,8 @@
 local scene = vis.scene {
-    width = 960,
-    height = 540,
-    fps = 30,
     camera = {
         mode = "interactive",
         view = "3d",
         eye = { 8, 6, 10 },
-        target = { 0, 0, 0 },
-        up = { 0, 1, 0 },
-        projection = "perspective",
         fov = 0.72,
         near = 0.1,
         far = 100,

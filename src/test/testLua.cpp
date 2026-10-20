@@ -270,6 +270,45 @@ return scene
     delete scene;
 }
 
+// A scene that names nothing is 960 by 540 at 30 fps, plays once and looks at the origin through a
+// fixed 2D camera 8 units tall; a side it names keeps the other side's default.
+static void _defaults()
+{
+    auto scene = _loaded("return vis.scene {}", "defaults.lua");
+    CHECK(scene != nullptr);
+    if (scene) {
+        auto& config = scene->config();
+        CHECK(config.width == 960u);
+        CHECK(config.height == 540u);
+        CHECK(config.fps == 30u);
+        CHECK(!config.loop);
+        CHECK(config.antialiasing);
+        CHECK(config.cameraMode == CameraMode::Fixed);
+        CHECK(config.cameraView == CameraView::TwoD);
+        CHECK(_near(config.camera.target.x, 0.0f) && _near(config.camera.target.y, 0.0f));
+        CHECK(_near(config.camera.orthoHeight, 8.0f));
+    }
+    delete scene;
+
+    struct Size
+    {
+        const char* source;
+        uint32_t width;
+        uint32_t height;
+    };
+    static constexpr Size sizes[] = {
+        {"return vis.scene {width = 640}", 640u, 540u},
+        {"return vis.scene {height = 360}", 960u, 360u},
+        {"return vis.scene {width = 1280, height = 720}", 1280u, 720u},
+    };
+    for (auto& size : sizes) {
+        scene = _loaded(size.source, "size.lua");
+        CHECK(scene != nullptr);
+        if (scene) CHECK(scene->config().width == size.width && scene->config().height == size.height);
+        delete scene;
+    }
+}
+
 static void _deterministic()
 {
     static constexpr auto source = R"lua(
@@ -599,6 +638,7 @@ int main()
     delete renderer;
 
     _directRoot();
+    _defaults();
     _tableHelpers();
     _queries();
     _rowQueries();

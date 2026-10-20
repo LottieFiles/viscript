@@ -2,10 +2,7 @@
 // scene file takes.
 
 // A scene that names no theme is adaptive, and takes its colors from the Obsidian theme.
-export const SCENE = `local scene = vis.scene {
-    width = 640, height = 360,
-    camera = {view = "2d", target = {0, 0}, height = 7},
-}
+export const SCENE = `local scene = vis.scene {width = 640, height = 360, camera = {height = 7}}
 local ball = scene:circle {center = {-3, 0}, radius = 0.5, fill = "accent"}
 scene:grow_from_center(ball, 0.6)
 scene:shift(ball, {6, 0}, 1.5)

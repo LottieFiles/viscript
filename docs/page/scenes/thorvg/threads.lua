@@ -103,7 +103,7 @@ local FONT = "CMUTypewriter-Regular"
 local scene = vis.scene {width = 800, height = 450, fps = 25, loop = true,
   theme = {preset = "pro_black",
     text = {h1 = {font = FONT}, h2 = {font = FONT}, h3 = {font = FONT}, text = {font = FONT}, code = {font = FONT}}},
-  camera = {mode = "fixed", view = "2d", target = {0, 0}, height = 4.5}}
+  camera = {height = 4.5}}
 
 local C = {paper = "background", surface = "surface", soft = "border", hair = "border", faint = "muted",
   inksoft = "foreground", ink = "foreground", accent = "accent", light = "accent", wash = "surface"}

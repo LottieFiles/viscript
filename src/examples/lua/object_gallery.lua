@@ -29,8 +29,7 @@ local function panel(index, title, background)
         height = 270,
         fps = 60,
         background = background,
-        loop = false,
-        camera = { mode = "fixed", view = "2d", target = { 0, 0 }, height = 6.4 },
+        camera = { height = 6.4 },
     }
     child:text {
         text = index,
@@ -384,8 +383,7 @@ local gallery = vis.scene {
     height = 540,
     fps = 60,
     background = p.background,
-    loop = false,
-    camera = { mode = "fixed", view = "2d", target = { 0, 0 }, height = 6.4 },
+    camera = { height = 6.4 },
 }
 local panels = { scenePanel, shapePanel, vectorPanel, textPanel, spacePanel, groupPanel }
 for index, child in ipairs(panels) do

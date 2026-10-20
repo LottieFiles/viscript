@@ -6,10 +6,7 @@ if not vis.ui then
 end
 
 local WIDTH, HEIGHT = 960, 540
-local scene = vis.scene {
-    width = WIDTH, height = HEIGHT, fps = 30, loop = true,
-    camera = {mode = "fixed", view = "2d", target = {0, 0}, height = HEIGHT},
-}
+local scene = vis.scene {width = WIDTH, height = HEIGHT, loop = true, camera = {height = HEIGHT}}
 
 local LAYER = {route = 10, body = 20, focus = 30, text = 40, control = 50}
 local BUTTON = {width = 190, height = 52, stroke = 2}
@@ -81,7 +78,7 @@ scene:text {
 local indicator = scene:group {id = "state-demo:indicator"}
 indicator:rectangle {
     center = {queued_x, state_y}, size = {270, 144}, corner = 6,
-    fill = "#00000000", stroke = "focus", width = 3,
+    stroke = "focus", width = 3,
     layer = LAYER.focus, id = "state-demo:indicator:outline",
 }
 indicator:circle {

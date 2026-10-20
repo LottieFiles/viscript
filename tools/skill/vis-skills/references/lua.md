@@ -3,17 +3,14 @@
 The host provides the `vis` global. Create a Scene, author its objects and timeline, then return it:
 
 ```lua
-local scene = vis.scene {
-    width = 960, height = 540, fps = 30, loop = false,
-    camera = {view = "2d", target = {0, 0}, height = 7},
-}
-local ball = scene:circle {center = {0, 0}, radius = 0.5, fill = "accent", id = "ball"}
+local scene = vis.scene {camera = {height = 7}}
+local ball = scene:circle {radius = 0.5, fill = "accent", id = "ball"}
 scene:grow_from_center(ball, 0.6)
 scene:wait(0.5)
 return scene
 ```
 
-Scene dimensions are pixels; positions are world coordinates. Follow [scene-contract.md](scene-contract.md) for the mapping. Vectors use `{x, y}` or `{x, y, z}` and numeric indices. Ranges use `{min, max, step}`. Colors use theme roles or hex `#rgb`, `#rgba`, `#rrggbb`, or `#rrggbbaa`.
+Scene dimensions are pixels, 960×540 when left out; positions are world coordinates. Follow [scene-contract.md](scene-contract.md) for the mapping. Vectors use `{x, y}` or `{x, y, z}` and numeric indices. Ranges use `{min, max, step}`. Colors use theme roles or hex `#rgb`, `#rgba`, `#rrggbb`, or `#rrggbbaa`.
 
 A Scene that names no theme is `"adaptive"`: it takes the colors and font of the host app, such as VS Code or Obsidian, and is Pro White without one. `"pro_white"` and `"pro_black"` are fixed. Camera options include `target`, world-unit `height`, and for 3D, `eye`, `up`, `projection`, `fov`, `near`, and `far`.
 

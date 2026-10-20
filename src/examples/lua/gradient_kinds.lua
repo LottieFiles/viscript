@@ -1,13 +1,6 @@
 -- Linear, radial and conic gradients side by side.
 -- Stops resolve Theme color roles or hex colors; geometry is in local coordinates.
-local scene = vis.scene {
-    width = 960,
-    height = 540,
-    fps = 30,
-    antialiasing = true,
-    background = "#0b111a",
-    camera = { mode = "fixed", view = "2d", height = 7.4 },
-}
+local scene = vis.scene {background = "#0b111a", camera = { height = 7.4 }}
 local space = scene:space {
     x = { -6.5, 6.5, 1 },
     y = { -3.5, 3.5, 1 },

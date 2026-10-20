@@ -1,9 +1,10 @@
 local pi = math.pi
 local r, polar, az = 8, 65 * pi / 180, -60 * pi / 180
-local s = vis.scene {width = 960, height = 540, fps = 30, loop = false, theme = "pro_black",
-    camera = {view = "3d", mode = "fixed", projection = "perspective", target = {0, 0, 0},
-        eye = {r * math.sin(polar) * math.cos(az), r * math.sin(polar) * math.sin(az), r * math.cos(polar)},
-        up = {0, 0, 1}, fov = 42 * pi / 180, near = 0.1, far = 100}}
+local s = vis.scene {theme = "pro_black", camera = {
+    view = "3d",
+    eye = {r * math.sin(polar) * math.cos(az), r * math.sin(polar) * math.sin(az), r * math.cos(polar)},
+    up = {0, 0, 1}, fov = 42 * pi / 180, near = 0.1, far = 100,
+}}
 local label_size, tick_length = 18, 8
 local label_gap = 2 * label_size * 4 / 3
 local axes = s:space {x = {-3, 3, 1}, y = {-3, 3, 1}, z = {-2, 2, 1},

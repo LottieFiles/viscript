@@ -1,8 +1,5 @@
 // The JavaScript twin of ../prelude.js, which the JavaScript versions of those scenes open with.
-export const PRELUDE = `const scene = vis.scene({
-    width: 960, height: 540, theme: "pro_black",
-    camera: {mode: "fixed", view: "2d", height: 6},
-});
+export const PRELUDE = `const scene = vis.scene({theme: "pro_black", camera: {height: 6}});
 const C = {panel: "#14171f", line: "#3a4152", text: "#e6e8ee", mute: "#7d8596", bar: "#2a3142",
            accent: "#6cb6ff", warn: "#e3b341", danger: "#ff7b72", ok: "#7ee787", alt: "#c8a7ff",
            none: "#00000000"};
@@ -31,9 +28,9 @@ function token(id, s, x, y, o = {}) {
     const layer = o.layer ?? L.token;
     const g = scene.group({id, matrix: at(x, y)});
     const b = o.circle
-        ? g.circle({id: id + ":box", center: [0, 0], radius: o.circle, fill: o.fill ?? C.panel,
+        ? g.circle({id: id + ":box", radius: o.circle, fill: o.fill ?? C.panel,
                     stroke: o.stroke ?? C.accent, width: o.width ?? 2, layer})
-        : g.rectangle({id: id + ":box", center: [0, 0], size: o.size ?? [0.9, 0.48], corner: 0.04,
+        : g.rectangle({id: id + ":box", size: o.size ?? [0.9, 0.48], corner: 0.04,
                        fill: o.fill ?? C.panel, stroke: o.stroke ?? C.accent, width: o.width ?? 1.5, layer});
     const t = T(g, id + ":label", s, 0, 0, o.text ?? 15, o.color ?? C.text, null, layer + 2);
     return {g, b, t, x, y, v: s};

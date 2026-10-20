@@ -34,14 +34,11 @@ When the app switches between light and dark, the scene is drawn again in the ne
 Switch this page between light and dark, and the scene below follows.
 
 ```lua live
-local scene = vis.scene {
-    width = 960, height = 540,
-    camera = {mode = "fixed", view = "2d", height = 6},
-}
+local scene = vis.scene {camera = {height = 6}}
 
 scene:text {text = "adaptive", role = "h2", point = {0, 2}}
 local a = scene:circle {center = {-2.6, 0}, radius = 0.7}
-local b = scene:rectangle {center = {0, 0}, size = {1.4, 1.4}, fill = "accent"}
+local b = scene:rectangle {size = {1.4, 1.4}, fill = "accent"}
 local c = scene:circle {center = {2.6, 0}, radius = 0.7}
 scene:text {text = "the page's colours, light or dark", point = {0, -1.8}, color = "muted", size = 20}
 
@@ -52,14 +49,11 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({
-    width: 960, height: 540,
-    camera: {mode: "fixed", view: "2d", height: 6},
-});
+const scene = vis.scene({camera: {height: 6}});
 
 scene.text({text: "adaptive", role: "h2", point: [0, 2]});
 const a = scene.circle({center: [-2.6, 0], radius: 0.7});
-const b = scene.rectangle({center: [0, 0], size: [1.4, 1.4], fill: "accent"});
+const b = scene.rectangle({size: [1.4, 1.4], fill: "accent"});
 const c = scene.circle({center: [2.6, 0], radius: 0.7});
 scene.text({text: "the page's colours, light or dark", point: [0, -1.8], color: "muted", size: 20});
 
@@ -97,8 +91,7 @@ Pass a table instead of a name. Fields you leave out come from `preset` (`adapti
 
 ```lua live
 local scene = vis.scene {
-    width = 960, height = 540,
-    camera = {mode = "fixed", view = "2d", height = 6},
+    camera = {height = 6},
     theme = {
         preset = "pro_black",
         background = "#10141c",
@@ -111,7 +104,7 @@ local scene = vis.scene {
 
 scene:text {text = "Custom theme", role = "h2", point = {0, 2}}
 local a = scene:circle {center = {-3, 0}, radius = 0.8}
-local b = scene:rectangle {center = {0, 0}, size = {1.6, 1.6}}
+local b = scene:rectangle {size = {1.6, 1.6}}
 local c = scene:polygon {points = {{2.2, -0.8}, {3.8, -0.8}, {3, 0.8}}}
 scene:text {text = "result", point = {0, -1.6}, color = "result", size = 22}
 
@@ -123,8 +116,7 @@ return scene
 
 ```js live
 const scene = vis.scene({
-    width: 960, height: 540,
-    camera: {mode: "fixed", view: "2d", height: 6},
+    camera: {height: 6},
     theme: {
         preset: "pro_black",
         background: "#10141c",
@@ -137,7 +129,7 @@ const scene = vis.scene({
 
 scene.text({text: "Custom theme", role: "h2", point: [0, 2]});
 const a = scene.circle({center: [-3, 0], radius: 0.8});
-const b = scene.rectangle({center: [0, 0], size: [1.6, 1.6]});
+const b = scene.rectangle({size: [1.6, 1.6]});
 const c = scene.polygon({points: [[2.2, -0.8], [3.8, -0.8], [3, 0.8]]});
 scene.text({text: "result", point: [0, -1.6], color: "result", size: 22});
 
@@ -168,12 +160,10 @@ Below, one function builds the same card six times: the two presets and four cus
 The uncoloured circles take each theme's `objects`, the bar its `accent`, the label its `result`, and `indicate` its `focus`.
 
 ```lua live
-local root = vis.scene {width = 960, height = 540, theme = "pro_black",
-                        camera = {mode = "fixed", view = "2d", height = 6}}
+local root = vis.scene {width = 960, height = 540, theme = "pro_black", camera = {height = 6}}
 
 local function swatch(theme, name)
-    local s = vis.scene {width = 320, height = 270, theme = theme,
-                         camera = {mode = "fixed", view = "2d", height = 4}}
+    local s = vis.scene {width = 320, height = 270, theme = theme, camera = {height = 4}}
     s:text {text = name, role = "h3", point = {0, 1.45}}
     local shapes = {}
     for i, x in ipairs({-1.4, 0, 1.4}) do
@@ -208,12 +198,10 @@ return root
 ```
 
 ```js live
-const root = vis.scene({width: 960, height: 540, theme: "pro_black",
-                        camera: {mode: "fixed", view: "2d", height: 6}});
+const root = vis.scene({width: 960, height: 540, theme: "pro_black", camera: {height: 6}});
 
 function swatch(theme, name) {
-    const s = vis.scene({width: 320, height: 270, theme,
-                         camera: {mode: "fixed", view: "2d", height: 4}});
+    const s = vis.scene({width: 320, height: 270, theme, camera: {height: 4}});
     s.text({text: name, role: "h3", point: [0, 1.45]});
     const shapes = [-1.4, 0, 1.4].map((x) => s.circle({center: [x, 0.2], radius: 0.45}));
     const bar = s.rectangle({center: [-0.5, -1.05], size: [1.8, 0.3], fill: "accent"});
@@ -255,13 +243,13 @@ To change themes during a video, as below, make one scene per theme and play the
 Each child scene in a [viewport](#/docs/viewports) keeps its own theme.
 
 ```lua live
-local cam = {mode = "fixed", view = "2d", height = 6}
+local cam = {height = 6}
 
 local function scene_in(theme)
-    local s = vis.scene {width = 960, height = 540, theme = theme, camera = cam}
+    local s = vis.scene {theme = theme, camera = cam}
     s:text {text = type(theme) == "string" and theme or "custom", role = "h3", point = {0, 2.2}}
     local a = s:circle {center = {-2.6, 0}, radius = 0.7}
-    local b = s:rectangle {center = {0, 0}, size = {1.4, 1.4}}
+    local b = s:rectangle {size = {1.4, 1.4}}
     local c = s:circle {center = {2.6, 0}, radius = 0.7, fill = "result"}
     s:create({a, b, c}, 0.6, "smooth", 0.1)
     s:indicate(a)
@@ -270,7 +258,7 @@ local function scene_in(theme)
     return s
 end
 
-local root = vis.scene {width = 960, height = 540, theme = "pro_black", camera = cam}
+local root = vis.scene {theme = "pro_black", camera = cam}
 root:scene_transition({
     scene_in("pro_white"),
     scene_in("pro_black"),
@@ -281,13 +269,13 @@ return root
 ```
 
 ```js live
-const cam = {mode: "fixed", view: "2d", height: 6};
+const cam = {height: 6};
 
 function sceneIn(theme) {
-    const s = vis.scene({width: 960, height: 540, theme, camera: cam});
+    const s = vis.scene({theme, camera: cam});
     s.text({text: typeof theme === "string" ? theme : "custom", role: "h3", point: [0, 2.2]});
     const a = s.circle({center: [-2.6, 0], radius: 0.7});
-    const b = s.rectangle({center: [0, 0], size: [1.4, 1.4]});
+    const b = s.rectangle({size: [1.4, 1.4]});
     const c = s.circle({center: [2.6, 0], radius: 0.7, fill: "result"});
     s.create([a, b, c], 0.6, "smooth", 0.1);
     s.indicate(a);
@@ -296,7 +284,7 @@ function sceneIn(theme) {
     return s;
 }
 
-const root = vis.scene({width: 960, height: 540, theme: "pro_black", camera: cam});
+const root = vis.scene({theme: "pro_black", camera: cam});
 root.sceneTransition([
     sceneIn("pro_white"),
     sceneIn("pro_black"),

@@ -10,14 +10,7 @@ local p = {
     green = "#7bd88f",
 }
 
-local scene = vis.scene {
-    width = 960,
-    height = 540,
-    fps = 60,
-    background = p.background,
-    loop = false,
-    camera = { mode = "fixed", view = "2d", target = { 0, 0 }, height = 7 },
-}
+local scene = vis.scene {fps = 60, background = p.background, camera = { height = 7 }}
 
 local function arrow_points(from, to, shaft, head, head_length)
     local dx, dy = to[1] - from[1], to[2] - from[2]

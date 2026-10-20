@@ -6,10 +6,7 @@ const HEAD = `if not vis.runtime or not vis.input then
     error("this scene requires a viscript build configured with -Dmodules=interactive")
 end
 local W, H, U = 960, 540, 90          -- logical pixels, pixels per world unit
-local scene = vis.scene {
-    width = W, height = H, theme = "pro_black",
-    camera = {mode = "fixed", view = "2d", height = H / U},
-}
+local scene = vis.scene {width = W, height = H, theme = "pro_black", camera = {height = H / U}}
 local C = {panel = "#14171f", line = "#3a4152", grid = "#1f2430", text = "#e6e8ee", mute = "#7d8596", bar = "#2a3142",
            accent = "#6cb6ff", warn = "#e3b341", danger = "#ff7b72", ok = "#7ee787", alt = "#c8a7ff", none = "#00000000"}
 -- layer bands: background < guides < subjects < handles < labels
@@ -60,7 +57,7 @@ local function grid(x0, x1, y0, y1, parent, color)
 end
 -- a drag handle ring, moved by the runtime
 local function ring(color, r)
-    return scene:circle {center = {0, 0}, radius = r or 0.17, fill = C.none, stroke = color, width = 1.5, layer = L.handle}
+    return scene:circle {radius = r or 0.17, fill = C.none, stroke = color, width = 1.5, layer = L.handle}
 end
 -- pointer in world units (nil when the pointer is off the canvas)
 local function pointer(ctx)

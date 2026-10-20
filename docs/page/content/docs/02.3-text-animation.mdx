@@ -13,10 +13,7 @@ Text has its own ways to change over time. `write` only fades text in, so these 
 Playing a new `text` types it character by character. With `retype = true` it first erases back to the shared prefix (`Hello, `), then types the rest.
 
 ```lua live
-local scene = vis.scene {
-    width = 960, height = 540, theme = "pro_black",
-    camera = {mode = "fixed", view = "2d", height = 6},
-}
+local scene = vis.scene {theme = "pro_black", camera = {height = 6}}
 
 local line = scene:text {text = "", point = {-4, 0}, align = {0, 0.5}, size = 40}
 
@@ -29,10 +26,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({
-    width: 960, height: 540, theme: "pro_black",
-    camera: {mode: "fixed", view: "2d", height: 6},
-});
+const scene = vis.scene({theme: "pro_black", camera: {height: 6}});
 
 const line = scene.text({text: "", point: [-4, 0], align: [0, 0.5], size: 40});
 
@@ -49,10 +43,7 @@ return scene;
 `number` is a text that formats a `value`. Playing `value` counts through every number in between; `tabular = true` keeps the digits from jittering.
 
 ```lua live
-local scene = vis.scene {
-    width = 960, height = 540, theme = "pro_black",
-    camera = {mode = "fixed", view = "2d", height = 6},
-}
+local scene = vis.scene {theme = "pro_black", camera = {height = 6}}
 
 local n = scene:number {value = 0, point = {0, 0}, align = {0.5, 0.5}, size = 72,
                         decimals = 1, suffix = " %", tabular = true}
@@ -64,10 +55,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({
-    width: 960, height: 540, theme: "pro_black",
-    camera: {mode: "fixed", view: "2d", height: 6},
-});
+const scene = vis.scene({theme: "pro_black", camera: {height: 6}});
 
 const n = scene.number({value: 0, point: [0, 0], align: [0.5, 0.5], size: 72,
                          decimals: 1, suffix: " %", tabular: true});
@@ -83,10 +71,7 @@ return scene;
 `spans` with `split = "letters"` makes one handle per letter, so any array call with a `lag` staggers them.
 
 ```lua live
-local scene = vis.scene {
-    width = 960, height = 540, theme = "pro_black",
-    camera = {mode = "fixed", view = "2d", height = 6},
-}
+local scene = vis.scene {theme = "pro_black", camera = {height = 6}}
 
 local word = scene:spans {"viscript", point = {0, 0}, align = {0.5, 0.5}, size = 72, split = "letters"}
 
@@ -97,10 +82,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({
-    width: 960, height: 540, theme: "pro_black",
-    camera: {mode: "fixed", view: "2d", height: 6},
-});
+const scene = vis.scene({theme: "pro_black", camera: {height: 6}});
 
 const word = scene.spans(["viscript"], {point: [0, 0], align: [0.5, 0.5], size: 72, split: "letters"});
 
@@ -115,17 +97,14 @@ return scene;
 `fade_transform` swaps one text for another in place — the usual way to step through a list of captions. Create the new text right before the call.
 
 ```lua live
-local scene = vis.scene {
-    width = 960, height = 540, theme = "pro_black",
-    camera = {mode = "fixed", view = "2d", height = 6},
-}
+local scene = vis.scene {theme = "pro_black", camera = {height = 6}}
 
-local step = scene:text {text = "1. Split the list", point = {0, 0}, align = {0.5, 0.5}, size = 40}
+local step = scene:text {text = "1. Split the list", size = 40}
 scene:fade_in(step, {shift = {0, -0.3}, duration = 0.5})
 scene:wait(0.6)
 
 for _, label in ipairs({"2. Sort each half", "3. Merge the halves"}) do
-    local next_step = scene:text {text = label, point = {0, 0}, align = {0.5, 0.5}, size = 40}
+    local next_step = scene:text {text = label, size = 40}
     scene:fade_transform(step, next_step, 0.6)
     step = next_step
     scene:wait(0.6)
@@ -135,17 +114,14 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({
-    width: 960, height: 540, theme: "pro_black",
-    camera: {mode: "fixed", view: "2d", height: 6},
-});
+const scene = vis.scene({theme: "pro_black", camera: {height: 6}});
 
-let step = scene.text({text: "1. Split the list", point: [0, 0], align: [0.5, 0.5], size: 40});
+let step = scene.text({text: "1. Split the list", size: 40});
 scene.fadeIn(step, {shift: [0, -0.3], duration: 0.5});
 scene.wait(0.6);
 
 for (const label of ["2. Sort each half", "3. Merge the halves"]) {
-    const next = scene.text({text: label, point: [0, 0], align: [0.5, 0.5], size: 40});
+    const next = scene.text({text: label, size: 40});
     scene.fadeTransform(step, next, 0.6);
     step = next;
     scene.wait(0.6);
@@ -159,10 +135,7 @@ return scene;
 `match_transform` pairs equal pieces of two texts and slides them into their new places; the rest fades. With `split = "words"` the pieces are words, so keep tokens apart with spaces.
 
 ```lua live
-local scene = vis.scene {
-    width = 960, height = 540, theme = "pro_black",
-    camera = {mode = "fixed", view = "2d", height = 6},
-}
+local scene = vis.scene {theme = "pro_black", camera = {height = 6}}
 
 local before = scene:spans {"total = price + tax", point = {0, 0}, align = {0.5, 0.5}, size = 34,
                            font = "JetBrainsMono", split = "words"}
@@ -178,10 +151,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({
-    width: 960, height: 540, theme: "pro_black",
-    camera: {mode: "fixed", view: "2d", height: 6},
-});
+const scene = vis.scene({theme: "pro_black", camera: {height: 6}});
 
 const before = scene.spans(["total = price + tax"], {point: [0, 0], align: [0.5, 0.5], size: 34,
                                                     font: "JetBrainsMono", split: "words"});
@@ -201,10 +171,7 @@ return scene;
 `match_transform` slides the parts two formulas share into their new places and fades the rest. Create the target right before the call.
 
 ```lua live
-local scene = vis.scene {
-    width = 960, height = 540, theme = "pro_black",
-    camera = {mode = "fixed", view = "2d", height = 6},
-}
+local scene = vis.scene {theme = "pro_black", camera = {height = 6}}
 
 local a = scene:tex {tex = "a^2 + b^2 = c^2", point = {0, 0}, size = 60}
 scene:fade_in(a, {duration = 0.6})
@@ -218,10 +185,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({
-    width: 960, height: 540, theme: "pro_black",
-    camera: {mode: "fixed", view: "2d", height: 6},
-});
+const scene = vis.scene({theme: "pro_black", camera: {height: 6}});
 
 const a = scene.tex({tex: "a^2 + b^2 = c^2", point: [0, 0], size: 60});
 scene.fadeIn(a, {duration: 0.6});
@@ -239,10 +203,7 @@ return scene;
 `code` returns tokens you can search. `highlight` dims everything but the selection; `edit` replaces tokens and animates the diff.
 
 ```lua live
-local scene = vis.scene {
-    width = 960, height = 540, theme = "pro_black",
-    camera = {mode = "fixed", view = "2d", height = 6},
-}
+local scene = vis.scene {theme = "pro_black", camera = {height = 6}}
 
 local listing = scene:code {text = "local total = 0\nfor i = 1, n do\n    total = total + i\nend\nreturn total",
                             language = "lua", point = {0, 0}, align = {0.5, 0.5}, size = 26}
@@ -259,10 +220,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({
-    width: 960, height: 540, theme: "pro_black",
-    camera: {mode: "fixed", view: "2d", height: 6},
-});
+const scene = vis.scene({theme: "pro_black", camera: {height: 6}});
 
 const listing = scene.code({text: "local total = 0\nfor i = 1, n do\n    total = total + i\nend\nreturn total",
                             language: "lua", point: [0, 0], align: [0.5, 0.5], size: 26});

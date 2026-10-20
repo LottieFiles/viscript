@@ -1,9 +1,6 @@
 // The Lua the algorithm, data-structure and diagram scenes open with (algorithms.js, diagrams.js):
 // the scene and its palette, draw-order bands, labels, one phrase beside the action, and tokens.
-export const PRELUDE = `local scene = vis.scene {
-    width = 960, height = 540, theme = "pro_black",
-    camera = {mode = "fixed", view = "2d", height = 6},
-}
+export const PRELUDE = `local scene = vis.scene {theme = "pro_black", camera = {height = 6}}
 local C = {panel = "#14171f", line = "#3a4152", text = "#e6e8ee", mute = "#7d8596", bar = "#2a3142",
            accent = "#6cb6ff", warn = "#e3b341", danger = "#ff7b72", ok = "#7ee787", alt = "#c8a7ff",
            none = "#00000000"}
@@ -35,10 +32,10 @@ local function token(id, s, x, y, o)
     local g = scene:group {id = id, matrix = at(x, y)}
     local b
     if o.circle then
-        b = g:circle {id = id .. ":box", center = {0, 0}, radius = o.circle, fill = o.fill or C.panel,
+        b = g:circle {id = id .. ":box", radius = o.circle, fill = o.fill or C.panel,
                       stroke = o.stroke or C.accent, width = o.width or 2, layer = layer}
     else
-        b = g:rectangle {id = id .. ":box", center = {0, 0}, size = o.size or {0.9, 0.48}, corner = 0.04,
+        b = g:rectangle {id = id .. ":box", size = o.size or {0.9, 0.48}, corner = 0.04,
                          fill = o.fill or C.panel, stroke = o.stroke or C.accent, width = o.width or 1.5, layer = layer}
     end
     local t = T(g, id .. ":label", s, 0, 0, o.text or 15, o.color or C.text, nil, layer + 2)

@@ -8,10 +8,7 @@ if not vis.input then
 end
 
 local WIDTH, HEIGHT = 960, 540
-local scene = vis.scene {
-    width = WIDTH, height = HEIGHT, fps = 30, loop = true,
-    camera = {mode = "fixed", view = "2d", target = {0, 0}, height = HEIGHT},
-}
+local scene = vis.scene {width = WIDTH, height = HEIGHT, loop = true, camera = {height = HEIGHT}}
 
 local LAYER = {surface = 10, grid = 12, data = 20, mark = 30, text = 40, control = 50}
 local UI_RAIL = {left = -420, right = -188, bottom = -142, top = 148}
@@ -65,7 +62,7 @@ track:line {
     layer = LAYER.control, id = "routing:ui:track:max",
 }
 local handle = track_parent:circle {
-    center = {0, 0}, radius = 10, fill = "focus", stroke = "background", width = 3,
+    radius = 10, fill = "focus", stroke = "background", width = 3,
     layer = LAYER.control + 1, id = "routing:ui:handle",
 }
 
@@ -85,7 +82,7 @@ text {text = "drag remains captured", point = {UI_RAIL.left + 24, -119}, align =
 scene:rectangle {
     center = {(FIELD.left + FIELD.right) / 2, 3},
     size = {FIELD.right - FIELD.left, FIELD.top - FIELD.bottom}, corner = 4,
-    fill = "#00000000", stroke = "border", width = 1.5,
+    stroke = "border", width = 1.5,
     layer = LAYER.surface, id = "routing:input:field",
 }
 for x = FIELD.left + 56, FIELD.right - 1, 56 do
@@ -107,7 +104,7 @@ for _, spec in ipairs {
 
 local follower = scene:group {id = "routing:input:follower"}
 follower:circle {
-    center = {0, 0}, radius = 17, fill = "accent", stroke = "background", width = 3,
+    radius = 17, fill = "accent", stroke = "background", width = 3,
     layer = LAYER.mark, id = "routing:input:follower:body",
 }
 follower:line {
@@ -115,7 +112,7 @@ follower:line {
     layer = LAYER.mark + 1, id = "routing:input:follower:heading",
 }
 follower:circle {
-    center = {0, 0}, radius = 4, fill = "background", stroke = "background",
+    radius = 4, fill = "background", stroke = "background",
     layer = LAYER.mark + 2, id = "routing:input:follower:pivot",
 }
 

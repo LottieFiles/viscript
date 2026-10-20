@@ -1,7 +1,7 @@
 -- README "Build": optional modules plug into the core at configure time, then compile.
 -- Module names follow meson_options.txt; interactive is one option over four internal modules.
 local scene = vis.scene {width = 1200, height = 420, fps = 20, theme = "pro_white",
-  camera = {view = "2d", target = {0, 0.1}, height = 7.6}}
+  camera = {target = {0, 0.1}, height = 7.6}}
 local INK = "foreground"
 
 -- Text is set in world units (plane) so it scales with the camera moves below.
@@ -20,7 +20,7 @@ end
 local cmd1 = line(1.5, "$ meson setup build -Dmodules=diagram,tex", "cmd1")
 local cmd2 = line(0.8, "$ meson compile -C build", "cmd2")
 local BAR_Y, BAR_W = 0.05, TW - 0.7
-scene:rectangle {center = {TX, BAR_Y}, size = {BAR_W, 0.32}, fill = "#00000000", stroke = "muted", width = 1.5, layer = 1}
+scene:rectangle {center = {TX, BAR_Y}, size = {BAR_W, 0.32}, stroke = "muted", width = 1.5, layer = 1}
 local bar = scene:rectangle {center = {LX + 0.01, BAR_Y}, size = {0.02, 0.32}, fill = "success", stroke = "#00000000", layer = 2, opacity = 0, id = "bar"}
 local done = line(-0.7, "build/viscript", "done", "success")
 for _, h in ipairs({cmd1, cmd2, done}) do scene:set({target = h, opacity = 0}) end

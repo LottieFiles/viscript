@@ -21,14 +21,14 @@ parent: animation
 </table>
 
 ```lua live
-local cam = {mode = "fixed", view = "2d", height = 6}
-local root = vis.scene {width = 960, height = 540, theme = "pro_black", camera = cam}
+local cam = {height = 6}
+local root = vis.scene {theme = "pro_black", camera = cam}
 
 local function slide(label, color, shape)
-    local s = vis.scene {width = 960, height = 540, theme = "pro_black", camera = cam}
+    local s = vis.scene {theme = "pro_black", camera = cam}
     local obj = shape == "circle" and s:circle {radius = 1.2, fill = color}
                 or s:rectangle {size = {2.4, 2.4}, corner = 0.2, fill = color}
-    s:text {text = label, point = {0, -2}, size = 36, align = {0.5, 0.5}}
+    s:text {text = label, point = {0, -2}, size = 36}
     s:rotate(obj, math.pi / 2, {duration = 1})
     return s
 end
@@ -40,14 +40,14 @@ return root
 ```
 
 ```js live
-const cam = {mode: "fixed", view: "2d", height: 6};
-const root = vis.scene({width: 960, height: 540, theme: "pro_black", camera: cam});
+const cam = {height: 6};
+const root = vis.scene({theme: "pro_black", camera: cam});
 
 function slide(label, color, shape) {
-    const s = vis.scene({width: 960, height: 540, theme: "pro_black", camera: cam});
+    const s = vis.scene({theme: "pro_black", camera: cam});
     const obj = shape === "circle" ? s.circle({radius: 1.2, fill: color})
                                    : s.rectangle({size: [2.4, 2.4], corner: 0.2, fill: color});
-    s.text({text: label, point: [0, -2], size: 36, align: [0.5, 0.5]});
+    s.text({text: label, point: [0, -2], size: 36});
     s.rotate(obj, Math.PI / 2, {duration: 1});
     return s;
 }
@@ -73,9 +73,9 @@ Each transition can hand over differently. `styles` lists one per transition: be
 With `slide` or a zoom, `match = true` also carries objects that share an `id`, drawing them above both stages.
 
 ```lua live
-local cam = {mode = "fixed", view = "2d", height = 6}
+local cam = {height = 6}
 local function stage(build)
-    local s = vis.scene {width = 960, height = 540, theme = "pro_black", camera = cam}
+    local s = vis.scene {theme = "pro_black", camera = cam}
     build(s)
     return s
 end
@@ -109,7 +109,7 @@ local summary = stage(function(s)
     s:write(up, 0.8)
 end)
 
-local root = vis.scene {width = 960, height = 540, theme = "pro_black", camera = cam}
+local root = vis.scene {theme = "pro_black", camera = cam}
 root:scene_transition({overview, detail, summary}, {
     duration = 0.9, hold = {1.4, 1.4, 1.6}, curve = "smooth",
     styles = {{style = "zoom_in", area = "chart"},
@@ -120,9 +120,9 @@ return root
 ```
 
 ```js live
-const cam = {mode: "fixed", view: "2d", height: 6};
+const cam = {height: 6};
 function stage(build) {
-    const s = vis.scene({width: 960, height: 540, theme: "pro_black", camera: cam});
+    const s = vis.scene({theme: "pro_black", camera: cam});
     build(s);
     return s;
 }
@@ -156,7 +156,7 @@ const summary = stage((s) => {
     s.write(up, 0.8);
 });
 
-const root = vis.scene({width: 960, height: 540, theme: "pro_black", camera: cam});
+const root = vis.scene({theme: "pro_black", camera: cam});
 root.sceneTransition([overview, detail, summary], {
     duration: 0.9, hold: [1.4, 1.4, 1.6], curve: "smooth",
     styles: [{style: "zoom_in", area: "chart"},

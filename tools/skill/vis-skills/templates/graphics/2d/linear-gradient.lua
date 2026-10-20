@@ -1,8 +1,5 @@
 -- Project one sample onto a gradient direction and reuse t for every color channel.
-local scene = vis.scene {
-    width = 960, height = 540, fps = 30, loop = false,
-    camera = {mode = "fixed", view = "2d", target = {0, 0}, height = 6.2},
-}
+local scene = vis.scene {camera = {height = 6.2}}
 
 local start_rgb, end_rgb = {76, 201, 240}, {255, 107, 107}
 local stop_t = {0, 1}
@@ -50,7 +47,7 @@ local gradient = pixel_space:cell {
 }
 local selected = pixel_space:rectangle {
     id = "gradient-selected-cell", center = {sample_index + 0.5, 2}, size = {1, 4},
-    fill = "#00000000", stroke = "foreground", width = 2, layer = 20,
+    stroke = "foreground", width = 2, layer = 20,
 }
 
 local labels = {

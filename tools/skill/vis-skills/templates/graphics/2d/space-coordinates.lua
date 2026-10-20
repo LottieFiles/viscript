@@ -1,8 +1,5 @@
 -- Compare local coordinate numbers with labels scaled by the Space basis.
-local scene = vis.scene {
-    width = 960, height = 540, fps = 30, loop = false,
-    camera = {mode = "fixed", view = "2d", target = {0, 0}, height = 6.2},
-}
+local scene = vis.scene {camera = {height = 6.2}}
 
 local range_center, panel_y = {2, 1.5}, -0.1
 local point_value, basis_scale = {3, 2}, 0.75

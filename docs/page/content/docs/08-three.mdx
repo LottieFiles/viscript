@@ -21,9 +21,8 @@ Perspective cameras, 3D spaces, surfaces and voxels.
 </table>
 
 ```lua live
-local cam = {mode = "fixed", view = "3d", eye = {7, 5, 9}, target = {0, 0, 0}, up = {0, 1, 0},
-             projection = "perspective", fov = 0.7, near = 0.1, far = 100}
-local scene = vis.scene {width = 960, height = 540, theme = "pro_black", camera = cam}
+local cam = {view = "3d", eye = {7, 5, 9}, fov = 0.7, near = 0.1, far = 100}
+local scene = vis.scene {theme = "pro_black", camera = cam}
 
 local space = scene:space {x = {-3, 3, 1}, y = {-2, 2, 1}, z = {-3, 3, 1}, color = "#26313b"}
 local c = {{-1,-1,-1},{1,-1,-1},{1,1,-1},{-1,1,-1},{-1,-1,1},{1,-1,1},{1,1,1},{-1,1,1}}
@@ -32,16 +31,14 @@ local edges = {}
 for i, p in ipairs(e) do edges[i] = space:line {from = c[p[1]], to = c[p[2]], color = "#6cb6ff", width = 3} end
 
 scene:create(edges, 0.4, "ease_out", 0.05)
-scene:look({view = "3d", eye = {-8, 4, 7}, target = {0, 0, 0}, up = {0, 1, 0},
-            projection = "perspective", fov = 0.7, near = 0.1, far = 100}, 2, "ease_in_out")
+scene:look({eye = {-8, 4, 7}}, 2, "ease_in_out")
 
 return scene
 ```
 
 ```js live
-const cam = {mode: "fixed", view: "3d", eye: [7, 5, 9], target: [0, 0, 0], up: [0, 1, 0],
-             projection: "perspective", fov: 0.7, near: 0.1, far: 100};
-const scene = vis.scene({width: 960, height: 540, theme: "pro_black", camera: cam});
+const cam = {view: "3d", eye: [7, 5, 9], fov: 0.7, near: 0.1, far: 100};
+const scene = vis.scene({theme: "pro_black", camera: cam});
 
 const space = scene.space({x: [-3, 3, 1], y: [-2, 2, 1], z: [-3, 3, 1], color: "#26313b"});
 const c = [[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]];
@@ -49,8 +46,7 @@ const e = [[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,
 const edges = e.map(([p, q]) => space.line({from: c[p], to: c[q], color: "#6cb6ff", width: 3}));
 
 scene.create(edges, 0.4, "ease_out", 0.05);
-scene.look({view: "3d", eye: [-8, 4, 7], target: [0, 0, 0], up: [0, 1, 0],
-            projection: "perspective", fov: 0.7, near: 0.1, far: 100}, 2, "ease_in_out");
+scene.look({eye: [-8, 4, 7]}, 2, "ease_in_out");
 
 return scene;
 ```
@@ -68,9 +64,9 @@ Build the points with an ordinary Lua loop over your function.</p>
 </table>
 
 ```lua live
-local cam = {mode = "fixed", view = "3d", eye = {5.8, 4.4, 6.4}, target = {0, 0.25, 0}, up = {0, 1, 0},
-             projection = "perspective", fov = 0.66, near = 0.1, far = 100}
-local scene = vis.scene {width = 960, height = 540, theme = "pro_black", camera = cam}
+local cam = {view = "3d", eye = {5.8, 4.4, 6.4}, target = {0, 0.25, 0},
+             fov = 0.66, near = 0.1, far = 100}
+local scene = vis.scene {theme = "pro_black", camera = cam}
 
 local n, pts = 31, {}
 for row = 0, n - 1 do
@@ -84,16 +80,15 @@ local s = scene:surface {points = pts, size = {n, n}, mode = "solid_mesh", shadi
                          fill = "#6cb6ff40", stroke = "#6cb6ffb0", width = 0.75}
 
 scene:create(s, 1.0)
-scene:look({view = "3d", eye = {-5.4, 4.8, 6.0}, target = {0, 0.25, 0}, up = {0, 1, 0},
-            projection = "perspective", fov = 0.66, near = 0.1, far = 100}, 1.5, "ease_in_out")
+scene:look({eye = {-5.4, 4.8, 6.0}}, 1.5, "ease_in_out")
 
 return scene
 ```
 
 ```js live
-const cam = {mode: "fixed", view: "3d", eye: [5.8, 4.4, 6.4], target: [0, 0.25, 0], up: [0, 1, 0],
-             projection: "perspective", fov: 0.66, near: 0.1, far: 100};
-const scene = vis.scene({width: 960, height: 540, theme: "pro_black", camera: cam});
+const cam = {view: "3d", eye: [5.8, 4.4, 6.4], target: [0, 0.25, 0],
+             fov: 0.66, near: 0.1, far: 100};
+const scene = vis.scene({theme: "pro_black", camera: cam});
 
 const n = 31, pts = [];
 for (let row = 0; row < n; row++) {
@@ -107,8 +102,7 @@ const s = scene.surface({points: pts, size: [n, n], mode: "solid_mesh", shading:
                          fill: "#6cb6ff40", stroke: "#6cb6ffb0", width: 0.75});
 
 scene.create(s, 1.0);
-scene.look({view: "3d", eye: [-5.4, 4.8, 6.0], target: [0, 0.25, 0], up: [0, 1, 0],
-            projection: "perspective", fov: 0.66, near: 0.1, far: 100}, 1.5, "ease_in_out");
+scene.look({eye: [-5.4, 4.8, 6.0]}, 1.5, "ease_in_out");
 
 return scene;
 ```
@@ -126,9 +120,9 @@ leave a voxel empty. With <code>duration</code> and <code>fps</code>, the field 
 <p>The callback runs once per voxel per frame while the script loads, so keep the field coarse: the voxel count times the frame count may be at most 262,144, and the script shares one instruction budget.</p>
 
 ```lua live
-local cam = {mode = "fixed", view = "3d", eye = {6.4, 4.6, 6.4}, target = {0, -0.2, 0}, up = {0, 1, 0},
-             projection = "perspective", fov = 0.62, near = 0.1, far = 100}
-local scene = vis.scene {width = 960, height = 540, theme = "pro_black", camera = cam}
+local cam = {view = "3d", eye = {6.4, 4.6, 6.4}, target = {0, -0.2, 0},
+             fov = 0.62, near = 0.1, far = 100}
+local scene = vis.scene {theme = "pro_black", camera = cam}
 
 -- A ripple spreading from the centre: in each column, the voxel at the wave's height is filled,
 -- coloured from deep blue in the troughs to warm yellow on the crests.
@@ -155,9 +149,9 @@ return scene
 ```
 
 ```js live
-const cam = {mode: "fixed", view: "3d", eye: [6.4, 4.6, 6.4], target: [0, -0.2, 0], up: [0, 1, 0],
-             projection: "perspective", fov: 0.62, near: 0.1, far: 100};
-const scene = vis.scene({width: 960, height: 540, theme: "pro_black", camera: cam});
+const cam = {view: "3d", eye: [6.4, 4.6, 6.4], target: [0, -0.2, 0],
+             fov: 0.62, near: 0.1, far: 100};
+const scene = vis.scene({theme: "pro_black", camera: cam});
 
 // A ripple spreading from the centre: in each column, the voxel at the wave's height is filled,
 // coloured from deep blue in the troughs to warm yellow on the crests.

@@ -48,12 +48,19 @@ export type Mat4 = readonly [
 ];
 
 export interface Camera {
+    /** `"fixed"` when omitted. */
     mode?: "fixed" | "interactive";
+    /** `"2d"` when omitted. */
     view?: "2d" | "3d";
+    /** The origin when omitted. */
     target?: WorldVector;
+    /** `[6, 4, 6]` when omitted, in 3D. */
     eye?: WorldVector;
+    /** `[0, 1, 0]` when omitted, in 3D. */
     up?: WorldVector;
+    /** The world height the view shows, orthographic; 8 when omitted. */
     height?: number;
+    /** `"perspective"` when omitted, in 3D. */
     projection?: "perspective" | "orthographic";
     fov?: number;
     near?: number;
@@ -122,12 +129,19 @@ export interface ThemeOptions {
 }
 
 export interface SceneConfig {
+    /** Canvas width in pixels; 960 when omitted. */
     width?: number;
+    /** Canvas height in pixels; 540 when omitted. */
     height?: number;
+    /** 30 when omitted. */
     fps?: number;
+    /** The theme's when omitted. */
     background?: Color;
+    /** A fixed 2D camera 8 units tall on the origin when omitted. */
     camera?: Camera;
+    /** `true` when omitted. */
     antialiasing?: boolean;
+    /** `false` when omitted: the scene plays once. */
     loop?: boolean;
     /** `"adaptive"` when omitted: the host app's colors and font, or Pro White without one. */
     theme?: ThemePreset | ThemeOptions;

@@ -7,7 +7,7 @@ end
 local WIDTH, HEIGHT = 960, 540
 local scene = vis.scene {
     width = WIDTH, height = HEIGHT, fps = 60, loop = true,
-    camera = {mode = "fixed", view = "2d", target = {0, 0}, height = HEIGHT},
+    camera = {height = HEIGHT},
 }
 
 local LAYER = {field = 10, route = 20, mark = 30, text = 40}

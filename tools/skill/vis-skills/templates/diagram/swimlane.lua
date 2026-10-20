@@ -1,10 +1,7 @@
 -- Question: which role owns each step, and where does responsibility cross a lane?
 -- Replace step_specs and handoff_specs; keep roles, stages, and routing corridors separate.
 -- Look: hairline grid, ink steps and handoffs, and one hue (accent) for the focal decision.
-local scene = vis.scene {
-    width = 960, height = 540, fps = 30, loop = false,
-    camera = {mode = "fixed", view = "2d", target = {0, 0}, height = 540},
-}
+local scene = vis.scene {camera = {height = 540}}
 
 local LAYER = {guide = 0, route = 10, node = 20, text = 30}
 local root = scene:group {id = "release-handoff:root"}
@@ -84,7 +81,7 @@ for _, step in ipairs(step_specs) do
     local center = {stage_centers[step.stage], lane_centers[step.lane]}
     local prefix = "release-handoff:step:" .. step.id
     nodes:rectangle {
-        center = center, size = {STEP_W, STEP_H}, fill = "#00000000",
+        center = center, size = {STEP_W, STEP_H},
         stroke = step.focal and "accent" or "foreground", width = step.focal and 1.5 or 1.25,
         layer = LAYER.node, id = prefix .. ":body",
     }

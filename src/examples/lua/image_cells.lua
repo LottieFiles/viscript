@@ -1,10 +1,4 @@
-local scene = vis.scene {
-    width = 960,
-    height = 540,
-    fps = 30,
-    antialiasing = true,
-    camera = { mode = "fixed", view = "2d", height = 11 },
-}
+local scene = vis.scene {camera = { height = 11 }}
 
 local world = scene:space {
     x = { -7, 7, 1 },
@@ -41,8 +35,6 @@ scene:wait(0.4)
 scene:look({
     view = "3d",
     eye = { 7, 6, 9 },
-    target = { 0, 0, 0 },
-    up = { 0, 1, 0 },
     projection = "perspective",
     fov = 0.75,
     near = 0.1,

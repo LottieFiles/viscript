@@ -16,10 +16,7 @@ The camera starts where `camera` in [the scene](#/docs/scenes) puts it. These ca
 their size while geometry scales.</p>
 
 ```lua live
-local scene = vis.scene {
-    width = 960, height = 540, theme = "pro_black",
-    camera = {mode = "fixed", view = "2d", height = 6},
-}
+local scene = vis.scene {theme = "pro_black", camera = {height = 6}}
 
 scene:circle {center = {-3, 0}, radius = 1.4, stroke = "accent", width = 3}
 local a = scene:circle {center = {3, -1}, radius = 0.2, fill = "danger"}
@@ -34,10 +31,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({
-    width: 960, height: 540, theme: "pro_black",
-    camera: {mode: "fixed", view: "2d", height: 6},
-});
+const scene = vis.scene({theme: "pro_black", camera: {height: 6}});
 
 scene.circle({center: [-3, 0], radius: 1.4, stroke: "accent", width: 3});
 const a = scene.circle({center: [3, -1], radius: 0.2, fill: "danger"});
@@ -56,10 +50,7 @@ return scene;
 `scene:look(camera, duration)` moves the camera to explicit fields: `target` pans, `height` zooms (smaller is closer). Fields you leave out keep their value.
 
 ```lua live
-local scene = vis.scene {
-    width = 960, height = 540, theme = "pro_black",
-    camera = {mode = "fixed", view = "2d", height = 6},
-}
+local scene = vis.scene {theme = "pro_black", camera = {height = 6}}
 
 local axes = scene:space {x = {-5, 5, 1}, y = {-3, 3, 1}, stroke = "#00000000", ticks = true}
 local colors = {"accent", "warning", "success", "danger"}
@@ -78,10 +69,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({
-    width: 960, height: 540, theme: "pro_black",
-    camera: {mode: "fixed", view: "2d", height: 6},
-});
+const scene = vis.scene({theme: "pro_black", camera: {height: 6}});
 
 const axes = scene.space({x: [-5, 5, 1], y: [-3, 3, 1], stroke: "#00000000", ticks: true});
 const colors = ["accent", "warning", "success", "danger"];
@@ -102,10 +90,7 @@ return scene;
 `look` can also switch `view` to `"3d"` and place the `eye`, tipping a flat scene back into space. `orbit(angle)` then circles the eye around the target.
 
 ```lua live
-local scene = vis.scene {
-    width = 960, height = 540, theme = "pro_black",
-    camera = {mode = "fixed", view = "2d", height = 6},
-}
+local scene = vis.scene {theme = "pro_black", camera = {height = 6}}
 
 local axes = scene:space {x = {-5, 5, 1}, y = {-3, 3, 1}, stroke = "#00000000", ticks = true}
 local colors = {"accent", "warning", "success", "danger"}
@@ -114,26 +99,23 @@ for i, p in ipairs({{-3, 1.5}, {2, 2}, {3.5, -1.5}, {-2, -2}}) do
 end
 
 scene:wait(0.3)
-scene:look({view = "3d", eye = {0, -7, 6}, target = {0, 0, 0}}, 1.6)   -- tip the plane back
-scene:orbit(math.pi / 2, {duration = 2})                                  -- then circle around it
+scene:look({view = "3d", eye = {0, -7, 6}}, 1.6)   -- tip the plane back
+scene:orbit(math.pi / 2, {duration = 2})            -- then circle around it
 scene:wait(0.3)
 
 return scene
 ```
 
 ```js live
-const scene = vis.scene({
-    width: 960, height: 540, theme: "pro_black",
-    camera: {mode: "fixed", view: "2d", height: 6},
-});
+const scene = vis.scene({theme: "pro_black", camera: {height: 6}});
 
 const axes = scene.space({x: [-5, 5, 1], y: [-3, 3, 1], stroke: "#00000000", ticks: true});
 const colors = ["accent", "warning", "success", "danger"];
 [[-3, 1.5], [2, 2], [3.5, -1.5], [-2, -2]].forEach((p, i) => axes.circle({center: p, radius: 0.3, fill: colors[i]}));
 
 scene.wait(0.3);
-scene.look({view: "3d", eye: [0, -7, 6], target: [0, 0, 0]}, 1.6);   // tip the plane back
-scene.orbit(Math.PI / 2, {duration: 2});                               // then circle around it
+scene.look({view: "3d", eye: [0, -7, 6]}, 1.6);   // tip the plane back
+scene.orbit(Math.PI / 2, {duration: 2});          // then circle around it
 scene.wait(0.3);
 
 return scene;
@@ -144,12 +126,9 @@ return scene;
 `scene:view(rect, options)` adds an inset that renders the same scene through its own camera. `rect` is in fractions of the frame from the top left; `follow` keeps an object centred in it.
 
 ```lua live
-local scene = vis.scene {
-    width = 960, height = 540, theme = "pro_black",
-    camera = {mode = "fixed", view = "2d", height = 6},
-}
+local scene = vis.scene {theme = "pro_black", camera = {height = 6}}
 
-local track = scene:circle {radius = 2.2, stroke = "muted", width = 2, fill = "#00000000"}
+local track = scene:circle {radius = 2.2, stroke = "muted", width = 2}
 local ball = scene:circle {center = {2.2, 0}, radius = 0.12, fill = "warning"}
 scene:text {text = "close-up", point = {3.52, 0.6}, size = 14, align = {0.5, 1}, color = "muted"}
 
@@ -163,12 +142,9 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({
-    width: 960, height: 540, theme: "pro_black",
-    camera: {mode: "fixed", view: "2d", height: 6},
-});
+const scene = vis.scene({theme: "pro_black", camera: {height: 6}});
 
-scene.circle({radius: 2.2, stroke: "muted", width: 2, fill: "#00000000"});
+scene.circle({radius: 2.2, stroke: "muted", width: 2});
 const ball = scene.circle({center: [2.2, 0], radius: 0.12, fill: "warning"});
 scene.text({text: "close-up", point: [3.52, 0.6], size: 14, align: [0.5, 1], color: "muted"});
 

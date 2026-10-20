@@ -29,10 +29,7 @@ JavaScript; **Insert a scene code block** in the command palette starts one.
 
 ````markdown
 ```viscript loop
-local scene = vis.scene {
-    width = 640, height = 360,
-    camera = {view = "2d", target = {0, 0}, height = 7},
-}
+local scene = vis.scene {width = 640, height = 360, camera = {height = 7}}
 local ball = scene:circle {center = {-3, 0}, radius = 0.5, fill = "accent"}
 scene:grow_from_center(ball, 0.6)
 scene:shift(ball, {6, 0}, 1.5)

@@ -1,6 +1,6 @@
 -- README "Render": one scene.lua, sampled by time into a PNG frame, a GIF and an MP4.
 local scene = vis.scene {width = 1000, height = 360, fps = 20, theme = "pro_white",
-  camera = {view = "2d", target = {-0.55, 0}, height = 6}}
+  camera = {target = {-0.55, 0}, height = 6}}
 
 local DUR, STILL = 5.0, 3.8      -- scene length and the `--time 3.8` frame
 local THUMB = 0.8                -- wave scale inside an output card

@@ -8,10 +8,8 @@ local p = {
 local page = vis.scene {
     width = 960,
     height = 540,
-    fps = 30,
-    loop = false,
     theme = "pro_white",
-    camera = { mode = "fixed", view = "2d", target = { 0, 0 }, height = 8 },
+    camera = { view = "2d" },
 }
 
 page:text {
@@ -31,17 +29,10 @@ page:text {
 local view = vis.scene {
     width = 900,
     height = 400,
-    fps = 30,
-    loop = false,
     theme = "pro_white",
-    antialiasing = true,
     camera = {
-        mode = "fixed",
         view = "3d",
         eye = { 5.2, 3.8, 6.0 },
-        target = { 0, 0, 0 },
-        up = { 0, 1, 0 },
-        projection = "perspective",
         fov = 0.66,
         near = 0.1,
         far = 100,

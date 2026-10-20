@@ -1,8 +1,5 @@
 -- Compare phase-aligned sine and cosine plots on one shared coordinate Space.
-local scene = vis.scene {
-    width = 960, height = 540, fps = 30, loop = false,
-    camera = {mode = "fixed", view = "2d", target = {0, 0}, height = 6.2},
-}
+local scene = vis.scene {camera = {height = 6.2}}
 
 local periodMultiple, samples = 2, 160
 local x0, x1 = -periodMultiple * math.pi, periodMultiple * math.pi

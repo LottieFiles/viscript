@@ -2,7 +2,7 @@
 // Source: docs/assets/skills.lua.
 export const SKILLS = String.raw`-- README "Skills for AI agents": the example prompt, and the scene an agent makes from it.
 local scene = vis.scene {width = 1000, height = 360, fps = 20, theme = "pro_black",
-  camera = {view = "2d", target = {0, 0}, height = 6}}
+  camera = {height = 6}}
 
 local PROMPT = "Use vis-skills to animate binary search on a sorted array of 16 numbers."
 local DATA = {2, 5, 8, 12, 16, 23, 38, 41, 45, 56, 61, 67, 72, 80, 88, 95}
@@ -18,7 +18,7 @@ end
 
 -- Prompt bubble.
 local bubble = scene:rectangle {center = {0, 2.0}, size = {15.2, 0.9}, corner = 0.45, fill = "surface", stroke = "border", width = 2, layer = 0}
-local prompt = scene:text {text = PROMPT, point = {0, 2.0}, align = {0.5, 0.5}, size = 14, role = "code", fill = "foreground", layer = 1, id = "prompt"}
+local prompt = scene:text {text = PROMPT, point = {0, 2.0}, size = 14, role = "code", fill = "foreground", layer = 1, id = "prompt"}
 
 -- Array cells.
 local CW, Y = 0.92, -0.2
@@ -34,7 +34,7 @@ local function cx(i) return x0 + (i - 1) * CW end
 local goal = scene:text {text = "target = " .. TARGET, point = {0, -1.75}, size = 16, role = "code", fill = "muted", layer = 3, id = "goal"}
 local mid = scene:arrow {from = {cx(trace[1].mid), Y + 1.15}, to = {cx(trace[1].mid), Y + 0.5}, stroke = "warning", tip = 9, width = 3, layer = 4, opacity = 0}
 local range = scene:rectangle {center = {(cx(1) + cx(#DATA)) / 2, Y}, size = {cx(#DATA) - cx(1) + CW + 0.08, 1.04}, corner = 0.12,
-  fill = "#00000000", stroke = "accent", width = 3, layer = 4, opacity = 0, id = "range"}
+  stroke = "accent", width = 3, layer = 4, opacity = 0, id = "range"}
 local all = {}
 for i = 1, #DATA do all[#all + 1] = cells[i]; all[#all + 1] = nums[i]; all[#all + 1] = idxs[i] end
 for _, h in ipairs(all) do scene:set({target = h, opacity = 0}) end

@@ -1,8 +1,5 @@
 -- One owning Space carries its complete geometric family through real matrices.
-local scene = vis.scene {
-    width = 960, height = 540, fps = 30, loop = false,
-    camera = {mode = "fixed", view = "2d", target = {0, 0}, height = 7.4},
-}
+local scene = vis.scene {camera = {height = 7.4}}
 
 local identity = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}
 local matrices = {
@@ -47,7 +44,7 @@ scene:transform(localSpace, matrices[3], 1.25, {preset = "ease_in_out", reverse 
 
 local conclusion = scene:text {
     id = "shortform-transform-conclusion", text = "grid · basis · point · area  —  one matrix",
-    point = {0, -3.12}, role = "code", fill = "result", align = {0.5, 0.5}, layer = 40,
+    point = {0, -3.12}, role = "code", fill = "result", layer = 40,
 }
 scene:fade_in(conclusion, {shift = {0, 0.08}, duration = 0.34, curve = "gentle"})
 scene:wait(1.7)

@@ -3,11 +3,7 @@
 -- The numeric row below is illustrative; replace it only with sourced or recomputed values.
 -- Look: ink operators and routes; the selected q₂ row carries `accent`, its output o₂ carries `result`,
 -- and the masked key is a dashed cell. Node widths fit their measured labels with at least 6 px inset.
-local scene = vis.scene {
-    width = 960, height = 540, fps = 30, loop = false,
-    theme = "pro_white",
-    camera = {mode = "fixed", view = "2d", target = {0, 0}, height = 540},
-}
+local scene = vis.scene {theme = "pro_white", camera = {height = 540}}
 
 local LAYER = {guide = 0, route = 10, cell = 20, node = 22, text = 30, focus = 40}
 local root = scene:group {id = "scaled-attention:root"}
@@ -27,7 +23,7 @@ header:text {
 local function node(id, label, detail, center, size)
     local group = nodes:group {id = "scaled-attention:node:" .. id}
     local body = group:rectangle {
-        center = center, size = size, fill = "#00000000",
+        center = center, size = size,
         stroke = "foreground", width = 1.25,
         layer = LAYER.node, id = "scaled-attention:node:" .. id .. ":body",
     }
@@ -97,7 +93,7 @@ for row = 1, 4 do
         -- No fills: the printed weights carry the values, the selected row its hue, a mask its dash.
         matrix:rectangle {
             center = {x0 + (column - 1) * cw, y0 - (row - 1) * ch},
-            size = {54, 28}, fill = "#00000000",
+            size = {54, 28},
             stroke = is_selected and "accent" or "border", width = is_selected and 1.25 or 1,
             dash = is_selected and is_masked and {3, 3} or nil,
             layer = LAYER.cell, id = "scaled-attention:cell:" .. row .. ":" .. column,
@@ -126,7 +122,7 @@ local axis_label = axis_group:text {
 }
 
 result:rectangle {
-    center = {232, -50}, size = {336, 112}, fill = "#00000000",
+    center = {232, -50}, size = {336, 112},
     stroke = "result", width = 1.25, layer = LAYER.node,
     id = "scaled-attention:selected-output:body",
 }

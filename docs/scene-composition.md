@@ -10,10 +10,7 @@ Scene factories create roots. Object factories create children, so a shape can o
 its annotation and a Group can contain a complete visual unit.
 
 ```lua
-local scene = vis.scene {
-    width = 960, height = 540,
-    camera = {view = "2d", height = 6},
-}
+local scene = vis.scene {camera = {height = 6}}
 local node = scene:group {id = "node"}
 node:circle {radius = 0.8}
 node:text {text = "A", id = "label", measure = true}
@@ -285,9 +282,9 @@ and handing it over during `duration`. Live stages start at local time zero duri
 their incoming transition; `live=false` uses completed frames.
 
 ```lua
-local root = vis.scene {width = 960, height = 540}
-local first = vis.scene {width = 960, height = 540}
-local second = vis.scene {width = 960, height = 540}
+local root = vis.scene {}
+local first = vis.scene {}
+local second = vis.scene {}
 first:circle {center = {-2, 0}, radius = 0.8, id = "subject"}
 second:rectangle {center = {2, 0}, size = {2, 1}, id = "subject"}
 root:scene_transition({first, second}, {duration = 1, hold = 0.5, curve = "smooth"})

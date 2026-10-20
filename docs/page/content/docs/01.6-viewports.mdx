@@ -17,13 +17,12 @@ To play whole scenes one after another instead, see [Scene](#/docs/scene-transit
 ```lua live
 local panelTheme = {preset = "pro_black", background = "#161b22"}
 local root = vis.scene {width = 960, height = 540, theme = {preset = "pro_black", background = "#0d1117"},
-                        camera = {mode = "fixed", view = "2d", height = 6}}
+                        camera = {height = 6}}
 root:text {text = "Trigonometry at a glance", role = "h2", point = {0, 2.62}}
 
 -- One card of the sheet: its own scene, camera and timeline, with a caption at the bottom.
 local function card(caption, build)
-    local s = vis.scene {width = 312, height = 222, theme = panelTheme,
-                         camera = {mode = "fixed", view = "2d", height = 3.6}}
+    local s = vis.scene {width = 312, height = 222, theme = panelTheme, camera = {height = 3.6}}
     s:text {text = caption, point = {0, -1.55}, size = 13, color = "muted"}
     build(s)
     return s
@@ -31,7 +30,7 @@ end
 
 local cards = {
     card("unit circle", function(s)
-        local ring = s:circle {radius = 1, stroke = "muted", width = 1.5}
+        local ring = s:circle {stroke = "muted", width = 1.5}
         local ray = s:line {from = {0, 0}, to = {math.cos(0.9), math.sin(0.9)}, stroke = "accent", width = 3}
         local mark = s:angle {vertex = {0, 0}, from = {1, 0}, to = {math.cos(0.9), math.sin(0.9)}, radius = 0.35,
                               stroke = "warning", width = 2, label = "θ"}
@@ -89,13 +88,12 @@ return root
 ```js live
 const panelTheme = {preset: "pro_black", background: "#161b22"};
 const root = vis.scene({width: 960, height: 540, theme: {preset: "pro_black", background: "#0d1117"},
-                        camera: {mode: "fixed", view: "2d", height: 6}});
+                        camera: {height: 6}});
 root.text({text: "Trigonometry at a glance", role: "h2", point: [0, 2.62]});
 
 // One card of the sheet: its own scene, camera and timeline, with a caption at the bottom.
 function card(caption, build) {
-    const s = vis.scene({width: 312, height: 222, theme: panelTheme,
-                         camera: {mode: "fixed", view: "2d", height: 3.6}});
+    const s = vis.scene({width: 312, height: 222, theme: panelTheme, camera: {height: 3.6}});
     s.text({text: caption, point: [0, -1.55], size: 13, color: "muted"});
     build(s);
     return s;
@@ -104,7 +102,7 @@ function card(caption, build) {
 const tip = [Math.cos(0.9), Math.sin(0.9)];
 const cards = [
     card("unit circle", (s) => {
-        const ring = s.circle({radius: 1, stroke: "muted", width: 1.5});
+        const ring = s.circle({stroke: "muted", width: 1.5});
         const ray = s.line({from: [0, 0], to: tip, stroke: "accent", width: 3});
         const mark = s.angle({vertex: [0, 0], from: [1, 0], to: tip, radius: 0.35,
                               stroke: "warning", width: 2, label: "θ"});

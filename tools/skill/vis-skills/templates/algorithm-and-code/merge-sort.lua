@@ -4,10 +4,7 @@
 -- Edit LEFT and RIGHT; the stable left-first trace and output are regenerated below.
 -- Look: ink slots and values; the run heads under comparison get a transient `focus` outline, and a value
 -- turns `result` when it is committed to the output buffer. The tags, not hues, tell the runs apart.
-local scene = vis.scene {
-    width = 960, height = 540, fps = 30, loop = false,
-    camera = {mode = "fixed", view = "2d", target = {0, 0}, height = 540},
-}
+local scene = vis.scene {camera = {height = 540}}
 
 local LEFT = {
     {id = "2L", key = 2, label = "2L"},
@@ -81,17 +78,17 @@ local outputSlots = {}
 for index, x in ipairs(OUTPUT_X) do
     outputSlots[index] = slots:rectangle {
         center = {x, OUTPUT_Y}, size = SLOT,
-        fill = "#00000000", stroke = "border", width = 1,
+        stroke = "border", width = 1,
         layer = LAYER.slot, id = "buffer-slot:" .. index,
     }
 end
 for index, x in ipairs(INPUT_X) do
     slots:rectangle {
-        center = {x, INPUT_Y}, size = SLOT, fill = "#00000000", stroke = "border", width = 1,
+        center = {x, INPUT_Y}, size = SLOT, stroke = "border", width = 1,
         layer = LAYER.slot, id = "run:left:slot:" .. index,
     }
     slots:rectangle {
-        center = {-x, INPUT_Y}, size = SLOT, fill = "#00000000", stroke = "border", width = 1,
+        center = {-x, INPUT_Y}, size = SLOT, stroke = "border", width = 1,
         layer = LAYER.slot, id = "run:right:slot:" .. (4 - index),
     }
 end
@@ -102,7 +99,7 @@ local function makeToken(spec, x)
     local token = tokenLayer:group {matrix = translate(x, INPUT_Y), id = "value:" .. spec.id}
     local body = token:rectangle {
         center = {0, 0}, size = SLOT,
-        fill = "#00000000", stroke = "foreground", width = 1.25,
+        stroke = "foreground", width = 1.25,
         layer = LAYER.token, id = "value:" .. spec.id .. ":body",
     }
     token:text {

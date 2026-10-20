@@ -1,6 +1,6 @@
 -- Question: which state belongs to each call frame, and which object survives a return?
 -- Variant: main -> buildUser(" Ada ") -> normalize(" Ada ") -> "Ada".
-local scene = vis.scene {width = 960, height = 540, fps = 30, loop = false, camera = {mode = "fixed", view = "2d", target = {0, 0}, height = 540}}
+local scene = vis.scene {camera = {height = 540}}
 local LAYER = {route = 8, body = 20, text = 40}
 local TRACE = {
     {kind = "call", frame = "main", detail = "result = buildUser(...)"},
@@ -25,11 +25,11 @@ local frameGroup, frameBody, frameLabel, frameDetail = {}, {}, {}, {}
 for _, id in ipairs({"main", "build", "normalize"}) do
     local spec = FRAME[id]
     frameGroup[id] = scene:group {id = "frame:" .. id}
-    frameBody[id] = scene:rectangle {center = {-260, spec.y}, size = {340, 70}, fill = "#00000000", stroke = "foreground", width = 1.25, opacity = 0, layer = LAYER.body, id = "frame:" .. id .. ":body"}
+    frameBody[id] = scene:rectangle {center = {-260, spec.y}, size = {340, 70}, stroke = "foreground", width = 1.25, opacity = 0, layer = LAYER.body, id = "frame:" .. id .. ":body"}
     frameLabel[id] = scene:text {text = spec.label, point = {-260, spec.y + 16}, role = "code", fill = "foreground", opacity = 0, layer = LAYER.text, id = "frame:" .. id .. ":label"}
     frameDetail[id] = scene:text {text = "waiting", point = {-260, spec.y - 16}, role = "code", fill = "muted", opacity = 0, layer = LAYER.text, id = "frame:" .. id .. ":detail:0"}
 end
-local objectBody = scene:rectangle {center = {260, 15}, size = {300, 120}, fill = "#00000000", stroke = "foreground", width = 1.25, opacity = 0, layer = LAYER.body, id = "object:user:body"}
+local objectBody = scene:rectangle {center = {260, 15}, size = {300, 120}, stroke = "foreground", width = 1.25, opacity = 0, layer = LAYER.body, id = "object:user:body"}
 local objectAddress = scene:text {text = "user@A0 (illustrative)", point = {260, 48}, role = "code", fill = "muted", opacity = 0, layer = LAYER.text, id = "object:user:address"}
 local objectValue = scene:text {text = "name = ?", point = {260, -10}, role = "code", fill = "foreground", opacity = 0, layer = LAYER.text, id = "object:user:value:0"}
 local returnRoute = scene:arrow {from = {-90, -75}, to = {105, -10}, tip = 7, stroke = "result", width = 1.5, opacity = 0, layer = LAYER.route, id = "return:user-to-main"}

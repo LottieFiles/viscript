@@ -1,7 +1,7 @@
 -- README demo: a command typed in a terminal produces a result on the right.
 -- One loop, ink-on-white, camera opens on the cause and widens to the effect.
 local scene = vis.scene {width = 1200, height = 420, fps = 20, loop = true, theme = "pro_white",
-  camera = {view = "2d", target = {-4.6, 0.25}, height = 5}}
+  camera = {target = {-4.6, 0.25}, height = 5}}
 local INK = "foreground"
 
 -- The configured camera is the opening close-up on the terminal; focus() widens to the
@@ -25,7 +25,7 @@ local ok = TEXT {text = "wrote scene.gif", point = {TX - TW / 2 + 0.35, 0.4}, al
 local RX, RW = 4.4, 4.6
 local out = scene:rectangle {center = {RX, 0}, size = {RW, TH}, fill = "#ffffff", stroke = INK, width = 2.5, layer = 0, id = "output"}
 local outTitle = TEXT {text = "SCENE.GIF", point = {RX - RW / 2, TH / 2 + 0.3}, align = {0, 0.5}, size = 12, role = "code", fill = INK, id = "output:title"}
-local slot = scene:rectangle {center = {RX, 0}, size = {RW - 0.8, TH - 0.8}, fill = "#00000000", stroke = "border", width = 1.5, dash = {6, 5}, layer = 1, id = "slot"}
+local slot = scene:rectangle {center = {RX, 0}, size = {RW - 0.8, TH - 0.8}, stroke = "border", width = 1.5, dash = {6, 5}, layer = 1, id = "slot"}
 local dot = scene:circle {center = {RX - 1.2, -0.6}, radius = 0.4, fill = "accent", stroke = INK, width = 2.5, layer = 2, opacity = 0, id = "dot"}
 local wire = scene:arrow {from = {TX + TW / 2 + 0.15, 0}, to = {RX - RW / 2 - 0.15, 0}, stroke = INK, width = 2, tip = 10, layer = 1, progress = 0, id = "wire"}
 

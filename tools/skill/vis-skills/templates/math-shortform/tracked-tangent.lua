@@ -3,10 +3,7 @@
 -- frames overview -> detail -> overview. No title: the curve is the subject, and the final frame
 -- answers with a caption. Figure weights: the curve is ink, the ball and its path are accent, and the
 -- slope keeps `result` across the tangent and its label.
-local scene = vis.scene {
-    width = 960, height = 540, theme = "pro_black",
-    camera = {mode = "fixed", view = "2d", target = {0, 2}, height = 6},
-}
+local scene = vis.scene {theme = "pro_black", camera = {target = {0, 2}, height = 6}}
 
 -- Source truth: the function, its slope, and the start value.
 local f = function(x) return 0.5 * x * x end

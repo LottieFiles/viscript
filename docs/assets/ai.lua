@@ -1,7 +1,7 @@
 -- README "Scenes as code, written with AI": a prompt becomes a scene script; the script is a
 -- retained object tree; animation changes properties; the agent checks layout and renders.
 local scene = vis.scene {width = 1200, height = 420, fps = 20, theme = "pro_white",
-  camera = {view = "2d", target = {0, 0.1}, height = 7.0}}
+  camera = {target = {0, 0.1}, height = 7.0}}
 
 -- Text is set in world units (plane) so it scales with the camera moves below; sizes are
 -- authored in points at the opening camera and converted here.

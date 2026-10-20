@@ -2,11 +2,7 @@
 -- This is an illustrative pre-norm block. Replace the variant, shapes, head grouping, and equations from the source.
 -- Look: ink operators and main path; the residual paths and the contract they keep share one hue (accent).
 -- The focal sublayer is told apart by a heavier outline, not a color. Box widths fit the measured labels.
-local scene = vis.scene {
-    width = 960, height = 540, fps = 30, loop = false,
-    theme = "pro_white",
-    camera = {mode = "fixed", view = "2d", target = {0, 0}, height = 540},
-}
+local scene = vis.scene {theme = "pro_white", camera = {height = 540}}
 
 local LAYER = {route = 10, node = 20, text = 30, focus = 40}
 local root = scene:group {id = "transformer-block:root"}
@@ -26,7 +22,7 @@ local function node(spec)
     local group = nodes:group {id = "transformer-block:node:" .. spec.id}
     local body = group:rectangle {
         center = {spec.x, NODE_Y}, size = spec.size,
-        fill = "#00000000", stroke = "foreground",
+        stroke = "foreground",
         width = spec.focal and 1.5 or 1.25, layer = LAYER.node,
         id = "transformer-block:node:" .. spec.id .. ":body",
     }

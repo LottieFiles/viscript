@@ -24,13 +24,7 @@ local function regular_polygon(center, radius, sides, rotation)
 end
 
 local function stage(index, title, count, accent, summary)
-    local scene = vis.scene {
-        width = 960,
-        height = 540,
-        fps = 60,
-        background = p.background,
-        camera = { mode = "fixed", view = "2d", target = { 0, 0 }, height = 8 },
-    }
+    local scene = vis.scene {fps = 60, background = p.background}
     scene:text {
         text = "SEMANTIC SCENE TRANSITION",
         point = { -6.45, 3.25 },
@@ -353,19 +347,11 @@ for index, item in ipairs(additions) do
     })
 end
 
-local scene = vis.scene {
-    width = 960,
-    height = 540,
-    fps = 60,
-    background = p.background,
-    loop = false,
-    camera = { mode = "fixed", view = "2d", target = { 0, 0 }, height = 8 },
-}
+local scene = vis.scene {fps = 60, background = p.background}
 scene:rectangle {
     center = { 0, 0 },
     size = { 13.75, 7.55 },
     corner = 0.10,
-    fill = "#00000000",
     stroke = p.rule,
     width = 1,
     id = "outer-frame",

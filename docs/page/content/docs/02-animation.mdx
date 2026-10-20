@@ -34,10 +34,7 @@ scrubber under the player.</p>
 <p>Below, every curve moves a dot the same distance in the same two seconds; <code>parallel</code> starts them together.</p>
 
 ```lua live
-local scene = vis.scene {
-    width = 960, height = 540, theme = "pro_black",
-    camera = {mode = "fixed", view = "2d", height = 6},
-}
+local scene = vis.scene {theme = "pro_black", camera = {height = 6}}
 
 local curves = {"linear", "smooth", "ease_in", "ease_out", "ease_in_out",
                 "gentle", "snappy", "back", "bounce", "elastic",
@@ -61,10 +58,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({
-    width: 960, height: 540, theme: "pro_black",
-    camera: {mode: "fixed", view: "2d", height: 6},
-});
+const scene = vis.scene({theme: "pro_black", camera: {height: 6}});
 
 const curves = ["linear", "smooth", "ease_in", "ease_out", "ease_in_out",
                 "gentle", "snappy", "back", "bounce", "elastic",
@@ -99,14 +93,11 @@ return scene;
 </table>
 
 ```lua live
-local scene = vis.scene {
-    width = 960, height = 540, theme = "pro_black",
-    camera = {mode = "fixed", view = "2d", height = 6},
-}
+local scene = vis.scene {theme = "pro_black", camera = {height = 6}}
 
 -- one slot per call: the label is there from t = 0, the shape enters on its turn
 local function slot(x, y, name)
-    scene:text {text = name, point = {x, y - 1}, align = {0.5, 0.5}, size = 14,
+    scene:text {text = name, point = {x, y - 1}, size = 14,
                 font = "JetBrainsMono", color = "muted"}
 end
 slot(-3.4, 1.3, "create");           slot(0, 1.3, "draw_border_then_fill")
@@ -132,14 +123,11 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({
-    width: 960, height: 540, theme: "pro_black",
-    camera: {mode: "fixed", view: "2d", height: 6},
-});
+const scene = vis.scene({theme: "pro_black", camera: {height: 6}});
 
 // one slot per call: the label is there from t = 0, the shape enters on its turn
 const slot = (x, y, name) =>
-    scene.text({text: name, point: [x, y - 1], align: [0.5, 0.5], size: 14,
+    scene.text({text: name, point: [x, y - 1], size: 14,
                 font: "JetBrainsMono", color: "muted"});
 slot(-3.4, 1.3, "create");           slot(0, 1.3, "draw_border_then_fill");
 slot(3.4, 1.3, "fade_in");          slot(-3.4, -1.5, "grow_from_center");
@@ -168,10 +156,7 @@ return scene;
 Pass an array and a fourth argument, `lag`, to start each item that many seconds after the previous one. The whole span is `duration + lag × (n − 1)` — here `0.8 + 0.2 × 5 = 1.8` s for the lower row.
 
 ```lua live
-local scene = vis.scene {
-    width = 960, height = 540, theme = "pro_black",
-    camera = {mode = "fixed", view = "2d", height = 6},
-}
+local scene = vis.scene {theme = "pro_black", camera = {height = 6}}
 
 local together, staggered = {}, {}
 for i = 1, 6 do
@@ -188,10 +173,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({
-    width: 960, height: 540, theme: "pro_black",
-    camera: {mode: "fixed", view: "2d", height: 6},
-});
+const scene = vis.scene({theme: "pro_black", camera: {height: 6}});
 
 const together = [], staggered = [];
 for (let i = 1; i <= 6; i++) {

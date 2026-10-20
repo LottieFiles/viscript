@@ -17,10 +17,7 @@ A descriptor takes only one of <code>shift</code>, <code>transform</code> and <c
 no bounds yet, such as an empty group, cannot move to a position.</p>
 
 ```lua live
-local scene = vis.scene {
-    width = 960, height = 540, theme = "pro_black",
-    camera = {mode = "fixed", view = "2d", height = 6},
-}
+local scene = vis.scene {theme = "pro_black", camera = {height = 6}}
 
 local stops = {{-4, -1}, {0, -1}, {4, -1}}
 for _, point in ipairs(stops) do
@@ -39,10 +36,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({
-    width: 960, height: 540, theme: "pro_black",
-    camera: {mode: "fixed", view: "2d", height: 6},
-});
+const scene = vis.scene({theme: "pro_black", camera: {height: 6}});
 
 const stops = [[-4, -1], [0, -1], [4, -1]];
 for (const point of stops) {
@@ -67,10 +61,7 @@ the first node, <code>move_along</code> carries its center along the edge, and a
 the arrow tip. A last <code>position</code> parks it beside the node it reached.</p>
 
 ```lua live
-local scene = vis.scene {
-    width = 960, height = 540, theme = "pro_black",
-    camera = {mode = "fixed", view = "2d", height = 6},
-}
+local scene = vis.scene {theme = "pro_black", camera = {height = 6}}
 
 local d = vis.diagram(scene, {id = "request", layout = "manual", node_size = {1.8, 0.9}, corner = 0.08})
 local client = d:node {id = "client", label = "Client", position = {-4, 0}}
@@ -94,10 +85,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({
-    width: 960, height: 540, theme: "pro_black",
-    camera: {mode: "fixed", view: "2d", height: 6},
-});
+const scene = vis.scene({theme: "pro_black", camera: {height: 6}});
 
 // vis.diagram is Lua-only; this draws the same three nodes and two edges from primitives
 const [w, h] = [1.8, 0.9];
@@ -106,7 +94,7 @@ scene.arrow({from: [w / 2, 0], to: [4 - w / 2, 0], stroke: "muted", layer: -20})
 const node = (label, x) => {
     const group = scene.group({});
     const body = group.rectangle({center: [x, 0], size: [w, h], corner: 0.08, fill: "background", stroke: "foreground"});
-    group.text({text: label, point: [x, 0], role: "text", color: "foreground", layer: 10});
+    group.text({text: label, point: [x, 0], color: "foreground", layer: 10});
     return body;
 };
 node("Client", -4);
@@ -132,17 +120,14 @@ return scene;
 <code>fade_transform</code> the old one into it.</p>
 
 ```lua live
-local scene = vis.scene {
-    width = 960, height = 540, theme = "pro_black",
-    camera = {mode = "fixed", view = "2d", height = 6},
-}
+local scene = vis.scene {theme = "pro_black", camera = {height = 6}}
 
 local dot = scene:circle {radius = 0.25, fill = "accent"}
 scene:set {target = dot, position = {-4, 0.5}}
 
-local caption = scene:text {text = "1. Start on the left", point = {0, -1.8}, align = {0.5, 0.5}, size = 30}
+local caption = scene:text {text = "1. Start on the left", point = {0, -1.8}, size = 30}
 local function say(text)
-    local line = scene:text {text = text, point = {0, -1.8}, align = {0.5, 0.5}, size = 30}
+    local line = scene:text {text = text, point = {0, -1.8}, size = 30}
     scene:fade_transform(caption, line, 0.4)
     caption = line
 end
@@ -158,17 +143,14 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({
-    width: 960, height: 540, theme: "pro_black",
-    camera: {mode: "fixed", view: "2d", height: 6},
-});
+const scene = vis.scene({theme: "pro_black", camera: {height: 6}});
 
 const dot = scene.circle({radius: 0.25, fill: "accent"});
 scene.set({target: dot, position: [-4, 0.5]});
 
-let caption = scene.text({text: "1. Start on the left", point: [0, -1.8], align: [0.5, 0.5], size: 30});
+let caption = scene.text({text: "1. Start on the left", point: [0, -1.8], size: 30});
 const say = (text) => {
-    const line = scene.text({text, point: [0, -1.8], align: [0.5, 0.5], size: 30});
+    const line = scene.text({text, point: [0, -1.8], size: 30});
     scene.fadeTransform(caption, line, 0.4);
     caption = line;
 };

@@ -2,10 +2,7 @@
 -- Variant: ascending data, zero-based indices, closed [lo, hi], return any match.
 -- Edit VALUES and TARGET; the closed-range trace is regenerated below.
 -- Replace the trace builder when reviewing a half-open or duplicate-selecting implementation.
-local scene = vis.scene {
-    width = 960, height = 540, fps = 30, loop = false,
-    camera = {mode = "fixed", view = "2d", target = {0, 0}, height = 540},
-}
+local scene = vis.scene {camera = {height = 540}}
 
 local VALUES = {2, 5, 8, 12, 16, 23, 38}
 local TARGET = 23
@@ -57,7 +54,7 @@ for index, value in ipairs(VALUES) do
     local cell = array:group {id = "array-cell:" .. logical}
     local body = cell:rectangle {
         center = {x, Y}, size = {CELL, CELL},
-        fill = "#00000000", stroke = "foreground", width = 1,
+        stroke = "foreground", width = 1,
         layer = LAYER.body, id = "array-cell:" .. logical .. ":body",
     }
     values[index] = cell:text {
@@ -84,7 +81,7 @@ local function rangeBox(lo, hi, id)
     end
     return scene:rectangle {
         center = {(left + right) / 2, Y}, size = {right - left + 12, CELL + 16},
-        fill = "#00000000", stroke = "accent", width = 1.5,
+        stroke = "accent", width = 1.5,
         layer = LAYER.range, id = id,
     }
 end

@@ -16,18 +16,15 @@ descendants that set none of their own, as in SVG; <code>opacity</code> and <cod
 other while the group fades. Compare the two pairs below.</p>
 
 ```lua live
-local scene = vis.scene {
-    width = 960, height = 540, theme = "pro_black",
-    camera = {mode = "fixed", view = "2d", height = 6},
-}
+local scene = vis.scene {theme = "pro_black", camera = {height = 6}}
 
 local plain = scene:group {fill = "accent"}
-plain:circle {center = {-3.4, 0}, radius = 1}
-plain:circle {center = {-2.2, 0}, radius = 1}
+plain:circle {center = {-3.4, 0}}
+plain:circle {center = {-2.2, 0}}
 
 local iso = scene:group {fill = "accent", isolate = true}
-iso:circle {center = {2.2, 0}, radius = 1}
-iso:circle {center = {3.4, 0}, radius = 1}
+iso:circle {center = {2.2, 0}}
+iso:circle {center = {3.4, 0}}
 
 scene:parallel(
     function() scene:fade(plain, 0.4, 1.2) end,
@@ -38,18 +35,15 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({
-    width: 960, height: 540, theme: "pro_black",
-    camera: {mode: "fixed", view: "2d", height: 6},
-});
+const scene = vis.scene({theme: "pro_black", camera: {height: 6}});
 
 const plain = scene.group({fill: "accent"});
-plain.circle({center: [-3.4, 0], radius: 1});
-plain.circle({center: [-2.2, 0], radius: 1});
+plain.circle({center: [-3.4, 0]});
+plain.circle({center: [-2.2, 0]});
 
 const iso = scene.group({fill: "accent", isolate: true});
-iso.circle({center: [2.2, 0], radius: 1});
-iso.circle({center: [3.4, 0], radius: 1});
+iso.circle({center: [2.2, 0]});
+iso.circle({center: [3.4, 0]});
 
 scene.parallel(
     () => scene.fade(plain, 0.4, 1.2),
@@ -79,10 +73,7 @@ return scene;
 </table>
 
 ```lua live
-local scene = vis.scene {
-    width = 960, height = 540, theme = "pro_black",
-    camera = {mode = "fixed", view = "2d", height = 6},
-}
+local scene = vis.scene {theme = "pro_black", camera = {height = 6}}
 
 local stripes = scene:group {}
 for i = -6, 6 do
@@ -99,10 +90,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({
-    width: 960, height: 540, theme: "pro_black",
-    camera: {mode: "fixed", view: "2d", height: 6},
-});
+const scene = vis.scene({theme: "pro_black", camera: {height: 6}});
 
 const stripes = scene.group({});
 for (let i = -6; i <= 6; i++) {
@@ -125,10 +113,7 @@ shadow beneath it.<br />
 Omitted fields default to 40% black, <code>&#123;0, -4&#125;</code> and <code>8</code>. Both animate through <code>play</code>.</p>
 
 ```lua live
-local scene = vis.scene {
-    width = 960, height = 540, theme = "pro_black",
-    camera = {mode = "fixed", view = "2d", height = 6},
-}
+local scene = vis.scene {theme = "pro_black", camera = {height = 6}}
 
 local card = scene:rectangle {center = {-2.5, 0}, size = {3, 2}, corner = 0.15, fill = "#e6e8ee"}
 local soft = scene:circle {center = {2.5, 0}, radius = 1.1, fill = "accent"}
@@ -141,10 +126,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({
-    width: 960, height: 540, theme: "pro_black",
-    camera: {mode: "fixed", view: "2d", height: 6},
-});
+const scene = vis.scene({theme: "pro_black", camera: {height: 6}});
 
 const card = scene.rectangle({center: [-2.5, 0], size: [3, 2], corner: 0.15, fill: "#e6e8ee"});
 const soft = scene.circle({center: [2.5, 0], radius: 1.1, fill: "accent"});
@@ -176,10 +158,7 @@ return scene;
 </table>
 
 ```lua live
-local scene = vis.scene {
-    width = 960, height = 540, theme = "pro_black",
-    camera = {mode = "fixed", view = "2d", height = 6},
-}
+local scene = vis.scene {theme = "pro_black", camera = {height = 6}}
 
 local ops = {"union", "intersection", "difference", "exclusion"}
 for i, op in ipairs(ops) do
@@ -195,10 +174,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({
-    width: 960, height: 540, theme: "pro_black",
-    camera: {mode: "fixed", view: "2d", height: 6},
-});
+const scene = vis.scene({theme: "pro_black", camera: {height: 6}});
 
 const ops = ["union", "intersection", "difference", "exclusion"];
 ops.forEach((op, i) => {

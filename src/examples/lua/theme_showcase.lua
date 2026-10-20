@@ -64,14 +64,7 @@ local function vector_to_point(origin, target, clearance)
 end
 
 local function panel(theme, name, heading)
-    local scene = vis.scene {
-        width = 480,
-        height = 500,
-        fps = 30,
-        loop = false,
-        theme = theme,
-        camera = { mode = "fixed", view = "2d", target = { 0, 0 }, height = 10 },
-    }
+    local scene = vis.scene {width = 480, height = 500, theme = theme, camera = { height = 10 }}
 
     local content = scene:group { id = "content" }
     local typography = content:group { id = "typography" }
@@ -178,13 +171,7 @@ local function panel(theme, name, heading)
     return scene
 end
 
-local page = vis.scene {
-    width = 1440,
-    height = 1000,
-    fps = 30,
-    loop = false,
-    background = "#111827",
-}
+local page = vis.scene {width = 1440, height = 1000, background = "#111827"}
 
 local columns = {
     { "pro_white", gradient_pro_white, "PRO WHITE" },

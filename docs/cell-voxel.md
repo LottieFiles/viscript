@@ -36,7 +36,7 @@ attached, and attachment advances by their longest duration.
 ## Lua
 
 ```lua
-local scene = vis.scene {width = 960, height = 540}
+local scene = vis.scene {}
 local field = scene:space {
     x = {-2, 2, 0.25}, y = {-2, 2, 0.25}, z = {-2, 2, 0.25},
 }

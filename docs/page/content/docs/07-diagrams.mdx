@@ -22,10 +22,7 @@ The diagram module turns nodes and edges into a laid-out, animatable object tree
 <p>With <code>flow = true</code> an edge is dashed; animate its <code>dash_offset</code> to show data moving.</p>
 
 ```lua live
-local scene = vis.scene {
-    width = 960, height = 540, theme = "pro_black",
-    camera = {mode = "fixed", view = "2d", height = 7.5},
-}
+local scene = vis.scene {theme = "pro_black", camera = {height = 7.5}}
 
 local d = vis.diagram(scene, {
     id = "flow", direction = "lr", origin = {-3.4, 0},
@@ -61,10 +58,7 @@ Zones draw a labelled region around their members.</p>
 </table>
 
 ```lua live
-local scene = vis.scene {
-    width = 960, height = 540, theme = "pro_black",
-    camera = {mode = "fixed", view = "2d", height = 7.5},
-}
+local scene = vis.scene {theme = "pro_black", camera = {height = 7.5}}
 
 local d = vis.diagram(scene, {
     id = "compiler", direction = "lr", origin = {-4.6, 0.3},
@@ -100,10 +94,7 @@ return scene
 </table>
 
 ```lua live
-local scene = vis.scene {
-    width = 960, height = 540, theme = "pro_black",
-    camera = {mode = "fixed", view = "2d", height = 7.5},
-}
+local scene = vis.scene {theme = "pro_black", camera = {height = 7.5}}
 
 local d = vis.diagram(scene, {
     id = "plan", layout = "timeline", origin = {-4.5, 1.2},

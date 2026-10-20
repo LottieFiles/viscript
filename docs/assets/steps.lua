@@ -1,6 +1,6 @@
 -- README "Show every step": four algorithms, each showing its intermediate states.
 local scene = vis.scene {width = 1200, height = 380, fps = 20, theme = "pro_white",
-  camera = {view = "2d", target = {0, 0.15}, height = 6.33}}
+  camera = {target = {0, 0.15}, height = 6.33}}
 
 -- Text is set in world units (plane) so it scales with the camera moves below; sizes are
 -- authored in points at the opening camera and converted here.
@@ -85,7 +85,7 @@ end
 local stepC = panel(CX[3], "PIXEL SAMPLING", "sample")
 local cellsC = grid(CX[3], "c")
 local CR = 1.55
-scene:circle {center = {CX[3], -0.2}, radius = CR, fill = "#00000000", stroke = "accent", width = 2.5, layer = 3, id = "circle"}
+scene:circle {center = {CX[3], -0.2}, radius = CR, stroke = "accent", width = 2.5, layer = 3, id = "circle"}
 local dotsC = {}
 for r = 1, N do
   dotsC[r] = {}
@@ -105,7 +105,7 @@ local function inside(p, a, b, c)
   local neg, pos = d1 < 0 or d2 < 0 or d3 < 0, d1 > 0 or d2 > 0 or d3 > 0
   return not (neg and pos)
 end
-local scan = scene:rectangle {center = {CX[4], cellsD[N][1].p[2]}, size = {N * CELL, CELL}, fill = "#00000000", stroke = "warning", width = 2.5, layer = 5, opacity = 0, id = "scanline"}
+local scan = scene:rectangle {center = {CX[4], cellsD[N][1].p[2]}, size = {N * CELL, CELL}, stroke = "warning", width = 2.5, layer = 5, opacity = 0, id = "scanline"}
 
 -- Camera: open wide, push in on each panel in turn, pull back for the finale.
 local function camera()

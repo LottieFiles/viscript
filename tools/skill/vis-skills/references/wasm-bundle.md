@@ -11,8 +11,8 @@ Serve copied files over HTTP so the adjacent WASM binary can load. Import from t
 ```js
 import {createVis, vis} from "./vis-wasm/client.js";
 
-const definition = vis.scene({width: 640, height: 360, loop: false});
-definition.circle({center: [0, 0], radius: 1.2, fill: "#2563eb", id: "subject"});
+const definition = vis.scene({width: 640, height: 360});
+definition.circle({radius: 1.2, fill: "#2563eb", id: "subject"});
 const runtime = await createVis(definition, "scene.js");
 runtime.draw(document.querySelector("canvas"), runtime.duration);
 window.addEventListener("pagehide", () => runtime.destroy(), {once: true});

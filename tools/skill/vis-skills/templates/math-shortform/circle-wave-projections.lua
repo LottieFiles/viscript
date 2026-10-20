@@ -1,8 +1,5 @@
 -- One rotating coordinate writes two phase-locked projection waves.
-local scene = vis.scene {
-    width = 960, height = 540, fps = 30, loop = false,
-    camera = {mode = "fixed", view = "2d", target = {0, 0}, height = 7.2},
-}
+local scene = vis.scene {camera = {height = 7.2}}
 
 local center, radius, steps = {-3.75, 0}, 1.35, 36
 local graph = {x0 = -1.35, width = 6.2, scale = 0.78, sineY = 1.35, cosineY = -1.35}
@@ -52,7 +49,7 @@ local function array(m)
 end
 
 -- Stable structure stays quiet while the shared phase does the explanatory work.
-local circle = scene:circle {id = "projection-circle", center = center, radius = radius, fill = "#00000000", stroke = "border", width = 1.25}
+local circle = scene:circle {id = "projection-circle", center = center, radius = radius, stroke = "border", width = 1.25}
 local axes = {
     scene:line {id = "projection-circle-x", from = {center[1] - 1.7, 0}, to = {center[1] + 1.7, 0}, stroke = "border", width = 1},
     scene:line {id = "projection-circle-y", from = {center[1], -1.7}, to = {center[1], 1.7}, stroke = "border", width = 1},
@@ -73,7 +70,7 @@ end
 
 local conclusion = scene:text {
     id = "projection-conclusion", text = "one phase  ·  two projections",
-    point = {1.85, 2.75}, role = "code", fill = "result", align = {0.5, 0.5}, layer = 40,
+    point = {1.85, 2.75}, role = "code", fill = "result", layer = 40,
 }
 scene:fade_in(conclusion, {shift = {0, -0.08}, duration = 0.35, curve = "gentle"})
 scene:wait(1.8)

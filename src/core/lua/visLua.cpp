@@ -60,6 +60,9 @@ static constexpr uint64_t LUA_SAMPLE_WORK_LIMIT = 4000000;
 static constexpr size_t LUA_TEXT_LIMIT = 1024u * 1024u;
 static constexpr size_t LUA_ID_LIMIT = 256;
 static constexpr uint32_t LUA_PIXEL_LIMIT = 67108864;
+// The size of a scene that names none, the size the documentation and the skills write scenes at.
+static constexpr uint32_t LUA_SCENE_WIDTH = 960;
+static constexpr uint32_t LUA_SCENE_HEIGHT = 540;
 static constexpr uint32_t LUA_VIEWPORT_LIMIT = 64;
 static constexpr uint32_t LUA_SCENE_LIMIT = LUA_VIEWPORT_LIMIT + 1u;
 // Each view draws its scene's objects once more, so a script keeps fewer than the core allows.
@@ -9813,8 +9816,8 @@ static int _sceneGen(lua_State* lua)
     luaL_checktype(lua, 1, LUA_TTABLE);
     _options(lua, 1, {"width", "height", "fps", "background", "camera", "antialiasing", "loop", "theme"}, false);
     Config config;
-    auto width = _fieldInteger(lua, 1, "width", config.width);
-    auto height = _fieldInteger(lua, 1, "height", config.height);
+    auto width = _fieldInteger(lua, 1, "width", LUA_SCENE_WIDTH);
+    auto height = _fieldInteger(lua, 1, "height", LUA_SCENE_HEIGHT);
     auto fps = _fieldInteger(lua, 1, "fps", config.fps);
     if (width <= 0 || width > UINT32_MAX || height <= 0 || height > UINT32_MAX || fps <= 0 || fps > UINT32_MAX) {
         return luaL_error(lua, "width, height and fps must be positive 32-bit integers");

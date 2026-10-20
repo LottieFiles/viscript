@@ -3,10 +3,7 @@
 -- Replace state_specs and transition labels; preserve the Ready -> Running -> Waiting -> Ready cycle.
 -- Look: ink states and transitions; accent marks execution (Running and the dispatch into it), and the
 -- final state is dimmed context (`muted`). The caption above the rule states what the figure shows.
-local scene = vis.scene {
-    width = 960, height = 540, fps = 30, loop = false,
-    camera = {mode = "fixed", view = "2d", target = {0, 0}, height = 540},
-}
+local scene = vis.scene {camera = {height = 540}}
 
 local LAYER = {guide = 0, route = 10, state = 20, text = 30}
 local root = scene:group {id = "process-lifecycle:root"}
@@ -38,7 +35,7 @@ for _, spec in ipairs(state_specs) do
     local group = states:group {id = "process-lifecycle:state:" .. spec.id}
     local prefix = "process-lifecycle:state:" .. spec.id
     group:rectangle {
-        center = spec.center, size = spec.size, fill = "#00000000",
+        center = spec.center, size = spec.size,
         stroke = spec.color or "foreground", width = spec.focal and 1.5 or 1.25,
         layer = LAYER.state, id = prefix .. ":body",
     }

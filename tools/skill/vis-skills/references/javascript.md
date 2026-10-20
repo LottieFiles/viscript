@@ -5,10 +5,7 @@ Import `vis` and `createVis` from the installed runtime's `client.js`. The build
 ```js
 import {createVis, vis} from "./client.js";
 
-const definition = vis.scene({
-    width: 960, height: 540, fps: 30, loop: false,
-    camera: {view: "2d", target: [0, 0], height: 7},
-});
+const definition = vis.scene({camera: {height: 7}});
 const figure = definition.group({id: "figure"});
 const plane = figure.space({x: [-5, 5, 1], y: [-3, 3, 1], numbers: true});
 const vector = plane.vector({value: [3, 2], stroke: "accent", width: 2, tip: 7, id: "vector-a"});
@@ -22,7 +19,7 @@ runtime.load(definition, "vector-scene.js");
 runtime.draw(document.querySelector("canvas"), runtime.duration);
 ```
 
-Scene size is in pixels and object positions are world coordinates. Vectors use arrays, ranges use `[min, max, step]`, and matrices are row-major absolute local-to-parent transforms. Follow [scene-contract.md](scene-contract.md) for camera mapping. A Scene that names no theme is `"adaptive"`, the colors and font of the host app, such as VS Code or Obsidian, or Pro White without one; `"pro_white"` and `"pro_black"` are fixed.
+Scene size is in pixels, 960×540 when left out, and object positions are world coordinates. Vectors use arrays, ranges use `[min, max, step]`, and matrices are row-major absolute local-to-parent transforms. Follow [scene-contract.md](scene-contract.md) for camera mapping. A Scene that names no theme is `"adaptive"`, the colors and font of the host app, such as VS Code or Obsidian, or Pro White without one; `"pro_white"` and `"pro_black"` are fixed.
 
 ## Objects and layout
 

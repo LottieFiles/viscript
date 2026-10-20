@@ -2,10 +2,7 @@
 -- an explicit indexed low-poly mesh. viscript has no scene light/material system;
 -- every face color below is calculated author-side from the same N/L/V/H data
 -- shown at the selected surface sample.
-local page = vis.scene {
-    width = 960, height = 540, fps = 30, loop = false,
-    camera = {mode = "fixed", view = "2d", target = {0, 0}, height = 6},
-}
+local page = vis.scene {width = 960, height = 540, camera = {view = "2d", height = 6}}
 
 local function add(a, b) return {a[1] + b[1], a[2] + b[2], a[3] + b[3]} end
 local function subtract(a, b) return {a[1] - b[1], a[2] - b[2], a[3] - b[3]} end
@@ -139,10 +136,9 @@ end
 assert(math.abs(stateA.nDotL - stateB.nDotL) > 0.15, "light motion must visibly change the selected sample")
 
 local spatial = vis.scene {
-    width = 620, height = 410, fps = 30, loop = false,
+    width = 620, height = 410,
     camera = {
-        mode = "fixed", view = "3d", eye = viewPosition, target = {0, 0.05, 0}, up = {0, 1, 0},
-        projection = "perspective", fov = 0.62, near = 0.1, far = 30,
+        view = "3d", eye = viewPosition, target = {0, 0.05, 0}, fov = 0.62, near = 0.1, far = 30,
     },
 }
 local space = spatial:space {
@@ -218,10 +214,7 @@ local lightMoveEnd = spatial:duration()
 spatial:wait(2.15)
 local spatialEnd = spatial:duration()
 
-local ledger = vis.scene {
-    width = 336, height = 405, fps = 30, loop = false,
-    camera = {mode = "fixed", view = "2d", target = {0, 0}, height = 7.4},
-}
+local ledger = vis.scene {width = 336, height = 405, camera = {view = "2d", height = 7.4}}
 local formula = ledger:text {
     text = "H = normalize(L + V)\nC = ambient + diffuse + specular",
     point = {-2.78, 2.75}, align = {0, 0.5}, role = "code", size = 12.0,

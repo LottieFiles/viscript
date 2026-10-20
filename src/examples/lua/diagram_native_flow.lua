@@ -1,8 +1,5 @@
 -- Build with -Dmodules=diagram. The builder emits ordinary Scene Objects.
-local scene = vis.scene {
-    width = 800, height = 450, fps = 30, loop = false, theme = "pro_white",
-    camera = {mode = "fixed", view = "2d", target = {0, 0}, height = 7.5},
-}
+local scene = vis.scene {width = 800, height = 450, theme = "pro_white", camera = {height = 7.5}}
 
 local diagram = vis.diagram(scene, {
     id = "request-flow", direction = "lr", origin = {-4.8, 0},

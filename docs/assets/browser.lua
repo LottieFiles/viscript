@@ -1,6 +1,6 @@
 -- README "Browser": the JS example from the README, playing on a <canvas> in a page.
 local scene = vis.scene {width = 1000, height = 400, fps = 20, theme = "pro_white",
-  camera = {view = "2d", target = {0, 0}, height = 6.4}}
+  camera = {height = 6.4}}
 
 -- Browser window chrome.
 local WX, WY, WW, WH = 0, -0.1, 11.2, 5.8
@@ -17,7 +17,7 @@ local loading = scene:line {from = {WX - WW / 2 + 0.02, BAR_Y}, to = {WX + WW / 
 
 -- The page's <canvas>: a dashed outline, and the time draw(canvas, t) is asked for.
 local CW, CH, CY = 7.6, 4.0, WY - 0.4
-local canvas = scene:rectangle {center = {WX, CY}, size = {CW, CH}, corner = 0.06, fill = "#00000000", stroke = "border", width = 1.5, dash = {6, 5}, layer = 1, opacity = 0}
+local canvas = scene:rectangle {center = {WX, CY}, size = {CW, CH}, corner = 0.06, stroke = "border", width = 1.5, dash = {6, 5}, layer = 1, opacity = 0}
 local tag = scene:text {text = "<canvas>", point = {WX - CW / 2 + 0.1, CY + CH / 2 + 0.2}, align = {0, 0.5}, size = 11, role = "code", fill = "muted", layer = 2, id = "canvas-tag"}
 local clock = scene:number {value = 0, decimals = 2, prefix = "draw(canvas, ", suffix = ")", point = {WX + CW / 2 - 0.1, CY - CH / 2 + 0.25},
   align = {1, 0.5}, size = 11, role = "code", fill = "muted", layer = 3, tabular = true, id = "clock"}

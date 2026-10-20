@@ -1,9 +1,6 @@
 -- Requires a Lua host built with -Dmodules=diagram.
 -- Question: which boundary owns each stage, and how does one request cross it?
-local scene = vis.scene {
-    width = 960, height = 540, fps = 30, loop = false,
-    camera = {mode = "fixed", view = "2d", target = {0, -0.35}, height = 11.5},
-}
+local scene = vis.scene {camera = {target = {0, -0.35}, height = 11.5}}
 
 local diagram = vis.diagram(scene, {
     id = "request-flow",

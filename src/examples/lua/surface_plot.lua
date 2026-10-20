@@ -1,16 +1,11 @@
 local p = { paper = "#f7f8fb", ink = "#182033", muted = "#687086", blue = "#2563eb" }
 local scene = vis.scene {
-    width = 960,
-    height = 540,
     fps = 60,
     background = p.paper,
     camera = {
-        mode = "fixed",
         view = "3d",
         eye = { 5.8, 4.4, 6.4 },
         target = { 0, 0.25, 0 },
-        up = { 0, 1, 0 },
-        projection = "perspective",
         fov = 0.66,
         near = 0.1,
         far = 100,
@@ -54,15 +49,6 @@ local surface = scene:surface {
     id = "gaussian-surface",
 }
 scene:create(surface, 1.0, "gentle")
-scene:look({
-    view = "3d",
-    eye = { -5.4, 4.8, 6.0 },
-    target = { 0, 0.25, 0 },
-    up = { 0, 1, 0 },
-    projection = "perspective",
-    fov = 0.66,
-    near = 0.1,
-    far = 100,
-}, 1.2, "ease_in_out")
+scene:look({ eye = { -5.4, 4.8, 6.0 } }, 1.2, "ease_in_out")
 scene:wait(0.8)
 return scene

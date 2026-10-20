@@ -9,6 +9,15 @@ Rules for every viscript scene. Profiles may narrow a default; they never weaken
 - Keep supplied values and special cases. Mark illustrative values as such; make them non-degenerate and inside the claimed regime.
 - Before final choreography, change one input to an asymmetric value: every dependent must update without editing another literal.
 
+## Defaults
+
+Leave out every option that equals its default; write a default only beside variants that set the same option otherwise, such as one centered label among left-aligned ones.
+
+- A Scene is 960×540 at 30 fps, plays once, takes the `adaptive` theme, and looks at the origin through a fixed 2D camera 8 units tall: `camera = {height = 6}` names only what differs.
+- A `3d` camera looks at the origin in perspective with +y up, and a 2D one is orthographic. `look` keeps every field it does not name, so it names only what moves: `scene:look({eye = {-6, 4.5, 8}}, 2)`. A `look` that turns a 2D camera to `3d` therefore stays orthographic unless it names `projection = "perspective"`.
+- A shape has no fill until given one, so an outline needs only `stroke`; a circle sits on the origin with radius 1, and a rectangle on the origin.
+- Text sits on the origin, centered (`align = {0.5, 0.5}`), in the `text` role.
+
 ## Coordinates and identity
 
 - Scene `width`/`height` are output pixels. Geometry is world units, right-handed, Y-up, relative to the direct parent; two components mean `z=0`.

@@ -1,7 +1,7 @@
 -- README "Embed it where you need it": one Lua scene and one renderer, playing the same frames
 -- in a native app, a web page and VS Code.
 local scene = vis.scene {width = 1200, height = 400, fps = 20, theme = "pro_white",
-  camera = {view = "2d", target = {0.3, -0.3}, height = 6.67}}
+  camera = {target = {0.3, -0.3}, height = 6.67}}
 
 -- Text is set in world units (plane) so it scales with the camera moves below; sizes are
 -- authored in points at the opening camera and converted here.

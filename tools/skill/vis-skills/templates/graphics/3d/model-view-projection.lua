@@ -2,10 +2,7 @@
 -- explicit right-handed, column-vector, OpenGL-depth MVP convention.
 -- The visible "concept camera" owns V/P; the presentation camera only lets the
 -- viewer inspect the object, frustum, image plane, and projection ray together.
-local page = vis.scene {
-    width = 960, height = 540, fps = 30, loop = false,
-    camera = {mode = "fixed", view = "2d", target = {0, 0}, height = 6},
-}
+local page = vis.scene {width = 960, height = 540, camera = {view = "2d", height = 6}}
 
 local function add(a, b) return {a[1] + b[1], a[2] + b[2], a[3] + b[3]} end
 local function subtract(a, b) return {a[1] - b[1], a[2] - b[2], a[3] - b[3]} end
@@ -153,10 +150,10 @@ for index, vertex in ipairs(objectVertices) do
 end
 
 local spatial = vis.scene {
-    width = 620, height = 410, fps = 30, loop = false,
+    width = 620, height = 410,
     camera = {
-        mode = "fixed", view = "3d", eye = {7.20, 4.60, 0.00}, target = {1.90, 1.05, 2.45},
-        up = {0, 1, 0}, projection = "perspective", fov = 0.74, near = 0.1, far = 40,
+        view = "3d", eye = {7.20, 4.60, 0.00}, target = {1.90, 1.05, 2.45},
+        fov = 0.74, near = 0.1, far = 40,
     },
 }
 local space = spatial:space {
@@ -248,10 +245,7 @@ local viewportReady = spatial:duration()
 spatial:wait(2.10)
 local spatialEnd = spatial:duration()
 
-local ledger = vis.scene {
-    width = 336, height = 405, fps = 30, loop = false,
-    camera = {mode = "fixed", view = "2d", target = {0, 0}, height = 7.4},
-}
+local ledger = vis.scene {width = 336, height = 405, camera = {view = "2d", height = 7.4}}
 -- Stage labels stay ink; only the final ndc stage carries the result hue.
 local rows = {
     {"object", format4(selected.point), "muted"},
@@ -277,7 +271,7 @@ end
 local screenCenter, screenSize = {0, -2.04}, {4.80, 2.20}
 local viewport = ledger:rectangle {
     center = screenCenter, size = screenSize,
-    fill = "#00000000", stroke = "border", width = 1, id = "mvp:viewport-frame",
+    stroke = "border", width = 1, id = "mvp:viewport-frame",
 }
 local function toMiniScreen(ndc)
     return {

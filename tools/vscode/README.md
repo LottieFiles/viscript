@@ -24,11 +24,8 @@ Requires VS Code 1.96 or newer.
 **viscript: Open Viewer** opens the viewer with the workspace's series catalog. While open, it follows the active Lua tab. Failed reloads keep the last valid scene and report diagnostics.
 
 ```lua
-local scene = vis.scene {
-    width = 960, height = 540, fps = 30, loop = false,
-    camera = {view = "2d", height = 7},
-}
-local circle = scene:circle {radius = 1, fill = "accent", id = "circle"}
+local scene = vis.scene {camera = {height = 7}}
+local circle = scene:circle {fill = "accent", id = "circle"}
 scene:grow_from_center(circle, 0.6)
 scene:wait(1)
 return scene

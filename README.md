@@ -38,10 +38,7 @@ What a scene can hold:
 <p align="center"><img src="docs/assets/first-scene.gif" alt="Editing scene.lua live: tweak a value, retime an animation, add and remove objects, and watch the Scene re-render"></p>
 
 ```lua
-local scene = vis.scene {
-    width = 960, height = 540, theme = "pro_white",
-    camera = {mode = "fixed", view = "2d", height = 6},
-}
+local scene = vis.scene {theme = "pro_white", camera = {height = 6}}
 
 local axes = scene:space {x = {-5, 5, 1}, y = {-2, 2, 1}, stroke = "#00000000"}
 local wave = axes:plot {fn = math.sin, x_range = {-5, 5, 0.02}, stroke = "accent", width = 4}
@@ -60,10 +57,7 @@ return scene
 The same scene in JavaScript:
 
 ```js
-const scene = vis.scene({
-    width: 960, height: 540, theme: "pro_white",
-    camera: {mode: "fixed", view: "2d", height: 6},
-});
+const scene = vis.scene({theme: "pro_white", camera: {height: 6}});
 
 const axes = scene.space({x: [-5, 5, 1], y: [-2, 2, 1], stroke: "#00000000"});
 const wave = axes.plot({fn: Math.sin, x_range: [-5, 5, 0.02], stroke: "accent", width: 4});
@@ -174,11 +168,8 @@ const font = await fetch("./viscript/Pretendard.ttf");
 runtime.font("Pretendard", await font.arrayBuffer(), "ttf");
 
 // Build and load the real scene.
-const scene = vis.scene({
-    width: 960, height: 540, theme: "pro_white",
-    camera: {mode: "fixed", view: "2d", height: 6},
-});
-const title = scene.text({text: "Hello, viscript", point: [0, 1.2], size: 48, align: [0.5, 0.5]});
+const scene = vis.scene({theme: "pro_white", camera: {height: 6}});
+const title = scene.text({text: "Hello, viscript", point: [0, 1.2], size: 48});
 const circle = scene.circle({center: [-2, -0.8], radius: 0.6, fill: "accent", stroke: "accent"});
 scene.write(title, 1);
 scene.growFromCenter(circle, 0.5);

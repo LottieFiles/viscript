@@ -1,8 +1,5 @@
 -- Advanced reference: estimate pixel coverage and magnify one boundary sample pattern.
-local scene = vis.scene {
-    width = 960, height = 540, fps = 30, loop = false,
-    camera = {mode = "fixed", view = "2d", target = {0, 0}, height = 6.4},
-}
+local scene = vis.scene {camera = {height = 6.4}}
 
 local columns, rows, samples = 8, 6, 10
 local circle = {center = {3.25, 2.4}, radius = 2.15}
@@ -61,7 +58,7 @@ local boundary = grid:circle {
 }
 local focus = grid:rectangle {
     id = "coverage-selected-pixel", center = {selected.x, selected.y}, size = {0.94, 0.94},
-    fill = "#00000000", stroke = "foreground", width = 2, layer = 30,
+    stroke = "foreground", width = 2, layer = 30,
 }
 
 -- A second Cell expands the exact binary subsamples used by coverageAt.
@@ -79,7 +76,7 @@ for sy = 0, samples - 1 do
     end
 end
 local detailCell = detail:cell {id = "coverage-subsamples", origin = {-0.5, -0.5}, size = {samples, samples}, mode = "padd", padding = 0.08, patches = detailPatches}
-local detailFrame = detail:rectangle {id = "coverage-detail-frame", center = {4.5, 4.5}, size = {10, 10}, fill = "#00000000", stroke = "foreground", width = 1.25, layer = 30}
+local detailFrame = detail:rectangle {id = "coverage-detail-frame", center = {4.5, 4.5}, size = {10, 10}, stroke = "foreground", width = 1.25, layer = 30}
 local sourceTop = mapPoint(gridMatrix, {selected.x + 0.5, selected.y + 0.5})
 local sourceBottom = mapPoint(gridMatrix, {selected.x + 0.5, selected.y - 0.5})
 local targetTop = mapPoint(detailMatrix, {-0.5, 9.5})
@@ -89,8 +86,8 @@ local wedge = {
     scene:line {id = "coverage-wedge-bottom", from = sourceBottom, to = targetBottom, stroke = "muted", width = 1, layer = 10},
 }
 local labels = {
-    scene:text {id = "coverage-detail-label", text = string.format("%d × %d subsamples", samples, samples), point = {detailCenter[1], 1.38}, role = "code", fill = "muted", align = {0.5, 0.5}, layer = 40},
-    scene:text {id = "coverage-value", text = string.format("coverage(%d, %d) = %.2f", selected.x, selected.y, selected.coverage), point = {detailCenter[1], -1.42}, role = "code", fill = "result", align = {0.5, 0.5}, layer = 40},
+    scene:text {id = "coverage-detail-label", text = string.format("%d × %d subsamples", samples, samples), point = {detailCenter[1], 1.38}, role = "code", fill = "muted", layer = 40},
+    scene:text {id = "coverage-value", text = string.format("coverage(%d, %d) = %.2f", selected.x, selected.y, selected.coverage), point = {detailCenter[1], -1.42}, role = "code", fill = "result", layer = 40},
 }
 
 -- Reveal the continuous boundary first, then its discrete area estimate.

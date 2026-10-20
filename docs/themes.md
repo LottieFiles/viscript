@@ -101,7 +101,7 @@ local scene = vis.scene {
     },
 }
 
-local subject = scene:circle {radius = 1}
+local subject = scene:circle {}
 scene:text {text = "42", point = {0, -1.5}, fill = "result"}
 scene:indicate(subject)
 ```
@@ -136,11 +136,11 @@ scene:rectangle {size = {3, 2}, fill = "#fff", gradient = {
     type = "linear", stops = {"accent", "warning"},
     from = {-1.5, 0}, to = {1.5, 0},
 }}
-scene:circle {radius = 1, fill = "#fff", gradient = {
+scene:circle {fill = "#fff", gradient = {
     type = "radial", stops = {{0, "#ffd166"}, {0.6, "accent"}, {1, "surface"}},
     center = {0, 0}, radius = 1, focal = {-0.3, 0.3},
 }}
-scene:circle {radius = 1, fill = "#fff", gradient = {
+scene:circle {fill = "#fff", gradient = {
     type = "conic", stops = {"accent", "success", "warning", "accent"}, angle = -90,
 }}
 ```

@@ -16,9 +16,8 @@ local function make_panel(background, prefix, index, title, caption)
     local panel = vis.scene {
         width = 320,
         height = 270,
-        fps = 30,
         background = background,
-        camera = { mode = "fixed", view = "2d", target = { 0, 0 }, height = 6.4 },
+        camera = { height = 6.4 },
     }
     panel:text {
         text = index,
@@ -61,9 +60,8 @@ local function direction_panel(background, index, title, direction, color)
     local panel = vis.scene {
         width = 160,
         height = 270,
-        fps = 30,
         background = background,
-        camera = { mode = "fixed", view = "2d", target = { 0, 0 }, height = 6.4 },
+        camera = { height = 6.4 },
     }
     panel:text {
         text = index,
@@ -93,7 +91,6 @@ local function direction_panel(background, index, title, direction, color)
     panel:circle {
         center = { 0, -0.12 },
         radius = 1.05,
-        fill = "#00000000",
         stroke = p.rule,
         width = 2,
         id = "direction-" .. direction .. "-guide",
@@ -101,7 +98,6 @@ local function direction_panel(background, index, title, direction, color)
     local path = panel:circle {
         center = { 0, -0.12 },
         radius = 1.05,
-        fill = "#00000000",
         stroke = color,
         width = 5,
         id = "direction-" .. direction .. "-path",
@@ -152,9 +148,8 @@ end
 local direction = vis.scene {
     width = 320,
     height = 270,
-    fps = 30,
     background = p.panel_a,
-    camera = { mode = "fixed", view = "2d", target = { 0, 0 }, height = 6.4 },
+    camera = { height = 6.4 },
 }
 local ccw = direction_panel(p.panel_a, "01A", "CCW PATH", "counterclockwise", p.cyan)
 local cw = direction_panel(p.panel_b, "01B", "CW PATH", "clockwise", p.magenta)
@@ -461,9 +456,8 @@ indicate:wait(0.55)
 local gallery = vis.scene {
     width = 960,
     height = 540,
-    fps = 30,
     background = p.background,
-    camera = { mode = "fixed", view = "2d", target = { 0, 0 }, height = 6.4 },
+    camera = { height = 6.4 },
 }
 gallery:viewport(direction, { x = 0, y = 0, width = 1 / 3, height = 0.5 })
 gallery:viewport(fade, { x = 1 / 3, y = 0, width = 1 / 3, height = 0.5 })

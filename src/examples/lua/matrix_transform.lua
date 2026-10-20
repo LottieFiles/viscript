@@ -1,9 +1,4 @@
-local scene = vis.scene {
-    width = 960,
-    height = 540,
-    fps = 30,
-    camera = { mode = "interactive", view = "2d", height = 7 },
-}
+local scene = vis.scene {camera = { mode = "interactive", height = 7 }}
 
 local world = scene:space {
     x = { -6, 6, 1 },

@@ -102,7 +102,7 @@ local function slots(parent, prefix, n, y)
     for i = 0, n - 1 do
         parent:rectangle {
             id = prefix .. ":slot:" .. i, center = P(slotX(i), y), size = {SLOT.w, SLOT.w},
-            fill = "#00000000", stroke = "border", width = 1, layer = LAYER.slot,
+            stroke = "border", width = 1, layer = LAYER.slot,
         }
         text(parent, prefix .. ":index:" .. i, tostring(i), slotX(i), y + SLOT.w / 2 + 14,
             {align = {0.5, 0.5}, size = 11, fill = "muted"})
@@ -124,8 +124,8 @@ end
 
 -- Root: the claim and the spine --------------------------------------------------------------------
 local root = vis.scene {
-    width = W, height = H, fps = 30, loop = true, theme = THEME,
-    camera = {mode = "fixed", view = "2d", height = H},
+    width = W, height = H, loop = true, theme = THEME,
+    camera = {height = H},
 }
 text(root, "title", "Why sprites added after load() never appear", MARGIN, HEADER.title, {role = "h3"})
 text(root, "answer", "load() fixes count once; update(dt) grows items every frame; draw() still stops at count.",
@@ -188,8 +188,8 @@ end
 local function band(section)
     local h = section.h
     section.scene = vis.scene {
-        width = W - BODY, height = h, fps = 30, loop = true, theme = THEME,
-        camera = {mode = "fixed", view = "2d", height = h,
+        width = W - BODY, height = h, loop = true, theme = THEME,
+        camera = {height = h,
             target = {(BODY + W) / 2 - W / 2, H / 2 - section.top - h / 2}},
     }
     return section.scene
@@ -208,7 +208,7 @@ end
 text(ONE, "load:count", "count", REGISTER.x + REGISTER.w / 2, Y1.items - 40, {fill = "muted", align = {0.5, 0.5}})
 local register = ONE:rectangle {
     id = "load:register", center = P(REGISTER.x + REGISTER.w / 2, Y1.items), size = {REGISTER.w, REGISTER.h},
-    fill = "#00000000", stroke = "danger", width = 1.5, layer = LAYER.slot,
+    stroke = "danger", width = 1.5, layer = LAYER.slot,
 }
 -- The copied value: born at the end of items, it moves into count and stays there.
 local copyFrom = M(rulerX(LOADED) + 24, Y1.items)
@@ -296,10 +296,10 @@ THREE:line {id = "draw:ruler", from = P(rulerX(count), Y3.items - 30), to = P(ru
 fragment(THREE, "draw:code", "for (int i = 0; i < count; i++) canvas.draw(items[i]);", X0, Y3.code, "count")
 local head = THREE:group {id = "draw:head", matrix = M(slotX(DRAWN), Y3.items)}
 local headBox = head:rectangle {id = "draw:head:box", center = {0, 0}, size = {SLOT.w + 6, SLOT.w + 6},
-    fill = "#00000000", stroke = "danger", width = 2, layer = LAYER.head}
+    stroke = "danger", width = 2, layer = LAYER.head}
 text(THREE, "draw:screen", "screen", LABEL_X, Y3.screen, {fill = "muted"})
 THREE:rectangle {id = "draw:screen:frame", center = P((SCREEN.x0 + SCREEN.x1) / 2, Y3.screen),
-    size = {SCREEN.x1 - SCREEN.x0, SCREEN.h}, fill = "#00000000", stroke = "foreground", width = 1.25,
+    size = {SCREEN.x1 - SCREEN.x0, SCREEN.h}, stroke = "foreground", width = 1.25,
     layer = LAYER.slot}
 local shown, missing = {}, {}
 for i = 0, SIZE - 1 do
