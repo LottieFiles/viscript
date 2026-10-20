@@ -3,7 +3,7 @@ import test from "node:test";
 import {fontFileName, fontProvider, namedFile, type FontSettings, type FontSources, type ThemeRole} from "../src/fonts.ts";
 
 const SETTINGS: FontSettings = {textFont: "default", textFontName: "", codeFont: "default", codeFontName: "", downloadFonts: true};
-const THEME = ["Pretendard", "JetBrainsMono", "Source Serif 4", "IBM Plex Sans KR"];
+const THEME = ["Pretendard", "JetBrainsMono", "Source Serif 4"];
 
 interface Fixture {
     folder?: readonly string[];
@@ -42,7 +42,7 @@ test("the theme's names take the bundled fonts, whatever else the vault or Fonts
     const {found, downloaded} = await answers({}, {folder: THEME, fontsource: THEME}, THEME);
     assert.deepEqual(found, {
         Pretendard: "bundled:text", JetBrainsMono: "bundled:code",
-        "Source Serif 4": "bundled:serif", "IBM Plex Sans KR": "bundled:serifKorean",
+        "Source Serif 4": "bundled:serif",
     });
     assert.deepEqual(downloaded, []);
 });
@@ -54,7 +54,7 @@ test("a font named in the settings is looked for like one a scene names, else th
     // adaptive_vscode's fonts are not the text font's to replace.
     assert.deepEqual(found, {
         Pretendard: "fontsource:Noto Sans KR", JetBrainsMono: "folder:Fira Code",
-        "Source Serif 4": "bundled:serif", "IBM Plex Sans KR": "bundled:serifKorean",
+        "Source Serif 4": "bundled:serif",
     });
     const missing = await answers({codeFont: "custom", codeFontName: "Nowhere Mono"}, fixture, ["JetBrainsMono"]);
     assert.equal(missing.found.JetBrainsMono, "bundled:code");

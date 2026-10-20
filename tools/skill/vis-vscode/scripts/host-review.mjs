@@ -1,8 +1,8 @@
 // Renders a Lua Scene the way the VS Code Viewer does: the same WASM runtime, the same fonts
-// (Source Serif 4 for the adaptive_vscode heading and body roles), and the runtime's light and
-// dark host colors, which approximate the default Light and Dark themes; a workbench theme's own
-// colors can differ. Writes one PNG per time and prints one line per time with the text that
-// overlaps, is clipped, or leaves its box.
+// (Source Serif 4, Korean in Pretendard, for the adaptive_vscode heading and body roles), and the
+// runtime's light and dark host colors, which approximate the default Light and Dark themes; a
+// workbench theme's own colors can differ. Writes one PNG per time and prints one line per time
+// with the text that overlaps, is clipped, or leaves its box.
 // Usage: node host-review.mjs <scene.lua> [--time SEC|end]... [--theme light|dark|both]
 //        [--contain TEXT PANEL [INSET]]... [--padding PX] [--out DIR] [--runtime DIR]
 import {mkdirSync, readFileSync, writeFileSync} from "node:fs";
@@ -16,7 +16,6 @@ import {deflateSync} from "node:zlib";
 const FONTS = [
     ["Pretendard", "Pretendard.ttf"],
     ["JetBrainsMono", "JetBrainsMono.ttf"],
-    ["IBM Plex Sans KR", "IBMPlexSansKR-SemiBold.ttf"],
     ["Source Serif 4", "SourceSerif4-Semibold.ttf"],
 ];
 

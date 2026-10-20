@@ -72,7 +72,9 @@ VIS_API const char* vis_missing_fonts(VisEngine engine);
 VIS_API VisResult vis_load_asset(VisEngine engine, const char* name, const uint8_t* data, uint32_t size,
                                        const char* mime);
 /* Host colors, as 0xRRGGBBAA, for the scenes loaded after it that use the adaptive_vscode theme;
-   dark picks the pro_black base over pro_white, and objects holds 1 to 10 object colors. */
+   dark picks the pro_black base over pro_white, and objects holds 1 to 10 object colors.
+   Headings and body text take the font list "Source Serif 4, Pretendard", and code
+   JetBrainsMono. */
 VIS_API VisResult vis_host_theme(VisEngine engine, uint8_t dark, uint32_t background, uint32_t foreground,
                                  uint32_t muted, uint32_t accent, uint32_t secondary, uint32_t success,
                                  uint32_t warning, uint32_t danger, uint32_t info, uint32_t surface,

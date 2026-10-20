@@ -44,8 +44,6 @@ static constexpr uint32_t MAX_VIEWPORTS = 64;
 static constexpr uint32_t MAX_VIEWPORT_DEPTH = 16;
 static constexpr uint32_t MAX_VIEWS = 64;
 static constexpr uint32_t MAX_VIEW_HIDDEN = 256;
-static constexpr auto SOURCE_SERIF_FONT = "Source Serif 4";
-static constexpr auto KOREAN_FONT = "IBM Plex Sans KR";
 
 float billboardScale(const Mat4& reference, const Mat4& model, float fallback) noexcept
 {
@@ -95,58 +93,6 @@ static const TextTheme& _textTheme(const Theme& theme, TextRole role)
         case TextRole::Code: return theme.code;
     }
     return theme.text;
-}
-
-static bool _hangul(const char* text)
-{
-    auto cursor = reinterpret_cast<const uint8_t*>(text);
-    while (cursor && *cursor) {
-        uint32_t codepoint = 0u;
-        uint32_t length = 0u;
-        if (*cursor < 0x80u) {
-            codepoint = *cursor;
-            length = 1u;
-        } else if ((*cursor & 0xe0u) == 0xc0u) {
-            codepoint = *cursor & 0x1fu;
-            length = 2u;
-        } else if ((*cursor & 0xf0u) == 0xe0u) {
-            codepoint = *cursor & 0x0fu;
-            length = 3u;
-        } else if ((*cursor & 0xf8u) == 0xf0u) {
-            codepoint = *cursor & 0x07u;
-            length = 4u;
-        } else {
-            cursor++;
-            continue;
-        }
-        auto valid = true;
-        for (auto i = 1u; i < length; i++) {
-            if ((cursor[i] & 0xc0u) != 0x80u) {
-                valid = false;
-                break;
-            }
-            codepoint = (codepoint << 6u) | (cursor[i] & 0x3fu);
-        }
-        if (!valid) {
-            cursor++;
-            continue;
-        }
-        if ((codepoint >= 0x1100u && codepoint <= 0x11ffu)
-            || (codepoint >= 0x3130u && codepoint <= 0x318fu)
-            || (codepoint >= 0xa960u && codepoint <= 0xa97fu)
-            || (codepoint >= 0xac00u && codepoint <= 0xd7ffu)
-            || (codepoint >= 0xffa0u && codepoint <= 0xffdcu)) {
-            return true;
-        }
-        cursor += length;
-    }
-    return false;
-}
-
-static const char* _textFont(const TextTheme& theme, const Text* text)
-{
-    if (std::strcmp(theme.font, SOURCE_SERIF_FONT) == 0 && _hangul(text->text())) return KOREAN_FONT;
-    return theme.font;
 }
 
 static bool _valid(const TextTheme& text)
@@ -3677,7 +3623,7 @@ Result Scene::attach(Object* object, Object* parent) noexcept
         auto text = static_cast<Text*>(tree[i]);
         if (text->font()) continue;
         auto& typography = _textTheme(pImpl->sceneTheme, text->role);
-        fonts[i] = _duplicate(_textFont(typography, text));
+        fonts[i] = _duplicate(typography.font);
         if (fonts[i]) continue;
         for (auto j = 0u; j < count; j++)
             delete[] fonts[j];
@@ -4625,7 +4571,7 @@ Result Scene::measure(const Text* text, const char* sample, TextExtent& output) 
     if (!sample || !valid(text)) return pImpl->fail(Result::InvalidArguments, MEASURE_TEXT);
     // The font and size attach() gives a text that sets none of its own.
     auto& typography = _textTheme(pImpl->sceneTheme, text->role);
-    auto font = text->font() ? text->font() : _textFont(typography, text);
+    auto font = text->font() ? text->font() : typography.font;
     auto size = text->size > 0.0f ? text->size : typography.size;
     auto result = renderer::measureText(font, size, sample, text->slant, text->tabular, output);
     if (result == Result::InsufficientCondition) return pImpl->fail(result, "no font is loaded, not even the default one");

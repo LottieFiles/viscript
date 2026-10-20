@@ -932,9 +932,6 @@ export class PreviewPanel implements vscode.Disposable {
         const wasmUri = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, "runtime", "vis-wasm.wasm"));
         const fontUri = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, "runtime", "Pretendard.ttf"));
         const codeFontUri = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, "runtime", "JetBrainsMono.ttf"));
-        const headingFontUri = webview.asWebviewUri(
-            vscode.Uri.joinPath(this.context.extensionUri, "runtime", "IBMPlexSansKR-SemiBold.ttf"),
-        );
         const serifHeadingFontUri = webview.asWebviewUri(
             vscode.Uri.joinPath(this.context.extensionUri, "runtime", "SourceSerif4-Semibold.ttf"),
         );
@@ -945,7 +942,6 @@ export class PreviewPanel implements vscode.Disposable {
             fonts: {
                 "Pretendard": fontUri.toString(),
                 "JetBrainsMono": codeFontUri.toString(),
-                "IBM Plex Sans KR": headingFontUri.toString(),
                 "Source Serif 4": serifHeadingFontUri.toString(),
             },
             autoPlayNext: this.context.globalState.get<boolean>(AUTO_PLAY_NEXT_STATE_KEY, false),
@@ -973,7 +969,7 @@ export class PreviewPanel implements vscode.Disposable {
     <link rel="stylesheet" href="${styleUri}">
     <style nonce="${nonce}">
         @font-face { font-family: "JetBrains Mono"; src: url("${codeFontUri}") format("truetype"); font-display: swap; }
-        @font-face { font-family: "IBM Plex Sans KR"; src: url("${headingFontUri}") format("truetype"); font-display: swap; }
+        @font-face { font-family: "Pretendard"; src: url("${fontUri}") format("truetype"); font-display: swap; }
         @font-face { font-family: "Source Serif 4"; src: url("${serifHeadingFontUri}") format("truetype"); font-display: swap; }
     </style>
     <title>viscript Preview</title>

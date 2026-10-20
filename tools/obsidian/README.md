@@ -72,8 +72,7 @@ Commands: **Insert a scene code block**, **Toggle autoplay**, **Reload all scene
 
 Scenes ask for fonts by name, as ThorVG's web players do. The plugin ships the fonts the
 engine's themes set text in, the files the VS Code extension ships: Pretendard for text, Korean
-included, JetBrains Mono NL for code, and Source Serif 4 with IBM Plex Sans KR for the
-`adaptive_vscode` theme. Fonts installed on the device are never used, so a scene draws the same
+included, JetBrains Mono NL for code, and Source Serif 4 for the `adaptive_vscode` theme. Fonts installed on the device are never used, so a scene draws the same
 on a computer, a phone or a tablet. A scene can also name another font, as
 `font = "Noto Serif KR"`. The plugin gives each name a font:
 
@@ -167,5 +166,5 @@ is skipped.
 
 The plugin is MIT-licensed, as viscript is. `main.js` also includes ThorVG (MIT), Lua (MIT),
 LodePNG (zlib), miniaudio (public domain or MIT-0), CodeMirror's legacy modes (MIT), and the
-fonts Pretendard, Pretendard Std, JetBrains Mono, Source Serif 4, IBM Plex Sans KR and Noto Sans
-Math (SIL Open Font License 1.1); their notices are at the top of `main.js`.
+fonts Pretendard, Pretendard Std, JetBrains Mono, Source Serif 4 and Noto Sans Math (SIL Open
+Font License 1.1); their notices are at the top of `main.js`.

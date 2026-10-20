@@ -593,7 +593,9 @@ struct Style
 
 struct TextTheme
 {
-    // A font name, or a comma list of them, as Text::font() takes.
+    // A font name, or a comma list of them as Text::font() takes, which a text of the role that
+    // names no font takes as it is, whatever its string: "Source Serif 4, Pretendard" sets Latin
+    // letters in Source Serif 4 and Hangul, which it lacks, in Pretendard.
     const char* font = "Pretendard";
     float size = 17.0f;
     Color color = {219, 231, 243, 255};
@@ -1507,7 +1509,7 @@ struct Text final : Object
     // Direct text edits require unsealed authoring; failed scene refresh restores the string.
     Result text(const char* value) noexcept;
     // The font the text is set in: a name a renderer loaded a font under, or a comma list of
-    // them, such as "Source Serif 4, IBM Plex Sans KR", the spaces around each name aside.
+    // them, such as "Source Serif 4, Pretendard", the spaces around each name aside.
     // Each character goes in the first loaded font of the list that has a glyph for it, or
     // else in the engine's math font or its default one, "default"; the first loaded font, or
     // "default" when none is, sets the lines. Names past the eighth are left out.

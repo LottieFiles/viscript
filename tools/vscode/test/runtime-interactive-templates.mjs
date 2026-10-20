@@ -19,7 +19,6 @@ const {createVis} = await import(pathToFileURL(path.join(runtimeRoot, "client.js
 const wasmBinary = fs.readFileSync(path.join(runtimeRoot, "vis-wasm.wasm"));
 const fonts = [
     ["Source Serif 4", "SourceSerif4-Semibold.ttf"],
-    ["IBM Plex Sans KR", "IBMPlexSansKR-SemiBold.ttf"],
     ["Pretendard", "Pretendard.ttf"],
 ].map(([name, file]) => [
     name,

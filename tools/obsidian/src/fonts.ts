@@ -2,7 +2,7 @@
 // FontProvider. The fonts the engine's themes set text in ship with the plugin, the files VS Code
 // ships, so a scene draws the same on every computer, phone and tablet: "Pretendard" and
 // "JetBrainsMono" take the text and code fonts the settings choose, the bundled ones unless another
-// is named, and adaptive_vscode's "Source Serif 4" and "IBM Plex Sans KR" are the bundled ones. Any
+// is named, and adaptive_vscode's "Source Serif 4" is the bundled one. Any
 // other name a scene sets text in, as `font = "Noto Serif KR"`, is looked for in the vault's font
 // folder, which syncs with the vault, then on Fontsource, which saves it in the folder; failing
 // both, its text is drawn in the text font, or in the code font for a name that reads as a

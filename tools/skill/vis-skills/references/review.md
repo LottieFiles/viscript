@@ -36,7 +36,7 @@ Review renders and probes go under `temp/` next to the scene. In a VS Code
 workspace keep them outside `.vscode/vis`, which holds only Scenes and their
 assets. A Scene for the VS Code Viewer also gets the vis-vscode host review: the
 CLI sets `adaptive_vscode` in Pretendard, while the Viewer sets headings and body
-text in Source Serif 4 and takes the editor's colors.
+text in Source Serif 4, Korean in Pretendard, and takes the editor's colors.
 
 A successful command is not proof of correct layout. Check labels against their
 owners' own paint bounds, and tell intended contacts from unrelated collisions. A

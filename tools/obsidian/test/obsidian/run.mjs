@@ -248,7 +248,7 @@ test("fonts by name: the theme's from the plugin, one the scene names from the f
     const found = await app.evaluate(async () => {
         const fonts = window.app.plugins.plugins.viscript.fonts;
         const found = {};
-        for (const name of ["Pretendard", "JetBrainsMono", "Source Serif 4", "IBM Plex Sans KR", "Pretendard Std", "No Such Sans", "No Such Mono"]) {
+        for (const name of ["Pretendard", "JetBrainsMono", "Source Serif 4", "Pretendard Std", "No Such Sans", "No Such Mono"]) {
             const font = await fonts.fetch(name);
             // A bundled font arrives whole; one from the folder as the face the engine reads.
             found[name] = font.source.startsWith("bundled:") ? [font.source, font.data.byteLength] : font.source;
@@ -261,7 +261,6 @@ test("fonts by name: the theme's from the plugin, one the scene names from the f
         Pretendard: await bundled("text", "Pretendard.ttf"),
         JetBrainsMono: await bundled("code", "JetBrainsMono.ttf"),
         "Source Serif 4": await bundled("serif", "SourceSerif4-Semibold.ttf"),
-        "IBM Plex Sans KR": await bundled("serifKorean", "IBMPlexSansKR-SemiBold.ttf"),
         "Pretendard Std": "folder:Fonts/PretendardStd-Regular.ttf",
         "No Such Sans": await bundled("text", "Pretendard.ttf"),
         "No Such Mono": await bundled("code", "JetBrainsMono.ttf"),

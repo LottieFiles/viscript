@@ -77,7 +77,7 @@ definition.track(radius, 2, 1, "linear");
 
 ## Text and code
 
-Text size is in points: the em spans `4/3 * size` screen pixels for billboard text and world units for plane text. Theme roles choose fonts and semantic colors. A font can be a comma list, such as `font: "Source Serif 4, IBM Plex Sans KR"`: each character takes the first registered font that has it, then the bundled Noto Sans Math symbols or the default font. `measure: true` gives text a layout box; `baseline: true` pins the first baseline at `point`. `reserve: "-0.00"` keeps a stable box, and `tabular: true` gives digits, minus, and spaces equal advance cells.
+Text size is in points: the em spans `4/3 * size` screen pixels for billboard text and world units for plane text. Theme roles choose fonts and semantic colors. A font can be a comma list, such as `font: "Source Serif 4, Pretendard"`: each character takes the first registered font that has it, then the bundled Noto Sans Math symbols or the default font. `measure: true` gives text a layout box; `baseline: true` pins the first baseline at `point`. `reserve: "-0.00"` keeps a stable box, and `tabular: true` gives digits, minus, and spaces equal advance cells.
 
 `number` animates `value` and formats decimals, sign, separator, prefix, and suffix. `matrix` and `table` return row/entry groups accessible through one-based `row`, `entry`, and `column` methods. Matrix string entries are inline TeX when the tex module is present (plain text otherwise); numbers stay countable and table strings stay text.
 

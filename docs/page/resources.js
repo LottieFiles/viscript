@@ -9,8 +9,6 @@ export const FONTS = new Map([
   ["Pretendard", "runtime/PretendardStd-Regular.ttf"],
   ["JetBrainsMono", "runtime/JetBrainsMono.ttf"],
   ["Source Serif 4", "runtime/SourceSerif4-Semibold.ttf"],
-  // adaptive_vscode sets text with Hangul in it in this font instead of Source Serif 4
-  ["IBM Plex Sans KR", "runtime/IBMPlexSansKR-SemiBold.ttf"],
   ["CMUTypewriter-Regular", "assets/thorvg/CMUTypewriter-Regular.ttf"],
   ["CMUSerif-Roman", "assets/thorvg/CMUSerif-Roman.ttf"],
 ]);

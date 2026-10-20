@@ -16,5 +16,4 @@ The Preview runtime includes:
 - Noto Sans Math glyph outlines, Copyright 2022 The Noto Project Authors, licensed under the SIL Open Font License 1.1. See `runtime/NotoSansMath-OFL.txt`.
 - JetBrains Mono NL Regular 2.304, licensed under the SIL Open Font License 1.1, without the hinting, glyph names and other parts ThorVG does not read, which viscript's `scripts/code-font.mjs` removes. See `runtime/JetBrainsMono-OFL.txt`.
 - Pretendard, licensed under the SIL Open Font License 1.1. See `runtime/Pretendard-OFL.txt`.
-- IBM Plex Sans KR SemiBold, Copyright © 2017 IBM Corp., licensed under the SIL Open Font License 1.1. See `runtime/IBM-Plex-Sans-KR-OFL.txt`. The unmodified font is pinned from <https://github.com/IBM/plex/tree/bf260093582f04622aacc1e9f9ca604d7ccd0c42/packages/plex-sans-kr>.
 - Source Serif 4 Semibold, Copyright 2014–2023 Adobe, licensed under the SIL Open Font License 1.1. See `runtime/Source-Serif-4-OFL.txt`. The unmodified font is pinned from <https://github.com/adobe-fonts/source-serif/tree/2823e993c53fca27c5c8749f529b56a5a7c77b6b>.

@@ -219,32 +219,40 @@ void sceneThemes(Renderer* renderer)
     CHECK(scene->diagnostic() && std::strstr(scene->diagnostic(), "the theme must come before objects"));
     delete scene;
 
+    // A text that names no font takes its role's as it is, a font list included, whatever its
+    // string: the renderer sets each character in the first font of the list that has it, so
+    // Korean in a role of Source Serif 4 alone stays in that font, and a list sets the Hangul a
+    // text shows only later, which JetBrainsMono, like Source Serif 4, lacks.
     auto editorial = proWhite;
-    editorial.h1.font = "Source Serif 4";
-    editorial.h2.font = "Source Serif 4";
-    editorial.h3.font = "Source Serif 4";
-    editorial.text.font = "Source Serif 4";
+    editorial.h2.font = "Source Serif 4, Pretendard";
+    editorial.h3.font = "JetBrainsMono, Pretendard";
     editorial.code.font = "Source Serif 4";
     scene = Scene::gen();
-    auto english = Text::gen("English explanation");
-    auto korean = Text::gen(u8"\ud55c\uae00 \uc124\uba85");
-    auto explicitKorean = Text::gen(u8"\uc0ac\uc6a9\uc790 \ud3f0\ud2b8");
-    CHECK(scene && english && korean && explicitKorean);
-    if (scene && english && korean && explicitKorean) {
+    auto listed = Text::gen(u8"\ud55c\uae00 \uc124\uba85");
+    auto alone = Text::gen(u8"\ud55c\uae00 \uc124\uba85");
+    auto named = Text::gen(u8"\uc0ac\uc6a9\uc790 \ud3f0\ud2b8");
+    auto later = Text::gen("English first");
+    CHECK(scene && listed && alone && named && later);
+    if (scene && listed && alone && named && later) {
         CHECK(scene->theme(editorial) == Result::Success);
-        english->role = TextRole::Code;
-        korean->role = TextRole::H2;
-        CHECK(explicitKorean->font("Pretendard") == Result::Success);
-        CHECK(scene->add(english) == Result::Success);
-        CHECK(scene->add(korean) == Result::Success);
-        CHECK(scene->add(explicitKorean) == Result::Success);
-        CHECK(std::strcmp(english->font(), "Source Serif 4") == 0);
-        CHECK(std::strcmp(korean->font(), "IBM Plex Sans KR") == 0);
-        CHECK(std::strcmp(explicitKorean->font(), "Pretendard") == 0);
+        listed->role = TextRole::H2;
+        alone->role = TextRole::Code;
+        later->role = TextRole::H3;
+        CHECK(named->font("Custom Sans") == Result::Success);
+        CHECK(scene->add(listed) == Result::Success);
+        CHECK(scene->add(alone) == Result::Success);
+        CHECK(scene->add(named) == Result::Success);
+        CHECK(scene->add(later) == Result::Success);
+        CHECK(std::strcmp(listed->font(), "Source Serif 4, Pretendard") == 0);
+        CHECK(std::strcmp(alone->font(), "Source Serif 4") == 0);
+        CHECK(std::strcmp(named->font(), "Custom Sans") == 0);
+        TextExtent hangul;
+        CHECK(scene->measure(later, u8"\ud55c\uae00", hangul) == Result::Success && hangul.missing == 0u);
     } else {
-        delete english;
-        delete korean;
-        delete explicitKorean;
+        delete listed;
+        delete alone;
+        delete named;
+        delete later;
     }
     delete scene;
 

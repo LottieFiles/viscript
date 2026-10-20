@@ -99,7 +99,7 @@ Surfaces use `"solid"`, `"mesh"`, or `"solid_mesh"`. Colors can be a colormap na
 
 ## Text and code
 
-Text `size` is in points: the em spans `4/3 * size` screen pixels for billboard text or world units for plane text. Theme roles select font, size, and color. A font can be a comma list, such as `font = "Source Serif 4, IBM Plex Sans KR"`: each character takes the first loaded font that has it, and the first loaded font sets the line height. Characters no listed font has are drawn from the bundled Noto Sans Math symbols or the default font when either has them.
+Text `size` is in points: the em spans `4/3 * size` screen pixels for billboard text or world units for plane text. Theme roles select font, size, and color. A font can be a comma list, such as `font = "Source Serif 4, Pretendard"`: each character takes the first loaded font that has it, and the first loaded font sets the line height. Characters no listed font has are drawn from the bundled Noto Sans Math symbols or the default font when either has them.
 
 `local w, h = text:measure()` returns width and height in world units, in the registered font. `measure = true` stores that box at creation, so `scene:bounds`, `around`, and arranging see the Text's extent rather than its anchor point. To place a Text that appears later, create it with `opacity = 0`, measure and place it before the timeline calls, and reveal it in its beat. `baseline = true` pins the first baseline at `point`, with `align.x` selecting horizontal alignment. `reserve = "-0.00"` fixes a box from a sample string and the initial text. `tabular = true` gives digits, minus, and spaces equal advance cells.
 

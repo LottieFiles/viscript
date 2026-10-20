@@ -31,7 +31,7 @@
     --content-inline: 8px;
     --document-inline: 14px;
     --normal-stage-max-height: max(0px, calc(100vh - 45px));
-    --font: "Source Serif 4", "IBM Plex Sans KR", var(--vscode-font-family, serif);
+    --font: "Source Serif 4", "Pretendard", var(--vscode-font-family, serif);
     --mono: "JetBrains Mono", var(--vscode-editor-font-family, monospace);
 }
 

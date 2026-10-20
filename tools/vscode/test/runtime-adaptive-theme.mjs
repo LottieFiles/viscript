@@ -7,7 +7,7 @@ import {createVis} from "../runtime/client.js";
 const extensionRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const codeFont = fs.readFileSync(path.resolve(extensionRoot, "../../src/examples/assets/JetBrainsMono.ttf"));
 const wasmBinary = fs.readFileSync(path.join(extensionRoot, "runtime", "vis-wasm.wasm"));
-const headingFont = fs.readFileSync(path.join(extensionRoot, "runtime", "IBMPlexSansKR-SemiBold.ttf"));
+const textFont = fs.readFileSync(path.join(extensionRoot, "runtime", "Pretendard.ttf"));
 const serifHeadingFont = fs.readFileSync(path.join(extensionRoot, "runtime", "SourceSerif4-Semibold.ttf"));
 // Without a source the engine holds no scene until load, so fonts and the host theme go in first.
 const runtime = await createVis({wasmBinary});
@@ -17,7 +17,7 @@ for (const read of [() => runtime.render(0), () => runtime.bounds("a"), () => ru
     () => runtime.resize(8, 8)]) {
     assert.throws(read, /No scene is loaded; call load with a Lua or JavaScript scene first/);
 }
-runtime.font("IBM Plex Sans KR", headingFont, "ttf");
+runtime.font("Pretendard", textFont, "ttf");
 runtime.font("Source Serif 4", serifHeadingFont, "ttf");
 runtime.font("JetBrainsMono", codeFont, "ttf");
 
@@ -74,8 +74,8 @@ local scene = vis.scene {
     theme = {
         preset = "adaptive_vscode",
         text = {
-            h1 = {font = "IBM Plex Sans KR"},
-            h2 = {font = "IBM Plex Sans KR"},
+            h1 = {font = "Pretendard"},
+            h2 = {font = "Pretendard"},
         },
     },
     camera = {height = 4},
@@ -126,6 +126,23 @@ assert.ok(runtime.bounds("automatic-serif-text").width > 0);
 assert.ok(runtime.bounds("automatic-serif-code").width > 0);
 assert.ok(runtime.bounds("automatic-korean").width > 0);
 assert.ok(runtime.render(0).some((value, index) => index % 4 !== 3 && value !== 255));
+
+// The host roles name the list "Source Serif 4, Pretendard", so Hangul that a text shows only
+// later, which Source Serif 4 lacks, is drawn in Pretendard.
+runtime.load(`
+local scene = vis.scene {width = 240, height = 120, theme = "adaptive_vscode", camera = {height = 4}}
+local later = scene:text {text = "English first", point = {0, 0}, align = {0.5, 0.5}, role = "text"}
+scene:play({target = later, text = "\ub098\uc911\uc5d0 \ud55c\uae00"}, 0.5)
+return scene
+`, "adaptive-later-korean.lua");
+const ink = (pixels) => {
+    let count = 0;
+    for (let i = 0; i < pixels.length; i += 4) {
+        if (pixels[i] !== 16 || pixels[i + 1] !== 24 || pixels[i + 2] !== 32) count += 1;
+    }
+    return count;
+};
+assert.ok(ink(runtime.render(runtime.duration)) > ink(runtime.render(0)) / 4);
 
 // A color the host leaves undefined or empty is the runtime's light or dark one, and object colors
 // keep the number given. Two lines take the first two object colors; the third is the danger color.

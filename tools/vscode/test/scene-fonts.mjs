@@ -77,13 +77,13 @@ const load = (runtime) => { runtime.loads += 1; };
 }
 
 // With the shipped runtime and fonts: the first load names every font the timeline sets text in,
-// including text added later, a later scene of a transition, and Hangul in a Source Serif 4 role,
-// and the scene the preview loads with only those fonts draws as it does with all four fonts.
+// including text added later, a later scene of a transition, and Hangul in a role of the host's
+// list "Source Serif 4, Pretendard", and the scene the preview loads with only those fonts draws
+// as it does with all three fonts.
 const wasmBinary = fs.readFileSync(path.join(runtimeDir, "vis-wasm.wasm"));
 const FILES = {
     "Pretendard": "Pretendard.ttf",
     "JetBrainsMono": "JetBrainsMono.ttf",
-    "IBM Plex Sans KR": "IBMPlexSansKR-SemiBold.ttf",
     "Source Serif 4": "SourceSerif4-Semibold.ttf",
 };
 const HOST_THEME = {
@@ -110,7 +110,7 @@ const SCENES = [
         name: "adaptive.lua",
         // What the first second shows, and what the whole scene sets text in.
         early: ["Source Serif 4"],
-        needs: ["Source Serif 4", "IBM Plex Sans KR", "JetBrainsMono"],
+        needs: ["Source Serif 4", "Pretendard", "JetBrainsMono"],
         times: (duration) => [0, 0.5, 1.5, 2.25, duration],
         source: `
 local scene = vis.scene {width = 480, height = 270, theme = "adaptive_vscode", ${CAMERA}}

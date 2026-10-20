@@ -8,9 +8,8 @@ declare module "viscript:embedded" {
     /** The runtime binary (vis-wasm.wasm). */
     export const wasm: string;
     /** The fonts the engine's themes set text in: Pretendard and JetBrains Mono NL Regular, and
-     * adaptive_vscode's Source Serif 4 and IBM Plex Sans KR SemiBold. */
+     * adaptive_vscode's Source Serif 4 Semibold. */
     export const textFont: string;
     export const codeFont: string;
     export const serifFont: string;
-    export const serifKoreanFont: string;
 }

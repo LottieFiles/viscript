@@ -8,7 +8,7 @@ import {ASSETS, assetsFor, FONTS, FULL_PRETENDARD, needsFullPretendard} from "..
 const page = new URL("../docs/page/", import.meta.url);
 
 test("the page has a font for each name the engine's themes set text in", () => {
-    for (const name of ["Pretendard", "JetBrainsMono", "Source Serif 4", "IBM Plex Sans KR"]) assert.ok(FONTS.has(name), name);
+    for (const name of ["Pretendard", "JetBrainsMono", "Source Serif 4"]) assert.ok(FONTS.has(name), name);
 });
 
 test("every font and image the page names ships with it, under the page", () => {

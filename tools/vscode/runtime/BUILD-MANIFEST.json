@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "project": "viscript",
   "projectVersion": "0.1.0",
-  "sourceCommit": "f4304131f826",
+  "sourceCommit": "08c69c283ad6",
   "sourceDirty": false,
   "buildDate": "2026-10-20",
   "toolchain": {
@@ -33,12 +33,12 @@
     {
       "path": "vis-wasm.js",
       "bytes": 22366,
-      "sha256": "19d5a6a7dfb6890bdc5248979cb4397423bfdbd5925062083c841badbcbbcb73"
+      "sha256": "71e650c749431aa2850f39dad3a22d0a6e23a426a33e2e9fd4dbc060b7b9caa8"
     },
     {
       "path": "vis-wasm.wasm",
-      "bytes": 1183899,
-      "sha256": "1771cb732a5485473c8c792fe4184e623249a0746e0f8b1e63f0b24b845ac7b3"
+      "bytes": 1183595,
+      "sha256": "819369c2267419cfe19a45846206c376697bee6004d72790827754b25337edd6"
     },
     {
       "path": "client.js",
@@ -69,16 +69,6 @@
       "path": "Pretendard-OFL.txt",
       "bytes": 4418,
       "sha256": "85fce85e25260b03777bf10373d3bd9363b9da96d9e0ca86a280dd37ed7667a0"
-    },
-    {
-      "path": "IBMPlexSansKR-SemiBold.ttf",
-      "bytes": 2481868,
-      "sha256": "c1640995dae522401987918ac5caf90c2d7ecc90552216b653c97754fa941eb3"
-    },
-    {
-      "path": "IBM-Plex-Sans-KR-OFL.txt",
-      "bytes": 4362,
-      "sha256": "d741e57d5f865e294df801f96b7b5161a88b211df65887e4358d271c9fc5fb4f"
     },
     {
       "path": "SourceSerif4-Semibold.ttf",

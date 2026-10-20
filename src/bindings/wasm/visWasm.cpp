@@ -325,10 +325,12 @@ extern "C" VIS_KEEPALIVE VisResult vis_host_theme(VisEngine handle, uint8_t dark
     }
     auto theme = vis::Theme::preset(dark ? vis::ThemePreset::ProBlack
                                            : vis::ThemePreset::ProWhite);
-    theme.h1.font = "Source Serif 4";
-    theme.h2.font = "Source Serif 4";
-    theme.h3.font = "Source Serif 4";
-    theme.text.font = "Source Serif 4";
+    // Hangul, which Source Serif 4 lacks, comes from Pretendard, as in the extension's CSS.
+    auto serif = "Source Serif 4, Pretendard";
+    theme.h1.font = serif;
+    theme.h2.font = serif;
+    theme.h3.font = serif;
+    theme.text.font = serif;
     theme.code.font = "JetBrainsMono";
     theme.background = _rgba(background);
     theme.h1.color = _rgba(foreground);

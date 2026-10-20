@@ -3,7 +3,8 @@
 // and registers in each instance only the fonts the scene needs: the ones its document needed
 // last time, then any the loaded scene still lacks, after which it loads again, since its text
 // was measured in the default font. A scene's texts get their fonts as the scene is built, so the
-// first load names every font the timeline will set text in, later ones included.
+// first load names every font the timeline will set text in, later ones included, and every font
+// of a list, since it cannot yet tell which characters each one has.
 
 // Font bytes by the names scenes set text in, each fetched on first use; a failed fetch is tried
 // again the next time.

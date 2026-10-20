@@ -27,7 +27,6 @@ const PAYLOAD = {
     textFont: join(runtimeDir, "Pretendard.ttf"),
     codeFont: join(runtimeDir, "JetBrainsMono.ttf"),
     serifFont: join(runtimeDir, "SourceSerif4-Semibold.ttf"),
-    serifKoreanFont: join(runtimeDir, "IBMPlexSansKR-SemiBold.ttf"),
 };
 
 // Everything in main.js whose license asks for its notice to travel with it.
@@ -42,7 +41,6 @@ const NOTICES = [
         join(runtimeDir, "Pretendard-OFL.txt")],
     ["JetBrains Mono, the bundled code font", join(runtimeDir, "JetBrainsMono-OFL.txt")],
     ["Source Serif 4, a bundled font of the adaptive_vscode theme", join(runtimeDir, "Source-Serif-4-OFL.txt")],
-    ["IBM Plex Sans KR, a bundled font of the adaptive_vscode theme", join(runtimeDir, "IBM-Plex-Sans-KR-OFL.txt")],
     ["Noto Sans Math, built into the runtime", join(runtimeDir, "NotoSansMath-OFL.txt")],
 ];
 

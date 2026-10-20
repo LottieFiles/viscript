@@ -15,7 +15,6 @@ const FONTS: Readonly<Record<ThemeRole, string>> = {
     text: embedded.textFont,
     code: embedded.codeFont,
     serif: embedded.serifFont,
-    serifKorean: embedded.serifKoreanFont,
 };
 
 let wasm: Promise<ArrayBuffer> | null = null;

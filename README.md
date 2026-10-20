@@ -319,7 +319,6 @@ viscript is released under the [MIT License](LICENSE).
 | [Noto Sans Math](https://github.com/notofonts/math) | OFL 1.1 | A subset is embedded in the runtime for the math symbols other fonts lack |
 | [Pretendard](https://github.com/orioncactus/pretendard) | OFL 1.1 | Bundled font; a subset of Pretendard Std is the runtime's default font, and the docs site ships Pretendard Std |
 | [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) | OFL 1.1 | Bundled font |
-| [IBM Plex Sans KR](https://github.com/IBM/plex) | OFL 1.1 | Bundled font (runtime bundles and the Obsidian plugin) |
 | [Source Serif 4](https://github.com/adobe-fonts/source-serif) | OFL 1.1 | Bundled font (runtime bundles and the Obsidian plugin) |
 | [FFmpeg](https://ffmpeg.org) | LGPL/GPL | Optional MP4 export, run as an external program; not linked or distributed |
 

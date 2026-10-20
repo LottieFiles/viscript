@@ -14,9 +14,6 @@ const sourceSerif = fs.readFileSync(path.join(
     extensionRoot, "runtime", "SourceSerif4-Semibold.ttf",
 ));
 const pretendard = fs.readFileSync(path.join(extensionRoot, "runtime", "Pretendard.ttf"));
-const koreanSans = fs.readFileSync(path.join(
-    extensionRoot, "runtime", "IBMPlexSansKR-SemiBold.ttf",
-));
 
 const source = `
 local scene = vis.scene {
@@ -67,7 +64,6 @@ try {
     runtime.font("Source Serif 4", sourceSerif, "ttf");
     runtime.font("Pretendard", pretendard, "ttf");
     runtime.font("JetBrainsMono", codeFont, "ttf");
-    runtime.font("IBM Plex Sans KR", koreanSans, "ttf");
     assert.equal(typeof runtime.advanceRuntime, "function");
     assert.equal(runtime.retainedLua, true);
     assert.equal(runtime.runtimeTime, 0);

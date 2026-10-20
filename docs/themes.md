@@ -19,9 +19,10 @@ The presets use Pretendard for `h1`, `h2`, `h3`, and `text`, and JetBrainsMono f
 build/viscript render scene.lua -o frame.png   --font src/examples/assets/Pretendard.ttf   --font src/examples/assets/JetBrainsMono.ttf
 ```
 
-The preview host resolves `adaptive_vscode` from the active editor colors and
-rebuilds adaptive scenes when the editor Theme changes. Direct C++ use defaults to
-Pro White until a host supplies a palette.
+The preview host resolves `adaptive_vscode` from the active editor colors, sets
+`h1`, `h2`, `h3`, and `text` in the font list `"Source Serif 4, Pretendard"`,
+and rebuilds adaptive scenes when the editor Theme changes. Direct C++ use defaults
+to Pro White until a host supplies a palette.
 
 ## Semantic colors
 
@@ -42,7 +43,7 @@ semantic roles keep their assigned color. `indicate` uses `focus` and restores t
 incoming color afterward.
 
 A role's font, like a text's, can be a comma list such as
-`"Source Serif 4, IBM Plex Sans KR"`: each character is set in the first loaded font
+`"Source Serif 4, Pretendard"`: each character is set in the first loaded font
 of the list that has it, then in the runtime's math or default font, and the first
 loaded font sets the line height.
 
