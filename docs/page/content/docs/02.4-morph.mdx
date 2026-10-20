@@ -12,7 +12,7 @@ parent: animation
 <code>fade_transform</code>; to cross-fade two independent handles, use <code>transition</code>.</p>
 
 ```lua live
-local scene = vis.scene {camera = {height = 6}}
+local scene = vis.scene {}
 
 -- a ring and a star, 10 points each
 local ring, star = {}, {}
@@ -32,7 +32,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({camera: {height: 6}});
+const scene = vis.scene();
 
 // a ring and a star, 10 points each
 const ring = [], star = [];
@@ -56,7 +56,7 @@ return scene;
 With `{copy = true}` the source stays where it is and a fresh copy does the morphing, so one shape can send copies to several targets. Create each target right before its `morph`.
 
 ```lua live
-local scene = vis.scene {camera = {height = 6}}
+local scene = vis.scene {}
 
 local function ngon(cx, cy, r, n)
     local points = {}
@@ -80,7 +80,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({camera: {height: 6}});
+const scene = vis.scene();
 
 const ngon = (cx, cy, r, n) => Array.from({length: n}, (_, i) => {
     const a = Math.PI / 2 + i * 2 * Math.PI / n;

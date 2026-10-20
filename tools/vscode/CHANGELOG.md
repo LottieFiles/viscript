@@ -10,6 +10,7 @@
 - Fit the canvas to the player always; the FIT/RAW sizes, wheel zoom, middle-drag pan, and the frame-rate readout are gone.
 - Follow the editor theme in scenes that name no theme, which are now `adaptive`.
 - Draw scenes that name no size at 960×540, the size the documentation and skills write them at.
+- Show 6 world units vertically through a camera that names no height, as the documentation's scenes do.
 
 ## 0.7.79
 

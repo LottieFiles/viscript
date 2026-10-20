@@ -1,6 +1,6 @@
 -- Reference study: compare a unit-quaternion great-circle interpolation with
 -- a two-leg Euler route between the same 3D directions.
-local page=vis.scene {width=960,height=540,camera={view="2d",height=6}}
+local page=vis.scene {width=960,height=540,camera={view="2d"}}
 local function dot(a,b)return a[1]*b[1]+a[2]*b[2]+a[3]*b[3]end
 local function scale(v,s)return{v[1]*s,v[2]*s,v[3]*s}end
 local function add(a,b)return{a[1]+b[1],a[2]+b[2],a[3]+b[3]}end

@@ -10,8 +10,8 @@ type FontNameKey = "textFontName" | "codeFontName";
 // The text and code fonts as set, so letters a choice lacks are seen at once, in the adaptive
 // theme, which takes the note's colors and sets text in the text font.
 const PREVIEW = `local s = vis.scene {width = 720, height = 132}
-s:text {text = "Aa Gg Rr 0123 · 가나다", point = {0, 1.2}, size = 22}
-s:text {text = "local answer = 42 -- 코드", point = {0, -1.4}, role = "code", size = 18}
+s:text {text = "Aa Gg Rr 0123 · 가나다", point = {0, 0.9}, size = 22}
+s:text {text = "local answer = 42 -- 코드", point = {0, -1.05}, role = "code", size = 18}
 return s`;
 
 class FontSuggest extends AbstractInputSuggest<string> {

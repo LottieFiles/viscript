@@ -21,7 +21,7 @@ the same descriptor instantly.</p>
 Every key in the descriptor moves together on the same curve, so position, size, corners and colour change as one motion.
 
 ```lua live
-local scene = vis.scene {camera = {height = 6}}
+local scene = vis.scene {}
 
 local card = scene:rectangle {center = {-3, 0}, size = {1.2, 1.2}, corner = 0, fill = "accent"}
 
@@ -34,7 +34,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({camera: {height: 6}});
+const scene = vis.scene();
 
 const card = scene.rectangle({center: [-3, 0], size: [1.2, 1.2], corner: 0, fill: "accent"});
 
@@ -51,7 +51,7 @@ return scene;
 `arc` bends a `shift` into a circular arc by that angle. Without it, points travel in a straight line.
 
 ```lua live
-local scene = vis.scene {camera = {height = 6}}
+local scene = vis.scene {}
 
 local straight = scene:circle {center = {-3.5, -1}, radius = 0.3, fill = "accent"}
 local curved = scene:circle {center = {-3.5, -1}, radius = 0.3, fill = "warning"}
@@ -65,7 +65,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({camera: {height: 6}});
+const scene = vis.scene();
 
 const straight = scene.circle({center: [-3.5, -1], radius: 0.3, fill: "accent"});
 const curved = scene.circle({center: [-3.5, -1], radius: 0.3, fill: "warning"});
@@ -83,7 +83,7 @@ return scene;
 `play` blends over its duration; `set` jumps at the cursor. A `set` before any animation defines the starting state.
 
 ```lua live
-local scene = vis.scene {camera = {height = 6}}
+local scene = vis.scene {}
 
 local a = scene:rectangle {center = {-2, 0}, size = {1.6, 1.6}, fill = "accent"}
 local b = scene:rectangle {center = {2, 0}, size = {1.6, 1.6}, fill = "accent"}
@@ -98,7 +98,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({camera: {height: 6}});
+const scene = vis.scene();
 
 const a = scene.rectangle({center: [-2, 0], size: [1.6, 1.6], fill: "accent"});
 const b = scene.rectangle({center: [2, 0], size: [1.6, 1.6], fill: "accent"});
@@ -124,7 +124,7 @@ return scene;
 `play` also takes a list, one descriptor per target, and a fourth argument `lag` staggers them.
 
 ```lua live
-local scene = vis.scene {camera = {height = 6}}
+local scene = vis.scene {}
 
 local bars, steps = {}, {}
 for i = 1, 6 do
@@ -139,7 +139,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({camera: {height: 6}});
+const scene = vis.scene();
 
 const steps = [];
 for (let i = 1; i <= 6; i++) {

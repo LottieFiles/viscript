@@ -9,7 +9,7 @@ local page = vis.scene {
     width = 960,
     height = 540,
     theme = "pro_white",
-    camera = { view = "2d" },
+    camera = { view = "2d", height = 8 },
 }
 
 page:text {

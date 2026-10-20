@@ -1,6 +1,6 @@
 -- README "Quick Start": someone edits scene.lua and the Scene re-renders beside it — type a line,
 -- tweak a value, add an animation, retime it, add more, delete it again, swap the animation.
-local scene = vis.scene {fps = 20, theme = "pro_white", camera = {height = 6}}
+local scene = vis.scene {fps = 20, theme = "pro_white"}
 
 local L = {card = 0, guide = 1, body = 2, mark = 3, text = 4}
 local U = 6 / 540                       -- world units per pixel

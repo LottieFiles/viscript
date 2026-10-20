@@ -34,7 +34,7 @@ When the app switches between light and dark, the scene is drawn again in the ne
 Switch this page between light and dark, and the scene below follows.
 
 ```lua live
-local scene = vis.scene {camera = {height = 6}}
+local scene = vis.scene {}
 
 scene:text {text = "adaptive", role = "h2", point = {0, 2}}
 local a = scene:circle {center = {-2.6, 0}, radius = 0.7}
@@ -49,7 +49,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({camera: {height: 6}});
+const scene = vis.scene();
 
 scene.text({text: "adaptive", role: "h2", point: [0, 2]});
 const a = scene.circle({center: [-2.6, 0], radius: 0.7});
@@ -91,7 +91,6 @@ Pass a table instead of a name. Fields you leave out come from `preset` (`adapti
 
 ```lua live
 local scene = vis.scene {
-    camera = {height = 6},
     theme = {
         background = "#10141c",
         objects = {"#f4a261", "#2a9d8f", "#e76f51"},
@@ -115,7 +114,6 @@ return scene
 
 ```js live
 const scene = vis.scene({
-    camera: {height: 6},
     theme: {
         background: "#10141c",
         objects: ["#f4a261", "#2a9d8f", "#e76f51"],
@@ -158,7 +156,7 @@ Below, one function builds the same card six times: the two presets and four cus
 The uncoloured circles take each theme's `objects`, the bar its `accent`, the label its `result`, and `indicate` its `focus`.
 
 ```lua live
-local root = vis.scene {width = 960, height = 540, camera = {height = 6}}
+local root = vis.scene {width = 960, height = 540}
 
 local function swatch(theme, name)
     local s = vis.scene {width = 320, height = 270, theme = theme, camera = {height = 4}}
@@ -196,7 +194,7 @@ return root
 ```
 
 ```js live
-const root = vis.scene({width: 960, height: 540, camera: {height: 6}});
+const root = vis.scene({width: 960, height: 540});
 
 function swatch(theme, name) {
     const s = vis.scene({width: 320, height: 270, theme, camera: {height: 4}});
@@ -241,10 +239,8 @@ To change themes during a video, as below, make one scene per theme and play the
 Each child scene in a [viewport](#/docs/viewports) keeps its own theme.
 
 ```lua live
-local cam = {height = 6}
-
 local function scene_in(theme)
-    local s = vis.scene {theme = theme, camera = cam}
+    local s = vis.scene {theme = theme}
     s:text {text = type(theme) == "string" and theme or "custom", role = "h3", point = {0, 2.2}}
     local a = s:circle {center = {-2.6, 0}, radius = 0.7}
     local b = s:rectangle {size = {1.4, 1.4}}
@@ -256,7 +252,7 @@ local function scene_in(theme)
     return s
 end
 
-local root = vis.scene {camera = cam}
+local root = vis.scene {}
 root:scene_transition({
     scene_in("pro_white"),
     scene_in("pro_black"),
@@ -267,10 +263,8 @@ return root
 ```
 
 ```js live
-const cam = {height: 6};
-
 function sceneIn(theme) {
-    const s = vis.scene({theme, camera: cam});
+    const s = vis.scene({theme});
     s.text({text: typeof theme === "string" ? theme : "custom", role: "h3", point: [0, 2.2]});
     const a = s.circle({center: [-2.6, 0], radius: 0.7});
     const b = s.rectangle({size: [1.4, 1.4]});
@@ -282,7 +276,7 @@ function sceneIn(theme) {
     return s;
 }
 
-const root = vis.scene({camera: cam});
+const root = vis.scene();
 root.sceneTransition([
     sceneIn("pro_white"),
     sceneIn("pro_black"),

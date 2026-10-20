@@ -38,7 +38,7 @@ What a scene can hold:
 <p align="center"><img src="docs/assets/first-scene.gif" alt="Editing scene.lua live: tweak a value, retime an animation, add and remove objects, and watch the Scene re-render"></p>
 
 ```lua
-local scene = vis.scene {theme = "pro_white", camera = {height = 6}}
+local scene = vis.scene {theme = "pro_white"}
 
 local axes = scene:space {x = {-5, 5, 1}, y = {-2, 2, 1}, stroke = "#00000000"}
 local wave = axes:plot {fn = math.sin, x_range = {-5, 5, 0.02}, stroke = "accent", width = 4}
@@ -57,7 +57,7 @@ return scene
 The same scene in JavaScript:
 
 ```js
-const scene = vis.scene({theme: "pro_white", camera: {height: 6}});
+const scene = vis.scene({theme: "pro_white"});
 
 const axes = scene.space({x: [-5, 5, 1], y: [-2, 2, 1], stroke: "#00000000"});
 const wave = axes.plot({fn: Math.sin, x_range: [-5, 5, 0.02], stroke: "accent", width: 4});
@@ -75,8 +75,9 @@ return scene;
 
 Three ideas carry through every scene:
 
-- **Sizes are pixels, positions are world units.** `camera.height = 6` shows six world
-  units vertically; `width`, stroke widths and font sizes are pixels.
+- **Sizes are pixels, positions are world units.** The camera shows six world units
+  vertically unless `camera.height` says otherwise; `width`, stroke widths and font sizes
+  are pixels.
 - **Calls run on a timeline cursor.** Each animation starts where the previous one ended;
   `wait` holds, and `parallel` runs tracks side by side.
 - **The script runs once.** It describes the scene; the host then samples any time `t`,
@@ -168,7 +169,7 @@ const font = await fetch("./viscript/Pretendard.ttf");
 runtime.font("Pretendard", await font.arrayBuffer(), "ttf");
 
 // Build and load the real scene.
-const scene = vis.scene({theme: "pro_white", camera: {height: 6}});
+const scene = vis.scene({theme: "pro_white"});
 const title = scene.text({text: "Hello, viscript", point: [0, 1.2], size: 48});
 const circle = scene.circle({center: [-2, -0.8], radius: 0.6, fill: "accent", stroke: "accent"});
 scene.write(title, 1);

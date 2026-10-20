@@ -58,7 +58,7 @@ export interface Camera {
     eye?: WorldVector;
     /** `[0, 1, 0]` when omitted, in 3D. */
     up?: WorldVector;
-    /** The world height the view shows, orthographic; 8 when omitted. */
+    /** The world height the view shows, orthographic; 6 when omitted. */
     height?: number;
     /** `"perspective"` when omitted, in 3D. */
     projection?: "perspective" | "orthographic";
@@ -137,7 +137,7 @@ export interface SceneConfig {
     fps?: number;
     /** The theme's when omitted. */
     background?: Color;
-    /** A fixed 2D camera 8 units tall on the origin when omitted. */
+    /** A fixed 2D camera 6 units tall on the origin when omitted. */
     camera?: Camera;
     /** `true` when omitted. */
     antialiasing?: boolean;

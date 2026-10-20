@@ -10,7 +10,7 @@ Scene factories create roots. Object factories create children, so a shape can o
 its annotation and a Group can contain a complete visual unit.
 
 ```lua
-local scene = vis.scene {camera = {height = 6}}
+local scene = vis.scene {}
 local node = scene:group {id = "node"}
 node:circle {radius = 0.8}
 node:text {text = "A", id = "label", measure = true}

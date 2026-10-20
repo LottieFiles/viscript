@@ -102,7 +102,7 @@ A string becomes a text beside the tick; a handle, such as a `tex` formula, move
 Call `space:labels` once the space is made and animate the handles it returns.
 
 ```lua live
-local scene = vis.scene {camera = {height = 6, target = {math.pi / 2, 0}}}
+local scene = vis.scene {camera = {target = {math.pi / 2, 0}}}
 
 local pi = math.pi
 local axes = scene:space {x = {-pi, 2 * pi, pi / 2}, y = {-1.5, 1.5, 0.5}, ticks = true}
@@ -122,7 +122,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({camera: {height: 6, target: [Math.PI / 2, 0]}});
+const scene = vis.scene({camera: {target: [Math.PI / 2, 0]}});
 
 const pi = Math.PI;
 const axes = scene.space({x: [-pi, 2 * pi, pi / 2], y: [-1.5, 1.5, 0.5], ticks: true});

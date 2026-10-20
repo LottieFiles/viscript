@@ -11,7 +11,7 @@ parent: animation
 `shift` moves a target by an offset, relative to where it is when the clip starts. Successive shifts add up.
 
 ```lua live
-local scene = vis.scene {camera = {height = 6}}
+local scene = vis.scene {}
 
 local box = scene:rectangle {center = {-3, -1}, size = {1, 1}, corner = 0.15, fill = "accent"}
 
@@ -25,7 +25,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({camera: {height: 6}});
+const scene = vis.scene();
 
 const box = scene.rectangle({center: [-3, -1], size: [1, 1], corner: 0.15, fill: "accent"});
 
@@ -53,7 +53,7 @@ return scene;
 A positive angle turns counter-clockwise. The same quarter turn looks different around the centre (left) and around a corner (right); the yellow dots mark the pivots.
 
 ```lua live
-local scene = vis.scene {camera = {height = 6}}
+local scene = vis.scene {}
 
 local a = scene:rectangle {center = {-2.5, 0}, size = {1.6, 1.6}, fill = "accent"}
 local b = scene:rectangle {center = {2, 0}, size = {1.6, 1.6}, fill = "danger"}
@@ -69,7 +69,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({camera: {height: 6}});
+const scene = vis.scene();
 
 const a = scene.rectangle({center: [-2.5, 0], size: [1.6, 1.6], fill: "accent"});
 const b = scene.rectangle({center: [2, 0], size: [1.6, 1.6], fill: "danger"});
@@ -89,7 +89,7 @@ return scene;
 Scaling grows away from the pivot: from the centre the square grows evenly; from `bottom_left` that corner stays put.
 
 ```lua live
-local scene = vis.scene {camera = {height = 6}}
+local scene = vis.scene {}
 
 local a = scene:rectangle {center = {-2.5, 0}, size = {1.2, 1.2}, fill = "accent"}
 local b = scene:rectangle {center = {2, -0.4}, size = {1.2, 1.2}, fill = "danger"}
@@ -105,7 +105,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({camera: {height: 6}});
+const scene = vis.scene();
 
 const a = scene.rectangle({center: [-2.5, 0], size: [1.2, 1.2], fill: "accent"});
 const b = scene.rectangle({center: [2, -0.4], size: [1.2, 1.2], fill: "danger"});
@@ -125,7 +125,7 @@ return scene;
 Pass an object or a point as `about` and the target circles it. Here the planet orbits the sun and the moon runs the other way around `{0, 0}`.
 
 ```lua live
-local scene = vis.scene {camera = {height = 6}}
+local scene = vis.scene {}
 
 scene:circle {radius = 2.4, stroke = "muted", width = 1, dash = {4, 6}}   -- orbits
 scene:circle {radius = 1.84, stroke = "muted", width = 1, dash = {4, 6}}
@@ -141,7 +141,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({camera: {height: 6}});
+const scene = vis.scene();
 
 scene.circle({radius: 2.4, stroke: "muted", width: 1, dash: [4, 6]});   // orbits
 scene.circle({radius: 1.84, stroke: "muted", width: 1, dash: [4, 6]});
@@ -161,7 +161,7 @@ return scene;
 `transform` applies any 4×4 matrix, written row by row, on top of the current placement — shears and other maps that `shift`, `rotate` and `scale` cannot express.
 
 ```lua live
-local scene = vis.scene {camera = {height = 6}}
+local scene = vis.scene {}
 
 local box = scene:rectangle {size = {2, 2}, fill = "accent"}
 
@@ -176,7 +176,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({camera: {height: 6}});
+const scene = vis.scene();
 
 const box = scene.rectangle({size: [2, 2], fill: "accent"});
 

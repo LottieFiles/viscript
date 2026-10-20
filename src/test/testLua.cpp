@@ -271,7 +271,8 @@ return scene
 }
 
 // A scene that names nothing is 960 by 540 at 30 fps, plays once and looks at the origin through a
-// fixed 2D camera 8 units tall; a side it names keeps the other side's default.
+// fixed 2D camera 6 units tall; a side it names keeps the other side's default, and a camera that
+// names no height, in 2D or 3D, keeps the default height.
 static void _defaults()
 {
     auto scene = _loaded("return vis.scene {}", "defaults.lua");
@@ -286,7 +287,7 @@ static void _defaults()
         CHECK(config.cameraMode == CameraMode::Fixed);
         CHECK(config.cameraView == CameraView::TwoD);
         CHECK(_near(config.camera.target.x, 0.0f) && _near(config.camera.target.y, 0.0f));
-        CHECK(_near(config.camera.orthoHeight, 8.0f));
+        CHECK(_near(config.camera.orthoHeight, 6.0f));
     }
     delete scene;
 
@@ -305,6 +306,23 @@ static void _defaults()
         scene = _loaded(size.source, "size.lua");
         CHECK(scene != nullptr);
         if (scene) CHECK(scene->config().width == size.width && scene->config().height == size.height);
+        delete scene;
+    }
+
+    struct Height
+    {
+        const char* source;
+        float height;
+    };
+    static constexpr Height heights[] = {
+        {"return vis.scene {camera = {target = {1, 2}}}", 6.0f},
+        {"return vis.scene {camera = {view = \"3d\", projection = \"orthographic\"}}", 6.0f},
+        {"return vis.scene {camera = {height = 8}}", 8.0f},
+    };
+    for (auto& height : heights) {
+        scene = _loaded(height.source, "height.lua");
+        CHECK(scene != nullptr);
+        if (scene) CHECK(_near(scene->config().camera.orthoHeight, height.height));
         delete scene;
     }
 }

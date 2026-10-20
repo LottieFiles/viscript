@@ -13,7 +13,7 @@ This page covers the ways out of that line: running tracks at once, going back t
 `scene:parallel(fn, fn, …)` starts each function's track at the same time. The cursor continues after the **longest** one, so the next call waits for every track.
 
 ```lua live
-local scene = vis.scene {camera = {height = 6}}
+local scene = vis.scene {}
 
 local dots = {}
 for i, d in ipairs({1, 2, 3}) do
@@ -30,7 +30,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({camera: {height: 6}});
+const scene = vis.scene();
 
 const dots = [1, 2, 3].map((i) => scene.circle({center: [-4, 2 - i * 1.2 + 0.4], radius: 0.3, fill: "accent"}));
 
@@ -48,7 +48,7 @@ return scene;
 `scene:mark(name)` names the current time. `scene:at(name, fn)` jumps back there, records `fn`, and returns the cursor to where it was — handy for adding an accent to a moment you have already passed.
 
 ```lua live
-local scene = vis.scene {camera = {height = 6}}
+local scene = vis.scene {}
 
 local ball = scene:circle {center = {-4, 0}, radius = 0.35, fill = "accent"}
 
@@ -68,7 +68,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({camera: {height: 6}});
+const scene = vis.scene();
 
 const ball = scene.circle({center: [-4, 0], radius: 0.35, fill: "accent"});
 
@@ -135,7 +135,7 @@ return scene;
 The point of a tracker is that several objects stay in sync without separate animations. Here one `x` drives the dot, the dashed drop line and the readout.
 
 ```lua live
-local scene = vis.scene {camera = {height = 6}}
+local scene = vis.scene {}
 
 local axes = scene:space {x = {-4, 4, 1}, y = {-2, 2, 1}, stroke = "#00000000"}
 local f = function(x) return math.sin(x) * 1.5 end
@@ -159,7 +159,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({camera: {height: 6}});
+const scene = vis.scene();
 
 const axes = scene.space({x: [-4, 4, 1], y: [-2, 2, 1], stroke: "#00000000"});
 const f = (x) => Math.sin(x) * 1.5;
@@ -187,7 +187,7 @@ return scene;
 `vis.spring_response(seconds, options)` gives a physical spring's displacement after that many seconds. Bind it to a tracker that counts seconds and track it linearly, so physical time runs evenly.
 
 ```lua live
-local scene = vis.scene {camera = {height = 6}}
+local scene = vis.scene {}
 
 local anchor = scene:line {from = {0, -2}, to = {0, 2}, stroke = "muted", width = 1, dash = {6, 6}}
 local ball = scene:circle {radius = 0.35, fill = "accent"}
@@ -204,7 +204,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({camera: {height: 6}});
+const scene = vis.scene();
 
 scene.line({from: [0, -2], to: [0, 2], stroke: "muted", width: 1, dash: [6, 6]});
 const ball = scene.circle({radius: 0.35, fill: "accent"});
@@ -225,7 +225,7 @@ return scene;
 `move_along(target, path, options)` carries the target's centre along any outline — line, circle, rectangle, polygon, plot, route, path or curve. The outline is copied when the call is made, so later changes to the path do not move existing followers.
 
 ```lua live
-local scene = vis.scene {camera = {height = 6}}
+local scene = vis.scene {}
 
 local curve = scene:curve {from = {-4, -1.5}, control1 = {-2, 3}, control2 = {2, -3}, to = {4, 1.5},
                           stroke = "muted", width = 2}
@@ -238,7 +238,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({camera: {height: 6}});
+const scene = vis.scene();
 
 const curve = scene.curve({from: [-4, -1.5], control1: [-2, 3], control2: [2, -3], to: [4, 1.5],
                           stroke: "muted", width: 2});
@@ -255,7 +255,7 @@ return scene;
 `orient = true` also rotates the target to match the path direction (left: off, right: on). Draw the target pointing the way the path starts.
 
 ```lua live
-local scene = vis.scene {camera = {height = 6}}
+local scene = vis.scene {}
 
 -- points up: the direction of travel where a circle's outline starts
 local function arrowhead(cx)
@@ -272,7 +272,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({camera: {height: 6}});
+const scene = vis.scene();
 
 // points up: the direction of travel where a circle's outline starts
 const arrowhead = (cx) =>

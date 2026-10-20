@@ -41,12 +41,12 @@ return scene;
 ### Camera and world units
 
 Objects are placed in world units, not pixels.<br />
-The camera decides how much of the world fits in the frame: `height = 6` shows six units vertically, so a 960×540 frame spans about ±5.33 × ±3.
+The camera decides how much of the world fits in the frame: it shows six units vertically unless `camera.height` says otherwise, so a 960×540 frame spans about ±5.33 × ±3.
 
 To pan and zoom during the scene, see [Camera](#/docs/camera).
 
 ```lua live
-local scene = vis.scene {camera = {height = 6}}
+local scene = vis.scene {}
 
 local axes = scene:space {x = {-5, 5, 1}, y = {-3, 3, 1}, stroke = "#00000000", ticks = true}
 local dot = axes:circle {radius = 0.2, fill = "warning"}
@@ -59,7 +59,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({camera: {height: 6}});
+const scene = vis.scene();
 
 const axes = scene.space({x: [-5, 5, 1], y: [-3, 3, 1], stroke: "#00000000", ticks: true});
 const dot = axes.circle({radius: 0.2, fill: "warning"});
@@ -74,7 +74,7 @@ return scene;
 <table>
 <tr><th>Field</th><th>Unit</th><th>Meaning</th></tr>
 <tr><td><code>camera.target</code></td><td>world</td><td>Point at the centre of the frame (default <code>&#123;0, 0&#125;</code>).</td></tr>
-<tr><td><code>camera.height</code></td><td>world</td><td>World units visible vertically.</td></tr>
+<tr><td><code>camera.height</code></td><td>world</td><td>World units visible vertically; 6 when left out.</td></tr>
 </table>
 
 ## In this chapter

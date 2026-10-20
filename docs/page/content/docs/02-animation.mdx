@@ -34,7 +34,7 @@ scrubber under the player.</p>
 <p>Below, every curve moves a dot the same distance in the same two seconds; <code>parallel</code> starts them together.</p>
 
 ```lua live
-local scene = vis.scene {camera = {height = 6}}
+local scene = vis.scene {}
 
 local curves = {"linear", "smooth", "ease_in", "ease_out", "ease_in_out",
                 "gentle", "snappy", "back", "bounce", "elastic",
@@ -58,7 +58,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({camera: {height: 6}});
+const scene = vis.scene();
 
 const curves = ["linear", "smooth", "ease_in", "ease_out", "ease_in_out",
                 "gentle", "snappy", "back", "bounce", "elastic",
@@ -93,7 +93,7 @@ return scene;
 </table>
 
 ```lua live
-local scene = vis.scene {camera = {height = 6}}
+local scene = vis.scene {}
 
 -- one slot per call: the label is there from t = 0, the shape enters on its turn
 local function slot(x, y, name)
@@ -123,7 +123,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({camera: {height: 6}});
+const scene = vis.scene();
 
 // one slot per call: the label is there from t = 0, the shape enters on its turn
 const slot = (x, y, name) =>
@@ -156,7 +156,7 @@ return scene;
 Pass an array and a fourth argument, `lag`, to start each item that many seconds after the previous one. The whole span is `duration + lag × (n − 1)` — here `0.8 + 0.2 × 5 = 1.8` s for the lower row.
 
 ```lua live
-local scene = vis.scene {camera = {height = 6}}
+local scene = vis.scene {}
 
 local together, staggered = {}, {}
 for i = 1, 6 do
@@ -173,7 +173,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({camera: {height: 6}});
+const scene = vis.scene();
 
 const together = [], staggered = [];
 for (let i = 1; i <= 6; i++) {

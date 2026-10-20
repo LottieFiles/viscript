@@ -2,7 +2,7 @@
 -- explicit right-handed, column-vector, OpenGL-depth MVP convention.
 -- The visible "concept camera" owns V/P; the presentation camera only lets the
 -- viewer inspect the object, frustum, image plane, and projection ray together.
-local page = vis.scene {width = 960, height = 540, camera = {view = "2d", height = 6}}
+local page = vis.scene {width = 960, height = 540, camera = {view = "2d"}}
 
 local function add(a, b) return {a[1] + b[1], a[2] + b[2], a[3] + b[3]} end
 local function subtract(a, b) return {a[1] - b[1], a[2] - b[2], a[3] - b[3]} end

@@ -13,7 +13,7 @@ Rules for every viscript scene. Profiles may narrow a default; they never weaken
 
 Leave out every option that equals its default; write a default only beside variants that set the same option otherwise, such as one centered label among left-aligned ones.
 
-- A Scene is 960×540 at 30 fps, plays once, takes the `adaptive` theme, and looks at the origin through a fixed 2D camera 8 units tall: `camera = {height = 6}` names only what differs.
+- A Scene is 960×540 at 30 fps, plays once, takes the `adaptive` theme, and looks at the origin through a fixed 2D camera 6 units tall: `camera = {height = 8}` names only what differs.
 - A `3d` camera looks at the origin in perspective with +y up, and a 2D one is orthographic. `look` keeps every field it does not name, so it names only what moves: `scene:look({eye = {-6, 4.5, 8}}, 2)`. A `look` that turns a 2D camera to `3d` therefore stays orthographic unless it names `projection = "perspective"`.
 - A shape has no fill until given one, so an outline needs only `stroke`; a circle sits on the origin with radius 1, and a rectangle on the origin.
 - Text sits on the origin, centered (`align = {0.5, 0.5}`), in the `text` role.
@@ -21,7 +21,7 @@ Leave out every option that equals its default; write a default only beside vari
 ## Coordinates and identity
 
 - Scene `width`/`height` are output pixels. Geometry is world units, right-handed, Y-up, relative to the direct parent; two components mean `z=0`.
-- A 2D camera shows vertical span `camera.height` (default 8) and horizontal span `camera.height * width / height`, centered on `camera.target`. From a top-left pixel plan: `x = target.x + (px - width/2) * camera.height/height`, `y = target.y + (height/2 - py) * camera.height/height`. Never pass pixels as world positions.
+- A 2D camera shows vertical span `camera.height` (default 6) and horizontal span `camera.height * width / height`, centered on `camera.target`. From a top-left pixel plan: `x = target.x + (px - width/2) * camera.height/height`, `y = target.y + (height/2 - py) * camera.height/height`. Never pass pixels as world positions.
 - Text `size` uses points: the em spans `4/3 * size` screen pixels for billboard text, or world units for plane text; ink bounds depend on the font. Stroke `width`, Point radius, and arrow caps are screen pixels.
 - A moving token is one Group at its slot with mark and label authored around `{0,0}`; animate the Group, never body and label separately. A Group is paintless; use explicit layer bands for its painted children.
 - Give a unique stable `id` to every Text and every object that is queried, connected, matched across states, or reviewed. Reuse the handle; never recreate an ID.

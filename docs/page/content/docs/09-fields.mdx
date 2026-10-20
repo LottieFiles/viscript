@@ -67,7 +67,7 @@ construction — once per cell per frame of <code>fps</code> — so it must be p
 </table>
 
 ```lua live
-local scene = vis.scene {camera = {height = 6}}
+local scene = vis.scene {}
 
 local field = scene:space {x = {-4.5, 4.5, 0.15}, y = {-2.5, 2.5, 0.15}, opacity = 0}
 local T = 3
@@ -83,7 +83,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({camera: {height: 6}});
+const scene = vis.scene();
 
 const field = scene.space({x: [-4.5, 4.5, 0.15], y: [-2.5, 2.5, 0.15], opacity: 0});
 const T = 3;

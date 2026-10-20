@@ -17,7 +17,7 @@ A descriptor takes only one of <code>shift</code>, <code>transform</code> and <c
 no bounds yet, such as an empty group, cannot move to a position.</p>
 
 ```lua live
-local scene = vis.scene {camera = {height = 6}}
+local scene = vis.scene {}
 
 local stops = {{-4, -1}, {0, -1}, {4, -1}}
 for _, point in ipairs(stops) do
@@ -36,7 +36,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({camera: {height: 6}});
+const scene = vis.scene();
 
 const stops = [[-4, -1], [0, -1], [4, -1]];
 for (const point of stops) {
@@ -61,7 +61,7 @@ the first node, <code>move_along</code> carries its center along the edge, and a
 the arrow tip. A last <code>position</code> parks it beside the node it reached.</p>
 
 ```lua live
-local scene = vis.scene {camera = {height = 6}}
+local scene = vis.scene {}
 
 local d = vis.diagram(scene, {id = "request", layout = "manual", node_size = {1.8, 0.9}, corner = 0.08})
 local client = d:node {id = "client", label = "Client", position = {-4, 0}}
@@ -85,7 +85,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({camera: {height: 6}});
+const scene = vis.scene();
 
 // vis.diagram is Lua-only; this draws the same three nodes and two edges from primitives
 const [w, h] = [1.8, 0.9];
@@ -120,7 +120,7 @@ return scene;
 <code>fade_transform</code> the old one into it.</p>
 
 ```lua live
-local scene = vis.scene {camera = {height = 6}}
+local scene = vis.scene {}
 
 local dot = scene:circle {radius = 0.25, fill = "accent"}
 scene:set {target = dot, position = {-4, 0.5}}
@@ -143,7 +143,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({camera: {height: 6}});
+const scene = vis.scene();
 
 const dot = scene.circle({radius: 0.25, fill: "accent"});
 scene.set({target: dot, position: [-4, 0.5]});

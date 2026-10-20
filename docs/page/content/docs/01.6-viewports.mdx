@@ -15,7 +15,7 @@ For the same layout across themes, see <a href="#/docs/themes">Themes</a>.</p>
 To play whole scenes one after another instead, see [Scene](#/docs/scene-transitions).
 
 ```lua live
-local root = vis.scene {width = 960, height = 540, camera = {height = 6}}
+local root = vis.scene {width = 960, height = 540}
 root:text {text = "Trigonometry at a glance", role = "h2", point = {0, 2.62}}
 
 -- One card of the sheet: its own scene, camera and timeline on a panel, with a caption at the bottom.
@@ -85,7 +85,7 @@ return root
 ```
 
 ```js live
-const root = vis.scene({width: 960, height: 540, camera: {height: 6}});
+const root = vis.scene({width: 960, height: 540});
 root.text({text: "Trigonometry at a glance", role: "h2", point: [0, 2.62]});
 
 // One card of the sheet: its own scene, camera and timeline on a panel, with a caption at the bottom.

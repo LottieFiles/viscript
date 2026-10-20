@@ -316,7 +316,8 @@ return s
                     BBox bounds;
                     CHECK(renderer->bounds(scene, scene->object("line"), time, bounds) == Result::Success);
                     auto v = static_cast<double>(frame) / frames;
-                    CHECK(std::fabs(bounds.height - initial.height - v * v * 90.0 / 8.0) < 1.0e-4);
+                    // The default camera shows 6 units in the 90 pixel height.
+                    CHECK(std::fabs(bounds.height - initial.height - v * v * 90.0 / 6.0) < 1.0e-4);
                 }
             }
         }
