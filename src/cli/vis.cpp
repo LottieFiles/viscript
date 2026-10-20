@@ -28,7 +28,7 @@ static void _usage()
 {
     std::fprintf(stderr,
                  "Usage:\n"
-                 "  viscript render <scene.lua> [-o output.png|mp4|gif] [--time SEC]\n"
+                 "  viscript render <scene.lua> [-o output.png|mp4|gif] [--time SEC | --times SEC,SEC...]\n"
                  "               [--width PX] [--height PX] [--fps N] [--font FILE]... [--audio FILE]\n"
                  "  viscript benchmark <scene.lua> [--frames N] [--warmup N] [--font FILE]...\n"
                  "  viscript layout <scene.lua> [--time SEC] [--padding PX] [--font FILE]...\n"
@@ -44,6 +44,8 @@ static void _usage()
                  "that is not loaded is drawn in the next loaded font of its comma list, or in\n"
                  "the engine's default font, with a warning.\n"
                  "--audio plays a sound file, such as a narration, from time 0 in an .mp4.\n"
+                 "--times renders up to 12 times into one .png, three frames to a row, in order;\n"
+                 "a time is seconds, the name of a scene:mark, or end, the scene's duration.\n"
     );
 }
 
@@ -542,6 +544,86 @@ static void _saveFailed(const char* output, Result status, const Renderer* rende
     }
 }
 
+// Times listed for a contact sheet, such as "0,swap,end": seconds, the names of scene marks,
+// or end, the scene's duration. Names wait for the scene to give their times.
+struct SheetTimes
+{
+    static constexpr uint32_t Limit = 12u;
+    float values[Limit] = {};
+    char names[Limit][129] = {};
+    uint32_t count = 0u;
+
+    bool parse(const char* list)
+    {
+        for (auto cursor = list; cursor && *cursor;) {
+            auto comma = std::strchr(cursor, ',');
+            auto length = comma ? static_cast<size_t>(comma - cursor) : std::strlen(cursor);
+            if (count == Limit || length == 0 || length >= sizeof(names[0])) return false;
+            auto name = names[count];
+            std::memcpy(name, cursor, length);
+            name[length] = '\0';
+            // A number is a time; any other word is a name.
+            if (std::strchr("0123456789.+-", name[0])) {
+                if (!_float(name, values[count])) return false;
+                name[0] = '\0';
+            }
+            count++;
+            cursor += length;
+            if (comma && !*++cursor) return false;
+        }
+        return count > 0u;
+    }
+
+    // Gives each name its time; returns the first name the scene does not know, or nothing.
+    const char* resolve(const Scene* scene)
+    {
+        for (auto i = 0u; i < count; i++) {
+            if (!names[i][0]) continue;
+            if (std::strcmp(names[i], "end") == 0) values[i] = scene->duration();
+            else if (!scene->marker(names[i], values[i])) return names[i];
+        }
+        return nullptr;
+    }
+};
+
+// Renders each listed time and lays the frames out in order, three to a row, between gray
+// gutters, so one image shows the moments a review compares.
+static Result _sheet(const Scene* scene, Renderer& renderer, const SheetTimes& times, const char* output)
+{
+    static constexpr uint32_t Gutter = 6u;
+    static constexpr uint32_t Gray = 0xff808080u;
+    Surface frame;
+    Surface sheet;
+    auto columns = times.count < 3u ? times.count : 3u;
+    auto rows = (times.count + columns - 1u) / columns;
+    for (auto i = 0u; i < times.count; i++) {
+        auto status = renderer.render(scene, times.values[i], frame);
+        if (status != Result::Success) {
+            _failed("render", status, &renderer);
+            return status;
+        }
+        auto width = frame.width();
+        auto height = frame.height();
+        if (i == 0u) {
+            status = sheet.resize(columns * width + (columns - 1u) * Gutter, rows * height + (rows - 1u) * Gutter);
+            if (status != Result::Success) return status;
+            for (auto y = 0u; y < sheet.height(); y++) {
+                auto row = sheet.data() + static_cast<size_t>(y) * sheet.stride();
+                for (auto x = 0u; x < sheet.width(); x++) row[x] = Gray;
+            }
+        }
+        auto left = (i % columns) * (width + Gutter);
+        auto top = (i / columns) * (height + Gutter);
+        for (auto y = 0u; y < height; y++) {
+            std::memcpy(sheet.data() + static_cast<size_t>(top + y) * sheet.stride() + left,
+                        frame.data() + static_cast<size_t>(y) * frame.stride(), width * sizeof(uint32_t));
+        }
+    }
+    auto status = Saver::png(sheet, output);
+    if (status != Result::Success) std::fprintf(stderr, "viscript: render failed: could not write %s\n", output);
+    return status;
+}
+
 static int _render(int argc, char** argv)
 {
     if (argc < 3) {
@@ -555,6 +637,7 @@ static int _render(int argc, char** argv)
     uint32_t height = 0;
     uint32_t fps = 0;
     float time = -1.0f;
+    SheetTimes times;
     const char* narration = nullptr;
     for (auto i = 3; i < argc; i++) {
         if ((std::strcmp(argv[i], "-o") == 0 || std::strcmp(argv[i], "--output") == 0) && i + 1 < argc) {
@@ -567,11 +650,21 @@ static int _render(int argc, char** argv)
                 return 2;
             }
             narration = argv[++i];
+        } else if (std::strcmp(argv[i], "--times") == 0 && i + 1 < argc) {
+            if (times.count || !times.parse(argv[++i])) {
+                std::fprintf(stderr, "viscript: --times takes one list of 1 to %u times, such as 0,swap,end\n",
+                             SheetTimes::Limit);
+                return 2;
+            }
         } else if (!_option(argc, argv, i, "--width", width) && !_option(argc, argv, i, "--height", height)
                    && !_option(argc, argv, i, "--fps", fps) && !_option(argc, argv, i, "--time", time)) {
             std::fprintf(stderr, "viscript: invalid option: %s\n", argv[i]);
             return 2;
         }
+    }
+    if (times.count && (time >= 0.0f || !_ends(output, ".png"))) {
+        std::fprintf(stderr, "viscript: --times writes one .png and replaces --time\n");
+        return 2;
     }
     if (narration) {
         if (!_ends(output, ".mp4")) {
@@ -612,6 +705,12 @@ static int _render(int argc, char** argv)
 #endif
         status = Saver::save(scene, *renderer, output, fps, soundtrackPath);
         if (status != Result::Success) _saveFailed(output, status, renderer, config);
+    } else if (times.count) {
+        if (auto name = times.resolve(scene)) {
+            std::fprintf(stderr, "viscript: --times names '%s', which is no mark of the scene\n", name);
+            return 2;
+        }
+        status = _sheet(scene, *renderer, times, output);
     } else if (_ends(output, ".png")) {
         Surface surface;
         if (time < 0.0f) time = scene->duration();

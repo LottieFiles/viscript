@@ -123,6 +123,7 @@ so pass them with `--font` (the presets use Pretendard for text and JetBrains Mo
 set -- --font src/examples/assets/Pretendard.ttf --font src/examples/assets/JetBrainsMono.ttf
 
 build/viscript render scene.lua --time 3.8 -o frame.png "$@"   # one frame
+build/viscript render scene.lua --times 0,2,end -o sheet.png "$@"  # frames side by side
 build/viscript render scene.lua --fps 30 -o scene.mp4 "$@"     # video
 build/viscript render scene.lua --fps 20 -o scene.gif "$@"     # GIF
 build/viscript inspect scene.lua "$@"                         # objects and timeline

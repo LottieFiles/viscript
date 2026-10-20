@@ -1,7 +1,8 @@
 # Skill templates are checked through the CLI.
 # Each entry: test-name suffix, template path, build condition, whether it
 # measures text and so needs the example font ('font'), and whether to add a CPU
-# render ('render') or a layout audit ('audit') test.
+# render ('render'), a contact sheet at the listed times ('sheet'), or a layout
+# audit ('audit') test.
 skill_templates = [
     {'name': '', 'src': 'vis-skills/templates/core/scene.lua'},
     {'name': '-math-shortform-circle-wave-projections', 'src': 'vis-skills/templates/math-shortform/circle-wave-projections.lua'},
@@ -33,7 +34,7 @@ skill_templates = [
     },
     {
         'name': '-readme-demo-command-to-result', 'src': 'vis-skills/templates/readme-demo/command-to-result.lua',
-        'font': true, 'render': true,
+        'font': true, 'render': true, 'sheet': '0,1.5,3,4.5,end',
         'audit': ['--contain', 'cmd', 'terminal', '8', '--contain', 'ok', 'terminal', '8'],
     },
     {'name': '-graphics-2d-coverage-rasterization', 'src': 'vis-skills/templates/graphics/2d/advanced/coverage-rasterization.lua'},
@@ -72,6 +73,13 @@ foreach t : skill_templates
                 'render-' + name,
                 vis_cli,
                 args: ['render', template] + example_fonts + ['-o', name + '.png'],
+            )
+        endif
+        if t.has_key('sheet')
+            test(
+                'sheet-' + name,
+                vis_cli,
+                args: ['render', template] + example_fonts + ['--times', t['sheet'], '-o', name + '-sheet.png'],
             )
         endif
         if t.has_key('audit') and audit_enabled

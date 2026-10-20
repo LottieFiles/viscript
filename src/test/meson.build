@@ -218,6 +218,16 @@ if cli_enabled
         endforeach
     endif
 
+    # A contact sheet takes seconds, the names of scene marks, and end; a name the scene lacks fails.
+    sheet_scene = files('fixtures/cli/sheet-marks.lua')
+    test('cli-sheet', vis_cli, args: ['render', sheet_scene, '--times', '0,moved,end', '-o', 'cli-sheet.png'])
+    test(
+        'cli-sheet-unknown-mark',
+        vis_cli,
+        args: ['render', sheet_scene, '--times', '0,turned', '-o', 'cli-sheet-unknown.png'],
+        should_fail: true,
+    )
+
     # tsc from PATH, or else the one npm installs for the VS Code extension or the player.
     typescript = find_program(
         'tsc',
