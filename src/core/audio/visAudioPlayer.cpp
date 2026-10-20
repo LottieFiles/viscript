@@ -587,7 +587,13 @@ Result Player::sync(const Transport& transport) noexcept
 
         float cursor = 0.0f;
         auto cursorResult = ma_sound_get_cursor_in_seconds(&slot.sound, &cursor);
-        auto seek = hard || cursorResult != MA_SUCCESS || std::fabs(cursor - offset) > 0.08f;
+        auto drift = std::fabs(cursor - offset);
+        // Opposite sides of a loop boundary can still be close in playback time.
+        if (cue.loop && slot.length > 0.0f) {
+            drift = std::fmod(drift, slot.length);
+            drift = std::fmin(drift, slot.length - drift);
+        }
+        auto seek = hard || cursorResult != MA_SUCCESS || drift > 0.08f;
         if (seek) {
             auto status = ma_sound_seek_to_second(&slot.sound, offset);
             if (status != MA_SUCCESS) return _result(status);

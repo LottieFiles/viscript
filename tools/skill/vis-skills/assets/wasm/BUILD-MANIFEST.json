@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "project": "viscript",
   "projectVersion": "0.1.0",
-  "sourceCommit": "747994256e1b",
-  "sourceDirty": false,
+  "sourceCommit": "ded3e7f331c7",
+  "sourceDirty": true,
   "buildDate": "2026-10-20",
   "toolchain": {
     "emscripten": "4.0.19",
@@ -36,8 +36,8 @@
     },
     {
       "path": "vis-wasm.wasm",
-      "bytes": 1183997,
-      "sha256": "94796c0561a1813f42e7cfa353ac780f8edeedbf91bffa7de16fe02106328247"
+      "bytes": 1184072,
+      "sha256": "32d78dca6125ed8f99c86a9bad502f12469ddb8f0e844c9176e0311fdc3abd0b"
     },
     {
       "path": "client.js",

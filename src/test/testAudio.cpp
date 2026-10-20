@@ -3,6 +3,8 @@
 #include <cstring>
 #include <limits>
 
+#include <miniaudio.h>
+
 #include "vis.h"
 #include "vis_audio.h"
 #if defined(VIS_LUA_RUNTIME)
@@ -332,6 +334,46 @@ static void player()
     delete player;
 }
 
+// A long callback must finish a gain ramp at its smoothing boundary, including when the
+// boundary falls inside a later callback. Stereo samples keep their channel and offset.
+static void gainSmoothing()
+{
+    static constexpr uint32_t Frames = 2048u;
+    static constexpr uint32_t Smooth = 128u;
+    float input[Frames * 2u];
+    float output[Frames * 2u];
+    for (auto channels = 1u; channels <= 2u; channels++) {
+        for (auto split = 0u; split <= 37u; split += 37u) {
+            for (auto sample = 0u; sample < Frames * channels; sample++) {
+                input[sample] = sample % channels ? -0.5f : 0.25f;
+                output[sample] = 7.0f;
+            }
+            auto config = ma_gainer_config_init(channels, Smooth);
+            ma_gainer gainer = {};
+            auto result = ma_gainer_init(&config, nullptr, &gainer);
+            CHECK(result == MA_SUCCESS);
+            if (result != MA_SUCCESS) continue;
+            CHECK(ma_gainer_set_gain(&gainer, 1.0f) == MA_SUCCESS);
+            CHECK(ma_gainer_set_gain(&gainer, 0.0f) == MA_SUCCESS);
+            if (split) {
+                CHECK(ma_gainer_process_pcm_frames(&gainer, output, input, split) == MA_SUCCESS);
+            }
+            CHECK(ma_gainer_process_pcm_frames(&gainer, output + split * channels,
+                                               input + split * channels, Frames - split) == MA_SUCCESS);
+            auto exact = true;
+            for (auto frame = 0u; frame < Frames; frame++) {
+                auto gain = frame < Smooth ? 1.0f - static_cast<float>(frame) / Smooth : 0.0f;
+                for (auto channel = 0u; channel < channels; channel++) {
+                    auto sample = frame * channels + channel;
+                    if (!near(output[sample], input[sample] * gain, 1.0e-6f)) exact = false;
+                }
+            }
+            CHECK(exact);
+            ma_gainer_uninit(&gainer, nullptr);
+        }
+    }
+}
+
 // The decoded level of frame index of the test tone, as miniaudio converts 8-bit samples.
 static float _level(uint32_t index)
 {
@@ -555,6 +597,7 @@ int main()
     soundscape();
     limits();
     player();
+    gainSmoothing();
     mixing();
     lua();
     luaAsset();

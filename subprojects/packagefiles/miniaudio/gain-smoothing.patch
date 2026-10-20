@@ -1,0 +1,38 @@
+--- a/miniaudio.h
++++ b/miniaudio.h
+@@ -50708,7 +50708,7 @@
+     if (pGainer->t >= pGainer->config.smoothTimeInFrames) {
+         interpolatedFrameCount = 0;
+     } else {
+-        interpolatedFrameCount = pGainer->t - pGainer->config.smoothTimeInFrames;
++        interpolatedFrameCount = pGainer->config.smoothTimeInFrames - pGainer->t;
+         if (interpolatedFrameCount > frameCount) {
+             interpolatedFrameCount = frameCount;
+         }
+@@ -50754,6 +50754,7 @@
+                         /* Expand some arrays so we can have a clean SIMD loop below. */
+                         __m128 runningGainDelta0 = _mm_set_ps(pRunningGainDelta[1], pRunningGainDelta[0], pRunningGainDelta[1], pRunningGainDelta[0]);
+                         __m128 runningGain0      = _mm_set_ps(pRunningGain[1] + pRunningGainDelta[1], pRunningGain[0] + pRunningGainDelta[0], pRunningGain[1], pRunningGain[0]);
++                        runningGainDelta0 = _mm_add_ps(runningGainDelta0, runningGainDelta0);
+
+                         for (; iFrame < unrolledLoopCount; iFrame += 1) {
+                             _mm_storeu_ps(&pFramesOutF32[iFrame*4 + 0], _mm_mul_ps(_mm_loadu_ps(&pFramesInF32[iFrame*4 + 0]), runningGain0));
+@@ -50761,6 +50762,7 @@
+                         }
+
+                         iFrame = unrolledLoopCount << 1;
++                        _mm_storeu_ps(pRunningGain, runningGain0);
+                     } else
+                 #endif
+                     {
+@@ -50899,8 +50901,8 @@
+                 }
+             }
+
+-            pFramesOut = ma_offset_ptr(pFramesOut, interpolatedFrameCount * sizeof(float));
+-            pFramesIn  = ma_offset_ptr(pFramesIn,  interpolatedFrameCount * sizeof(float));
++            pFramesOut = ma_offset_ptr(pFramesOut, interpolatedFrameCount * pGainer->config.channels * sizeof(float));
++            pFramesIn  = ma_offset_ptr(pFramesIn,  interpolatedFrameCount * pGainer->config.channels * sizeof(float));
+         }
+
+         frameCount -= interpolatedFrameCount;

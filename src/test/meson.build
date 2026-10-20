@@ -109,7 +109,7 @@ if audio_enabled
     cpp_tests += {
         'name': 'audio', 'exe': 'testAudio', 'when': true,
         'deps': [vis_audio_dep] + runtime_deps, 'args': ['-DVIS_AUDIO'] + runtime_args,
-        'inc': [lua_inc],
+        'inc': [lua_inc, miniaudio_include],
     }
 endif
 # The GL module's tests make an offscreen CGL context, so they run on macOS only.
