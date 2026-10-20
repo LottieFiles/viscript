@@ -104,12 +104,10 @@
     ]
   },
   "scripts": {
-    "compile": "npm run generate:api && tsc -p . && npm run build:webview",
-    "generate:api": "node scripts/generate-lua-meta.mjs",
-    "build:webview": "node esbuild.mjs",
+    "compile": "node scripts/generate-lua-meta.mjs && tsc -p . && node esbuild.mjs",
     "watch": "tsc -watch -p .",
     "check": "tsc --noEmit -p .",
-    "test": "npm run compile && node test/open-viewer-command.mjs && node test/preview-target.mjs && node test/visualization-manifest.mjs && node test/symbol-locator.mjs && node test/unified-diff.mjs && node test/markdown.mjs && node test/source-inspector.mjs && node test/syntax-highlighter.mjs && node test/horizontal-wheel.mjs && node test/series-step.mjs && node test/preferences.mjs && node test/viewer-layout.mjs && node test/adaptive-theme.mjs && node test/api-sync.mjs && node test/language-timing.mjs && node test/time.mjs && node test/playback-range.mjs && node test/retained-runtime.mjs && node test/viewport.mjs && node test/canvas-input.mjs && node test/camera.mjs && node test/runtime-trim-distance.mjs && node test/runtime-module-boundary.mjs && node test/runtime-states.mjs && node test/runtime-ui.mjs && node test/runtime-audio.mjs && node test/runtime-input.mjs && node test/runtime-retained-autonomous.mjs && node test/runtime-retained-lua.mjs && node test/runtime-interactive-templates.mjs && node test/runtime-authoring-modules.mjs && node test/layout-report.mjs && node test/export-plan.mjs && node test/runtime-render-density.mjs && node test/runtime-adaptive-theme.mjs && node test/scene-fonts.mjs && node test/runtime-seek.mjs",
+    "test": "npm run compile && node --test test/*.mjs",
     "package": "vsce package --no-dependencies --allow-missing-repository",
     "vscode:prepublish": "npm run compile"
   },

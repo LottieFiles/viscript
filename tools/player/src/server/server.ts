@@ -1,10 +1,11 @@
 // The render server: owns the WASM runtime, one session per player, and the shared instances.
 // It runs in the render worker (worker.ts) or, when a page cannot hand canvases to a worker, on
 // the main thread; either way it only talks through ClientMessage and ServerMessage.
-import type {HostThemePalette, SceneBuilder, VisModule, VisScene} from "vis-wasm-bundle";
+import type {HostThemePalette, SceneBuilder, VisModule, VisRuntimeSound, VisScene} from "vis-wasm-bundle";
 import {fontType} from "../fonts/provider.ts";
 import type {
-    AssetRef, ClientMessage, ErrorInfo, ErrorPhase, FrameRequest, FrameResult, SceneInfo, SceneRequest, ServerMessage,
+    AssetRef, AudioState, CaptureRequest, ClientMessage, ErrorInfo, ErrorPhase, FrameRequest, FrameResult, SceneInfo,
+    SceneRequest, ServerMessage,
 } from "../protocol.ts";
 import {InstancePool, type FontAnswer, type Lease} from "./pool.ts";
 import {type Canvas, Surface} from "./surface.ts";
@@ -61,6 +62,9 @@ class Session {
     latest = 0;
     /** The retained runtime stepped since the last input frame began. */
     consumed = true;
+    /** The loaded scene was given its sounds, and whether its audio has started since. */
+    audio = false;
+    audioStarted = false;
     /** Operations run one at a time, so a frame never draws a scene that is half loaded. */
     queue: Promise<void> = Promise.resolve();
     closed = false;
@@ -115,6 +119,11 @@ export class RenderServer {
             case "frame": {
                 const session = this.#sessions.get(message.session);
                 if (session) this.#enqueue(session, () => this.#frame(session, message.seq, message.frame));
+                break;
+            }
+            case "capture": {
+                const session = this.#sessions.get(message.session);
+                if (session) this.#enqueue(session, () => this.#capture(session, message.seq, message.capture));
                 break;
             }
             case "release": {
@@ -269,7 +278,7 @@ export class RenderServer {
                 lease = null;
             }
             lease ??= session.lease = await this.#pool.acquire();
-            await this.#pool.ensureAssets(lease, scene.resources.assets);
+            await this.#pool.ensureAssets(lease, scene.resources.assets, scene.audio);
         } catch (error) {
             if (lease) this.#pool.report(lease, error);
             this.#fail(session, seq, error instanceof ResourceError ? "resource" : "engine", error);
@@ -289,6 +298,8 @@ export class RenderServer {
             engine.load(input, scene.name);
             session.loaded = true;
             session.consumed = true;
+            session.audio = scene.audio === true;
+            session.audioStarted = false;
         } catch (error) {
             this.#pool.report(lease, error);
             this.#fail(session, seq, "load", error);
@@ -336,15 +347,19 @@ export class RenderServer {
         }
         const engine = lease.engine;
         let result: FrameResult = {};
+        let sounds: readonly VisRuntimeSound[] = [];
         const live = frame.advance !== undefined || frame.input?.length || frame.releaseInput;
         if (live) {
             try {
-                if (session.consumed) engine.beginInputFrame?.(engine.runtimeTime);
-                if (frame.releaseInput) engine.releaseInput?.(engine.runtimeTime);
-                for (const event of frame.input ?? []) engine.input?.({...event, time: engine.runtimeTime});
+                // A retained scene takes input on its runtime's clock, any other on the timeline.
+                const clock = () => engine.retainedLua ? engine.runtimeTime : frame.time;
+                if (session.consumed) engine.beginInputFrame?.(clock());
+                if (frame.releaseInput) engine.releaseInput?.(clock());
+                for (const event of frame.input ?? []) engine.input?.({...event, time: clock()});
                 const step = frame.advance !== undefined ? engine.advanceRuntime?.(frame.advance) : null;
                 session.consumed = !step || step.steps > 0;
-                result = {runtimeTime: engine.runtimeTime, ...(step?.sounds.length ? {sounds: step.sounds} : {})};
+                sounds = step?.sounds ?? [];
+                result = {runtimeTime: engine.runtimeTime, ...(sounds.length ? {sounds} : {})};
             } catch (error) {
                 this.#pool.report(lease, error);
                 // After a trap there is nothing left to draw with, so the scene stops here; any
@@ -356,20 +371,96 @@ export class RenderServer {
                 result = {runtimeError: {phase: "runtime", message: errorText(error)}};
             }
         }
+        // A move the camera does not make, as an orbit of a 2D camera, changes nothing.
+        for (const move of frame.camera ?? []) {
+            try {
+                engine.cameraInput(move.action, move.x, move.y);
+            } catch (error) {
+                this.#pool.report(lease, error);
+                if (!this.#pool.usable(lease)) {
+                    this.#fail(session, seq, "render", error);
+                    return;
+                }
+            }
+        }
         try {
+            if (frame.camera?.length) result = {...result, cameraView: engine.cameraView};
             session.surface.present(engine, frame.time, frame.plan, frame.crossfade);
         } catch (error) {
             this.#pool.report(lease, error);
             this.#fail(session, seq, "render", error);
             return;
         }
+        if (frame.audio && session.audio) this.#sound(session, lease, frame.audio, frame.time, sounds);
         this.#env.post({type: "framed", session: session.id, seq, result});
+    }
+
+    // The scene's sound follows the player's transport, and plays what the retained runtime
+    // started. Sound is optional: a runtime without audio, a browser that refuses to start it or a
+    // full set of voices drops sounds, never the scene.
+    #sound(session: Session, lease: Lease, state: AudioState, time: number, sounds: readonly VisRuntimeSound[]): void {
+        const audio = lease.engine.audio;
+        if (!audio) return;
+        const attempt = (run: () => void): boolean => {
+            try {
+                run();
+                return true;
+            } catch (error) {
+                this.#pool.report(lease, error);
+                return false;
+            }
+        };
+        let seek = state.seek;
+        if (!session.audioStarted) {
+            if (!attempt(() => audio.start())) return;
+            session.audioStarted = seek = true;
+        }
+        const engine = lease.engine;
+        attempt(() => audio.transport({time: engine.retainedLua ? engine.runtimeTime : time, rate: state.rate, playing: state.playing, seek}));
+        for (const sound of sounds) {
+            attempt(() => audio.play(sound.asset, {bus: sound.bus, gain: sound.gain, rate: sound.rate, loop: sound.loop}));
+        }
+    }
+
+    // A frame at the scene's own size is the engine's own copy of its pixels; a larger one is
+    // drawn on a canvas of its own and read back.
+    #capture(session: Session, seq: number, request: CaptureRequest): void {
+        const lease = session.lease;
+        if (!lease || !session.loaded || session.closed) {
+            this.#fail(session, seq, "render", "No scene is loaded to capture");
+            return;
+        }
+        if (!this.#pool.usable(lease)) {
+            this.#fail(session, seq, "engine", STOPPED);
+            return;
+        }
+        const engine = lease.engine;
+        try {
+            let width: number, height: number, pixels: Uint8ClampedArray;
+            if (request.ratio === 1) {
+                [width, height] = engine.size();
+                pixels = engine.render(request.time);
+            } else {
+                const canvas = this.#env.scratch();
+                engine.draw(canvas as HTMLCanvasElement, request.time, request.ratio);
+                ({width, height} = canvas);
+                const context = canvas.getContext("2d") as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null;
+                if (!context) throw new Error("This canvas has no 2D context");
+                pixels = context.getImageData(0, 0, width, height).data;
+            }
+            const data = pixels.buffer as ArrayBuffer;
+            this.#env.post({type: "captured", session: session.id, seq, frame: {width, height, data}}, [data]);
+        } catch (error) {
+            this.#pool.report(lease, error);
+            this.#fail(session, seq, "render", error);
+        }
     }
 
     #release(session: Session): void {
         const lease = session.lease;
         session.lease = null;
         session.loaded = false;
+        session.audio = session.audioStarted = false;
         if (lease) this.#pool.release(lease);
     }
 }

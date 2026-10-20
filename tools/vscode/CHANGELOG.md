@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.7.80
+
+- Play scenes with the shared viscript player, as the documentation site and the Obsidian plugin do.
+- Click the canvas to play or pause; **Camera → CONTROL ON/OFF** chooses whether drags, the wheel, and keys move an interactive camera.
+- Keep the time and whether the scene plays when the same file is edited.
+- Hold a paused scene's retained runtime until playback resumes.
+- Export PNG frames at the display's pixel ratio.
+- Fit the canvas to the player always; the FIT/RAW sizes, wheel zoom, middle-drag pan, and the frame-rate readout are gone.
+
 ## 0.7.79
 
 - Preview Lua scenes with live reload, seeking, camera controls, and adaptive editor themes.

@@ -16,6 +16,7 @@ class FakeCanvas {
         globalAlpha: 1,
         clearRect: () => this.calls.push("clear"),
         drawImage: () => this.calls.push("image"),
+        getImageData: (_x: number, _y: number, width: number, height: number) => ({data: new Uint8ClampedArray(width * height * 4)}),
     };
 
     getContext() {
@@ -30,6 +31,8 @@ interface FakeScene {
     duration?: number;
     live?: boolean;
     fonts?: string[];
+    /** Sounds the retained runtime starts at each step. */
+    sounds?: string[];
     fail?: "load" | "trapLoad" | "runtime" | "trapRuntime" | "trapDraw";
 }
 
@@ -49,13 +52,31 @@ function fakeRuntime() {
             const module = (options.module as {id: number}).id;
             let scene: FakeScene = {width: 16, height: 16};
             let runtimeTime = 0;
+            let view = "2d";
             const engine = {
                 get duration() { return scene.duration ?? 0; },
                 loop: false,
                 get retainedLua() { return scene.live ?? false; },
                 adaptiveTheme: false,
-                cameraMode: "fixed",
-                cameraView: "2d",
+                cameraMode: "interactive",
+                get cameraView() { return view; },
+                cameraInput(action: string, x: number, y: number) {
+                    log.push(`camera ${action} ${x} ${y}`);
+                    if (action === "orbit" && view === "2d") throw new Error("only a 3D camera orbits");
+                    if (action === "view3d" || action === "view2d") view = action.slice(4);
+                    return true;
+                },
+                render(time: number) {
+                    log.push(`render ${time}`);
+                    return new Uint8ClampedArray((scene.width ?? 16) * (scene.height ?? 16) * 4);
+                },
+                audio: {
+                    load: (name: string) => log.push(`sound ${name}`),
+                    start: () => log.push("audio start"),
+                    transport: ({time, rate, playing, seek}: {time: number; rate: number; playing: boolean; seek: boolean}) =>
+                        log.push(`transport ${time} ${rate} ${playing} ${seek}`),
+                    play: (name: string) => log.push(`play ${name}`),
+                },
                 get runtimeTime() { return runtimeTime; },
                 size: () => [scene.width ?? 16, scene.height ?? 16],
                 font: (name: string, _data: ArrayBuffer, type: string) => {
@@ -88,7 +109,7 @@ function fakeRuntime() {
                     if (scene.fail === "trapRuntime") throw new WebAssembly.RuntimeError("unreachable");
                     runtimeTime += dt;
                     log.push(`advance ${dt}`);
-                    return {steps: 1, sounds: []};
+                    return {steps: 1, sounds: (scene.sounds ?? []).map((asset) => ({asset, bus: "effect", gain: 1, rate: 1, loop: false}))};
                 },
                 destroy: () => log.push(`destroy ${module}`),
             };
@@ -278,6 +299,19 @@ test("a live frame begins input, lets go, applies input at the runtime time, the
     ]);
 });
 
+test("a scene without a retained runtime takes input on the timeline", async () => {
+    const {send, canvas, next, serve, runtime} = fixture();
+    send({type: "init", wasm: WASM});
+    send({type: "open", session: 1, canvas: canvas() as never});
+    const stop = serve();
+    send({type: "load", session: 1, seq: 1, scene: scene({})});
+    await next("loaded");
+    stop();
+    send({type: "frame", session: 1, seq: 2, frame: {time: 2.5, plan: PLAN, advance: 0.1, input: [{type: "pointerdown", x: 1, y: 2, button: 0}]}});
+    await next("framed", (message) => message.seq === 2);
+    assert.deepEqual(runtime.log.filter((line) => /^(begin|input)/.test(line)), ["begin 2.5", "input pointerdown at 2.5 button 0"]);
+});
+
 test("a runtime error stops the runtime but not the drawing", async () => {
     const {send, canvas, next, serve} = fixture();
     const target = canvas();
@@ -377,4 +411,72 @@ test("a crossfade keeps the frame on screen and dissolves it into the new ones",
     assert.deepEqual(target.calls, ["draw 3.9", "clear", "image", "image"]);
     await new Promise((resolve) => setTimeout(resolve, 80));
     assert.deepEqual(target.calls.slice(-2), ["clear", "image"], "the fade finishes on its own");
+});
+
+test("camera moves apply in order before the frame is drawn; one the camera does not make changes nothing", async () => {
+    const {send, canvas, next, serve, runtime} = fixture();
+    const target = canvas();
+    send({type: "init", wasm: WASM});
+    send({type: "open", session: 1, canvas: target as never});
+    const stop = serve();
+    send({type: "load", session: 1, seq: 1, scene: scene({})});
+    await next("loaded");
+    stop();
+    send({type: "frame", session: 1, seq: 2, frame: {time: 1, plan: PLAN, camera: [
+        {action: "orbit", x: 0.1, y: 0}, {action: "view3d", x: 0, y: 0}, {action: "orbit", x: 0.1, y: 0.2},
+    ]}});
+    assert.equal((await next("framed")).result.cameraView, "3d");
+    assert.deepEqual(runtime.log.filter((line) => line.startsWith("camera")),
+        ["camera orbit 0.1 0", "camera view3d 0 0", "camera orbit 0.1 0.2"]);
+    assert.deepEqual(target.calls, ["draw 1"]);
+});
+
+test("a capture draws a frame apart from the canvas; with nothing loaded there is none", async () => {
+    const {send, canvas, next, serve, runtime} = fixture();
+    const target = canvas();
+    send({type: "init", wasm: WASM});
+    send({type: "open", session: 1, canvas: target as never});
+    const stop = serve();
+    send({type: "load", session: 1, seq: 1, scene: scene({width: 4, height: 2})});
+    await next("loaded");
+    stop();
+    send({type: "capture", session: 1, seq: 2, capture: {time: 1.5, ratio: 1}});
+    const own = (await next("captured")).frame;
+    assert.deepEqual([own.width, own.height, own.data.byteLength], [4, 2, 32]);
+    assert.ok(runtime.log.includes("render 1.5"));
+    send({type: "capture", session: 1, seq: 3, capture: {time: 2, ratio: 3}});
+    const larger = (await next("captured")).frame;
+    assert.deepEqual([larger.width, larger.height, larger.data.byteLength], [12, 6, 288]);
+    assert.deepEqual(target.calls, []);
+    send({type: "release", session: 1});
+    send({type: "capture", session: 1, seq: 4, capture: {time: 0, ratio: 1}});
+    assert.equal((await next("failed")).error.phase, "render");
+});
+
+test("a scene given its sounds plays them with the player's transport, from the first frame that says where it is", async () => {
+    const {send, canvas, next, serve, runtime} = fixture();
+    send({type: "init", wasm: WASM});
+    send({type: "open", session: 1, canvas: canvas() as never});
+    const stop = serve();
+    const chime = {id: "chime.wav", name: "chime.wav", mime: "audio/wav"};
+    send({type: "load", session: 1, seq: 1, scene: {...scene({live: true, sounds: ["chime.wav"]}, [chime]), audio: true}});
+    await next("loaded");
+    const step = (seq: number, audio?: {playing: boolean; rate: number; seek: boolean}) =>
+        send({type: "frame", session: 1, seq, frame: {time: 0, plan: PLAN, advance: 0.25, ...audio ? {audio} : {}}});
+    step(2);
+    step(3, {playing: true, rate: 2, seek: false});
+    step(4, {playing: false, rate: 2, seek: false});
+    await next("framed", (message) => message.seq === 4);
+    const sound = () => runtime.log.filter((line) => /^(sound|audio|transport|play)/.test(line));
+    // A retained scene's sound follows its runtime's clock.
+    assert.deepEqual(sound(), ["sound chime.wav", "audio start", "transport 0.5 2 true true", "play chime.wav",
+        "transport 0.75 2 false false", "play chime.wav"]);
+    // A scene loaded without its sounds plays none.
+    send({type: "load", session: 1, seq: 5, scene: scene({live: true, sounds: ["chime.wav"]}, [chime])});
+    await next("loaded");
+    stop();
+    const before = sound().length;
+    step(6, {playing: true, rate: 1, seek: true});
+    await next("framed", (message) => message.seq === 6);
+    assert.equal(sound().length, before);
 });

@@ -244,6 +244,18 @@ test("scenes play in reading view: code blocks, an embed and JavaScript", option
     await shot("reading");
 });
 
+test("a click on a scene pauses it, and another plays it again", options, async () => {
+    const scene = app.locator(READING).first();
+    const canvas = scene.locator(".viscript-canvas");
+    const reaches = (wanted) => until(async () => await scene.getAttribute("data-state") === wanted, `the scene to be ${wanted}`, 5000);
+    await canvas.scrollIntoViewIfNeeded();
+    await reaches("playing");
+    await canvas.click();
+    await reaches("paused");
+    await canvas.click();
+    await reaches("playing");
+});
+
 test("fonts by name: the theme's from the plugin, one the scene names from the folder, the rest in the text font", options, async () => {
     const found = await app.evaluate(async () => {
         const fonts = window.app.plugins.plugins.viscript.fonts;

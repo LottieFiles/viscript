@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import {exportPlan, frameTime, gifDelay} from "../webview/export-plan.mjs";
+import {exportPlan, frameTime, gifDelay, pngRatio} from "../webview/export-plan.mjs";
 
 const scene = {size: () => [320, 180], duration: 1.25};
 assert.deepEqual(exportPlan(scene, 24), {
@@ -28,5 +28,14 @@ assert.equal(gifDelay(0, 30), 30);
 assert.equal(gifDelay(1, 30), 40);
 assert.throws(() => exportPlan(scene, 0), /FPS/);
 assert.throws(() => exportPlan({size: () => [3840, 2160], duration: 100}, 60), /limited/);
+
+// A PNG takes the device pixel ratio, rounded up, as far as 3840×2160 pixels allow.
+assert.equal(pngRatio(960, 540, 1), 1);
+assert.equal(pngRatio(960, 540, 1.25), 2);
+assert.equal(pngRatio(960, 540, 3), 3);
+assert.equal(pngRatio(1920, 1080, 3), 2);
+assert.equal(pngRatio(3840, 2160, 2), 1);
+assert.equal(pngRatio(8000, 8000, 2), 1);
+assert.equal(pngRatio(960, 540, Number.NaN), 1);
 
 console.log("media export planning passed");

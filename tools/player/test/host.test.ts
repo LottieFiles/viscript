@@ -79,6 +79,15 @@ test("merging keeps the newest time and plan and queues input and runtime steps"
     assert.deepEqual(merge({time: 1, plan: PLAN, crossfade: 700}, {time: 0, plan: PLAN}), {time: 0, plan: PLAN, crossfade: 700});
 });
 
+test("merging queues camera moves, and keeps a jump in the sound for the frame that follows it", () => {
+    const merged = merge({time: 1, plan: PLAN, camera: [{action: "pan", x: 0.1, y: 0}], audio: {playing: true, rate: 1, seek: true}},
+        {time: 2, plan: PLAN, camera: [{action: "zoom", x: 0, y: -0.12}], audio: {playing: false, rate: 1, seek: false}});
+    assert.deepEqual(merged.camera, [{action: "pan", x: 0.1, y: 0}, {action: "zoom", x: 0, y: -0.12}]);
+    assert.deepEqual(merged.audio, {playing: false, rate: 1, seek: true});
+    assert.deepEqual(merge({time: 1, plan: PLAN, audio: {playing: true, rate: 2, seek: false}}, {time: 2, plan: PLAN}).audio,
+        {playing: true, rate: 2, seek: false});
+});
+
 test("a release lets go of input queued before it", () => {
     const merged = merge({time: 1, plan: PLAN, input: [{type: "keydown", key: "A"}], advance: 0},
         {time: 1, plan: PLAN, releaseInput: true, input: [{type: "pointercancel"}], advance: 0});
@@ -132,6 +141,24 @@ test("closing a session rejects its loads and ignores late answers", async () =>
     await tick();
     assert.deepEqual(events, []);
     assert.equal(sent(server, "close").length, 1);
+});
+
+test("a capture resolves with the frame the server drew, and rejects when it fails or its session closes", async () => {
+    const {host, server} = inlineHost();
+    const session = host.open({} as HTMLCanvasElement, handlers().handler);
+    const drawn = session.capture({time: 1, ratio: 2});
+    const failing = session.capture({time: 2, ratio: 1});
+    const closing = session.capture({time: 3, ratio: 1});
+    await tick();
+    const [first, second] = sent(server, "capture");
+    assert.deepEqual(first?.capture, {time: 1, ratio: 2});
+    const data = new ArrayBuffer(16);
+    server.post({type: "captured", session: first!.session, seq: first!.seq, frame: {width: 2, height: 2, data}});
+    server.post({type: "failed", session: second!.session, seq: second!.seq, error: {phase: "render", message: "No scene"}});
+    assert.equal((await drawn).data, data);
+    await assert.rejects(failing, SceneError);
+    session.close();
+    await assert.rejects(closing, SupersededError);
 });
 
 test("the server's requests for images are answered from the assets", async () => {

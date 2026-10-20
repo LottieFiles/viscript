@@ -4,8 +4,9 @@ Plays viscript scenes on canvases in a web page, an editor or an app built on we
 WebAssembly runtime compiles and draws each scene in a render worker, so a heavy scene never
 blocks typing or scrolling; the page keeps a light player per canvas that asks for frames.
 
-It is the player behind the [documentation site](../../docs/page) and the
-[Obsidian plugin](../obsidian), written in TypeScript and bundled with esbuild.
+It is the player behind the [documentation site](../../docs/page), the
+[Obsidian plugin](../obsidian) and the [VS Code extension](../vscode), written in TypeScript and
+bundled with esbuild.
 
 ```text
  main thread                                   render worker (or the page, as a fallback)
@@ -99,14 +100,35 @@ bundles the sources, as the Obsidian plugin does, imports the other modules itse
 
 `new VisPlayer({host, canvas | container, resources, …})` takes a canvas, or makes one in
 `container`; `resources` lists the images each scene loads. Options: `autoplay`, `end`
-(`"auto"`, `"loop"`, `"crossfade"`, `"stop"`), `maxFps`, `quality` (`"auto"` or `"high"`),
-`maxRatio`, `interactive`, `theme` (colors for scenes that adapt to the host), `label`,
-`releaseDelay` and `rootMargin`.
+(`"auto"`, `"loop"`, `"crossfade"`, `"stop"`), `rate` (0.125 to 8), `camera`, `maxFps`,
+`quality` (`"auto"` or `"high"`), `maxRatio`, `interactive`, `audio`, `theme` (colors for scenes
+that adapt to the host), `label`, `releaseDelay` (2000 milliseconds out of view before the engine
+is freed; `Infinity` keeps it) and `rootMargin`. A click on the canvas plays or pauses the scene,
+unless the scene takes input (`live`), which gets the click instead, or the click ends a drag that
+moved the camera.
+
+- **`interactive`**: `true` for a scene driven by its own UI controls, which take pointer and
+  key input while the timeline stays at 0; `"timeline"` for controls whose transitions run on the
+  timeline, which take input as it plays. A scene passed to `load` may set its own. Scenes with
+  a retained runtime take input either way, and their runtime steps while the scene plays.
+- **`camera`**: on a scene whose camera is interactive and that does not take input, a drag
+  orbits a 3D camera and pans a 2D one (with Shift held, it pans either), the wheel zooms, and
+  once the canvas has focus the arrow keys pan, `+` and `-` zoom, `r` resets, and `2` and `3`
+  switch the view. Off unless given; `moveCamera` works either way.
+- **`audio`**: plays the scene's sounds and music once the page has had a click or a key press.
+  Browsers play audio on the main thread alone, so only a render host in `"inline"` mode can; in
+  a worker the sounds arrive as `sound` events only.
 
 Methods: `load(scene)`, `reload()`, `play()`, `pause()`, `stop()`, `seek(time)`,
-`playRange(start, end)`, `clearRange()`, `configure(options)`, `on(type, listener)` and
-`destroy()`. Properties: `state`, `info`, `duration`, `time`, `playing`, `range`, `live`,
-`error` and `canvas`, which is replaced when a worker is, so read it again after events.
+`playRange(start, end)`, `clearRange()`, `configure(options)` (`end`, `rate`, `camera`, `maxFps`,
+`quality`, `maxRatio`), `moveCamera(action, x, y)`, `capture({time, ratio})`,
+`on(type, listener)` and `destroy()`. `moveCamera` pans or orbits by fractions of the canvas,
+zooms by `y`, resets, or sets the `"view2d"` or `"view3d"` view, with the next frame; it answers
+false when the scene's camera is fixed. `capture` draws a frame apart from the canvas, at the
+time shown unless given and at the scene's size times `ratio`, and resolves to its `ImageData`,
+as an export does. Properties: `state`, `info`, `duration`, `time`, `playing`, `range`, `rate`,
+`cameraView`, `live`, `error` and `canvas`, which is replaced when a worker is, so read it again
+after events.
 
 | State | Meaning |
 |---|---|
@@ -118,7 +140,8 @@ Methods: `load(scene)`, `reload()`, `play()`, `pause()`, `stop()`, `seek(time)`,
 | `destroyed` | Gone for good |
 
 Events, all `CustomEvent`s: `load`, `play`, `pause`, `stop`, `freeze`, `frame`, `loop`,
-`complete`, `error`, `sound`, `statechange` and `destroyed`. An `error` carries its `phase`:
+`complete`, `error`, `sound`, `camera` (the camera's view changed), `statechange` and
+`destroyed`. An `error` carries its `phase`:
 `load`, `render`, `runtime`, `resource`, `engine` or `timeout`.
 
 ### Scene code
@@ -223,19 +246,22 @@ compiler bundle its JavaScript API (`bindings.js`); both are classic scripts. Th
 module takes only the client's key names. The host fetches `vis-wasm.wasm` itself. Other builds call `build.mjs`: the
 documentation site's `scripts/build-page.mjs` writes the files with `buildWeb`, and the Obsidian
 plugin embeds the server's and the compiler's source with `bundleServer` and `bundleCompiler` and
-resolves the runtime for its own bundle with `runtime`.
+resolves the runtime for its own bundle with `runtime`. The VS Code extension writes the module and
+the server beside its webview with `bundlePlayer` and `bundleServer`, from its own `runtime` folder,
+and runs the server on the webview's main thread.
 
 ## Test
 
 ```sh
 npm run check            # TypeScript
-npm test                 # policy, theme, key names, fonts and font providers, the instance pool, the server and the host
-npm run test:browser     # Chromium: worker and main thread, fonts, input, a hung worker, scrolling, the sandbox
+npm test                 # policy, theme, key names, clicks and camera drags, fonts and font providers, the instance pool, the server and the host
+npm run test:browser     # Chromium: worker and main thread, fonts, input and clicks, rate, the camera, capture, sound, a hung worker, scrolling, the sandbox
 ```
 
 `test:browser` uses Playwright's Chromium, or the browser `CHROMIUM` names.
 
 ## Limits
 
-- Sounds the retained runtime starts arrive as `sound` events; the player does not play audio.
+- Sounds always arrive as `sound` events, and play only with `audio` on a render host in
+  `"inline"` mode.
 - Without `OffscreenCanvas`, or when the worker cannot start, scenes are drawn on the main thread.

@@ -61,6 +61,7 @@ export class SceneBlock extends MarkdownRenderChild {
         this.#notice.hide();
         this.#bar = this.#stage.createDiv({cls: "viscript-bar"});
         this.#play = this.#bar.createEl("button", {cls: "clickable-icon viscript-play"});
+        // A click on a scene that takes no input does the same; the player sees to it.
         this.#play.addEventListener("click", () => this.toggle());
         this.#scrub = this.#bar.createEl("input", {cls: "viscript-scrub", type: "range"});
         Object.assign(this.#scrub, {min: "0", max: "1", step: "0.01", value: "0"});
@@ -78,10 +79,6 @@ export class SceneBlock extends MarkdownRenderChild {
         }
         this.#error = this.#root.createEl("pre", {cls: "viscript-error", attr: {role: "alert"}});
         this.#error.hide();
-        // A click on a scene that does not take input plays or pauses it.
-        this.#stage.addEventListener("click", (event) => {
-            if (this.#player && event.target === this.#player.canvas && !this.#player.live) this.toggle();
-        });
         this.#showState("loading");
         this.#layout();
     }

@@ -5,7 +5,7 @@ import type {HostThemePalette, VisRuntimeSound} from "vis-wasm-bundle";
 import {SceneError, SupersededError, type HostSession, type LostReason, type RenderHost} from "../host/host.ts";
 import {fitPlan, frameInterval, type Quality} from "../policy.ts";
 import type {
-    ErrorInfo, FrameRequest, FrameResult, InputEvent, SceneInfo, SceneLanguage, SceneResources,
+    CameraAction, CameraMove, ErrorInfo, FrameRequest, FrameResult, InputEvent, SceneInfo, SceneLanguage, SceneResources,
 } from "../protocol.ts";
 import {bindInput} from "./input.ts";
 import {schedulerFor, type Scheduler, type Tickable} from "./scheduler.ts";
@@ -29,10 +29,19 @@ export interface PlayerScene {
     readonly language?: SceneLanguage;
     /** The file name errors and stack traces show. */
     readonly name?: string;
+    /** How this scene takes input, in place of the player's `interactive` option. */
+    readonly interactive?: boolean | "timeline";
 }
 
 export interface PlaybackOptions {
     readonly end?: EndBehavior;
+    /** How fast the timeline and the retained runtime run, from 0.125 to 8; 1 unless given. */
+    readonly rate?: number;
+    /**
+     * Drags, the wheel and keys on the canvas move the camera of a scene whose camera is
+     * interactive, unless the scene takes input; false unless given.
+     */
+    readonly camera?: boolean;
     /** Frames drawn per second at most; 60, or 30 on phones, unless given. */
     readonly maxFps?: number;
     readonly quality?: Quality;
@@ -57,15 +66,31 @@ export interface PlayerOptions extends PlaybackOptions {
     readonly autoplay?: boolean;
     /**
      * The scene is driven by its own UI controls: they take pointer and key input and the
-     * timeline stays at 0. Scenes with a retained runtime take input either way.
+     * timeline stays at 0. With "timeline" they take input as the timeline plays, for controls
+     * whose transitions run on it. Scenes with a retained runtime take input either way, and
+     * their runtime steps while the scene plays. A scene's own `interactive` overrides this.
      */
-    readonly interactive?: boolean;
+    readonly interactive?: boolean | "timeline";
     /** The canvas's accessible name. */
     readonly label?: string;
-    /** Milliseconds out of view before the scene's engine is freed; it loads again when shown. */
+    /**
+     * Milliseconds out of view before the scene's engine is freed; it loads again when shown.
+     * Infinity keeps it, as for the only scene of a view.
+     */
     readonly releaseDelay?: number;
     /** Grows the viewport the player counts as in view, as an IntersectionObserver rootMargin. */
     readonly rootMargin?: string;
+    /**
+     * Plays the scene's sounds and music once the page has had a click or a key press. Only a
+     * render host in inline mode can, since browsers play audio on the main thread alone.
+     */
+    readonly audio?: boolean;
+}
+
+/** A frame drawn apart from the canvas: at `time` (the time shown unless given), `ratio` times the scene's size. */
+export interface CaptureOptions {
+    readonly time?: number;
+    readonly ratio?: number;
 }
 
 export interface FrameDetail {
@@ -96,8 +121,10 @@ export interface PlayerEventMap {
      * a failed draw stops the player until the next load.
      */
     error: CustomEvent<ErrorInfo>;
-    /** Sounds the retained runtime started; the player does not play audio itself. */
+    /** Sounds the retained runtime started; the player plays them only with the `audio` option. */
     sound: CustomEvent<readonly VisRuntimeSound[]>;
+    /** The camera's view changed, after camera moves. */
+    camera: CustomEvent<{readonly view: "2d" | "3d"}>;
     statechange: CustomEvent<StateDetail>;
     destroyed: CustomEvent<undefined>;
 }
@@ -116,12 +143,15 @@ interface Scene {
     readonly source: string;
     readonly language: SceneLanguage;
     readonly name: string;
+    readonly interactive: boolean | "timeline";
 }
 
 const PLACEHOLDER_SIZE = [960, 540] as const;
 // Milliseconds a crossfade replay takes.
 const CROSSFADE = 700;
 const NO_RESOURCES: SceneResources = {assets: []};
+// The rates the runtime's audio takes.
+const MIN_RATE = 0.125, MAX_RATE = 8;
 
 const errorText = (error: unknown): string => error instanceof Error ? error.message : String(error);
 
@@ -132,7 +162,8 @@ export class VisPlayer extends EventTarget implements Tickable {
     readonly #host: RenderHost;
     readonly #resources: PlayerOptions["resources"];
     readonly #theme: PlayerOptions["theme"];
-    readonly #interactive: boolean;
+    readonly #interactive: boolean | "timeline";
+    readonly #audio: boolean;
     readonly #releaseDelay: number;
     readonly #rootMargin: string;
     /** The loop and observers of the window the canvas is in. */
@@ -143,6 +174,7 @@ export class VisPlayer extends EventTarget implements Tickable {
     readonly #resize: ResizeObserver;
     #unbind: () => void = () => undefined;
     #unwatch: () => void = () => undefined;
+    #unlisten: () => void = () => undefined;
 
     #state: PlayerState = "loading";
     #scene: Scene | null = null;
@@ -171,6 +203,12 @@ export class VisPlayer extends EventTarget implements Tickable {
     #advance = 0;
     #releaseInput = false;
     #crossfadeNext = false;
+    #cameraMoves: CameraMove[] = [];
+    #cameraView: "2d" | "3d" = "2d";
+    /** The page may play audio, after a click or a key press. */
+    #audioAllowed = false;
+    /** The timeline jumped since the sound last heard of it. */
+    #audioSeek = true;
 
     #shown = false;
     #canvasWidth = 0;
@@ -185,10 +223,11 @@ export class VisPlayer extends EventTarget implements Tickable {
         this.#resources = options.resources;
         this.#theme = options.theme;
         this.#interactive = options.interactive ?? false;
+        this.#audio = options.audio ?? false;
         this.#releaseDelay = options.releaseDelay ?? 2000;
         this.#rootMargin = options.rootMargin ?? "0px";
         this.#playing = options.autoplay ?? true;
-        this.#playback = {end: "auto", quality: "auto", maxRatio: 3};
+        this.#playback = {end: "auto", rate: 1, camera: false, quality: "auto", maxRatio: 3};
 
         let canvas = options.canvas;
         if (!canvas) {
@@ -212,6 +251,7 @@ export class VisPlayer extends EventTarget implements Tickable {
         });
         this.#session = this.#open();
         this.#attach();
+        if (this.#audio) this.#awaitGesture();
         scheduler.track(this);
     }
 
@@ -253,6 +293,16 @@ export class VisPlayer extends EventTarget implements Tickable {
         return this.#live;
     }
 
+    /** How fast playback runs. */
+    get rate(): number {
+        return this.#playback.rate;
+    }
+
+    /** The view of the scene's camera, which camera moves change. */
+    get cameraView(): "2d" | "3d" {
+        return this.#cameraView;
+    }
+
     /** The last failure, cleared by the next load that succeeds. */
     get error(): ErrorInfo | null {
         return this.#error;
@@ -266,7 +316,8 @@ export class VisPlayer extends EventTarget implements Tickable {
     load(scene: PlayerScene): Promise<void> {
         if (this.#destroyed) return Promise.resolve();
         const language = scene.language ?? "lua";
-        this.#scene = {source: scene.source, language, name: scene.name ?? `scene.${language}`};
+        this.#scene = {source: scene.source, language, name: scene.name ?? `scene.${language}`,
+            interactive: scene.interactive ?? this.#interactive};
         this.#loading = true;
         this.#settle();
         const done = new Promise<void>((resolve) => this.#waiters.push(resolve));
@@ -287,7 +338,10 @@ export class VisPlayer extends EventTarget implements Tickable {
     play(): void {
         if (this.#destroyed || (this.#playing && !this.#stopped)) return;
         const start = this.#range?.[0] ?? 0;
-        if (this.#stopped || (this.#info && this.#time >= this.#end(this.#info.duration))) this.#time = start;
+        if (this.#stopped || (this.#info && this.#time >= this.#end(this.#info.duration))) {
+            this.#time = start;
+            this.#audioSeek = true;
+        }
         this.#stopped = false;
         this.#playing = true;
         this.#last = 0;
@@ -299,6 +353,8 @@ export class VisPlayer extends EventTarget implements Tickable {
     pause(): void {
         if (this.#destroyed || !this.#playing) return;
         this.#playing = false;
+        // The sound hears of it with the next frame.
+        if (this.#audio) this.#invalidate();
         this.#emit("pause");
         this.#sync();
     }
@@ -309,6 +365,7 @@ export class VisPlayer extends EventTarget implements Tickable {
         this.#playing = false;
         this.#stopped = true;
         this.#time = this.#range?.[0] ?? 0;
+        this.#audioSeek = true;
         this.#invalidate();
         this.#emit("stop");
         this.#sync();
@@ -319,6 +376,7 @@ export class VisPlayer extends EventTarget implements Tickable {
         if (this.#destroyed || !Number.isFinite(time)) return;
         this.#time = Math.max(0, this.#info ? Math.min(time, this.#info.duration) : time);
         this.#stopped = false;
+        this.#audioSeek = true;
         this.#last = 0;
         this.#invalidate();
         this.#sync();
@@ -330,6 +388,7 @@ export class VisPlayer extends EventTarget implements Tickable {
         const from = Math.max(0, Math.min(start, end));
         this.#range = [from, Math.max(start, end)];
         this.#time = from;
+        this.#audioSeek = true;
         this.#stopped = false;
         this.#playing = true;
         this.#last = 0;
@@ -343,18 +402,50 @@ export class VisPlayer extends EventTarget implements Tickable {
         this.#range = null;
     }
 
-    /** Changes how playback ends and how frames are drawn. */
+    /** Changes how playback ends, how fast it runs, whether the camera moves and how frames are drawn. */
     configure(options: PlaybackOptions): void {
         const playback = this.#playback;
+        const rate = options.rate !== undefined && Number.isFinite(options.rate) && options.rate > 0
+            ? Math.min(MAX_RATE, Math.max(MIN_RATE, options.rate)) : playback.rate;
         this.#playback = {
             end: options.end ?? playback.end,
+            rate,
+            camera: options.camera ?? playback.camera,
             // Given as undefined, the default rate applies again.
             maxFps: "maxFps" in options ? options.maxFps : playback.maxFps,
             quality: options.quality ?? playback.quality,
             maxRatio: options.maxRatio ?? playback.maxRatio,
         };
+        if (rate !== playback.rate) this.#audioSeek = true;
+        this.#focusable();
         this.#nextDraw = 0;
         this.#invalidate();
+    }
+
+    /**
+     * Moves the camera of a scene whose camera is interactive, with the next frame: a pan or an
+     * orbit by `x` and `y` as fractions of the canvas, a zoom by `y` (less than 0 zooms in), or a
+     * reset or a view. Works whether or not the `camera` option lets the canvas move it; false
+     * when the scene's camera is fixed.
+     */
+    moveCamera(action: CameraAction, x = 0, y = 0): boolean {
+        if (this.#destroyed || this.#info?.cameraMode !== "interactive" || !Number.isFinite(x) || !Number.isFinite(y)) return false;
+        this.#cameraMoves.push({action, x, y});
+        this.#invalidate();
+        return true;
+    }
+
+    /**
+     * Draws a frame apart from the canvas, as for an export: at the time shown unless given, at
+     * the scene's size times `ratio`. Rejects when no scene is loaded or the frame cannot be drawn.
+     */
+    capture(options: CaptureOptions = {}): Promise<ImageData> {
+        const info = this.#info;
+        if (this.#destroyed || !info || !this.#resident) return Promise.reject(new Error("No scene is loaded to capture"));
+        const time = Math.max(0, Math.min(options.time ?? this.time, info.duration));
+        const ratio = Math.max(1, Math.floor(options.ratio ?? 1));
+        return this.#session.capture({time: Number.isFinite(time) ? time : 0, ratio}).then((frame) =>
+            new ImageData(new Uint8ClampedArray(frame.data), frame.width, frame.height));
     }
 
     /** Calls `listener` for `type` until the returned function is called. */
@@ -370,9 +461,11 @@ export class VisPlayer extends EventTarget implements Tickable {
         clearTimeout(this.#releaseTimer);
         this.#scheduler.untrack(this);
         this.#detach();
+        this.#unlisten();
         this.#resize.disconnect();
         this.#session.close();
         this.#input = [];
+        this.#cameraMoves = [];
         this.#settle();
         this.#sync();
         this.#emit("destroyed");
@@ -387,11 +480,12 @@ export class VisPlayer extends EventTarget implements Tickable {
         }
         const duration = this.#info!.duration;
         const elapsed = (now - (this.#last || now)) / 1000;
+        const rate = this.#playback.rate;
         this.#last = now;
-        if (this.#playing && duration > 0 && !(this.#live && this.#interactive)) this.#step(elapsed, duration);
-        // The retained runtime keeps stepping; only drawing is held to the frame rate.
-        if (this.#live) this.#advance += Math.min(0.1, elapsed);
-        const moving = this.#live || (this.#playing && duration > 0);
+        if (this.#playing && duration > 0 && !this.#holdsTimeline()) this.#step(elapsed * rate, duration);
+        // The retained runtime steps while the scene plays; only drawing is held to the frame rate.
+        if (this.#live && this.#playing) this.#advance += Math.min(0.1, elapsed) * rate;
+        const moving = this.#playing && (this.#live || duration > 0);
         if (!this.#dirty && !moving) return false;
         if (!this.#dirty && now < this.#nextDraw - 0.5) return moving;
         this.#draw(duration);
@@ -425,6 +519,7 @@ export class VisPlayer extends EventTarget implements Tickable {
         } else if (time >= duration) {
             time %= duration;
             if (this.#endBehavior() === "crossfade") this.#crossfadeNext = true;
+            this.#audioSeek = true;
             this.#emit("loop");
         }
         this.#time = time;
@@ -460,11 +555,16 @@ export class VisPlayer extends EventTarget implements Tickable {
             ...(this.#input.length ? {input: this.#input} : {}),
             ...(this.#releaseInput ? {releaseInput: true} : {}),
             ...(this.#crossfadeNext ? {crossfade: CROSSFADE} : {}),
+            ...(this.#cameraMoves.length ? {camera: this.#cameraMoves} : {}),
+            ...(this.#plays() && this.#audioAllowed
+                ? {audio: {playing: this.#playing, rate: this.#playback.rate, seek: this.#audioSeek}} : {}),
         };
         this.#input = [];
         this.#advance = 0;
         this.#releaseInput = false;
         this.#crossfadeNext = false;
+        this.#cameraMoves = [];
+        if (frame.audio) this.#audioSeek = false;
         this.#session.frame(frame);
         this.#emit("frame", {time, duration});
     }
@@ -481,15 +581,24 @@ export class VisPlayer extends EventTarget implements Tickable {
         const canvas = this.#canvas;
         this.#unbind = bindInput(canvas, {
             live: () => this.#live,
+            camera: () => this.#takesCamera(),
+            view: () => this.#cameraView,
             size: () => this.#info ? [this.#info.width, this.#info.height] : PLACEHOLDER_SIZE,
             queue: (event) => {
                 this.#input.push(event);
                 this.#invalidate();
             },
+            moveCamera: (action, x, y) => this.moveCamera(action, x, y),
             releaseAll: () => {
                 this.#input = [{type: "pointercancel", buttons: 0}];
                 this.#releaseInput = true;
                 this.#invalidate();
+            },
+            // A click on a drawn scene that does not take input plays or pauses it.
+            click: () => {
+                if (!this.#info) return;
+                if (this.#playing) this.pause();
+                else this.play();
             },
         });
         this.#resize.observe(canvas);
@@ -531,6 +640,7 @@ export class VisPlayer extends EventTarget implements Tickable {
         this.#session.load({
             source: scene.source, language: scene.language, name: scene.name, resources,
             ...(theme ? {theme} : {}),
+            ...(this.#plays() ? {audio: true} : {}),
         }).then((info) => this.#loaded(token, info), (error: unknown) => {
             // A later load, a released engine or a replaced worker took over.
             if (error instanceof SupersededError) return;
@@ -546,16 +656,19 @@ export class VisPlayer extends EventTarget implements Tickable {
         this.#resident = true;
         this.#error = null;
         this.#halted = false;
-        this.#live = info.input && (this.#interactive || (info.retained && info.runtime));
+        this.#live = info.input && (this.#scene!.interactive !== false || (info.retained && info.runtime));
         this.#input = [];
         this.#advance = 0;
         this.#releaseInput = false;
-        if (this.#live && this.#interactive) this.#time = 0;
+        this.#cameraMoves = [];
+        this.#cameraView = info.cameraView;
+        this.#audioSeek = true;
+        if (this.#holdsTimeline()) this.#time = 0;
         if (this.#time > info.duration) {
             this.#time = 0;
             this.#range = null;
         }
-        this.#canvas.tabIndex = this.#live ? 0 : -1;
+        this.#focusable();
         this.#canvas.style.aspectRatio = `${info.width} / ${info.height}`;
         this.#last = 0;
         this.#nextDraw = 0;
@@ -585,11 +698,15 @@ export class VisPlayer extends EventTarget implements Tickable {
         if (result.runtimeError) {
             // The scene still draws; its runtime and input stop.
             this.#live = false;
-            this.#canvas.tabIndex = -1;
+            this.#focusable();
             this.#error = result.runtimeError;
             this.#emit("error", result.runtimeError);
         }
         if (result.sounds?.length) this.#emit("sound", result.sounds);
+        if (result.cameraView && result.cameraView !== this.#cameraView) {
+            this.#cameraView = result.cameraView;
+            this.#emit("camera", {view: result.cameraView});
+        }
     }
 
     #frameFailed(error: ErrorInfo): void {
@@ -605,6 +722,7 @@ export class VisPlayer extends EventTarget implements Tickable {
     #halt(error: ErrorInfo): void {
         this.#halted = true;
         this.#live = false;
+        this.#focusable();
         this.#error = error;
         this.#sync();
         this.#emit("error", error);
@@ -624,6 +742,7 @@ export class VisPlayer extends EventTarget implements Tickable {
         this.#input = [];
         this.#advance = 0;
         this.#releaseInput = false;
+        this.#cameraMoves = [];
         this.#session = this.#open();
         this.#attach();
         if (reason === "timeout") {
@@ -651,7 +770,9 @@ export class VisPlayer extends EventTarget implements Tickable {
             if (!this.#resident && !this.#loadInFlight && this.#mayLoad()) this.#startLoad();
             this.#invalidate();
         } else {
-            this.#releaseTimer = setTimeout(() => this.#release(), this.#releaseDelay);
+            // A timer given more than 2^31 - 1 milliseconds fires at once.
+            const delay = this.#releaseDelay;
+            if (delay !== Infinity) this.#releaseTimer = setTimeout(() => this.#release(), Math.min(delay, 2 ** 31 - 1));
         }
         const before = this.#state;
         this.#sync();
@@ -673,6 +794,45 @@ export class VisPlayer extends EventTarget implements Tickable {
     #invalidate(): void {
         this.#dirty = true;
         this.#scheduler.requestTick();
+    }
+
+    // The scene's own controls drive it, and its timeline stays at 0.
+    #holdsTimeline(): boolean {
+        return this.#live && this.#scene?.interactive === true;
+    }
+
+    // Drags, the wheel and keys move the camera: the option allows it, the scene's camera is
+    // interactive, and the scene does not take the input itself.
+    #takesCamera(): boolean {
+        return this.#playback.camera && this.#info?.cameraMode === "interactive" && !this.#live && !this.#halted;
+    }
+
+    // The canvas takes focus, and so keys, when the scene takes input or the camera moves.
+    #focusable(): void {
+        this.#canvas.tabIndex = this.#live || this.#takesCamera() ? 0 : -1;
+    }
+
+    // The scene's sound plays where the server can play it: on the main thread.
+    #plays(): boolean {
+        return this.#audio && this.#host.mode === "inline";
+    }
+
+    // Browsers play audio once the page has had a click or a key press, which may have come before.
+    #awaitGesture(): void {
+        const view = this.#scheduler.window;
+        if ((view.navigator as Navigator & {userActivation?: {hasBeenActive: boolean}}).userActivation?.hasBeenActive) {
+            this.#audioAllowed = true;
+            return;
+        }
+        const controller = new AbortController();
+        const allow = () => {
+            controller.abort();
+            this.#audioAllowed = true;
+            this.#audioSeek = true;
+            this.#invalidate();
+        };
+        for (const type of ["pointerdown", "keydown"]) view.addEventListener(type, allow, {capture: true, signal: controller.signal});
+        this.#unlisten = () => controller.abort();
     }
 
     #settle(): void {

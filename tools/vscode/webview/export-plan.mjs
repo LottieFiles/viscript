@@ -23,6 +23,13 @@ export function exportPlan(scene, fps, range = null) {
     return {width, height, start, end, duration, fps, frames};
 }
 
+/** A PNG's scale over the scene's size: the device pixel ratio, rounded up, within the pixel limit. */
+export function pngRatio(width, height, pixelRatio = 1) {
+    const fits = Math.floor(Math.sqrt(PIXEL_LIMIT / Math.max(1, width * height)));
+    const wanted = Number.isFinite(pixelRatio) && pixelRatio > 0 ? Math.ceil(pixelRatio) : 1;
+    return Math.max(1, Math.min(wanted, fits));
+}
+
 export function frameTime(plan, frame) {
     return Math.min(plan.start + frame / plan.fps, plan.end);
 }

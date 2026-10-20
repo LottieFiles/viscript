@@ -4,4 +4,5 @@ out/
 *.log
 media/shiki/
 media/savers.js
+media/player/
 api/vis.d.lua

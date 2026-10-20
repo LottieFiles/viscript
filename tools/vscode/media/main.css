@@ -126,7 +126,7 @@ button:disabled { cursor: default; opacity: 0.38; }
 button:focus-visible,
 input:focus-visible,
 summary:focus-visible,
-.canvas-wrap:focus-visible {
+canvas:focus-visible {
     outline: 1px solid var(--focus);
     outline-offset: -1px;
 }
@@ -218,69 +218,37 @@ summary:focus-visible,
     outline: none;
 }
 
-.stage-resizer-status {
-    position: absolute;
-    z-index: 1;
-    top: -4px;
-    right: var(--content-inline);
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    padding: 0 3px;
-    background: var(--paper);
-    color: var(--focus);
-    font: 700 8px/11px var(--font);
-    letter-spacing: 0.05em;
-}
-
-#canvas-stat {
-    display: none;
-    color: var(--muted);
-    font-weight: 500;
-    letter-spacing: 0;
-    font-variant-numeric: tabular-nums;
-}
-
-.stage-resizer[data-stats="true"] #canvas-stat { display: inline; }
-
 .canvas-wrap {
     position: absolute;
     inset: 0;
+    display: grid;
     min-width: 0;
     min-height: 0;
-    overflow: auto;
-    scrollbar-color: var(--scrollbar) transparent;
-    scrollbar-width: thin;
-}
-
-.canvas-wrap[data-fit="true"] { overflow: hidden; }
-
-.canvas-wrap:focus-visible { outline-offset: -2px; }
-
-.canvas-viewport {
-    display: grid;
-    width: max-content;
-    min-width: 100%;
-    min-height: 100%;
     place-items: center;
-    padding: 0;
+    overflow: hidden;
+    container-type: size;
 }
 
+/* The scene fits the stage whole; the player sizes its frames to the canvas and keeps its
+   proportions. */
 canvas {
     display: block;
-    width: 960px;
-    height: 540px;
-    max-width: none;
-    max-height: none;
+    width: min(100cqw, 100cqh * var(--scene-ratio, 1.7778));
+    height: auto;
     background: transparent;
     image-rendering: auto;
     touch-action: none;
     transition: opacity 120ms ease, filter 120ms ease;
 }
 
-canvas[data-camera-mode="fixed"] { cursor: default; }
-canvas[data-camera-mode="interactive"] { cursor: grab; }
-.canvas-wrap[data-fit="true"] canvas[data-dragging="true"] { cursor: grabbing; }
+canvas[data-input="playback"] { cursor: pointer; }
+canvas[data-input="camera"] { cursor: grab; }
+canvas[data-input="camera"]:active { cursor: grabbing; }
+
+canvas[data-failed="true"] {
+    opacity: 0.2;
+    filter: grayscale(0.7);
+}
 
 .empty,
 .error-card {

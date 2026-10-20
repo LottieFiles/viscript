@@ -8,6 +8,8 @@ interface FakeEngine {
     destroyed: boolean;
     fonts: [string, ArrayBuffer, string][];
     assets: [string, ArrayBuffer][];
+    sounds: string[];
+    audio: {load(name: string): void};
     font(name: string, data: ArrayBuffer, type: string): void;
     asset(name: string, data: ArrayBuffer): void;
     destroy(): void;
@@ -54,7 +56,8 @@ function fixture({failModule = false, failEngine = false, trapDestroy = false, f
             await Promise.resolve();
             if (failEngine && module.engines.length) throw new Error("engine failed");
             const engine: FakeEngine = {
-                destroyed: false, fonts: [], assets: [],
+                destroyed: false, fonts: [], assets: [], sounds: [],
+                audio: {load: (name) => engine.sounds.push(name)},
                 font(name, data, type) {
                     if (font === "throw") throw new Error("could not load the font");
                     if (font === "trap") throw new WebAssembly.RuntimeError("unreachable");
@@ -187,6 +190,19 @@ test("an image under a known name but with other bytes replaces the one register
     await pool.ensureAssets(lease, [EARTH]);
     await pool.ensureAssets(lease, [{...EARTH, id: "other/earth.png"}]);
     assert.deepEqual(engineOf(lease).assets.map(([name]) => name), ["earth.png", "earth.png"]);
+});
+
+test("sounds go to the engine's audio when the scene plays them, and are left out when it does not", async () => {
+    const {pool, state} = fixture();
+    const lease = await pool.acquire();
+    const chime: AssetRef = {id: "chime.wav", name: "chime.wav", mime: "audio/wav"};
+    await pool.ensureAssets(lease, [EARTH, chime]);
+    assert.deepEqual(engineOf(lease).assets.map(([name]) => name), ["earth.png"]);
+    assert.deepEqual(engineOf(lease).sounds, []);
+    assert.equal(count(state.calls, "asset:chime.wav"), 0);
+    await pool.ensureAssets(lease, [EARTH, chime], true);
+    assert.deepEqual(engineOf(lease).sounds, ["chime.wav"]);
+    assert.equal(engineOf(lease).assets.length, 1);
 });
 
 test("retired instances take no new sessions; the idle go at once, the others when their sessions leave", async () => {

@@ -9,7 +9,8 @@ export function previewPreferences(state, config) {
         autoPlayNext: flag("autoPlayNext"),
         forceCompactLayout: flag("forceCompactLayout"),
         sourceContextLineCount: SOURCE_CONTEXT_LINE_COUNTS.has(lines) ? lines : 5,
-        // Stats are a per-webview choice the extension does not store.
-        showStats: state?.showStats === true,
+        // Moving the camera on the canvas is a per-webview choice the extension does not store; on
+        // unless turned off.
+        cameraControl: state?.cameraControl !== false,
     };
 }

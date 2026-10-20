@@ -1,6 +1,7 @@
 // The preview panel: one webview that shows the scene of the active Lua or JavaScript document,
 // reloads it as the document changes, serves its assets and fonts from the extension, follows
 // series and source references, and exports PNG, GIF and MP4 through the webview.
+import {createHash} from "node:crypto";
 import * as path from "node:path";
 import * as vscode from "vscode";
 import {openVerifiedGitDiff, verifiedGitDiff, type GitDiffReference} from "./gitSnapshots";
@@ -10,6 +11,8 @@ import type {SourceRange} from "./visualizationManifest";
 import type {UnifiedDiffRow} from "./unifiedDiff";
 
 type AssetPayload = {
+    // By content, so the player loads a file again once it changes.
+    id: string;
     name: string;
     mime: string;
     base64: string;
@@ -18,8 +21,6 @@ type AssetPayload = {
 type ScenePayload = {
     type: "scene";
     sceneId: number;
-    // The webview remembers by it the fonts the document's scene needed.
-    documentUri: string;
     fileName: string;
     displayName: string;
     source: string;
@@ -455,7 +456,6 @@ export class PreviewPanel implements vscode.Disposable {
         const payload: ScenePayload = {
             type: "scene",
             sceneId: this.sceneId,
-            documentUri: document.uri.toString(),
             fileName: path.basename(document.fileName),
             displayName: this.previewContext?.title ?? path.basename(document.fileName),
             source,
@@ -496,6 +496,7 @@ export class PreviewPanel implements vscode.Disposable {
                     continue;
                 }
                 assets.push({
+                    id: createHash("sha256").update(bytes).digest("hex"),
                     name,
                     mime: mimeFor(name),
                     base64: Buffer.from(bytes).toString("base64"),
@@ -928,7 +929,7 @@ export class PreviewPanel implements vscode.Disposable {
         const nonce = randomNonce();
         const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, "media", "main.css"));
         const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, "media", "main.js"));
-        const clientUri = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, "runtime", "client.js"));
+        const serverUri = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, "media", "player", "player-worker.js"));
         const wasmUri = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, "runtime", "vis-wasm.wasm"));
         const fontUri = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, "runtime", "Pretendard.ttf"));
         const codeFontUri = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, "runtime", "JetBrainsMono.ttf"));
@@ -936,9 +937,10 @@ export class PreviewPanel implements vscode.Disposable {
             vscode.Uri.joinPath(this.context.extensionUri, "runtime", "SourceSerif4-Semibold.ttf"),
         );
         const config = JSON.stringify({
-            client: clientUri.toString(),
+            // The shared player's render server, which the webview runs on its main thread.
+            server: serverUri.toString(),
             wasm: wasmUri.toString(),
-            // By the names scenes set text in; the webview fetches each when a scene first needs it.
+            // By the names scenes set text in; the player fetches each when a scene first needs it.
             fonts: {
                 "Pretendard": fontUri.toString(),
                 "JetBrainsMono": codeFontUri.toString(),
@@ -978,10 +980,8 @@ export class PreviewPanel implements vscode.Disposable {
     <main class="viewer">
         <section class="player" aria-label="viscript animation player">
             <div class="stage-shell" id="stage-shell" aria-label="Rendered viscript canvas">
-                <div class="canvas-wrap" id="canvas-wrap" data-fit="true" tabindex="0" role="region" aria-label="Interactive viscript preview canvas">
-                    <div class="canvas-viewport" id="canvas-viewport">
-                        <canvas id="preview" width="960" height="540"></canvas>
-                    </div>
+                <div class="canvas-wrap" id="canvas-wrap">
+                    <canvas id="preview" width="960" height="540"></canvas>
                     <div class="empty" id="empty">
                         <strong>READY FOR A SCENE</strong>
                         <span>Open a viscript Lua file to begin.</span>
@@ -993,11 +993,7 @@ export class PreviewPanel implements vscode.Disposable {
                     </div>
                 </div>
             </div>
-            <div class="stage-resizer" id="stage-resizer" role="separator" aria-label="Resize canvas height" aria-orientation="horizontal" aria-valuemin="64" tabindex="0">
-                <span class="stage-resizer-status" aria-hidden="true">
-                    <span id="canvas-stat">— × — · — FPS</span>
-                </span>
-            </div>
+            <div class="stage-resizer" id="stage-resizer" role="separator" aria-label="Resize canvas height" aria-orientation="horizontal" aria-valuemin="64" tabindex="0"></div>
             <footer class="transport">
                 <div class="seek-row">
                     <div class="primary-controls" aria-label="Playback controls">
@@ -1068,13 +1064,6 @@ export class PreviewPanel implements vscode.Disposable {
                         </summary>
                         <div class="menu-panel">
                             <details class="menu-submenu" data-positioned="false">
-                                <summary><span>Stat</span><output id="stat-value">DISABLED</output></summary>
-                                <div class="submenu-panel stat-actions" role="group" aria-label="Canvas statistics visibility">
-                                    <button type="button" data-stat="true" aria-label="Enable canvas statistics">ENABLE</button>
-                                    <button type="button" data-stat="false" aria-label="Disable canvas statistics" aria-current="true" disabled>DISABLE</button>
-                                </div>
-                            </details>
-                            <details class="menu-submenu" data-positioned="false">
                                 <summary><span>Speed</span><output id="speed-value">1×</output></summary>
                                 <div class="submenu-panel speed-actions" role="group" aria-label="Playback speed">
                                     <button type="button" data-speed="0.25">0.25×</button>
@@ -1086,10 +1075,16 @@ export class PreviewPanel implements vscode.Disposable {
                             </details>
                             <details class="menu-submenu" data-positioned="false">
                                 <summary><span>Camera</span><output id="camera-mode">FIXED · 2D</output></summary>
-                                <div class="submenu-panel menu-actions" role="group" aria-label="Interactive camera controls">
-                                    <button type="button" data-camera="view2d" aria-current="true" disabled>2D</button>
-                                    <button type="button" data-camera="view3d" disabled>3D</button>
-                                    <button type="button" data-camera="reset" disabled>RESET</button>
+                                <div class="submenu-panel option-actions">
+                                    <div class="option-group" role="group" aria-label="Interactive camera controls">
+                                        <button type="button" data-camera="view2d" aria-current="true" disabled>2D</button>
+                                        <button type="button" data-camera="view3d" disabled>3D</button>
+                                        <button type="button" data-camera="reset" disabled>RESET</button>
+                                    </div>
+                                    <div class="option-group" role="group" aria-label="Camera control on the canvas">
+                                        <button type="button" data-camera-control="true">CONTROL ON</button>
+                                        <button type="button" data-camera-control="false">CONTROL OFF</button>
+                                    </div>
                                 </div>
                             </details>
                             <details class="menu-submenu" data-positioned="false">
@@ -1129,9 +1124,7 @@ export class PreviewPanel implements vscode.Disposable {
                                     <button id="refresh" type="button" aria-label="Refresh preview">REFRESH</button>
                                 </div>
                             </details>
-                            <div class="menu-direct-actions" role="group" aria-label="Canvas display">
-                                <button id="fit-mode" type="button" aria-current="true" disabled>CANVAS TO FIT WINDOW</button>
-                                <button id="actual-mode" type="button" disabled>CANVAS TO RAW SIZE</button>
+                            <div class="menu-direct-actions" role="group" aria-label="Layout">
                                 <button id="preview-reset" type="button" disabled>RESET LAYOUT</button>
                             </div>
                         </div>

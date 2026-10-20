@@ -40,14 +40,3 @@ export function setPlaybackEnd(range, time, duration) {
     const start = current && current.start < end ? current.start : 0;
     return {start, end};
 }
-
-export function advancePlaybackTime(time, elapsed, duration, range, looping) {
-    const {start, end} = playbackBounds(range, duration);
-    if (end <= start) return {time: start, ended: true};
-    if (Number.isFinite(time) && time >= end && !looping) return {time: end, ended: true};
-    const base = Number.isFinite(time) && time >= start && time < end ? time : start;
-    const next = base + (Number.isFinite(elapsed) ? Math.max(0, elapsed) : 0);
-    if (next < end) return {time: next, ended: false};
-    if (!looping) return {time: end, ended: true};
-    return {time: start + ((next - start) % (end - start)), ended: false};
-}

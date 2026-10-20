@@ -1,6 +1,6 @@
 // Plays scenes in Chromium through the built player: in the render worker and on the main thread,
-// with fonts asked for by name, input, a worker that hangs, players scrolled out of view, and
-// JavaScript scenes compiled in the sandbox.
+// with fonts asked for by name, input and clicks, a worker that hangs, players scrolled out of
+// view, and JavaScript scenes compiled in the sandbox.
 // Usage: npm run test:browser (builds first). Set CHROMIUM to use a browser other than Playwright's.
 import assert from "node:assert/strict";
 import {createServer} from "node:http";
@@ -46,8 +46,10 @@ after(async () => {
     server.close();
 });
 
-async function open(query = "") {
+// `init` runs in the page before its own scripts.
+async function open(query = "", init) {
     const page = await browser.newPage({viewport: {width: 800, height: 600}});
+    if (init) await page.addInitScript(init);
     const errors = [];
     page.on("pageerror", (error) => errors.push(error.message));
     page.on("console", (message) => { if (message.type() === "error") errors.push(message.text()); });
@@ -216,6 +218,30 @@ test("pointer input reaches a live scene in the worker", async () => {
     await page.close();
 });
 
+test("a click pauses or plays a scene that takes no input, and is input to one that does", async () => {
+    const {page, errors} = await open();
+    await page.evaluate(() => window.e2e.make("a", {source: window.e2e.scenes.HERO}));
+    await until(page, "a", "playing");
+    assert.equal(await page.evaluate(() => window.e2e.players.a.live), false);
+    const canvas = await page.evaluateHandle(() => window.e2e.players.a.canvas);
+    await canvas.click();
+    await until(page, "a", "paused");
+    const t0 = await page.evaluate(() => window.e2e.players.a.time);
+    await page.waitForTimeout(300);
+    assert.equal(await page.evaluate(() => window.e2e.players.a.time), t0, "a paused scene holds its time");
+    await canvas.click();
+    await until(page, "a", "playing");
+    await page.evaluate(() => window.e2e.make("b", {source: window.e2e.scenes.PATH, name: "path.lua"}, {interactive: true}));
+    await until(page, "b", "playing");
+    await (await page.evaluateHandle(() => window.e2e.players.b.canvas)).click();
+    await page.waitForTimeout(300);
+    assert.equal(await state(page, "b"), "playing");
+    assert.deepEqual(await page.evaluate(() => window.e2e.events.filter((event) => /^[ab] (play|pause)$/.test(event))),
+        ["a pause", "a play"], "each click on the first scene toggled it once, and none the live one");
+    assert.deepEqual(errors, []);
+    await page.close();
+});
+
 test("a scene that hangs the worker is halted, and the other players come back", async () => {
     const {page} = await open("?hang=1500");
     await page.evaluate(() => window.e2e.make("a", {source: window.e2e.scenes.HERO}));
@@ -273,6 +299,172 @@ test("playback ends, loops and plays ranges as asked", async () => {
     });
     await page.waitForFunction(() => window.e2e.events.includes("a loop"), null, {timeout: 5000});
     assert.equal(await state(page, "a"), "playing");
+    assert.deepEqual(errors, []);
+    await page.close();
+});
+
+test("playback runs at the rate asked, within the rates the runtime's audio takes", async () => {
+    const {page, errors} = await open();
+    const scene = "local s = vis.scene {width = 64, height = 64}\ns:circle {center = {0, 0}, radius = 0.5}\ns:wait(60)\nreturn s";
+    await page.evaluate((source) => window.e2e.make("a", {source}, {rate: 4}), scene);
+    await until(page, "a", "playing");
+    const time = () => page.evaluate(() => window.e2e.players.a.time);
+    const t0 = await time();
+    await page.waitForTimeout(500);
+    const t1 = await time();
+    assert.ok(t1 - t0 > 1.4 && t1 - t0 < 3, `four seconds a second: ${t0} → ${t1}`);
+    assert.deepEqual(await page.evaluate(() => [100, 0.01, -1].map((rate) => {
+        window.e2e.players.a.configure({rate});
+        return window.e2e.players.a.rate;
+    })), [8, 0.125, 0.125]);
+    assert.deepEqual(errors, []);
+    await page.close();
+});
+
+// A circle in a space, whose camera drags, the wheel and keys may move.
+const CAMERA = `local s = vis.scene {width = 320, height = 180, camera = {mode = "interactive", view = "2d", target = {0, 0}, height = 6}}
+local space = s:space {x = {-3, 3, 1}, y = {-2, 2, 1}}
+space:circle {center = {0, 0}, radius = 1}
+s:wait(60)
+return s`;
+
+test("drags, the wheel and keys move an interactive camera when the player lets them, and a drag is not a click", async () => {
+    const {page, errors} = await open();
+    await page.evaluate((source) => window.e2e.make("a", {source, name: "camera.lua"}, {camera: true, autoplay: false}), CAMERA);
+    await until(page, "a", "paused");
+    await page.waitForTimeout(200);
+    const canvas = await page.evaluateHandle(() => window.e2e.players.a.canvas);
+    const box = await canvas.boundingBox();
+    const drag = async (dx) => {
+        await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+        await page.mouse.down();
+        await page.mouse.move(box.x + box.width / 2 + dx, box.y + box.height / 2, {steps: 6});
+        await page.mouse.up();
+        await page.waitForTimeout(300);
+    };
+    const before = await shot(page, "a");
+    await drag(60);
+    const panned = await shot(page, "a");
+    assert.ok(!before.equals(panned), "the drag panned the camera");
+    assert.equal(await state(page, "a"), "paused", "the drag did not play the scene");
+    // The drag focused the canvas, so its keys reach the camera.
+    await page.keyboard.press("3");
+    await page.waitForFunction(() => window.e2e.players.a.cameraView === "3d");
+    await page.keyboard.press("r");
+    await page.waitForTimeout(300);
+    const turned = await shot(page, "a");
+    await page.mouse.wheel(0, 300);
+    await page.waitForTimeout(300);
+    assert.ok(!turned.equals(await shot(page, "a")), "the wheel zoomed");
+    // With the camera off, a drag moves nothing: it is a click, which plays the scene.
+    await page.evaluate(() => window.e2e.players.a.configure({camera: false}));
+    const still = await shot(page, "a");
+    await drag(60);
+    await until(page, "a", "playing");
+    assert.ok(still.equals(await shot(page, "a")), "the camera stayed");
+    assert.equal(await page.evaluate(() => window.e2e.players.a.moveCamera("view2d")), true, "the camera moves when asked");
+    await page.waitForFunction(() => window.e2e.players.a.cameraView === "2d");
+    assert.deepEqual(errors, []);
+    await page.close();
+});
+
+test("a frame is captured apart from the canvas, in the worker and on the main thread", async () => {
+    for (const query of ["", "?mode=inline"]) {
+        const {page, errors} = await open(query);
+        await page.evaluate(() => window.e2e.make("a", {source: window.e2e.scenes.HERO, name: "hero.lua"}));
+        await until(page, "a", "playing");
+        const captured = await page.evaluate(async () => {
+            const player = window.e2e.players.a;
+            const [one, again, two] = [await player.capture({time: 1}), await player.capture({time: 1}), await player.capture({time: 1, ratio: 2})];
+            let opaque = 0;
+            for (let i = 3; i < one.data.length; i += 4) if (one.data[i] === 255) opaque++;
+            return {
+                size: [player.info.width, player.info.height], one: [one.width, one.height], two: [two.width, two.height],
+                opaque: opaque / (one.width * one.height), same: one.data.every((value, i) => value === again.data[i]),
+            };
+        });
+        assert.deepEqual(captured.one, captured.size, query);
+        assert.deepEqual(captured.two, captured.size.map((side) => side * 2), query);
+        assert.ok(captured.opaque > 0.9, `the frame is drawn (${captured.opaque})`);
+        assert.ok(captured.same, "a frame captured twice is the same");
+        assert.equal(await state(page, "a"), "playing");
+        assert.deepEqual(errors, []);
+        await page.close();
+    }
+});
+
+test("with interactive set to timeline, a scene's UI controls take input as its timeline plays", async () => {
+    const {page, errors} = await open();
+    const source = await (await fetch(`${origin}/tools/skill/vis-interactive/templates/button-state-motion.lua`)).text();
+    // The first scene sets its own, in place of the player's.
+    await page.evaluate((source) => {
+        window.e2e.make("a", {source, name: "buttons.lua", interactive: "timeline"}, {interactive: false});
+        window.e2e.make("b", {source, name: "buttons.lua"}, {interactive: true});
+    }, source);
+    await until(page, "a", "playing");
+    await until(page, "b", "playing");
+    await page.waitForTimeout(400);
+    assert.deepEqual(await page.evaluate(() => [window.e2e.players.a.live, window.e2e.players.b.live]), [true, true]);
+    assert.ok(await page.evaluate(() => window.e2e.players.a.time) > 0.2, "the timeline plays");
+    assert.equal(await page.evaluate(() => window.e2e.players.b.time), 0, "the timeline stays at 0");
+    // "Set running" at (145, -198) from the centre of the 960 by 540 scene moves the indicator over 0.48 seconds.
+    const box = await (await page.evaluateHandle(() => window.e2e.players.a.canvas)).boundingBox();
+    const before = await shot(page, "a");
+    await page.mouse.click(box.x + (480 + 145) / 960 * box.width, box.y + (270 + 198) / 540 * box.height);
+    await page.mouse.move(box.x + 5, box.y + 5);
+    await page.waitForTimeout(800);
+    assert.ok(!before.equals(await shot(page, "a")), "the button moved the indicator");
+    assert.deepEqual(errors, []);
+    await page.close();
+});
+
+test("a retained runtime steps while its scene plays, and holds while it is paused", async () => {
+    const {page, errors} = await open();
+    const source = `local s = vis.scene {width = 160, height = 90, camera = {view = "2d", target = {0, 0}, height = 9}}
+local dot = s:circle {center = {0, 0}, radius = 1, fill = "accent"}
+vis.runtime(s, {fixed_step = 1 / 60, update = function(ctx, dt, time)
+    ctx:update(dot, {shift = {math.sin(time * 6) * 3, 0, 0}})
+end})
+return s`;
+    await page.evaluate((source) => window.e2e.make("a", {source, name: "runtime.lua"}), source);
+    await until(page, "a", "playing");
+    assert.equal(await page.evaluate(() => window.e2e.players.a.live), true);
+    const moves = async () => {
+        const first = await shot(page, "a");
+        await page.waitForTimeout(250);
+        return !first.equals(await shot(page, "a"));
+    };
+    assert.ok(await moves(), "the runtime steps as the scene plays");
+    await page.evaluate(() => window.e2e.players.a.pause());
+    await page.waitForTimeout(150);
+    assert.equal(await moves(), false, "a paused scene's runtime holds");
+    await page.evaluate(() => window.e2e.players.a.play());
+    await page.waitForTimeout(100);
+    assert.ok(await moves(), "it steps again once played");
+    assert.deepEqual(errors, []);
+    await page.close();
+});
+
+test("on the main thread a scene's sound starts once the page has had a click", async () => {
+    // Playwright's calls count as the user's, so the page is told it has had none.
+    const {page, errors} = await open("?mode=inline", () => Object.defineProperty(Navigator.prototype, "userActivation",
+        {get: () => ({hasBeenActive: false, isActive: false})}));
+    const source = `local s = vis.scene {width = 64, height = 64}
+s:circle {center = {0, 0}, radius = 0.5}
+vis.audio.cue(s, {asset = "tone.wav", bus = "music", ["end"] = 2, loop = true})
+s:wait(2)
+return s`;
+    await page.evaluate((source) => window.e2e.make("a", {source, name: "tone.lua"}, {audio: true, end: "loop"}), source);
+    await until(page, "a", "playing");
+    // miniaudio marks the device the runtime's audio starts.
+    const started = () => (window.miniaudio?.devices ?? []).some((device) => device?.state === window.miniaudio.device_state.started);
+    await page.waitForTimeout(300);
+    assert.equal(await page.evaluate(started), false, "no sound before a click");
+    await page.mouse.click(4, 4);
+    await page.waitForFunction(started, null, {timeout: 5000});
+    await page.evaluate(() => window.e2e.players.a.pause());
+    await page.waitForTimeout(200);
+    assert.equal(await state(page, "a"), "paused");
     assert.deepEqual(errors, []);
     await page.close();
 });

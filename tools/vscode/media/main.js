@@ -1,7 +1,6 @@
-// The preview webview: draws the scene the extension sends into the canvas with the runtime's
-// client, and runs the player around it: transport and playback range, speed, camera, fit and
-// zoom, the series menu, the source inspector, performance stats, runtime audio and export.
-import {frameElapsed, normalizeTime} from "./time.mjs";
+// The preview webview: plays the scene the extension sends on the canvas with the shared player,
+// and runs the viewer around it: transport and playback range, speed, camera, the series menu,
+// the source inspector and export.
 import {
     clampPlaybackRange,
     playbackBounds,
@@ -19,22 +18,10 @@ import {
     responsiveViewerLayout,
     widePlayerWidth,
 } from "./viewer-layout.mjs";
-import {
-    clampPreviewScale,
-    fitPreviewScale,
-    previewAnchorTranslation,
-    previewRenderPixelRatio,
-    stepPreviewScale,
-    wheelPreviewScale,
-} from "./viewport.mjs";
-import {saveGif, saveMp4} from "./savers.js";
+import {saveGif, saveMp4, savePng} from "./savers.js";
 import {adaptiveVscodeThemeKey, readAdaptiveVscodeTheme} from "./adaptive-theme.mjs";
-import {advanceSeriesPlayback, seriesStepTarget} from "./series-step.mjs";
+import {autoAdvanceSeriesTarget, playbackEnd, seriesStepTarget} from "./series-step.mjs";
 import {SOURCE_CONTEXT_LINE_COUNTS, previewPreferences} from "./preferences.mjs";
-import {createRuntimeAudio, loadSceneAsset} from "./runtime-audio.mjs";
-import {createCanvasInputRouter, isHostKeyTarget} from "./canvas-input.mjs";
-import {advanceRetainedRuntime, sceneCanPlay} from "./retained-runtime.mjs";
-import {createFontCache, loadWithFonts} from "./scene-fonts.mjs";
 import {
     useVerticalWheelForHorizontalScroll,
     useVerticalWheelScrollChain,
@@ -48,6 +35,7 @@ import {
     sourceContextRowIsFocused,
     sourceContextRows,
 } from "./source-inspector.mjs";
+import {createRenderHost, fontTable, VisPlayer} from "./player/player.js";
 
 const vscode = acquireVsCodeApi();
 const config = window.visPreviewConfig;
@@ -59,13 +47,11 @@ function requiredElement(selector) {
 }
 
 const canvas = document.querySelector("#preview");
-const canvasWrap = document.querySelector("#canvas-wrap");
 const stageShell = document.querySelector("#stage-shell");
 const viewer = document.querySelector(".viewer");
 const player = document.querySelector(".player");
 const stageResizer = document.querySelector("#stage-resizer");
 const wideResizer = document.querySelector("#wide-resizer");
-const canvasStat = document.querySelector("#canvas-stat");
 const empty = document.querySelector("#empty");
 const errorCard = document.querySelector("#error-card");
 const errorMessage = document.querySelector("#error-message");
@@ -83,13 +69,10 @@ const speedValue = document.querySelector("#speed-value");
 const speedButtons = [...document.querySelectorAll("[data-speed]")];
 const cameraMode = document.querySelector("#camera-mode");
 const cameraButtons = [...document.querySelectorAll("[data-camera]")];
-const statValue = document.querySelector("#stat-value");
-const statButtons = [...document.querySelectorAll("[data-stat]")];
+const cameraControlButtons = [...document.querySelectorAll("[data-camera-control]")];
 const sourceLinesValue = document.querySelector("#source-lines-value");
 const sourceLineButtons = [...document.querySelectorAll("[data-source-lines]")];
 const errorTitle = document.querySelector("#error-title");
-const fitModeButton = document.querySelector("#fit-mode");
-const actualModeButton = document.querySelector("#actual-mode");
 const previewResetButton = document.querySelector("#preview-reset");
 const seriesMenu = document.querySelector("#series-menu");
 const seriesMenuTrigger = seriesMenu.querySelector("summary");
@@ -117,47 +100,27 @@ const rangeClearButton = document.querySelector("#range-clear");
 const rangeValue = document.querySelector("#range-value");
 const transport = document.querySelector(".transport");
 
-const BOOTSTRAP = `return vis.scene { width = 16, height = 16, loop = false }`;
 const PLAYER_MENU_WIDTH = 174;
+// Scenes that use the UI or Input modules take pointer and key input as their timeline plays; on
+// any other, the canvas plays and pauses the scene and moves its camera.
+const TAKES_INPUT = /\bvis\s*\.\s*(?:ui|input)\b/;
 
-let createVis;
-let inputKeyName;
-let runtime;
-let wasmBinary;
-const sceneFonts = createFontCache(config.fonts);
-// The fonts each document's scene was given when it last loaded, registered before it loads again.
-const documentFonts = new Map();
-let pendingScene;
-let loadGeneration = 0;
-let playing = false;
 let looping = false;
-let playbackSpeed = 1;
-let {autoPlayNext, forceCompactLayout, sourceContextLineCount, showStats} = previewPreferences(vscode.getState(), config);
-let measuredFps = "—";
-let currentTime = 0;
-let previousFrame = performance.now();
-let animationFrame = 0;
-let measuredFrames = 0;
-let measureStarted = performance.now();
+let {autoPlayNext, forceCompactLayout, sourceContextLineCount, cameraControl} = previewPreferences(vscode.getState(), config);
 let busy = false;
 let exportController;
 let sceneId;
 let playbackRange = null;
-let sceneWidth = canvas.width;
-let sceneHeight = canvas.height;
-let previewScale = 1;
-let renderPixelRatio = 1;
-let renderPixelRatioFrame = 0;
-let previewFits = true;
-let previewPanX = 0;
-let previewPanY = 0;
+// The current scene's assets as the extension sent them, base64 by content id, and the list the
+// player loads.
+let assetData = new Map();
+let sceneResources = {assets: []};
 let manualStageHeightValue = null;
 let stageResizePointerId = null;
 let manualWidePlayerWidthValue = null;
 let wideResizePointerId = null;
 let canvasFullscreen = false;
 let viewerLayout = "compact";
-let currentScenePayload;
 let activeHostThemeKey;
 let themeRefreshFrame = 0;
 let currentSeries;
@@ -168,12 +131,6 @@ let notesOpen = true;
 let openSourceKeys = new Set();
 const sourceHighlightGenerations = new WeakMap();
 let pendingSourceExpansionAnchor;
-const runtimeAudio = createRuntimeAudio({
-    runtime: () => runtime,
-    time: sceneTime,
-    rate: () => playbackSpeed,
-    playing: () => playing,
-});
 
 function setStatus(label, state) {
     status.dataset.state = state;
@@ -192,104 +149,117 @@ function describeError(error) {
     return String(error);
 }
 
-async function boot() {
-    try {
-        ({createVis, inputKeyName} = await import(config.client));
-        const wasmResponse = await fetch(config.wasm);
-        if (!wasmResponse.ok) throw new Error(`Bundled WASM failed to load (${wasmResponse.status})`);
-        wasmBinary = new Uint8Array(await wasmResponse.arrayBuffer());
-        setStatus("RUNTIME READY", "ready");
-        if (pendingScene) {
-            const scene = pendingScene;
-            pendingScene = undefined;
-            await loadScene(scene);
-        }
-    } catch (error) {
-        showError(describeError(error), "RUNTIME ERROR");
-    }
-}
+// Scenes draw on the main thread, where browsers play audio.
+const host = createRenderHost({
+    mode: "inline",
+    server: {url: config.server},
+    async wasm() {
+        const response = await fetch(config.wasm);
+        if (!response.ok) throw new Error(`Bundled WASM failed to load (${response.status})`);
+        return response.arrayBuffer();
+    },
+    // By the names scenes set text in; each is fetched when a scene first needs it.
+    fonts: fontTable(config.fonts),
+    assets: {
+        async bytes(id) {
+            const data = assetData.get(id);
+            if (data === undefined) throw new Error("The scene's assets changed while it loaded");
+            return decodeBase64(data).buffer;
+        },
+    },
+});
+const visPlayer = new VisPlayer({
+    host,
+    canvas,
+    resources: () => sceneResources,
+    theme: () => {
+        const theme = readAdaptiveVscodeTheme();
+        activeHostThemeKey = adaptiveVscodeThemeKey(theme);
+        return theme;
+    },
+    end: "stop",
+    camera: cameraControl,
+    audio: true,
+    // The viewer shows one scene, and keeps it while the panel is hidden.
+    releaseDelay: Infinity,
+    label: "viscript scene",
+});
 
-async function loadScene(scene, {themeRefresh = false} = {}) {
-    currentScenePayload = scene;
+function loadScene(scene) {
     documentName.textContent = scene.displayName || scene.fileName;
     documentName.title = scene.displayName || scene.fileName;
-    const preserveSourceSelection = themeRefresh || scene.sceneId === sceneId;
-    syncSourceInspector(scene.sourceContexts, scene.activeSourceIndex, {preserveSelection: preserveSourceSelection});
+    const sameScene = scene.sceneId === sceneId;
+    syncSourceInspector(scene.sourceContexts, scene.activeSourceIndex, {preserveSelection: sameScene});
     syncSeries(scene.series);
     descriptionContent.innerHTML = markdownToHtml(scene.description);
-    if (!createVis || !wasmBinary) {
-        pendingScene = scene;
-        setStatus("WAITING FOR RUNTIME", "loading");
+    exportController?.abort(new DOMException("Scene changed", "AbortError"));
+    // The scene before keeps playing behind the error.
+    if (scene.assetErrors.length) {
+        showError(scene.assetErrors.join("\n"), "LUA ERROR", "SCENE REJECTED");
         return;
     }
-    const generation = ++loadGeneration;
-    const wasPlaying = playing;
-    const wasAudioStarted = runtimeAudio.started;
-    exportController?.abort(new DOMException("Scene changed", "AbortError"));
+    assetData = new Map(scene.assets.map((asset) => [asset.id, asset.base64]));
+    sceneResources = {assets: scene.assets.map(({id, name, mime}) => ({id, name, mime}))};
     setStatus("COMPILING LUA", "loading");
+    // The same document keeps its time, range and whether it plays; another starts over.
+    void visPlayer.load({
+        source: scene.source,
+        name: scene.fileName,
+        interactive: TAKES_INPUT.test(scene.source) ? "timeline" : false,
+    });
+    if (sameScene) return;
+    sceneId = scene.sceneId;
+    playbackRange = null;
+    visPlayer.clearRange();
+    visPlayer.seek(0);
+    visPlayer.play();
+}
 
-    let candidate;
-    try {
-        if (scene.assetErrors.length) throw new Error(scene.assetErrors.join("\n"));
-        candidate = await createVis(BOOTSTRAP, "bootstrap.lua", {wasmBinary});
-        const hostTheme = readAdaptiveVscodeTheme();
-        const hostThemeKey = adaptiveVscodeThemeKey(hostTheme);
-        candidate.hostTheme(hostTheme);
-        for (const asset of scene.assets) loadSceneAsset(candidate, asset, decodeBase64(asset.base64));
-        const load = (engine) => engine.load(scene.source, scene.fileName);
-        const fonts = await loadWithFonts(candidate, load, sceneFonts, {
-            expected: documentFonts.get(scene.documentUri),
-            current: () => generation === loadGeneration,
-        });
-        if (generation !== loadGeneration) {
-            candidate.destroy();
-            return;
-        }
-        documentFonts.set(scene.documentUri, fonts);
+visPlayer.on("load", () => {
+    const {width, height, duration, loop} = visPlayer.info;
+    errorCard.hidden = true;
+    empty.hidden = true;
+    delete visPlayer.canvas.dataset.failed;
+    document.documentElement.style.setProperty("--scene-aspect-ratio", `${width} / ${height}`);
+    document.documentElement.style.setProperty("--scene-ratio", String(width / height));
+    syncViewerLayout();
+    syncNormalLayoutLimit();
+    looping = loop;
+    syncEnd();
+    playbackRange = clampPlaybackRange(playbackRange, duration);
+    applyPlaybackRange();
+    showTime(visPlayer.time, duration);
+    syncControls();
+    setStatus("PREVIEW READY", "ready");
+    vscode.postMessage({type: "renderSuccess"});
+});
 
-        const previous = runtime;
-        canvasInputRouter.cancel();
-        runtime = candidate;
-        candidate = undefined;
-        previous?.destroy();
-        runtimeAudio.reset();
-        activeHostThemeKey = runtime.adaptiveTheme ? hostThemeKey : undefined;
-        const [width, height] = runtime.size();
-        sceneWidth = width;
-        sceneHeight = height;
-        measuredFps = "—";
-        if (width > 0 && height > 0) {
-            document.documentElement.style.setProperty("--scene-aspect-ratio", `${width} / ${height}`);
-        }
-        syncViewerLayout();
-        syncNormalLayoutLimit();
-        syncCanvasStat();
-        const sameScene = scene.sceneId === sceneId;
-        playbackRange = sameScene ? clampPlaybackRange(playbackRange, runtime.duration) : null;
-        const previousTime = currentTime;
-        sceneId = scene.sceneId;
-        currentTime = sameScene ? normalizeTime(previousTime, runtime.duration) : playbackBounds(playbackRange, runtime.duration).start;
-        scrub.max = String(runtime.duration);
-        scrub.value = String(currentTime);
-        looping = runtime.loop;
-        playing = themeRefresh ? wasPlaying && sceneCanPlay(runtime) : sceneCanPlay(runtime);
-        if (wasAudioStarted) runtimeAudio.start();
-        previousFrame = performance.now();
-        empty.hidden = true;
-        errorCard.hidden = true;
-        canvas.style.opacity = "1";
-        canvas.style.filter = "none";
-        if (previewFits) fitPreview();
-        else setPreviewScale(previewScale, {preserveAnchor: false});
-        syncCamera();
-        draw();
-        syncControls();
-        setStatus("PREVIEW READY", "ready");
-        vscode.postMessage({type: "renderSuccess"});
-    } catch (error) {
-        candidate?.destroy();
-        if (generation === loadGeneration) showError(describeError(error), "LUA ERROR", "SCENE REJECTED");
-    }
+const ERROR_LABELS = {
+    load: ["LUA ERROR", "SCENE REJECTED"],
+    resource: ["ASSET ERROR", "SCENE REJECTED"],
+    engine: ["RUNTIME ERROR", "SCENE REJECTED"],
+    timeout: ["TIMEOUT", "SCENE REJECTED"],
+    render: ["RENDER ERROR", "RENDER INTERRUPTED"],
+    runtime: ["RUNTIME ERROR", "RENDER INTERRUPTED"],
+};
+visPlayer.on("error", ({detail}) => showError(detail.message, ...(ERROR_LABELS[detail.phase] ?? ERROR_LABELS.render)));
+visPlayer.on("frame", ({detail}) => showTime(detail.time, detail.duration));
+for (const type of ["play", "pause", "stop", "statechange"]) visPlayer.on(type, syncControls);
+visPlayer.on("complete", () => {
+    const next = autoAdvanceSeriesTarget(currentSeries, autoPlayNext);
+    if (next) openSeriesItem(next.groupIndex, next.itemIndex);
+    else if (looping && playbackRange) visPlayer.playRange(playbackRange.start, playbackRange.end);
+    syncControls();
+});
+visPlayer.on("camera", ({detail}) => {
+    syncCamera();
+    setStatus(`${detail.view.toUpperCase()} CAMERA`, "ready");
+});
+
+// With auto-play next on and an item to go to, the scene plays once and opens it; otherwise the
+// loop button decides.
+function syncEnd() {
+    visPlayer.configure({end: playbackEnd({series: currentSeries, autoPlayNext, looping})});
 }
 
 function scheduleAdaptiveThemeRefresh() {
@@ -298,9 +268,11 @@ function scheduleAdaptiveThemeRefresh() {
         themeRefreshFrame = requestAnimationFrame(() => {
             themeRefreshFrame = 0;
             if (currentSourceContexts.length) refreshOpenSourceHighlights();
-            if (!runtime?.adaptiveTheme || !currentScenePayload) return;
-            const nextKey = adaptiveVscodeThemeKey(readAdaptiveVscodeTheme());
-            if (nextKey !== activeHostThemeKey) void loadScene(currentScenePayload, {themeRefresh: true});
+            if (!visPlayer.info?.adaptiveTheme) return;
+            if (adaptiveVscodeThemeKey(readAdaptiveVscodeTheme()) === activeHostThemeKey) return;
+            // The scene loads again in the new colors, keeping its time and whether it plays.
+            exportController?.abort(new DOMException("Theme changed", "AbortError"));
+            void visPlayer.reload();
         });
     });
 }
@@ -318,6 +290,7 @@ vscodeThemeObserver.observe(document.body, {
 function syncSeries(series) {
     currentSeries = series;
     syncSeriesStepControls();
+    syncEnd();
     const groups = Array.isArray(series?.groups) ? series.groups : [];
     seriesGroupItems.replaceChildren();
     seriesItems.replaceChildren();
@@ -417,7 +390,7 @@ function syncSourceInspector(contexts, requestedIndex, {preserveSelection = fals
             }];
         }))
         : new Map();
-    // Collapsing a context replaces it here, so the Scene payload a theme refresh reloads stays as sent.
+    // A copy, since collapsing a context replaces it here and the message keeps its own.
     currentSourceContexts = [...contexts];
     activeSourceIndex = resolveActiveSourceIndex(
         currentSourceContexts,
@@ -740,46 +713,28 @@ function syncSeriesStepControls() {
 }
 
 function showError(message, label, title = "RENDER INTERRUPTED") {
-    playing = false;
-    runtimeAudio.sync(false);
     errorTitle.textContent = title;
     errorMessage.textContent = message;
     errorCard.hidden = false;
     empty.hidden = true;
-    canvas.style.opacity = "0.2";
-    canvas.style.filter = "grayscale(0.7)";
+    visPlayer.canvas.dataset.failed = "true";
     setStatus(label, "error");
     syncControls();
     vscode.postMessage({type: "renderError", message});
 }
 
-function draw() {
-    if (!runtime) return;
-    currentTime = normalizedTime(currentTime);
-    try {
-        runtime.draw(canvas, currentTime, renderPixelRatio);
-        measuredFrames += 1;
-        updatePerformance();
-        const duration = runtime.duration;
-        scrub.value = String(currentTime);
-        const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
-        scrub.style.setProperty("--progress", `${Math.max(0, Math.min(100, progress))}%`);
-        timeOutput.textContent = runtime.retainedLua && duration <= 0
-            ? `${runtime.runtimeTime.toFixed(2)} · LIVE`
-            : `${currentTime.toFixed(2)} / ${duration.toFixed(2)}`;
-        syncPlaybackRange();
-    } catch (error) {
-        const detail = `${describeError(error)}\n\nseek ${currentTime.toFixed(6)} / ${runtime.duration.toFixed(6)} s`;
-        showError(detail, "RENDER ERROR");
-    }
-}
-
-function normalizedTime(value) {
-    return normalizeTime(value, runtime?.duration ?? 0);
+function showTime(time, duration) {
+    scrub.max = String(duration);
+    scrub.value = String(time);
+    const progress = duration > 0 ? (time / duration) * 100 : 0;
+    scrub.style.setProperty("--progress", `${Math.max(0, Math.min(100, progress))}%`);
+    // A retained runtime without a timeline runs on its own clock.
+    timeOutput.textContent = visPlayer.live && duration <= 0 ? "LIVE" : `${time.toFixed(2)} / ${duration.toFixed(2)}`;
+    syncPlaybackRange();
 }
 
 function syncPlaybackRange() {
-    const duration = runtime?.duration ?? 0;
+    const duration = visPlayer.duration;
     if (playbackRange && duration > 0) {
         timeline.style.setProperty("--range-active", "1");
         timeline.style.setProperty("--range-start", `${playbackRange.start / duration * 100}%`);
@@ -791,112 +746,32 @@ function syncPlaybackRange() {
         timeline.style.setProperty("--range-end", "100%");
         rangeValue.textContent = "FULL";
     }
-    rangeInButton.disabled = busy || !runtime || currentTime >= duration;
-    rangeOutButton.disabled = busy || !runtime || currentTime <= 0;
-    rangeClearButton.disabled = busy || !runtime || !playbackRange;
+    const loaded = Boolean(visPlayer.info);
+    rangeInButton.disabled = busy || !loaded || visPlayer.time >= duration;
+    rangeOutButton.disabled = busy || !loaded || visPlayer.time <= 0;
+    rangeClearButton.disabled = busy || !loaded || !playbackRange;
+}
+
+// The player plays a range from its start; the viewer keeps the time and whether it plays.
+function applyPlaybackRange() {
+    if (!playbackRange) {
+        visPlayer.clearRange();
+        return;
+    }
+    const {time, playing} = visPlayer;
+    visPlayer.playRange(playbackRange.start, playbackRange.end);
+    visPlayer.seek(time);
+    if (!playing) visPlayer.pause();
 }
 
 function updatePlaybackRange(range) {
     playbackRange = range;
-    draw();
+    applyPlaybackRange();
     syncControls();
     setStatus(
         playbackRange ? `RANGE ${playbackRange.start.toFixed(2)}–${playbackRange.end.toFixed(2)}` : "FULL RANGE",
         "ready",
     );
-}
-
-function syncPreviewScale() {
-    canvasWrap.dataset.fit = String(previewFits);
-    canvas.style.width = `${sceneWidth * previewScale}px`;
-    canvas.style.height = `${sceneHeight * previewScale}px`;
-    syncPreviewTransform();
-    syncPreviewControls();
-    syncRenderPixelRatio();
-}
-
-function syncRenderPixelRatio() {
-    const next = previewRenderPixelRatio(
-        sceneWidth,
-        sceneHeight,
-        previewScale,
-        window.devicePixelRatio || 1,
-    );
-    if (next === renderPixelRatio) return;
-    renderPixelRatio = next;
-    if (!runtime || playing) return;
-    cancelAnimationFrame(renderPixelRatioFrame);
-    renderPixelRatioFrame = requestAnimationFrame(() => {
-        renderPixelRatioFrame = 0;
-        draw();
-    });
-}
-
-function syncPreviewTransform() {
-    canvas.style.transform = previewFits ? `translate(${previewPanX}px, ${previewPanY}px)` : "";
-}
-
-function syncPreviewControls() {
-    fitModeButton.setAttribute("aria-current", String(previewFits));
-    actualModeButton.setAttribute("aria-current", String(!previewFits));
-    fitModeButton.disabled = !runtime || busy || previewFits;
-    actualModeButton.disabled = !runtime || busy || !previewFits;
-    previewResetButton.disabled = !runtime || busy;
-}
-
-function setPreviewScale(value, options = {}) {
-    const next = clampPreviewScale(value);
-    const wrapBounds = canvasWrap.getBoundingClientRect();
-    const clientX = options.clientX ?? wrapBounds.left + wrapBounds.width / 2;
-    const clientY = options.clientY ?? wrapBounds.top + wrapBounds.height / 2;
-    const before = canvas.getBoundingClientRect();
-    const anchorX = before.width > 0 ? Math.max(0, Math.min(1, (clientX - before.left) / before.width)) : 0.5;
-    const anchorY = before.height > 0 ? Math.max(0, Math.min(1, (clientY - before.top) / before.height)) : 0.5;
-
-    const fit = Boolean(options.fit);
-    const preserveFitAnchor = fit && options.preserveAnchor !== false;
-    if (!preserveFitAnchor) {
-        previewPanX = 0;
-        previewPanY = 0;
-    }
-    previewScale = next;
-    previewFits = fit;
-    syncPreviewScale();
-
-    if (previewFits) {
-        canvasWrap.scrollLeft = 0;
-        canvasWrap.scrollTop = 0;
-        if (preserveFitAnchor) {
-            const translation = previewAnchorTranslation(before, canvas.getBoundingClientRect(), clientX, clientY);
-            previewPanX += translation.x;
-            previewPanY += translation.y;
-            syncPreviewTransform();
-        }
-        return;
-    }
-
-    requestAnimationFrame(() => {
-        if (options.preserveAnchor === false) {
-            canvasWrap.scrollLeft = 0;
-            canvasWrap.scrollTop = 0;
-            return;
-        }
-        const after = canvas.getBoundingClientRect();
-        canvasWrap.scrollLeft += after.left + anchorX * after.width - clientX;
-        canvasWrap.scrollTop += after.top + anchorY * after.height - clientY;
-    });
-}
-
-function fitPreview() {
-    setPreviewScale(
-        fitPreviewScale(sceneWidth, sceneHeight, canvasWrap.clientWidth, canvasWrap.clientHeight, 2),
-        {fit: true, preserveAnchor: false},
-    );
-}
-
-function resetPreviewTransform() {
-    if (previewFits) fitPreview();
-    else setPreviewScale(1, {preserveAnchor: false});
 }
 
 function applyManualStageHeight() {
@@ -920,16 +795,6 @@ function setManualStageHeight(value) {
     applyManualStageHeight();
 }
 
-function syncCanvasStat() {
-    stageResizer.dataset.stats = String(showStats);
-    canvasStat.textContent = `${sceneWidth} × ${sceneHeight} · ${measuredFps} FPS`;
-    statValue.textContent = showStats ? "ENABLED" : "DISABLED";
-    for (const button of statButtons) {
-        button.setAttribute("aria-current", String((button.dataset.stat === "true") === showStats));
-        button.disabled = (button.dataset.stat === "true") === showStats;
-    }
-}
-
 function resetCanvasView() {
     manualStageHeightValue = null;
     manualWidePlayerWidthValue = null;
@@ -940,11 +805,11 @@ function resetCanvasView() {
     document.documentElement.style.removeProperty("--wide-player-width");
     if (viewerLayout === "wide") syncWidePlayerWidth();
     else syncNormalLayoutLimit();
-    resetPreviewTransform();
 }
 
 function syncNormalLayoutLimit() {
     if (canvasFullscreen || viewerLayout === "wide" || manualStageHeightValue !== null) return;
+    const {width: sceneWidth, height: sceneHeight} = visPlayer.info ?? {width: canvas.width, height: canvas.height};
     const height = normalStageMaxHeight(
         window.innerHeight,
         transport.getBoundingClientRect().height,
@@ -987,9 +852,6 @@ function syncViewerLayout() {
     wideResizer.tabIndex = wideResizeEnabled ? 0 : -1;
     if (viewerLayout === "compact" && manualStageHeightValue === null) syncNormalLayoutLimit();
     if (viewerLayout === "wide") syncWidePlayerWidth();
-    requestAnimationFrame(() => {
-        if (previewFits) fitPreview();
-    });
 }
 
 function syncPlayerMenuPlacement() {
@@ -1123,76 +985,10 @@ function setCanvasFullscreen(enabled) {
         if (manualStageHeightValue !== null) applyManualStageHeight();
         else if (viewerLayout === "compact") syncNormalLayoutLimit();
     }
-    requestAnimationFrame(() => {
-        fitPreview();
-    });
-}
-
-function stepPreview(direction, clientX, clientY) {
-    setPreviewScale(stepPreviewScale(previewScale, direction), {clientX, clientY});
-}
-
-function wheelPreview(deltaY, clientX, clientY) {
-    if (!previewFits) return;
-    const fitScale = fitPreviewScale(
-        sceneWidth,
-        sceneHeight,
-        canvasWrap.clientWidth,
-        canvasWrap.clientHeight,
-        2,
-    );
-    setPreviewScale(wheelPreviewScale(previewScale, deltaY, fitScale), {clientX, clientY, fit: true});
-}
-
-function updatePerformance() {
-    const now = performance.now();
-    const elapsed = now - measureStarted;
-    if (elapsed < 500) return;
-    const fps = measuredFrames * 1000 / elapsed;
-    measuredFps = fps.toFixed(0);
-    syncCanvasStat();
-    measuredFrames = 0;
-    measureStarted = now;
-}
-
-function frame(now) {
-    const elapsed = frameElapsed(now, previousFrame);
-    previousFrame = now;
-    if (playing && runtime) {
-        const scaledElapsed = elapsed * playbackSpeed;
-        try {
-            const runtimeStep = advanceRetainedRuntime(runtime, scaledElapsed);
-            runtimeAudio.play(runtimeStep);
-            if (runtime.duration > 0) {
-                const next = advanceSeriesPlayback(
-                    {series: currentSeries, autoPlayNext, looping},
-                    currentTime,
-                    scaledElapsed,
-                    runtime.duration,
-                    playbackRange,
-                );
-                currentTime = next.time;
-                if (next.ended) {
-                    playing = false;
-                    syncControls();
-                    if (next.open) openSeriesItem(next.open.groupIndex, next.open.itemIndex);
-                }
-            }
-            runtimeAudio.sync(false);
-            draw();
-        } catch (error) {
-            showError(describeError(error), "RUNTIME ERROR");
-        }
-    }
-    animationFrame = requestAnimationFrame(frame);
-}
-
-// Retained Lua runs on its own clock, other scenes on the transport's.
-function sceneTime() {
-    return runtime?.retainedLua ? runtime.runtimeTime : currentTime;
 }
 
 function syncControls() {
+    const playing = visPlayer.playing;
     playIcon.toggleAttribute("hidden", playing);
     pauseIcon.toggleAttribute("hidden", !playing);
     playButton.dataset.state = playing ? "playing" : "paused";
@@ -1204,37 +1000,33 @@ function syncControls() {
     playButton.disabled = busy;
     restartButton.disabled = busy;
     scrub.disabled = busy;
+    previewResetButton.disabled = !visPlayer.info || busy;
+    // An export draws its own frames; the canvas takes no input meanwhile.
+    visPlayer.canvas.inert = busy;
     syncPlaybackRange();
-    syncPreviewControls();
     syncCamera();
 }
 
 function syncCamera() {
-    if (!runtime) return;
-    const interactive = runtime.cameraMode === "interactive";
-    canvas.dataset.cameraMode = runtime.cameraMode;
-    cameraMode.textContent = `${runtime.cameraMode === "interactive" ? "" : "FIXED · "}${runtime.cameraView.toUpperCase()}`;
+    const info = visPlayer.info;
+    for (const button of cameraControlButtons) {
+        const current = (button.dataset.cameraControl === "true") === cameraControl;
+        button.setAttribute("aria-current", String(current));
+        button.disabled = current;
+    }
+    if (!info) return;
+    const interactive = info.cameraMode === "interactive";
+    const view = visPlayer.cameraView;
+    // What a pointer on the canvas does: the scene's own input, the camera, or play and pause.
+    visPlayer.canvas.dataset.input = visPlayer.live ? "scene"
+        : interactive && cameraControl ? "camera"
+        : info.duration > 0 ? "playback" : "none";
+    cameraMode.textContent = `${interactive ? "" : "FIXED · "}${view.toUpperCase()}`;
     for (const button of cameraButtons) {
         const action = button.dataset.camera;
-        button.setAttribute("aria-current", String(action !== "reset" && action === `view${runtime.cameraView}`));
-        button.disabled = !interactive || busy || (action !== "reset" && action === `view${runtime.cameraView}`);
-    }
-}
-
-function moveCamera(action, x = 0, y = 0, redraw = true) {
-    if (!runtime || busy) return false;
-    try {
-        if (!runtime.cameraInput(action, x, y)) {
-            setStatus("FIXED CAMERA", "ready");
-            return false;
-        }
-        syncCamera();
-        if (redraw) draw();
-        setStatus(`${runtime.cameraView.toUpperCase()} CAMERA`, "ready");
-        return true;
-    } catch (error) {
-        showError(describeError(error), "CAMERA ERROR");
-        return false;
+        const current = action !== "reset" && action === `view${view}`;
+        button.setAttribute("aria-current", String(current));
+        button.disabled = !interactive || busy || current;
     }
 }
 
@@ -1243,26 +1035,23 @@ notesItem.addEventListener("toggle", () => {
 });
 
 playButton.addEventListener("click", () => {
-    if (!runtime) return;
-    runtimeAudio.start();
-    const {start, end} = playbackBounds(playbackRange, runtime.duration);
-    if (!playing && (currentTime < start || currentTime >= end)) currentTime = start;
-    playing = !playing;
-    previousFrame = performance.now();
-    runtimeAudio.sync(true);
-    draw();
-    syncControls();
+    if (!visPlayer.info) return;
+    if (visPlayer.playing) {
+        visPlayer.pause();
+        return;
+    }
+    const {start, end} = playbackBounds(playbackRange, visPlayer.duration);
+    if (visPlayer.time < start || visPlayer.time >= end) visPlayer.seek(start);
+    visPlayer.play();
 });
 
 restartButton.addEventListener("click", () => {
-    currentTime = playbackBounds(playbackRange, runtime?.duration ?? 0).start;
-    previousFrame = performance.now();
-    runtimeAudio.sync(true);
-    draw();
+    visPlayer.seek(playbackBounds(playbackRange, visPlayer.duration).start);
 });
 
 loopButton.addEventListener("click", () => {
     looping = !looping;
+    syncEnd();
     syncControls();
 });
 
@@ -1276,22 +1065,17 @@ seriesNextButton.addEventListener("click", () => {
     if (target) openSeriesItem(target.groupIndex, target.itemIndex);
 });
 
-scrub.addEventListener("input", () => {
-    currentTime = normalizedTime(Number(scrub.value));
-    previousFrame = performance.now();
-    runtimeAudio.sync(true);
-    draw();
-});
+scrub.addEventListener("input", () => visPlayer.seek(Number(scrub.value)));
 
 rangeInButton.addEventListener("click", () => {
-    if (!runtime) return;
-    updatePlaybackRange(setPlaybackStart(playbackRange, currentTime, runtime.duration));
+    if (!visPlayer.info) return;
+    updatePlaybackRange(setPlaybackStart(playbackRange, visPlayer.time, visPlayer.duration));
     closePlayerMenu();
 });
 
 rangeOutButton.addEventListener("click", () => {
-    if (!runtime) return;
-    updatePlaybackRange(setPlaybackEnd(playbackRange, currentTime, runtime.duration));
+    if (!visPlayer.info) return;
+    updatePlaybackRange(setPlaybackEnd(playbackRange, visPlayer.time, visPlayer.duration));
     closePlayerMenu();
 });
 
@@ -1323,24 +1107,28 @@ function dataUrl(data, mime) {
     });
 }
 
+// Exports draw their frames apart from the canvas, while playback holds.
 async function exportMedia(format, fps = 30) {
-    if (!runtime || busy || !["png", "gif", "mp4"].includes(format)) return;
-    const exportingRuntime = runtime;
+    const info = visPlayer.info;
+    if (!info || busy || !["png", "gif", "mp4"].includes(format)) return;
     const exportRange = playbackRange ? {...playbackRange} : null;
-    const resume = playing;
+    const resume = visPlayer.playing;
     const controller = new AbortController();
     busy = true;
-    playing = false;
-    runtimeAudio.sync(false);
+    visPlayer.pause();
     exportController = controller;
     syncControls();
+    const scene = {
+        size: () => [info.width, info.height],
+        duration: info.duration,
+        time: visPlayer.time,
+        capture: (time, ratio) => visPlayer.capture({time, ratio}),
+    };
     try {
         let bytes;
         let mime;
         if (format === "png") {
-            bytes = await new Promise((resolve, reject) => {
-                canvas.toBlob((value) => value ? resolve(value) : reject(new Error("PNG encoding failed")), "image/png");
-            });
+            bytes = await savePng(scene, window.devicePixelRatio || 1);
             mime = "image/png";
             setStatus("PNG READY", "ready");
         } else {
@@ -1350,41 +1138,36 @@ async function exportMedia(format, fps = 30) {
             const save = format === "gif" ? saveGif : saveMp4;
             mime = format === "gif" ? "image/gif" : "video/mp4";
             bytes = await save(
-                exportingRuntime,
+                scene,
                 fps,
                 (done, total) => {
-                    if (runtime === exportingRuntime) setStatus(`${format.toUpperCase()} ${done}/${total}`, "loading");
+                    if (!controller.signal.aborted) setStatus(`${format.toUpperCase()} ${done}/${total}`, "loading");
                 },
                 controller.signal,
                 exportRange,
             );
             setStatus(`${format.toUpperCase()} READY`, "ready");
         }
-        if (runtime !== exportingRuntime || controller.signal.aborted) return;
+        if (controller.signal.aborted) return;
         vscode.postMessage({type: "saveMedia", format, dataUrl: await dataUrl(bytes, mime)});
     } catch (error) {
-        if (error?.name !== "AbortError") {
-            const message = describeError(error);
-            setStatus(`${format.toUpperCase()} ERROR`, "error");
-            vscode.postMessage({type: "exportError", message});
-        }
+        // A scene that changed or loaded again ends the export without an error.
+        if (controller.signal.aborted || error?.name === "AbortError") return;
+        setStatus(`${format.toUpperCase()} ERROR`, "error");
+        vscode.postMessage({type: "exportError", message: describeError(error)});
     } finally {
         if (exportController === controller) {
             busy = false;
-            if (runtime === exportingRuntime) playing = resume;
-            if (runtime === exportingRuntime) runtimeAudio.sync(true);
-            previousFrame = performance.now();
-            syncControls();
-            if (runtime === exportingRuntime) draw();
             exportController = undefined;
+            if (resume) visPlayer.play();
+            syncControls();
         }
     }
 }
 
 for (const button of speedButtons) {
     button.addEventListener("click", () => {
-        playbackSpeed = Number(button.dataset.speed);
-        runtimeAudio.sync(true);
+        visPlayer.configure({rate: Number(button.dataset.speed)});
         speedValue.textContent = button.textContent;
         for (const candidate of speedButtons) {
             candidate.setAttribute("aria-current", String(candidate === button));
@@ -1394,19 +1177,20 @@ for (const button of speedButtons) {
     });
 }
 
-for (const button of statButtons) {
+for (const button of cameraControlButtons) {
     button.addEventListener("click", () => {
-        showStats = button.dataset.stat === "true";
+        cameraControl = button.dataset.cameraControl === "true";
         const state = vscode.getState();
         vscode.setState({
             ...(state && typeof state === "object" ? state : {}),
-            showStats,
+            cameraControl,
         });
-        syncCanvasStat();
+        visPlayer.configure({camera: cameraControl});
+        syncCamera();
         closePlayerMenu();
     });
 }
-syncCanvasStat();
+syncCamera();
 
 for (const button of sourceLineButtons) {
     button.addEventListener("click", () => {
@@ -1436,6 +1220,7 @@ for (const button of autoPlayNextButtons) {
         });
         vscode.postMessage({type: "setAutoPlayNext", enabled: autoPlayNext});
         syncAutoPlayNext();
+        syncEnd();
         closePlayerMenu();
     });
 }
@@ -1459,19 +1244,11 @@ syncForceCompactLayout();
 
 for (const button of cameraButtons) {
     button.addEventListener("click", () => {
-        moveCamera(button.dataset.camera);
+        if (!visPlayer.moveCamera(button.dataset.camera)) setStatus("FIXED CAMERA", "ready");
         closePlayerMenu();
     });
 }
 
-fitModeButton.addEventListener("click", () => {
-    fitPreview();
-    closePlayerMenu();
-});
-actualModeButton.addEventListener("click", () => {
-    setPreviewScale(1, {preserveAnchor: false});
-    closePlayerMenu();
-});
 previewResetButton.addEventListener("click", () => {
     resetCanvasView();
     closePlayerMenu();
@@ -1517,10 +1294,6 @@ seriesMenu.addEventListener("toggle", () => {
     if (seriesMenu.open) revealActiveSeriesItem();
     else syncSeriesPanelHost();
 });
-
-new ResizeObserver(() => {
-    if (previewFits) fitPreview();
-}).observe(canvasWrap);
 
 stageResizer.addEventListener("pointerdown", (event) => {
     if (canvasFullscreen || event.button !== 0) return;
@@ -1602,7 +1375,6 @@ window.addEventListener("resize", () => {
     syncPlayerMenuPlacement();
     for (const submenu of menuSubmenus) syncSubmenuPlacement(submenu);
     syncSeriesMenuPlacement();
-    syncRenderPixelRatio();
 });
 syncViewerLayout();
 syncNormalLayoutLimit();
@@ -1620,92 +1392,43 @@ window.addEventListener("keydown", (event) => {
     }
 });
 
-const canvasInputRouter = createCanvasInputRouter({
-    canvas,
-    wheelTarget: canvasWrap,
-    focusTarget: canvasWrap,
-    keyTarget: window,
-    getRuntime: () => runtime,
-    getSceneSize: () => [sceneWidth, sceneHeight],
-    getTime: sceneTime,
-    keyName: (key, code) => inputKeyName?.(key, code),
-    isBusy: () => busy,
-    isFit: () => previewFits,
-    camera: (action, x, y) => moveCamera(action, x, y, false),
-    previewPan: (phase, dx, dy) => {
-        if (phase !== "move") return;
-        previewPanX += dx;
-        previewPanY += dy;
-        syncPreviewTransform();
-    },
-    previewWheel: (event) => wheelPreview(event.deltaY, event.clientX, event.clientY),
-    previewKey: (event) => {
-        if (!event.ctrlKey && !event.metaKey) return false;
-        if (["+", "="].includes(event.key)) stepPreview(1);
-        else if (event.key === "-") stepPreview(-1);
-        else if (event.key === "0") setPreviewScale(1, {preserveAnchor: false});
-        else return false;
-        return true;
-    },
-    contextMenu: (event) => {
-        playerMenuAnchor = {x: event.clientX, y: event.clientY};
-        seriesMenu.open = false;
-        for (const submenu of menuSubmenus) {
-            submenu.open = false;
-            submenu.dataset.positioned = "false";
-        }
-        playerMenu.dataset.positioned = "false";
-        syncPlayerMenuPlacement();
-        playerMenu.dataset.positioned = "true";
-        playerMenu.open = true;
-    },
-    redraw: () => {
-        syncCamera();
-        if (!playing) draw();
-    },
-    ignoreKey: (event) => isHostKeyTarget(event.target),
-    inputError: (error) => showError(describeError(error), "INPUT ERROR"),
+canvas.addEventListener("contextmenu", (event) => {
+    event.preventDefault();
+    playerMenuAnchor = {x: event.clientX, y: event.clientY};
+    seriesMenu.open = false;
+    for (const submenu of menuSubmenus) {
+        submenu.open = false;
+        submenu.dataset.positioned = "false";
+    }
+    playerMenu.dataset.positioned = "false";
+    syncPlayerMenuPlacement();
+    playerMenu.dataset.positioned = "true";
+    playerMenu.open = true;
 });
 
-const disposeHorizontalWheel = [
-    useVerticalWheelForHorizontalScroll(seriesGroupItems),
-    useVerticalWheelForHorizontalScroll(canvasWrap, () => canvasWrap.dataset.fit !== "true"),
-];
+const disposeHorizontalWheel = useVerticalWheelForHorizontalScroll(seriesGroupItems);
 
 document.addEventListener("pointerdown", (event) => {
-    runtimeAudio.start();
     if (playerMenu.open && !playerMenu.contains(event.target)) playerMenu.open = false;
     if (seriesMenu.open && !seriesMenu.contains(event.target)) seriesMenu.open = false;
 });
 
-window.addEventListener("keydown", () => runtimeAudio.start(), {capture: true});
-
 window.addEventListener("message", (event) => {
-    if (event.data?.type === "scene") void loadScene(event.data);
+    if (event.data?.type === "scene") loadScene(event.data);
     if (event.data?.type === "series") syncSeries(event.data.series);
     if (event.data?.type === "sourceContexts") {
-        if (currentScenePayload) {
-            currentScenePayload = {
-                ...currentScenePayload,
-                sourceContexts: event.data.sourceContexts,
-                activeSourceIndex: event.data.activeSourceIndex,
-            };
-        }
         syncSourceInspector(event.data.sourceContexts, event.data.activeSourceIndex, {preserveSelection: true});
     }
     if (event.data?.type === "export") void exportMedia(event.data.format, Number(event.data.fps) || 30);
 });
 
 window.addEventListener("beforeunload", () => {
-    cancelAnimationFrame(animationFrame);
     cancelAnimationFrame(themeRefreshFrame);
     vscodeThemeObserver.disconnect();
     exportController?.abort(new DOMException("Preview closed", "AbortError"));
-    for (const dispose of disposeHorizontalWheel) dispose();
-    canvasInputRouter.dispose();
-    runtime?.destroy();
+    disposeHorizontalWheel();
+    visPlayer.destroy();
 });
 
-animationFrame = requestAnimationFrame(frame);
+syncControls();
 vscode.postMessage({type: "ready"});
-void boot();

@@ -1,5 +1,3 @@
-import {advancePlaybackTime} from "./playback-range.mjs";
-
 export function seriesStepTarget(series, offset) {
     if (offset !== -1 && offset !== 1) return null;
     const groups = Array.isArray(series?.groups) ? series.groups : [];
@@ -25,10 +23,8 @@ export function autoAdvanceSeriesTarget(series, enabled) {
     return {groupIndex, itemIndex: 0, groupLabel: group.label, itemLabel: group.items[0]};
 }
 
-// Advances playback by a frame. With auto-play-next on and an item to go to, the scene plays once
-// instead of looping, and ends with the item to open.
-export function advanceSeriesPlayback({series, autoPlayNext, looping}, time, elapsed, duration, range) {
-    const target = autoAdvanceSeriesTarget(series, autoPlayNext);
-    const next = advancePlaybackTime(time, elapsed, duration, range, looping && !target);
-    return next.ended && target ? {...next, open: target} : next;
+// How the player ends the scene: "loop" or "stop". With auto-play-next on and an item to go to,
+// the scene plays once instead of looping, and the viewer then opens that item.
+export function playbackEnd({series, autoPlayNext, looping}) {
+    return looping && !autoAdvanceSeriesTarget(series, autoPlayNext) ? "loop" : "stop";
 }

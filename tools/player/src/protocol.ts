@@ -26,6 +26,8 @@ export interface SceneRequest {
     readonly resources: SceneResources;
     /** Colors for scenes that use the host-adaptive theme. */
     readonly theme?: HostThemePalette;
+    /** Load the scene's sounds to play them; only a server on the main thread can. */
+    readonly audio?: boolean;
 }
 
 /** What the main thread needs to know about a loaded scene to play it. */
@@ -52,6 +54,27 @@ export interface SceneInfo {
  */
 export type InputEvent = Omit<VisInputEvent, "time">;
 
+/** The moves of a scene's interactive camera, as VisScene.cameraInput takes them. */
+export type CameraAction = "pan" | "orbit" | "zoom" | "reset" | "view2d" | "view3d";
+
+/**
+ * A camera move. A pan or an orbit goes by `x` and `y` as fractions of the canvas, a zoom by `y`
+ * (less than 0 zooms in); a reset and the views take neither.
+ */
+export interface CameraMove {
+    readonly action: CameraAction;
+    readonly x: number;
+    readonly y: number;
+}
+
+/** The player's transport, which the scene's sounds and music follow. */
+export interface AudioState {
+    readonly playing: boolean;
+    readonly rate: number;
+    /** The timeline jumped, as after a seek, a loop or a new rate. */
+    readonly seek: boolean;
+}
+
 /** Backing-store size in device pixels, and the integer scale WASM rasterizes at. */
 export interface FramePlan {
     readonly width: number;
@@ -70,6 +93,10 @@ export interface FrameRequest {
     readonly releaseInput?: boolean;
     /** Dissolve the frame on screen into this one over so many milliseconds. */
     readonly crossfade?: number;
+    /** Camera moves, applied in order before the frame is drawn. */
+    readonly camera?: readonly CameraMove[];
+    /** Where the scene's sound should be; sent once the browser lets the page play audio. */
+    readonly audio?: AudioState;
 }
 
 export interface FrameResult {
@@ -77,6 +104,22 @@ export interface FrameResult {
     readonly sounds?: readonly VisRuntimeSound[];
     /** The retained runtime failed; the frame was still drawn. */
     readonly runtimeError?: ErrorInfo;
+    /** The camera's view after the frame's camera moves. */
+    readonly cameraView?: "2d" | "3d";
+}
+
+/** A frame to draw apart from the canvas, as for an export. */
+export interface CaptureRequest {
+    readonly time: number;
+    /** The integer scale to draw at; 1 is the scene's own size. */
+    readonly ratio: number;
+}
+
+/** A captured frame: its size in pixels and its RGBA pixels, row by row. */
+export interface CapturedFrame {
+    readonly width: number;
+    readonly height: number;
+    readonly data: ArrayBuffer;
 }
 
 /**
@@ -98,6 +141,7 @@ export type ClientMessage =
     | {readonly type: "open"; readonly session: number; readonly canvas: OffscreenCanvas | HTMLCanvasElement}
     | {readonly type: "load"; readonly session: number; readonly seq: number; readonly scene: SceneRequest}
     | {readonly type: "frame"; readonly session: number; readonly seq: number; readonly frame: FrameRequest}
+    | {readonly type: "capture"; readonly session: number; readonly seq: number; readonly capture: CaptureRequest}
     | {readonly type: "release"; readonly session: number}
     | {readonly type: "close"; readonly session: number}
     /** An image's bytes, or why they could not be had. */
@@ -113,6 +157,7 @@ export type ServerMessage =
     /** A newer load for the session arrived before this one finished; nothing was loaded. */
     | {readonly type: "skipped"; readonly session: number; readonly seq: number}
     | {readonly type: "framed"; readonly session: number; readonly seq: number; readonly result: FrameResult}
+    | {readonly type: "captured"; readonly session: number; readonly seq: number; readonly frame: CapturedFrame}
     | {readonly type: "failed"; readonly session: number; readonly seq: number; readonly error: ErrorInfo}
     /**
      * The server is about to run a scene's code for this load. Should it stop answering, this

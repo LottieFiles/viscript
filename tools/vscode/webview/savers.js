@@ -1,6 +1,8 @@
+// PNG, GIF and MP4 from a scene the player draws: `scene` gives its `size()`, `duration` and the
+// `time` shown, and `capture(time, ratio)` draws a frame apart from the canvas as ImageData.
 import {GIFEncoder, applyPalette, quantize} from "gifenc";
 import {BufferTarget, CanvasSource, Mp4OutputFormat, Output, Quality} from "mediabunny";
-import {exportPlan, frameTime, gifDelay} from "./export-plan.mjs";
+import {exportPlan, frameTime, gifDelay, pngRatio} from "./export-plan.mjs";
 
 function active(signal) {
     if (signal?.aborted) throw signal.reason || new DOMException("Operation aborted", "AbortError");
@@ -23,13 +25,27 @@ async function yieldFrame(signal) {
     active(signal);
 }
 
+// The frame shown, at the device pixel ratio.
+export async function savePng(scene, pixelRatio = 1) {
+    const [width, height] = scene.size();
+    const image = await scene.capture(scene.time, pngRatio(width, height, pixelRatio));
+    const canvas = document.createElement("canvas");
+    canvas.width = image.width;
+    canvas.height = image.height;
+    canvas.getContext("2d").putImageData(image, 0, 0);
+    return new Promise((resolve, reject) => {
+        canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("PNG encoding failed")), "image/png");
+    });
+}
+
 export async function saveGif(scene, fps, progress = () => {}, signal = null, range = null) {
     active(signal);
     const plan = exportPlan(scene, fps, range);
     const gif = GIFEncoder();
     for (let frame = 0; frame < plan.frames; frame += 1) {
         active(signal);
-        const pixels = scene.render(frameTime(plan, frame));
+        const {data: pixels} = await scene.capture(frameTime(plan, frame), 1);
+        active(signal);
         const palette = quantize(pixels, 256);
         const index = applyPalette(pixels, palette);
         gif.writeFrame(index, plan.width, plan.height, {
@@ -51,6 +67,7 @@ export async function saveMp4(scene, fps, progress = () => {}, signal = null, ra
     const canvas = document.createElement("canvas");
     canvas.width = plan.width;
     canvas.height = plan.height;
+    const context = canvas.getContext("2d");
     const target = new BufferTarget();
     const output = new Output({format: new Mp4OutputFormat(), target});
     const source = new CanvasSource(canvas, {codec: "avc", quality: new Quality("high")});
@@ -60,7 +77,8 @@ export async function saveMp4(scene, fps, progress = () => {}, signal = null, ra
         active(signal);
         for (let frame = 0; frame < plan.frames; frame += 1) {
             active(signal);
-            scene.draw(canvas, frameTime(plan, frame));
+            context.putImageData(await scene.capture(frameTime(plan, frame), 1), 0, 0);
+            active(signal);
             await source.add(frame / plan.fps, 1 / plan.fps, {
                 keyFrame: frame % (plan.fps * 2) === 0,
             });

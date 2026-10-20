@@ -1,5 +1,19 @@
 import * as esbuild from "esbuild";
-import {rm} from "node:fs/promises";
+import {mkdir, rm, writeFile} from "node:fs/promises";
+import {bundlePlayer, bundleServer} from "../player/build.mjs";
+
+// The shared player, with the extension's runtime: the main-thread module and the render server,
+// which the webview runs on its main thread. Lua scenes need no compiler.
+await rm("media/player", {recursive: true, force: true});
+await mkdir("media/player", {recursive: true});
+const [playerModule, server] = await Promise.all([
+    bundlePlayer({runtimeDir: "runtime"}),
+    bundleServer({runtimeDir: "runtime"}),
+]);
+await Promise.all([
+    writeFile("media/player/player.js", playerModule),
+    writeFile("media/player/player-worker.js", server),
+]);
 
 await esbuild.build({
     entryPoints: ["webview/savers.js"],

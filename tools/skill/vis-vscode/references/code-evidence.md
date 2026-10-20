@@ -48,4 +48,4 @@ Drop rows that have no visible causal transition, repeat another row's claim, or
 - **Several independent claims.** Make a series: one `series` string, one claim per episode, each episode understandable on its own. The Viewer provides navigation.
 - **Short-form, only on request.** One verified claim per episode, and a final frame that keeps the answer and its evidence. No phone chrome, subtitles, or social controls. A tall Canvas or a wish for energy is not a short-form request.
 
-Choose the aspect ratio from the evidence geometry and the editor group the Scene will sit in. When a narrow FIT becomes unreadable, cut copy or split the episode before shrinking text.
+Choose the aspect ratio from the evidence geometry and the editor group the Scene will sit in. When the Canvas, fitted to a narrow group, becomes unreadable, cut copy or split the episode before shrinking text.

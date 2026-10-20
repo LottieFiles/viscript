@@ -12,3 +12,6 @@ runtime/*.d.ts
 runtime/package.json
 runtime/README.md
 runtime/BUILD-MANIFEST.json
+runtime/client.js
+runtime/bindings.js
+runtime/vis-wasm.js

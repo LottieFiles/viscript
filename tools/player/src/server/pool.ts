@@ -35,6 +35,8 @@ export interface PoolOptions {
 /** A trap or abort leaves an instance in an unknown state. */
 export const isTrap = (error: unknown): boolean => error instanceof WebAssembly.RuntimeError;
 
+const isSound = (asset: AssetRef): boolean => asset.mime.startsWith("audio/");
+
 class Instance {
     readonly ready: Promise<VisModule>;
     /** The host's fonts it was started with; see InstancePool.retire(). */
@@ -115,13 +117,18 @@ export class InstancePool {
         return added.some(Boolean);
     }
 
-    /** Registers the assets a scene loads in the lease's engine, replacing any of the same name. */
-    async ensureAssets(lease: Lease, assets: readonly AssetRef[]): Promise<void> {
-        const missing = assets.filter((asset) => lease.assets.get(asset.name) !== asset.id);
+    /**
+     * Registers the assets a scene loads in the lease's engine, replacing any of the same name.
+     * Sounds go to the engine's audio when `audio` is set, and are left out otherwise.
+     */
+    async ensureAssets(lease: Lease, assets: readonly AssetRef[], audio = false): Promise<void> {
+        const wanted = assets.filter((asset) => !isSound(asset) || (audio && lease.engine.audio));
+        const missing = wanted.filter((asset) => lease.assets.get(asset.name) !== asset.id);
         const loaded = await Promise.all(missing.map(async (asset) => [asset, await this.#deps.assetBytes(asset)] as const));
         for (const [asset, data] of loaded) {
             if (lease.released || lease.assets.get(asset.name) === asset.id) continue;
-            lease.engine.asset(asset.name, data, asset.mime);
+            if (isSound(asset)) lease.engine.audio!.load(asset.name, data);
+            else lease.engine.asset(asset.name, data, asset.mime);
             lease.assets.set(asset.name, asset.id);
         }
     }

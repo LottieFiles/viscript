@@ -16,7 +16,7 @@ From `tools/vscode/`, run `npm install` and `npm run compile`, press `F5`, and o
 
 These are the only delivery differences from vis-skills:
 
-- **Canvas.** One fixed logical Canvas. FIT scales it uniformly without cropping or stretching, and resizing never reruns Lua. Display zoom never changes export size.
+- **Canvas.** One fixed logical Canvas. The Viewer fits it to the player uniformly, without cropping or stretching, and resizing never reruns Lua. Exports keep the Canvas's own size.
 - **Theme.** `theme = "adaptive"` follows the workbench theme and rebuilds when the theme changes. Fixed and custom themes stay Scene-owned.
 - **Fonts.** Pretendard, monospaced JetBrains Mono NL (`JetBrainsMono`, used by code), and Source Serif 4 (used by the `adaptive` heading and body roles). The Viewer gives those roles the list `Source Serif 4, Pretendard`, so Korean letters, which Source Serif 4 lacks, come from Pretendard, as in the Viewer's CSS. The CLI has no host, so it sets `adaptive` in Pretendard with Pro White colors; the host review below measures what the Viewer shows.
 - **Assets.** `asset = "..."` and `texture = "..."` load relative to the Lua file.
@@ -43,21 +43,20 @@ The Series button between Previous and Next opens a two-level list: groups, then
 
 **RANGE → SET IN / SET OUT / CLEAR** sets an interval in the Viewer, not in the Scene. The seekbar highlights it, Restart seeks to its start, Loop wraps inside it, and playback without Loop stops at its end. The range survives a reload of the same Scene and clears when another Scene loads. The Scene's own timeline is unchanged.
 
-Export from the Command Palette with **viscript: Save Current Viewer as PNG/GIF/MP4**. PNG saves the current frame. GIF and MP4 sample only the active range, at 24, 30, or 60 fps.
+Export from the Command Palette with **viscript: Save Current Viewer as PNG/GIF/MP4**. PNG saves the current frame at the display's pixel ratio. GIF and MP4 sample only the active range, at 24, 30, or 60 fps.
 
 ## Layout
 
-Compact stacks the Canvas and Playback above the Inspector. Wide starts at 600 px and returns to Compact below 567 px, and **Option → Compact Layout** forces Compact. The sashes resize the player width and the Canvas height, and **RESET LAYOUT** restores automatic sizing. In FIT, the wheel zooms around the pointer and middle-drag pans; **CANVAS TO RAW SIZE** shows the Canvas at 1:1. Canvas Full Screen hides the Inspector, and Escape exits it. Right-clicking the Canvas opens the settings menu.
+Compact stacks the Canvas and Playback above the Inspector. Wide starts at 600 px and returns to Compact below 567 px, and **Option → Compact Layout** forces Compact. The sashes resize the player width and the Canvas height, and **RESET LAYOUT** restores automatic sizing. The Canvas always fits the player. Clicking it plays or pauses the Scene, and right-clicking it opens the settings menu.
 
 ## Interactive Scenes
 
-Author UI, Input, States, Runtime, and Audio with [vis-interactive](../../vis-interactive/SKILL.md). The Preview offers each Canvas pointer event to UI first and then to Input; only unhandled events fall through to camera and FIT gestures. With `camera = {mode = "interactive"}`:
+Author UI, Input, States, Runtime, and Audio with [vis-interactive](../../vis-interactive/SKILL.md). A Scene that uses UI or Input gets every Canvas pointer event, and the keys once the Canvas has focus, while its timeline plays; the Viewer's play and pause clicks and camera gestures do not apply to it, so give it its own controls. A retained Runtime steps while the Scene plays and holds while it is paused. With `camera = {mode = "interactive"}` in any other Scene, and **Camera → CONTROL ON** (the default):
 
-- dragging pans in 2D or orbits in 3D, and Shift-drag pans;
-- the arrow keys pan and `+`/`-` zoom;
-- `2` and `3` switch views, and `R` resets.
+- dragging pans in 2D or orbits in 3D, Shift-drag pans, and the wheel zooms;
+- once the Canvas has focus, the arrow keys pan, `+`/`-` zoom, `2` and `3` switch views, and `R` resets.
 
-Keep the first FIT frame complete for readers who never interact.
+**Camera → 2D / 3D / RESET** moves the camera even with **CONTROL OFF**, when a click on the Canvas only plays or pauses. Keep the first frame complete for readers who never interact.
 
 ## IntelliSense
 

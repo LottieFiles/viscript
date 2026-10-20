@@ -4,8 +4,8 @@
 // worker that stops answering is replaced; its players get new canvases and load again.
 import {fontType, type FontProvider} from "../fonts/provider.ts";
 import {
-    INLINE_SERVER, type ClientMessage, type ErrorInfo, type FrameRequest, type FrameResult, type SceneInfo,
-    type SceneRequest, type ServerMessage,
+    INLINE_SERVER, type CapturedFrame, type CaptureRequest, type ClientMessage, type ErrorInfo, type FrameRequest,
+    type FrameResult, type SceneInfo, type SceneRequest, type ServerMessage,
 } from "../protocol.ts";
 
 export interface AssetProvider {
@@ -79,6 +79,8 @@ export interface HostSession {
     load(scene: SceneRequest): Promise<SceneInfo>;
     /** Asks for a frame; while one is being drawn, later requests merge into one. */
     frame(frame: FrameRequest): void;
+    /** Draws a frame apart from the canvas; rejects with SupersededError when the session closes first. */
+    capture(request: CaptureRequest): Promise<CapturedFrame>;
     /** Frees the scene's engine but keeps the canvas, for a player out of view. */
     release(): void;
     close(): void;
@@ -124,10 +126,16 @@ interface Outstanding {
     readonly sentAt: number;
 }
 
+interface Pending<T> {
+    resolve(value: T): void;
+    reject(error: Error): void;
+}
+
 interface SessionState {
     readonly id: number;
     readonly handlers: SessionHandlers;
-    readonly loads: Map<number, {resolve(info: SceneInfo): void; reject(error: Error): void}>;
+    readonly loads: Map<number, Pending<SceneInfo>>;
+    readonly captures: Map<number, Pending<CapturedFrame>>;
     /** Loads asked for, so a scene still compiling gives way to a later load. */
     asked: number;
     /** The frame the server is drawing, by sequence number. */
@@ -139,12 +147,15 @@ interface SessionState {
 const canTransfer = (): boolean => typeof Worker === "function" && typeof OffscreenCanvas === "function"
     && typeof HTMLCanvasElement !== "undefined" && "transferControlToOffscreen" in HTMLCanvasElement.prototype;
 
-// The newest time and plan win; input queues up, and so does the time a live scene steps by. A
-// release lets go of everything before it, so input queued before one is dropped.
+// The newest time, plan and sound win; input and camera moves queue up, and so does the time a
+// live scene steps by. A release lets go of everything before it, so input queued before one is
+// dropped. A jump in the sound's timeline is kept for the frame that follows it.
 export function merge(older: FrameRequest | null, newer: FrameRequest): FrameRequest {
     if (!older) return newer;
     const live = older.advance !== undefined || newer.advance !== undefined;
     const input = [...newer.releaseInput ? [] : older.input ?? [], ...newer.input ?? []];
+    const camera = [...older.camera ?? [], ...newer.camera ?? []];
+    const audio = newer.audio && older.audio?.seek ? {...newer.audio, seek: true} : newer.audio ?? older.audio;
     return {
         time: newer.time,
         plan: newer.plan,
@@ -152,6 +163,8 @@ export function merge(older: FrameRequest | null, newer: FrameRequest): FrameReq
         ...(live ? {advance: (older.advance ?? 0) + (newer.advance ?? 0)} : {}),
         ...(older.releaseInput || newer.releaseInput ? {releaseInput: true} : {}),
         ...(newer.crossfade ?? older.crossfade ? {crossfade: newer.crossfade ?? older.crossfade} : {}),
+        ...(camera.length ? {camera} : {}),
+        ...(audio ? {audio} : {}),
     };
 }
 
@@ -200,7 +213,9 @@ class Host implements RenderHost {
     open(canvas: HTMLCanvasElement, handlers: SessionHandlers): HostSession {
         if (this.#disposed) throw new Error("This render host was disposed");
         const transport = this.#connect();
-        const state: SessionState = {id: this.#nextSession++, handlers, loads: new Map(), asked: 0, inflight: 0, pending: null};
+        const state: SessionState = {
+            id: this.#nextSession++, handlers, loads: new Map(), captures: new Map(), asked: 0, inflight: 0, pending: null,
+        };
         this.#sessions.set(state.id, state);
         if (this.#mode === "worker") {
             const offscreen = canvas.transferControlToOffscreen();
@@ -211,6 +226,7 @@ class Host implements RenderHost {
         return {
             load: (scene) => this.#load(state, scene),
             frame: (frame) => this.#frame(state, frame),
+            capture: (request) => this.#capture(state, request),
             release: () => {
                 if (this.#sessions.get(state.id) === state) this.#transport?.post({type: "release", session: state.id});
             },
@@ -279,8 +295,11 @@ class Host implements RenderHost {
         const server = loadInlineServer(this.#options.server).then((factory: Factory) => factory(post));
         server.catch((error: unknown) => {
             for (const state of this.#sessions.values()) {
-                for (const {reject} of state.loads.values()) reject(new SceneError({phase: "engine", message: String(error)}));
+                for (const pending of [...state.loads.values(), ...state.captures.values()]) {
+                    pending.reject(new SceneError({phase: "engine", message: String(error)}));
+                }
                 state.loads.clear();
+                state.captures.clear();
             }
         });
         return {
@@ -342,12 +361,19 @@ class Host implements RenderHost {
         this.#send({type: "frame", session: state.id, seq, frame});
     }
 
+    #capture(state: SessionState, request: CaptureRequest): Promise<CapturedFrame> {
+        if (this.#sessions.get(state.id) !== state || !this.#transport) return Promise.reject(new SupersededError());
+        const seq = this.#nextSeq++;
+        return new Promise<CapturedFrame>((resolve, reject) => {
+            state.captures.set(seq, {resolve, reject});
+            this.#send({type: "capture", session: state.id, seq, capture: request});
+        });
+    }
+
     #close(state: SessionState): void {
         if (this.#sessions.get(state.id) !== state) return;
         this.#sessions.delete(state.id);
-        for (const {reject} of state.loads.values()) reject(new SupersededError());
-        state.loads.clear();
-        state.pending = null;
+        abandon(state);
         for (const [seq, request] of this.#outstanding) if (request.session === state.id) this.#outstanding.delete(seq);
         this.#transport?.post({type: "close", session: state.id});
     }
@@ -371,7 +397,8 @@ class Host implements RenderHost {
             case "loaded":
             case "skipped":
             case "failed":
-            case "framed": {
+            case "framed":
+            case "captured": {
                 this.#outstanding.delete(message.seq);
                 if (this.#running?.seq === message.seq) this.#running = null;
                 const state = this.#sessions.get(message.session);
@@ -382,6 +409,14 @@ class Host implements RenderHost {
                     if (message.type === "loaded") load.resolve(message.info);
                     else if (message.type === "failed") load.reject(new SceneError(message.error));
                     else load.reject(new SupersededError());
+                    return;
+                }
+                const capture = state.captures.get(message.seq);
+                if (capture) {
+                    state.captures.delete(message.seq);
+                    if (message.type === "captured") capture.resolve(message.frame);
+                    else if (message.type === "failed") capture.reject(new SceneError(message.error));
+                    else capture.reject(new SupersededError());
                     return;
                 }
                 if (state.inflight !== message.seq) return;
@@ -494,13 +529,19 @@ class Host implements RenderHost {
         const sessions = [...this.#sessions.values()];
         this.#sessions.clear();
         for (const state of sessions) {
-            for (const {reject} of state.loads.values()) reject(new SupersededError());
-            state.loads.clear();
-            state.pending = null;
+            abandon(state);
             state.inflight = 0;
         }
         for (const state of sessions) state.handlers.lost(state.id === culprit ? "timeout" : "restart");
     }
+}
+
+// A session that closed or lost its server: what it waits for will not come.
+function abandon(state: SessionState): void {
+    for (const pending of [...state.loads.values(), ...state.captures.values()]) pending.reject(new SupersededError());
+    state.loads.clear();
+    state.captures.clear();
+    state.pending = null;
 }
 
 const inlineServers = new Map<string, Promise<unknown>>();
