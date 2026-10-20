@@ -1,8 +1,7 @@
 // README Skills for AI agents animation, with theme-aware cell fills and contrast.
 // Source: docs/assets/skills.lua.
 export const SKILLS = String.raw`-- README "Skills for AI agents": the example prompt, and the scene an agent makes from it.
-local scene = vis.scene {width = 1000, height = 360, fps = 20, theme = "pro_black",
-  camera = {height = 6}}
+local scene = vis.scene {width = 1000, height = 360, fps = 20, camera = {height = 6}}
 
 local PROMPT = "Use vis-skills to animate binary search on a sorted array of 16 numbers."
 local DATA = {2, 5, 8, 12, 16, 23, 38, 41, 45, 56, 61, 67, 72, 80, 88, 95}

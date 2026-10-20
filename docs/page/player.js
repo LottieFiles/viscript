@@ -9,8 +9,9 @@ const $ = (s, root = document) => root.querySelector(s);
 const players = new Set();
 
 // ---------- theme ----------
-// Scenes are authored for dark; in light mode the scene theme and the hard-coded
-// panel colours swap to their light counterparts (and back).
+// Scenes name no theme, so they take the page's colours (below). The panel colours some of them
+// hard-code are authored for dark and swap to their light counterparts in light mode (and back);
+// a theme a scene names, as the Themes page's do, stays as it is.
 const DARK_TO_LIGHT = {
   "14171f": "f4f6fa", "3a4152": "c3c8d3", "e6e8ee": "1d2230", "7d8596": "6b7280", "262b38": "dde1e8",
   "1d2230": "e8ebf0", "2f3646": "cfd4dc", "2a3142": "d5dae2", "aab1bf": "4b5563", "1f2430": "e5e8ee",
@@ -20,17 +21,14 @@ const DARK_TO_LIGHT = {
 const LIGHT_TO_DARK = Object.fromEntries(Object.entries(DARK_TO_LIGHT).map(([d, l]) => [l, d]));
 const mode = () => document.documentElement.dataset.theme === "light" ? "light" : "dark";
 function themeAdapt(src) {
-  const light = mode() === "light";
-  const map = light ? DARK_TO_LIGHT : LIGHT_TO_DARK;
-  return src
-    .replace(/\b((?:theme|preset)\s*(?:=|:)\s*)"pro_(?:black|white)"/g, (_, key) => `${key}"${light ? "pro_white" : "pro_black"}"`)
-    .replace(/#([0-9a-fA-F]{6})/g, (m, hex) => "#" + (map[hex.toLowerCase()] ?? hex));
+  const map = mode() === "light" ? DARK_TO_LIGHT : LIGHT_TO_DARK;
+  return src.replace(/#([0-9a-fA-F]{6})/g, (m, hex) => "#" + (map[hex.toLowerCase()] ?? hex));
 }
 export function retheme() {
   for (const p of players) p.retheme();
 }
-// Scenes with theme = "adaptive" take the page's own colours, read at each load, so they follow
-// the switch too; a colour left out is the runtime's light or dark one.
+// Scenes that name no theme, or name "adaptive", take the page's own colours, read at each load, so
+// they follow the switch; a colour left out is the runtime's light or dark one.
 const PAGE_COLORS = {background: "--stage", foreground: "--fg", muted: "--dim", accent: "--accent", surface: "--raise", line: "--line2"};
 function pageTheme() {
   const style = getComputedStyle(document.documentElement);

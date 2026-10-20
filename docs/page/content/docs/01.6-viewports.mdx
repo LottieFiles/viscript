@@ -15,14 +15,13 @@ For the same layout across themes, see <a href="#/docs/themes">Themes</a>.</p>
 To play whole scenes one after another instead, see [Scene](#/docs/scene-transitions).
 
 ```lua live
-local panelTheme = {preset = "pro_black", background = "#161b22"}
-local root = vis.scene {width = 960, height = 540, theme = {preset = "pro_black", background = "#0d1117"},
-                        camera = {height = 6}}
+local root = vis.scene {width = 960, height = 540, camera = {height = 6}}
 root:text {text = "Trigonometry at a glance", role = "h2", point = {0, 2.62}}
 
--- One card of the sheet: its own scene, camera and timeline, with a caption at the bottom.
+-- One card of the sheet: its own scene, camera and timeline on a panel, with a caption at the bottom.
 local function card(caption, build)
-    local s = vis.scene {width = 312, height = 222, theme = panelTheme, camera = {height = 3.6}}
+    local s = vis.scene {width = 312, height = 222, camera = {height = 3.6}}
+    s:rectangle {size = {5.06, 3.6}, corner = 0.12, fill = "surface", stroke = "border", width = 1}
     s:text {text = caption, point = {0, -1.55}, size = 13, color = "muted"}
     build(s)
     return s
@@ -86,14 +85,13 @@ return root
 ```
 
 ```js live
-const panelTheme = {preset: "pro_black", background: "#161b22"};
-const root = vis.scene({width: 960, height: 540, theme: {preset: "pro_black", background: "#0d1117"},
-                        camera: {height: 6}});
+const root = vis.scene({width: 960, height: 540, camera: {height: 6}});
 root.text({text: "Trigonometry at a glance", role: "h2", point: [0, 2.62]});
 
-// One card of the sheet: its own scene, camera and timeline, with a caption at the bottom.
+// One card of the sheet: its own scene, camera and timeline on a panel, with a caption at the bottom.
 function card(caption, build) {
-    const s = vis.scene({width: 312, height: 222, theme: panelTheme, camera: {height: 3.6}});
+    const s = vis.scene({width: 312, height: 222, camera: {height: 3.6}});
+    s.rectangle({size: [5.06, 3.6], corner: 0.12, fill: "surface", stroke: "border", width: 1});
     s.text({text: caption, point: [0, -1.55], size: 13, color: "muted"});
     build(s);
     return s;

@@ -6,7 +6,7 @@ const HEAD = `if not vis.runtime or not vis.input then
     error("this scene requires a viscript build configured with -Dmodules=interactive")
 end
 local W, H, U = 960, 540, 90          -- logical pixels, pixels per world unit
-local scene = vis.scene {width = W, height = H, theme = "pro_black", camera = {height = H / U}}
+local scene = vis.scene {width = W, height = H, camera = {height = H / U}}
 local C = {panel = "#14171f", line = "#3a4152", grid = "#1f2430", text = "#e6e8ee", mute = "#7d8596", bar = "#2a3142",
            accent = "#6cb6ff", warn = "#e3b341", danger = "#ff7b72", ok = "#7ee787", alt = "#c8a7ff", none = "#00000000"}
 -- layer bands: background < guides < subjects < handles < labels

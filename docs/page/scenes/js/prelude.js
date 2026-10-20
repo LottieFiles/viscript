@@ -1,5 +1,5 @@
 // The JavaScript twin of ../prelude.js, which the JavaScript versions of those scenes open with.
-export const PRELUDE = `const scene = vis.scene({theme: "pro_black", camera: {height: 6}});
+export const PRELUDE = `const scene = vis.scene({camera: {height: 6}});
 const C = {panel: "#14171f", line: "#3a4152", text: "#e6e8ee", mute: "#7d8596", bar: "#2a3142",
            accent: "#6cb6ff", warn: "#e3b341", danger: "#ff7b72", ok: "#7ee787", alt: "#c8a7ff",
            none: "#00000000"};

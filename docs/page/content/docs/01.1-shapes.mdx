@@ -25,7 +25,7 @@ later timeline calls.</p>
 </table>
 
 ```lua live
-local scene = vis.scene {theme = "pro_black", camera = {height = 6}}
+local scene = vis.scene {camera = {height = 6}}
 
 local rect = scene:rectangle {center = {-3.5, 0}, size = {2, 1.4}, corner = 0.2, fill = "accent"}
 local tri = scene:polygon {points = {{-1, -0.8}, {1, -0.8}, {0, 1}}, fill = "warning"}
@@ -41,7 +41,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({theme: "pro_black", camera: {height: 6}});
+const scene = vis.scene({camera: {height: 6}});
 
 const rect = scene.rectangle({center: [-3.5, 0], size: [2, 1.4], corner: 0.2, fill: "accent"});
 const tri = scene.polygon({points: [[-1, -0.8], [1, -0.8], [0, 1]], fill: "warning"});
@@ -60,7 +60,7 @@ return scene;
 `path` takes one contour as a list of commands, like a pen: move, draw, close.
 
 ```lua live
-local scene = vis.scene {theme = "pro_black", camera = {height = 6}}
+local scene = vis.scene {camera = {height = 6}}
 
 local arch = scene:path {commands = {
     {type = "move", to = {-2, -1.5}},
@@ -74,7 +74,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({theme: "pro_black", camera: {height: 6}});
+const scene = vis.scene({camera: {height: 6}});
 
 const arch = scene.path({commands: [
     {type: "move", to: [-2, -1.5]},
@@ -102,7 +102,7 @@ return scene;
 The control points pull the curve toward them without lying on it — the dashed handles show where they are.
 
 ```lua live
-local scene = vis.scene {theme = "pro_black", camera = {height = 6}}
+local scene = vis.scene {camera = {height = 6}}
 
 local p0, c1, c2, p1 = {-3, -1.5}, {-2, 2}, {2, -2}, {3, 1.5}
 local h1 = scene:line {from = p0, to = c1, stroke = "muted", width = 2, dash = {6, 6}}
@@ -120,7 +120,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({theme: "pro_black", camera: {height: 6}});
+const scene = vis.scene({camera: {height: 6}});
 
 const [p0, c1, c2, p1] = [[-3, -1.5], [-2, 2], [2, -2], [3, 1.5]];
 const h1 = scene.line({from: p0, to: c1, stroke: "muted", width: 2, dash: [6, 6]});
@@ -142,7 +142,7 @@ return scene;
 `route` connects points in order with straight segments, and `tip` adds an arrowhead (size in pixels) — handy for flows and connectors.
 
 ```lua live
-local scene = vis.scene {theme = "pro_black", camera = {height = 6}}
+local scene = vis.scene {camera = {height = 6}}
 
 local route = scene:route {
     points = {{-4, -1.5}, {-4, 1}, {0, 1}, {0, -1}, {4, -1}},
@@ -155,7 +155,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({theme: "pro_black", camera: {height: 6}});
+const scene = vis.scene({camera: {height: 6}});
 
 const route = scene.route({
     points: [[-4, -1.5], [-4, 1], [0, 1], [0, -1], [4, -1]],
@@ -176,7 +176,7 @@ These three mark parts of other shapes:
 - `brace` spans a segment or the bounds of objects, and sizes itself to its label.
 
 ```lua live
-local scene = vis.scene {theme = "pro_black", camera = {height = 6}}
+local scene = vis.scene {camera = {height = 6}}
 
 local arc = scene:arc {center = {-4, 0}, radius = 1, start = 0, angle = 2.2, stroke = "accent", width = 3}
 local pie = scene:arc {center = {-4, 0}, radius = 0.6, start = 2.4, angle = 1.6, sector = true, fill = "warning"}
@@ -200,7 +200,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({theme: "pro_black", camera: {height: 6}});
+const scene = vis.scene({camera: {height: 6}});
 
 const arc = scene.arc({center: [-4, 0], radius: 1, start: 0, angle: 2.2, stroke: "accent", width: 3});
 const pie = scene.arc({center: [-4, 0], radius: 0.6, start: 2.4, angle: 1.6, sector: true, fill: "warning"});

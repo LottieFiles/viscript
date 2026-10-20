@@ -26,8 +26,7 @@ local importedData = {}
 -- every _recordCell (cell area / cover), and every _sweep step and _horizLine call for row RLE_ROW.
 importedData.FONT = "CMUTypewriter-Regular"
 local scene = vis.scene {width = 800, height = 450, fps = 25, loop = true,
-  theme = {preset = "pro_black",
-    text = {h1 = {font = importedData.FONT}, h2 = {font = importedData.FONT}, h3 = {font = importedData.FONT}, text = {font = importedData.FONT}, code = {font = importedData.FONT}}},
+  theme = {text = {h1 = {font = importedData.FONT}, h2 = {font = importedData.FONT}, h3 = {font = importedData.FONT}, text = {font = importedData.FONT}, code = {font = importedData.FONT}}},
   camera = {height = 4.5}}
 
 -- ------------------------------------------------------------------ data (from ThorVG)

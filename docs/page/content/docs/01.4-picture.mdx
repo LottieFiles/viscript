@@ -20,7 +20,7 @@ parent: scenes
 Use exactly one of `asset` or `pixels`. A picture keeps its source colours, so `color`, `stroke`, `fill`, `radius` and `dash` are rejected.
 
 ```lua live
-local scene = vis.scene {theme = "pro_black", camera = {height = 6}}
+local scene = vis.scene {camera = {height = 6}}
 
 -- "The Blue Marble", NASA / Apollo 17 (public domain).
 local earth = scene:picture {asset = "earth.png", width = 4.2, center = {-1.6, 0}}
@@ -36,7 +36,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({theme: "pro_black", camera: {height: 6}});
+const scene = vis.scene({camera: {height: 6}});
 
 // "The Blue Marble", NASA / Apollo 17 (public domain).
 const earth = scene.picture({asset: "earth.png", width: 4.2, center: [-1.6, 0]});

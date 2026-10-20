@@ -1,6 +1,6 @@
 // The Lua the algorithm, data-structure and diagram scenes open with (algorithms.js, diagrams.js):
 // the scene and its palette, draw-order bands, labels, one phrase beside the action, and tokens.
-export const PRELUDE = `local scene = vis.scene {theme = "pro_black", camera = {height = 6}}
+export const PRELUDE = `local scene = vis.scene {camera = {height = 6}}
 local C = {panel = "#14171f", line = "#3a4152", text = "#e6e8ee", mute = "#7d8596", bar = "#2a3142",
            accent = "#6cb6ff", warn = "#e3b341", danger = "#ff7b72", ok = "#7ee787", alt = "#c8a7ff",
            none = "#00000000"}

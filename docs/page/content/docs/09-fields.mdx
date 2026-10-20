@@ -21,7 +21,7 @@ Dense colour grids — static, patched, or sampled over time.
 </table>
 
 ```lua live
-local scene = vis.scene {theme = "pro_black", camera = {height = 10}}
+local scene = vis.scene {camera = {height = 10}}
 
 local board = scene:cell {
     origin = {-4, -4}, size = {8, 8}, color = "#1d2230", mode = "padd", padding = 0.06,
@@ -39,7 +39,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({theme: "pro_black", camera: {height: 10}});
+const scene = vis.scene({camera: {height: 10}});
 
 const board = scene.cell({
     origin: [-4, -4], size: [8, 8], color: "#1d2230", mode: "padd", padding: 0.06,
@@ -67,7 +67,7 @@ construction — once per cell per frame of <code>fps</code> — so it must be p
 </table>
 
 ```lua live
-local scene = vis.scene {theme = "pro_black", camera = {height = 6}}
+local scene = vis.scene {camera = {height = 6}}
 
 local field = scene:space {x = {-4.5, 4.5, 0.15}, y = {-2.5, 2.5, 0.15}, opacity = 0}
 local T = 3
@@ -83,7 +83,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({theme: "pro_black", camera: {height: 6}});
+const scene = vis.scene({camera: {height: 6}});
 
 const field = scene.space({x: [-4.5, 4.5, 0.15], y: [-2.5, 2.5, 0.15], opacity: 0});
 const T = 3;
@@ -105,7 +105,7 @@ return scene;
 is anti-aliasing.</p>
 
 ```lua live
-local scene = vis.scene {theme = "pro_black", camera = {height = 18}}
+local scene = vis.scene {camera = {height = 18}}
 
 -- One cell per pixel: a 26 x 15 grid with 4 x 4 sample points in each pixel.
 local COLS, ROWS, N = 26, 15, 4
@@ -161,7 +161,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({theme: "pro_black", camera: {height: 18}});
+const scene = vis.scene({camera: {height: 18}});
 
 // One cell per pixel: a 26 x 15 grid with 4 x 4 sample points in each pixel.
 const COLS = 26, ROWS = 15, N = 4;

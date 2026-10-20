@@ -11,7 +11,7 @@ parent: scenes
 `text` draws a string at a world point. Set `size` in points, or pick a `role` and let the theme size it. `write` reveals it stroke by stroke.
 
 ```lua live
-local scene = vis.scene {theme = "pro_black", camera = {height = 6}}
+local scene = vis.scene {camera = {height = 6}}
 
 local title = scene:text {text = "Heading", role = "h1", point = {0, 1.2}}
 local body = scene:text {text = "Body text sized by the theme", role = "text", point = {0, 0}}
@@ -26,7 +26,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({theme: "pro_black", camera: {height: 6}});
+const scene = vis.scene({camera: {height: 6}});
 
 const title = scene.text({text: "Heading", role: "h1", point: [0, 1.2]});
 const body = scene.text({text: "Body text sized by the theme", role: "text", point: [0, 0]});
@@ -55,7 +55,7 @@ return scene;
 `point` is an anchor, and `align` says which part of the text sits on it: `0` is left/bottom, `0.5` the centre, `1` right/top. Here all three lines anchor on the same vertical line.
 
 ```lua live
-local scene = vis.scene {theme = "pro_black", camera = {height = 6}}
+local scene = vis.scene {camera = {height = 6}}
 
 local guide = scene:line {from = {0, -2}, to = {0, 2}, stroke = "muted", width = 1, dash = {6, 6}}
 local left = scene:text {text = "align {0, 0.5}", point = {0, 1}, align = {0, 0.5}, size = 22}
@@ -71,7 +71,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({theme: "pro_black", camera: {height: 6}});
+const scene = vis.scene({camera: {height: 6}});
 
 const guide = scene.line({from: [0, -2], to: [0, 2], stroke: "muted", width: 1, dash: [6, 6]});
 const left = scene.text({text: "align {0, 0.5}", point: [0, 1], align: [0, 0.5], size: 22});
@@ -91,7 +91,7 @@ return scene;
 `object:label` creates the same text as a **child** of an object, so it moves with it. `scene:text` stays where you put it.
 
 ```lua live
-local scene = vis.scene {theme = "pro_black", camera = {height = 6}}
+local scene = vis.scene {camera = {height = 6}}
 
 local dot = scene:circle {center = {-3, 0}, radius = 0.5, fill = "accent"}
 dot:label {text = "label", point = {-3, -0.9}, align = {0.5, 1}, size = 20, layer = 2}
@@ -104,7 +104,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({theme: "pro_black", camera: {height: 6}});
+const scene = vis.scene({camera: {height: 6}});
 
 const dot = scene.circle({center: [-3, 0], radius: 0.5, fill: "accent"});
 dot.label({text: "label", point: [-3, -0.9], align: [0.5, 1], size: 20, layer: 2});
@@ -137,7 +137,7 @@ Write `\\` for a backslash inside a quoted string.<br />
 `tex` comes from the TeX module: the WASM runtime includes it, and a native build needs `-Dmodules=tex`.
 
 ```lua live
-local scene = vis.scene {theme = "pro_black", camera = {height = 6}}
+local scene = vis.scene {camera = {height = 6}}
 
 local identity = scene:tex {tex = "e^{i\\pi} + 1 = 0", point = {0, 1.2}, role = "h2"}
 local pythagoras = scene:tex {
@@ -156,7 +156,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({theme: "pro_black", camera: {height: 6}});
+const scene = vis.scene({camera: {height: 6}});
 
 const identity = scene.tex({tex: "e^{i\\pi} + 1 = 0", point: [0, 1.2], role: "h2"});
 const pythagoras = scene.tex({
@@ -191,7 +191,7 @@ It returns a group whose children are the lines, and each line's children are it
 Code holds only text, so shape options such as `fill` or `stroke` are rejected. Token IDs read `<block-id>/<line>/<token>`.
 
 ```lua live
-local scene = vis.scene {theme = "pro_black", camera = {height = 6}}
+local scene = vis.scene {camera = {height = 6}}
 
 local listing = scene:code {
     text = "local total = 0\nfor i = 1, 10 do\n    total = total + i\nend\nreturn total",
@@ -208,7 +208,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({theme: "pro_black", camera: {height: 6}});
+const scene = vis.scene({camera: {height: 6}});
 
 let listing = scene.code({
     text: "local total = 0\nfor i = 1, 10 do\n    total = total + i\nend\nreturn total",
@@ -254,7 +254,7 @@ A matrix adds brackets; a table adds an optional header, stripes and rules.
 `row(r)` counts only rows: a table's header is not a row, and its stripes and rules are extra children of the group.
 
 ```lua live
-local scene = vis.scene {theme = "pro_black", camera = {height = 6}}
+local scene = vis.scene {camera = {height = 6}}
 
 local m = scene:matrix {rows = {{"\\cos\\theta", "-\\sin\\theta", 0}, {"\\sin\\theta", "\\cos\\theta", 0}, {0, 0, 1}},
                         point = {-3, 0}, brackets = "square", size = 24}
@@ -273,7 +273,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({theme: "pro_black", camera: {height: 6}});
+const scene = vis.scene({camera: {height: 6}});
 
 const m = scene.matrix({rows: [["\\cos\\theta", "-\\sin\\theta", 0], ["\\sin\\theta", "\\cos\\theta", 0], [0, 0, 1]],
                         point: [-3, 0], brackets: "square", size: 24});

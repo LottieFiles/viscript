@@ -15,7 +15,7 @@ Every script builds one root scene with `vis.scene`, adds objects to it, and **r
 The script runs once to *construct* the scene; the host then renders any time `t` from it.
 
 ```lua live
-local scene = vis.scene {theme = "pro_black"}
+local scene = vis.scene {}
 local dot = scene:circle {fill = "accent"}
 scene:grow_from_center(dot, 0.6)
 
@@ -23,7 +23,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({theme: "pro_black"});
+const scene = vis.scene();
 const dot = scene.circle({fill: "accent"});
 scene.growFromCenter(dot, 0.6);
 
@@ -46,7 +46,7 @@ The camera decides how much of the world fits in the frame: `height = 6` shows s
 To pan and zoom during the scene, see [Camera](#/docs/camera).
 
 ```lua live
-local scene = vis.scene {theme = "pro_black", camera = {height = 6}}
+local scene = vis.scene {camera = {height = 6}}
 
 local axes = scene:space {x = {-5, 5, 1}, y = {-3, 3, 1}, stroke = "#00000000", ticks = true}
 local dot = axes:circle {radius = 0.2, fill = "warning"}
@@ -59,7 +59,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({theme: "pro_black", camera: {height: 6}});
+const scene = vis.scene({camera: {height: 6}});
 
 const axes = scene.space({x: [-5, 5, 1], y: [-3, 3, 1], stroke: "#00000000", ticks: true});
 const dot = axes.circle({radius: 0.2, fill: "warning"});

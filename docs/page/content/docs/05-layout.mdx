@@ -25,7 +25,7 @@ describe intent ("to the right of", "a row of") instead of computing coordinates
 `arrange(direction, gap)` lines a group's children up: `{1, 0}` runs left to right, `{0, -1}` top to bottom. `move_to` then places the whole group.
 
 ```lua live
-local scene = vis.scene {theme = "pro_black", camera = {height = 6}}
+local scene = vis.scene {camera = {height = 6}}
 
 local row = scene:group {}
 for i = 1, 5 do row:rectangle {size = {0.8, 0.8}, corner = 0.1, fill = "accent"} end
@@ -45,7 +45,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({theme: "pro_black", camera: {height: 6}});
+const scene = vis.scene({camera: {height: 6}});
 
 const row = scene.group({});
 for (let i = 1; i <= 5; i++) row.rectangle({size: [0.8, 0.8], corner: 0.1, fill: "accent"});
@@ -69,7 +69,7 @@ return scene;
 `arrange_grid(columns, col_gap, row_gap)` fills rows of `columns` children, top to bottom.
 
 ```lua live
-local scene = vis.scene {theme = "pro_black", camera = {height = 6}}
+local scene = vis.scene {camera = {height = 6}}
 
 local grid = scene:group {}
 for i = 1, 12 do grid:rectangle {size = {0.7, 0.7}, corner = 0.1, fill = (i % 5 == 0) and "warning" or "secondary"} end
@@ -83,7 +83,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({theme: "pro_black", camera: {height: 6}});
+const scene = vis.scene({camera: {height: 6}});
 
 const grid = scene.group({});
 for (let i = 1; i <= 12; i++) grid.rectangle({size: [0.7, 0.7], corner: 0.1, fill: i % 5 === 0 ? "warning" : "secondary"});
@@ -101,7 +101,7 @@ return scene;
 `next_to(other, direction, gap)` puts an object beside another; `align_to(other, direction)` lines up one edge — here the red bar shares the box's top edge.
 
 ```lua live
-local scene = vis.scene {theme = "pro_black", camera = {height = 6}}
+local scene = vis.scene {camera = {height = 6}}
 
 local box = scene:rectangle {size = {2, 1.2}, corner = 0.1, fill = "accent"}
 local tags = {}
@@ -122,7 +122,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({theme: "pro_black", camera: {height: 6}});
+const scene = vis.scene({camera: {height: 6}});
 
 const box = scene.rectangle({size: [2, 1.2], corner: 0.1, fill: "accent"});
 const tags = [[1, 0], [-1, 0], [0, 1], [0, -1]].map((dir) =>
@@ -144,7 +144,7 @@ return scene;
 The timeline call `scene:arrange(items, duration)` moves siblings into a new row. Pass the list in its new order — here with a box inserted in the middle.
 
 ```lua live
-local scene = vis.scene {theme = "pro_black", camera = {height = 6}}
+local scene = vis.scene {camera = {height = 6}}
 
 local boxes = {}
 for i = 1, 4 do
@@ -162,7 +162,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({theme: "pro_black", camera: {height: 6}});
+const scene = vis.scene({camera: {height: 6}});
 
 const boxes = [1, 2, 3, 4].map((i) =>
     scene.rectangle({center: [-3 + i * 1.2, 0], size: [0.8, 0.8], corner: 0.1, fill: "accent"}));
@@ -195,7 +195,7 @@ return scene;
 Four ways out, left to right: `uncreate` erases the stroke, `fade_out` fades with an optional drift, `shrink_to_center` collapses, and `remove` drops it at the cursor.
 
 ```lua live
-local scene = vis.scene {theme = "pro_black", camera = {height = 6}}
+local scene = vis.scene {camera = {height = 6}}
 
 local ring = scene:circle {center = {-4, 0}, radius = 0.7, stroke = "accent", width = 5}
 local card = scene:rectangle {center = {-1.35, 0}, size = {1.4, 1.4}, corner = 0.15, fill = "success"}
@@ -213,7 +213,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({theme: "pro_black", camera: {height: 6}});
+const scene = vis.scene({camera: {height: 6}});
 
 const ring = scene.circle({center: [-4, 0], radius: 0.7, stroke: "accent", width: 5});
 const card = scene.rectangle({center: [-1.35, 0], size: [1.4, 1.4], corner: 0.15, fill: "success"});
@@ -235,7 +235,7 @@ return scene;
 `fade_transform(a, b)` hands `a`'s place to `b`; create `b` right before the call. To cross-fade two handles that stay independent, use `transition`.
 
 ```lua live
-local scene = vis.scene {theme = "pro_black", camera = {height = 6}}
+local scene = vis.scene {camera = {height = 6}}
 
 local before = scene:circle {fill = "accent"}
 scene:wait(0.5)
@@ -248,7 +248,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({theme: "pro_black", camera: {height: 6}});
+const scene = vis.scene({camera: {height: 6}});
 
 const before = scene.circle({fill: "accent"});
 scene.wait(0.5);
@@ -270,7 +270,7 @@ move. A <code>vector</code> is an arrow defined by <code>value</code> from an <c
 Move either end and the connector follows: it is recomputed from the two handles every frame.
 
 ```lua live
-local scene = vis.scene {theme = "pro_black", camera = {height = 6}}
+local scene = vis.scene {camera = {height = 6}}
 
 local a = scene:circle {center = {-3, 1}, radius = 0.5, fill = "accent"}
 local b = scene:rectangle {center = {3, -1}, size = {1.2, 0.8}, fill = "warning"}
@@ -285,7 +285,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({theme: "pro_black", camera: {height: 6}});
+const scene = vis.scene({camera: {height: 6}});
 
 const a = scene.circle({center: [-3, 1], radius: 0.5, fill: "accent"});
 const b = scene.rectangle({center: [3, -1], size: [1.2, 0.8], fill: "warning"});
@@ -304,7 +304,7 @@ return scene;
 Playing `value` swings the arrow to a new direction and length from the same origin.
 
 ```lua live
-local scene = vis.scene {theme = "pro_black", camera = {height = 6}}
+local scene = vis.scene {camera = {height = 6}}
 
 local v = scene:vector {origin = {0, 0}, value = {2, 1}, stroke = "danger", width = 4}
 
@@ -316,7 +316,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({theme: "pro_black", camera: {height: 6}});
+const scene = vis.scene({camera: {height: 6}});
 
 const v = scene.vector({origin: [0, 0], value: [2, 1], stroke: "danger", width: 4});
 

@@ -22,7 +22,7 @@ Every shape takes the same style fields, and every one of them can be animated w
 </table>
 
 ```lua live
-local scene = vis.scene {theme = "pro_black", camera = {height = 6}}
+local scene = vis.scene {camera = {height = 6}}
 
 local tokens = {"accent", "secondary", "success", "warning", "danger", "info", "muted"}
 for i, token in ipairs(tokens) do
@@ -44,7 +44,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({theme: "pro_black", camera: {height: 6}});
+const scene = vis.scene({camera: {height: 6}});
 
 const tokens = ["accent", "secondary", "success", "warning", "danger", "info", "muted"];
 tokens.forEach((token, i) => {
@@ -76,7 +76,7 @@ return scene;
 </table>
 
 ```lua live
-local scene = vis.scene {theme = "pro_black", camera = {height = 6}}
+local scene = vis.scene {camera = {height = 6}}
 
 local solid = scene:rectangle {center = {-3.4, 0}, size = {2, 2}, corner = 0.2, stroke = "accent", width = 2}
 local dashed = scene:circle {center = {0, 0}, stroke = "warning", width = 5, dash = {14, 8}}
@@ -96,7 +96,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({theme: "pro_black", camera: {height: 6}});
+const scene = vis.scene({camera: {height: 6}});
 
 const solid = scene.rectangle({center: [-3.4, 0], size: [2, 2], corner: 0.2, stroke: "accent", width: 2});
 const dashed = scene.circle({center: [0, 0], stroke: "warning", width: 5, dash: [14, 8]});
@@ -125,7 +125,7 @@ A gradient paints over the fill, so the shape needs an opaque `fill`. Rotating t
 </table>
 
 ```lua live
-local scene = vis.scene {theme = "pro_black", camera = {height = 6}}
+local scene = vis.scene {camera = {height = 6}}
 
 local linear = scene:rectangle {
     center = {-3.4, 0}, size = {2.2, 2.2}, corner = 0.3, fill = "#ffffff",
@@ -154,7 +154,7 @@ return scene
 ```
 
 ```js live
-const scene = vis.scene({theme: "pro_black", camera: {height: 6}});
+const scene = vis.scene({camera: {height: 6}});
 
 const linear = scene.rectangle({
     center: [-3.4, 0], size: [2.2, 2.2], corner: 0.3, fill: "#ffffff",
