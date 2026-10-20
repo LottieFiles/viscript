@@ -7,15 +7,15 @@ parent: object
 
 # Placement & Parenting
 
-Place an object relative to a point or another object, then inspect its children. Group and Space inherit these methods. Layout changes run before the first timeline animation.
+Place an object relative to a point or another object, then inspect its children. Group and Space inherit these methods. Run layout methods before scheduling animations or advancing the cursor, including `wait`.
 
 ## Place objects
 
 | Lua | JavaScript | Purpose |
 | --- | --- | --- |
 | `object:move_to(point)` | `object.moveTo(point)` | Place the object's bounds center at `point`. |
-| `object:next_to(target, direction, gap?)` | `object.nextTo(target, direction, gap?)` | Place beside `target` in `direction`; default gap is 0.25 world units. |
-| `object:align_to(target, direction)` | `object.alignTo(target, direction)` | Align the edge facing `direction` with the matching target edge. |
+| `object:next_to(target, direction, gap?)` | `object.nextTo(target, direction, gap?)` | Place beside a sibling `target` in `direction`; default gap is 0.25 world units. |
+| `object:align_to(target, direction)` | `object.alignTo(target, direction)` | Align the edge facing `direction` with the matching edge of a sibling `target`. |
 
 ## Inspect children
 

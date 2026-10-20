@@ -7,7 +7,7 @@ parent: group-space
 
 # Group Layout & Selection
 
-Group objects to share a transform/style, arrange their children, and select rows or entries. Layout methods run before the first timeline animation.
+Group objects to share a transform/style, arrange their children, and select rows or entries. Run layout methods before scheduling animations or advancing the cursor, including `wait`.
 
 ## Create a Group
 

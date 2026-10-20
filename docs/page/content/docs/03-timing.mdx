@@ -93,7 +93,7 @@ A tracker is a number that objects follow.
 
 Create it with `scene:tracker(value)`, bind each dependent once with `scene:bind(object, tracker, fn)`, then animate only the number with `scene:track`.
 
-The bind function returns any `tween` property; `shift` is relative to where the object was when bound.<br />
+The bind function returns a state table/object with `tween` properties except `position`, `arc`, `text`, `retype`, `sweep` and `layer`; `shift` is relative to where the object was when bound. The callback must be pure and cannot author scenes.<br />
 `track` bakes its samples into the timeline, so every frame is still seekable.
 
 ```lua live
@@ -222,7 +222,7 @@ return scene;
 
 ## Following a path
 
-`move_along(target, path, options)` carries the target's centre along any outline — line, circle, rectangle, polygon, plot, route, path or curve. The outline is copied when the call is made, so later changes to the path do not move existing followers.
+`move_along(target, path, options)` carries the target's centre along an outline — line, circle, rectangle, polygon, plot, route, path, curve or connector. Ordinary outlines are copied when the call is made, so later path changes do not move existing followers. A connector instead follows its live endpoints while the clip runs.
 
 ```lua live
 local scene = vis.scene {}

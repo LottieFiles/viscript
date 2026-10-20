@@ -1,8 +1,9 @@
 # @viscript/player
 
 Plays viscript scenes on canvases in a web page, an editor or an app built on web views. The
-WebAssembly runtime compiles and draws each scene in a render worker, so a heavy scene never
-blocks typing or scrolling; the page keeps a light player per canvas that asks for frames.
+WebAssembly runtime compiles and draws each scene in a render worker when available;
+fallback and audio hosts render on the main thread. The page keeps a player per canvas
+that asks for frames.
 
 It is the player behind the [documentation site](../../docs/page), the
 [Obsidian plugin](../obsidian) and the [VS Code extension](../vscode), written in TypeScript and
@@ -100,7 +101,7 @@ bundles the sources, as the Obsidian plugin does, imports the other modules itse
 
 `new VisPlayer({host, canvas | container, resources, …})` takes a canvas, or makes one in
 `container`; `resources` lists the images each scene loads. Options: `autoplay`, `end`
-(`"loop"` by default, or `"stop"` to hold the last frame), `rate` (0.125 to 8), `camera`, `maxFps`,
+(`"loop"` by default, restarting immediately, or `"stop"` to hold the last frame), `rate` (0.125 to 8), `camera`, `maxFps`,
 `quality` (`"auto"` or `"high"`), `maxRatio`, `interactive`, `audio`, `theme` (colors for scenes
 that adapt to the host), `label`, `releaseDelay` (2000 milliseconds out of view before the engine
 is freed; `Infinity` keeps it) and `rootMargin`. A click on the canvas plays or pauses the scene,
@@ -117,7 +118,7 @@ moved the camera.
   switch the view. Off unless given; `moveCamera` works either way.
 - **`audio`**: plays the scene's sounds and music once the page has had a click or a key press.
   Browsers play audio on the main thread alone, so only a render host in `"inline"` mode can; in
-  a worker the sounds arrive as `sound` events only.
+  a worker retained runtime sounds arrive as `sound` events only; authored cues are not played.
 
 Methods: `load(scene)`, `reload()`, `play()`, `pause()`, `stop()`, `seek(time)`,
 `playRange(start, end)`, `clearRange()`, `configure(options)` (`end`, `rate`, `camera`, `maxFps`,
@@ -262,6 +263,6 @@ npm run test:browser     # Chromium: worker and main thread, fonts, input and cl
 
 ## Limits
 
-- Sounds always arrive as `sound` events, and play only with `audio` on a render host in
-  `"inline"` mode.
+- Retained runtime sounds arrive as `sound` events. Runtime sounds and authored cues play only
+  with `audio` on a render host in `"inline"` mode.
 - Without `OffscreenCanvas`, or when the worker cannot start, scenes are drawn on the main thread.

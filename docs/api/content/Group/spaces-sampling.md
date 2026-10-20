@@ -7,7 +7,7 @@ parent: group-space
 
 # Spaces & Sampling
 
-Create coordinate axes, label their ticks, and sample colored cells or voxels. Space inherits Group and Object methods.
+Create coordinate axes, label their ticks, and sample colored cells or voxels. Space exposes Object factories and placement methods; Group-only arrangement and row/entry/column selection are unavailable.
 
 ## Create axes
 

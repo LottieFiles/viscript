@@ -139,7 +139,7 @@ card:rectangle {size = {3, 2}, fill = "surface"}
 ```
 
 `mask=target` uses the target's sampled alpha or luminance as a window. Modes are
-`alpha`, `inverse_alpha`, `luma`, and `inverse_luma`. Set the mask to `nil` to remove
+`alpha`, `inverse_alpha`, `luma`, and `inverse_luma`. Call `object:mask(nil)` to remove
 it. A mask target contributes to the mask layer.
 
 `blend` selects modes such as `multiply`, `screen`, `overlay`, `difference`, or
@@ -271,7 +271,7 @@ local detail = scene:view({x = 0.65, y = 0.05, width = 0.3, height = 0.3}, {
 ```
 
 Views sample the same content and time. `follow` centers on a moving Object;
-`hidden` excludes selected families. Optical views scale strokes and billboard
+`hide` excludes selected families. Optical views scale strokes and billboard
 text with magnification. View camera movement and fades have their own tracks.
 
 A Viewport mounts an independently authored child Scene in a normalized rectangle.

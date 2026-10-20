@@ -13,6 +13,8 @@ vector.label({text: "a = (3, 2)", point: [3.25, 2.2], align: [0, 0.5], role: "co
 definition.wait(0.35).fadeIn(figure, {duration: 0.55, curve: "gentle"}).wait(0.65);
 
 const runtime = await createVis();
+runtime.font("Pretendard", new Uint8Array(await
+    (await fetch("./Pretendard.ttf")).arrayBuffer()), "ttf");
 runtime.font("JetBrainsMono", new Uint8Array(await
     (await fetch("./JetBrainsMono.ttf")).arrayBuffer()), "ttf");
 runtime.load(definition, "vector-scene.js");
@@ -137,7 +139,7 @@ definition.tween({target: caption, text: "Ready to export", retype: true}, 1);
 definition.tween({target: caption, text: "EXPORTED", sweep: true}, 1);
 ```
 
-`morph` resamples outlines to turn source into target; contour `pairs` override automatic matching. `{copy: true}` preserves the source. `clone` snapshots a family at the current time. `fadeTransform` cross-fades source into target; `transition` cross-fades without consuming it. `matchTransform` carries matching text, TeX, and optional shapes, with arc or path detours and independent unmatched fades.
+`morph` resamples outlines to turn source into target; contour `pairs` override automatic matching. `{copy: true}` preserves the source. `clone` snapshots a family at the current time. `fadeTransform` cross-fades into a target attached at the current cursor without clips and removes the source from the timeline on completion. `transition` fades outgoing handles out and incoming handles in without removing them; create every incoming handle with `opacity: 0`. `matchTransform` carries matching text, TeX, and optional shapes into a target attached at the current cursor without clips. Its source must be at rest unless `copy: true` snapshots it; arc or path detours and independent unmatched fades control the handoff.
 
 `warp` samples a plane mapping over explicit ranges, with `step` controlling initial subdivision. The scene retains the resulting geometry:
 
@@ -173,7 +175,7 @@ samples.forEach((point, index) => {
 
 `vis.springResponse(seconds, {mass, stiffness, damping, displacement, velocity})` samples a physical spring. Bind it to an elapsed-seconds tracker and track with `"linear"` after the release hold.
 
-`look` aims at points or handles; `focus` frames authored bounds, and `focus()` returns to the opening camera. `orbit` circles a 3D target. `view(bounds, options)` draws the same scene through another camera; the returned handle exposes look, focus, orbit, and fade.
+`look` aims at points or handles. `focus` frames authored bounds in a 2D view with fractional padding; use `look` to frame a 3D view. `focus()` returns to the opening camera from either view. `orbit` circles a 3D target. `view(bounds, options)` draws the same scene through another camera; the returned handle exposes look, focus, orbit, and fade.
 
 ## Fonts, assets, and lifecycle
 
@@ -206,7 +208,7 @@ Destroy the runtime at teardown. Failed reload preserves the last valid scene.
 
 ## Scene composition and modules
 
-`space.cell(callback, options)` and `space.voxel(callback, options)` bake sampled fields during authoring. `viewport(child, bounds)` mounts a child builder; `sceneTransition(stages, options)` plays a sequence with local stage times.
+`space.cell(callback, options)` and `space.voxel(callback, options)` bake sampled fields during authoring. `viewport(child, bounds)` mounts a child builder; `sceneTransition(stages, options)` plays a sequence with local stage times. Finish authoring children and stages first: successful attachment seals and transfers them, so they cannot be edited or reused in another mount.
 
 ```js
 definition.sceneTransition([overview, detail, summary], {

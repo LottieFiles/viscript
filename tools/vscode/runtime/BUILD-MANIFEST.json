@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "project": "viscript",
   "projectVersion": "0.1.0",
-  "sourceCommit": "2e138faf80ae",
-  "sourceDirty": false,
+  "sourceCommit": "841b00ea5103",
+  "sourceDirty": true,
   "buildDate": "2026-10-20",
   "toolchain": {
     "emscripten": "4.0.19",
@@ -47,8 +47,8 @@
     },
     {
       "path": "client.d.ts",
-      "bytes": 14021,
-      "sha256": "f72ab245ad7066b5228986401fdfe43efa4dfcab30f97e0c62dfa570e5752172"
+      "bytes": 14115,
+      "sha256": "108d5cdbc41e0acaa4a96ad24abcece85ccd1d214e5da53ebb1728b8c8ce491a"
     },
     {
       "path": "bindings.js",

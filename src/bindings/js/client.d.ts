@@ -145,7 +145,8 @@ export interface HostThemePalette {
     readonly line?: string;
     readonly result?: string;
     readonly focus?: string;
-    /** 1 to 10 colors, each unset one the runtime's at its index; the runtime's four when left out. */
+    /** 1 to 10 colors; undefined or empty entries among the first four use the runtime's defaults.
+     * Later entries require explicit colors. Omit the array to use the runtime's four colors. */
     readonly objects?: readonly (string | undefined)[];
     /**
      * The font of headings and body text, a name or a comma list of up to 256 bytes, as the VS

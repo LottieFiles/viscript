@@ -14,7 +14,7 @@ Typeset rectangular data as a bracketed matrix or a styled table. Rows become Gr
 | `scene:matrix(opts)` | `scene.matrix(opts)` | Typeset rectangular `rows` into row Groups with `brackets`; configure `gap`, `justify`, `decimals`, `reserve`, and `tabular`. |
 | `scene:table(opts)` | `scene.table(opts)` | Typeset `rows` with optional `header`, `padding`, `justify`, `decimals`, `stripes`, and `rules`. Returns a Group. |
 
-Matrix string entries use inline TeX when available; table strings stay plain text. Select a row, entry, or column with [Group selection methods](../Group/group-layout.md). Selection indices start at **1** in both languages.
+Matrix string entries use inline TeX when available; table strings stay plain text. Select a row, entry, or column with [Group selection methods](../Group/group-layout.md). Selection indices start at **1** in both languages; a table's header is row **1** when present, and body rows follow it.
 
 ## Examples
 

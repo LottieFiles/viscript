@@ -1,6 +1,7 @@
 // A scene playing on a canvas. The player keeps the timeline, the playback state and the input
-// queue on the main thread and asks a render host for each frame, so it never blocks on the
-// runtime. Its states and events follow the thorvg.web lottie-player.
+// queue on the main thread and asks a render host for each frame. A worker host runs the runtime
+// off the main thread; the inline fallback runs it on the page. Its states and events follow
+// the thorvg.web lottie-player.
 import type {HostThemePalette, VisRuntimeSound} from "vis-wasm-bundle";
 import {SceneError, SupersededError, type HostSession, type LostReason, type RenderHost} from "../host/host.ts";
 import {fitPlan, frameInterval, type Quality} from "../policy.ts";

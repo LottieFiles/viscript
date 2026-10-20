@@ -1,8 +1,11 @@
 # Documentation
 
 The [viscript journal](page/index.html) is the GitHub Pages frontend for these
-documents, with executable Lua guides, visual essays, and editable examples.
+documents, with executable Lua/JavaScript guides, visual essays, and editable examples.
 See [website maintenance](page/README.md) for preview, validation, and deployment.
+
+The [API reference](page/index.html#/api) describes each exposed function. Its
+[Markdown source vault](api/content/) opens in Obsidian; see [API authoring](api/README.md).
 
 ## Author a scene
 

@@ -8,7 +8,7 @@ local INK = "foreground"
 -- whole stage and focus(nil) returns, so the loop starts and ends on the same frame.
 -- Plane text keeps its size relative to the frame while the camera moves.
 -- Sizes are points at the wide shot (height 7 over 420 px).
-local PT = (4 / 3) * 7 / 420
+local PT = 7 / 420
 local function plane(o) o.orientation = "plane"; o.size = (o.size or 14) * PT; return o end
 local function TEXT(o) return scene:text(plane(o)) end
 

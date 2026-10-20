@@ -236,7 +236,7 @@ return scene;
 | Call | Does |
 |---|---|
 | `block:row(n)` | The nth line, from 1. |
-| `block:search(find, {match, lines, whole})` | Tokens a string or pattern covers; `match` is `"first"`, `"last"`, `"all"` or an occurrence number. |
+| `block:search(find, {match, lines, whole})` | Tokens a literal string covers; JavaScript `block.search` also accepts a `RegExp`. `match` is `"first"`, `"last"`, `"all"` or an occurrence number. |
 | `scene:highlight(block, selection)` | Dims everything but the selected lines or tokens; no selection restores the block. |
 | `scene:edit(block, edits, duration)` | Returns the edited block and animates the diff. Edits: `replace`/`with`, `insert` + `before`/`after`, `remove`, `append`, `prepend`. |
 
@@ -251,7 +251,7 @@ A `table` always sets strings as text.
 Like `code`, they return a group of row groups, so `row(r)`, `entry(r, c)` and `column(c)` pick parts, counting from 1.<br />
 A matrix adds brackets; a table adds an optional header, stripes and rules.
 
-`row(r)` counts only rows: a table's header is not a row, and its stripes and rules are extra children of the group.
+`row(r)` counts direct child Groups: a table's header is row 1 when present, followed by its body rows. Stripes and rules are extra non-Group children and are not counted.
 
 ```lua live
 local scene = vis.scene {}
@@ -297,5 +297,6 @@ return scene;
 <tr><td>String entries</td><td>Inline TeX (plain text without the TeX module); <code>""</code> stays blank</td><td>Text</td></tr>
 <tr><td>Frame</td><td><code>brackets</code>: <code>"square"</code>, <code>"round"</code>, <code>"bar"</code>, <code>"none"</code></td><td><code>header</code>, <code>stripes</code>, <code>rules</code>: <code>"header"</code>, <code>"rows"</code>, <code>"columns"</code>, <code>"grid"</code>, <code>"none"</code></td></tr>
 <tr><td>Spacing</td><td><code>gap</code> between columns and rows</td><td><code>padding</code> inside each cell</td></tr>
-<tr><td>Both</td><td colspan="2"><code>justify</code> (one value or one per column), <code>decimals</code>, <code>reserve</code>, <code>tabular</code>, <code>point</code>, <code>align</code>, <code>size</code>, <code>font</code>, <code>role</code></td></tr>
+<tr><td>Fixed number layout</td><td><code>reserve</code>, <code>tabular</code></td><td>Not supported</td></tr>
+<tr><td>Both</td><td colspan="2"><code>justify</code> (one value or one per column), <code>decimals</code>, <code>point</code>, <code>align</code>, <code>size</code>, <code>font</code>, <code>role</code></td></tr>
 </table>

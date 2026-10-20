@@ -111,12 +111,15 @@ preview connects these paths and synchronizes authored cues with its transport.
 
 ## JavaScript and WASM
 
+The bundled WASM runtime decodes WAV audio. Use WAV assets for browser, VS Code,
+and Obsidian playback; native builds also decode MP3 and FLAC.
+
 The builder declares cues with `sound`:
 
 ```js
 const definition = vis.scene();
 const music = definition.sound({
-    asset: "music.mp3", bus: "music", begin: 0, end: 18,
+    asset: "music.wav", bus: "music", begin: 0, end: 18,
     gain: 0.7, loop: true,
 });
 music.gain(0.25, 14, 2, "smooth");
@@ -127,8 +130,8 @@ Register assets under the names used by cues. Start audio from a user activation
 handler, then provide the animation transport:
 
 ```js
-const music = new Uint8Array(await (await fetch("music.mp3")).arrayBuffer());
-scene.audio.load("music.mp3", music);
+const music = new Uint8Array(await (await fetch("music.wav")).arrayBuffer());
+scene.audio.load("music.wav", music);
 startButton.addEventListener("click", () => {
     scene.audio.start();
     scene.audio.transport({time: timeline.current, rate: timeline.rate,

@@ -209,6 +209,42 @@ for (const [name, fields] of Object.entries(api.configBaseExcept)) {
 
 // The LuaLS definitions npm run compile writes as api/vis.d.lua.
 const meta = luaMeta(api);
+// Lua factories require a table even when all its fields have defaults. JavaScript's
+// optional options object must not make the LuaLS signature accept circle() or vis.scene().
+assert.equal(api.globals.scene.parameters[0].optional, undefined);
+assert.match(meta, /---@param config vis\.SceneConfig\n---@return vis\.Scene\nfunction Library\.scene\(config\)/);
+for (const owner of ["Scene", "Object", "Group", "Space"]) {
+    for (const [name, factory] of Object.entries(api.factories)) {
+        if (owner === "Space" && name === "cell") continue;
+        assert.match(meta, new RegExp(`---@param config vis\\.${factory.config}\\n---@return [^\\n]+\\nfunction ${owner}:${name}\\(config\\)`),
+            `${owner}:${name} must require its Lua configuration table`);
+    }
+}
+// These methods supply defaults themselves instead of requiring their configuration/vector.
+assert.equal(api.methods.Scene.scene_transition.parameters[1].optional, true);
+assert.match(meta, /---@param config\? vis\.SceneTransitionConfig\nfunction Scene:scene_transition\(scenes, config\)/);
+assert.equal(api.methods.Object.arrange.parameters[0].optional, true);
+assert.match(meta, /---@param direction\? vis\.Vec2\|vis\.Vec3\n---@param gap\? number\nfunction Group:arrange\(direction, gap\)/);
+// Space:cell dispatches between the ordinary Cell factory and a sampled Group. Keep both
+// signatures in one LuaLS method, and retain the sampled Group's selection/layout methods.
+const staticCell = api.methods.Space.cell.overloads.find((overload) => overload.parameters[0]?.type === api.factories.cell.config);
+assert.ok(staticCell, "Space:cell is missing its ordinary Cell configuration overload");
+assert.equal(staticCell.parameters[0].optional, undefined);
+assert.equal(staticCell.returns, api.factories.cell.returns);
+for (const method of ["cell", "voxel"]) {
+    assert.equal(api.methods.Space[method].returns, "Group");
+    assert.match(meta, new RegExp(`---@return vis\\.Group\\nfunction Space:${method}\\(sample, config\\)`));
+}
+assert.match(meta, /---@overload fun\(self: vis\.Space, config: vis\.CellConfig\): vis\.Object/);
+assert.equal([...meta.matchAll(/function Space:cell\(/g)].length, 1);
+const curvePresets = /CURVE_PRESETS\[\]\s*=\s*\{([\s\S]*?)\};/.exec(binding)?.[1];
+assert.ok(curvePresets, "Could not find the binding's curve presets");
+const curveAliases = meta.match(/^---@alias vis\.Curve(?:Preset)? .+$/gm)?.join("\n") ?? "";
+assert.deepEqual(
+    [...new Set(Array.from(curveAliases.matchAll(/'([^']+)'/g), (match) => match[1]))].sort(),
+    Array.from(curvePresets.matchAll(/\{"([^"]+)",/g), (match) => match[1]).sort(),
+    "LuaLS curve presets differ from the Lua binding",
+);
 for (const name of sceneMethods) assert.match(meta, new RegExp(`function Scene:${name}\\(`));
 assert.match(meta, /---@class vis\.Tracker\n/);
 assert.match(meta, /function Tracker:get\(\)/);

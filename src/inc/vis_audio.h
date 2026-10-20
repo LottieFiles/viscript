@@ -128,8 +128,9 @@ struct Player
     Result sync(const Transport& transport) noexcept;
     // Mixes the bound Soundscape into interleaved stereo output (left, right), at frame/rate
     // scene time. Excludes immediate voices; applies cue/bus/master gain and clamps to [-1, 1].
-    // Rates are 8000..192000 Hz; gain is sampled every 32 frames. All assets must be loaded
-    // or InsufficientCondition is returned. Sequential blocks reuse decoder position.
+    // Rates are 8000..192000 Hz; cue gain is sampled every 32 timeline frames and interpolated
+    // per frame between them. All assets must be loaded or InsufficientCondition is returned.
+    // Sequential blocks reuse decoder position.
     Result mix(uint32_t rate, uint64_t first, float* output, uint32_t frames) noexcept;
 
 private:

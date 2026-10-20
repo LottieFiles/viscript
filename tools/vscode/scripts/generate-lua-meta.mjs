@@ -17,7 +17,8 @@ export function luaMeta(api) {
         "---@alias vis.Vec3 {[1]: number, [2]: number, [3]: number}",
         "---@alias vis.Range {[1]: number, [2]: number, [3]?: number}",
         "---@alias vis.Mat4 number[]",
-        "---@alias vis.Curve 'linear'|'smooth'|'ease_in'|'ease_out'|'ease_in_out'|'gentle'|'snappy'|{preset: string, strength?: number, reverse?: boolean}|{bezier: number[], strength?: number}",
+        "---@alias vis.CurvePreset 'linear'|'smooth'|'ease_in'|'ease_out'|'ease_in_out'|'gentle'|'snappy'|'back'|'bounce'|'elastic'",
+        "---@alias vis.Curve vis.CurvePreset|{preset: vis.CurvePreset, strength?: number, reverse?: boolean}|{bezier: number[], strength?: number, reverse?: boolean}",
         "---@alias vis.CreateDirection 'forward'|'reverse'|'clockwise'|'counterclockwise'",
         "---@alias vis.SceneTransitionStyleName 'match'|'fade'|'slide'|'zoom_in'|'zoom_out'",
         "---@alias vis.PathCommand table",
@@ -85,7 +86,7 @@ export function luaMeta(api) {
         for (const [name, factory] of Object.entries(factories)) {
             emitCallable(lines, owner, name, {
                 description: factory.description,
-                parameters: [{name: "config", type: factory.config, optional: true}],
+                parameters: [{name: "config", type: factory.config}],
                 returns: factory.returns,
             }, true);
         }

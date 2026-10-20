@@ -8,7 +8,8 @@ meson compile -C build
 meson test -C build --print-errorlogs
 ```
 
-For the VS Code extension, run `npm ci` and `npm test` in `tools/vscode`.
+For the VS Code extension, run `npm ci`, `npm ci --prefix ../player`, and `npm test`
+in `tools/vscode`; its build also bundles the shared player.
 
 `meson test` also runs `api-sync`, which holds the editor's API schema,
 `tools/vscode/api/vis-api.json`, to the Lua binding and checks the LuaLS definitions made from

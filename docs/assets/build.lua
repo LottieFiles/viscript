@@ -4,9 +4,10 @@ local scene = vis.scene {width = 1200, height = 420, fps = 20, theme = "pro_whit
   camera = {target = {0, 0.1}, height = 7.6}}
 local INK = "foreground"
 
--- Text is set in world units (plane) so it scales with the camera moves below.
-local PT = (4 / 3) * 7 / 420
-local function plane(o) o.orientation = "plane"; o.size = (o.size or 14) * PT; return o end
+-- Plane text scales with the camera. This factor includes the clip's existing 4/3 label
+-- enlargement as well as its reference-height mapping; it is not just a points conversion.
+local PLANE_SIZE_SCALE = (4 / 3) * 7 / 420
+local function plane(o) o.orientation = "plane"; o.size = (o.size or 14) * PLANE_SIZE_SCALE; return o end
 local function TEXT(o) return scene:text(plane(o)) end
 
 -- Terminal.

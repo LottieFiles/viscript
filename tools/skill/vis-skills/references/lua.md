@@ -180,7 +180,7 @@ A curve can be a preset (`"linear"`, `"smooth"`, `"gentle"`, `"ease_in_out"`, an
 
 `morph` resamples outlines to turn the source into the target. Multi-piece paths pair automatically; explicit one-based contour `pairs` override selected matches. `{copy = true}` preserves the source. `clone` snapshots an object's current family, with an optional parent, ID, style, and world shift.
 
-`fade_transform` cross-fades source into target; `transition` cross-fades without consuming handles. `match_transform` carries matching text, TeX, and optional shapes between objects. Options include `pairs`, `strings`, `diff`, `shapes`, `fade`, `lag`, `arc`, `path`, and `copy`.
+`fade_transform` cross-fades source into a target attached at the current cursor without clips; the source leaves the timeline on completion. `transition` fades outgoing handles out and incoming handles in without removing them; create every incoming handle with `opacity = 0`. `match_transform` carries matching text, TeX, and optional shapes into a target attached at the current cursor without clips. The source must be at rest unless `copy = true` snapshots it. Options include `pairs`, `strings`, `diff`, `shapes`, `fade`, `lag`, `arc`, `path`, and `copy`.
 
 `warp` maps authored points in each target's parent space. It subdivides straight segments using `step` before bending them. Geometry stays warped after the animation, so later bounds, cloning, and motion paths use its new outline.
 
@@ -190,7 +190,7 @@ scene:warp(ball, function(x, y) return x + 0.2 * y * y, y end, 1, "smooth", {ste
 
 ## Cameras and views
 
-`look` changes camera fields and can aim at handles while retaining the eye offset. `focus` frames handles with padding; `focus()` returns to the opening camera. `orbit` rotates a 3D camera around its target.
+`look` changes camera fields and can aim at handles while retaining the eye offset. `focus` frames handles in a 2D view with fractional padding; use `look` to frame a 3D view. `focus()` returns to the opening camera from either view. `orbit` rotates a 3D camera around its target.
 
 ```lua
 scene:focus(ball, {padding = 0.3, duration = 1})
@@ -239,7 +239,7 @@ end, {duration = 1, fps = 24, mode = "padd", padding = 0.06})
 
 ## Scene composition and modules
 
-`scene:viewport(child, bounds)` mounts a child Scene. Bounds use normalized `{x, y, width, height}` from the frame's top left. `scene:scene_transition(stages, options)` plays a sequence, with each incoming stage starting at local time zero.
+`scene:viewport(child, bounds)` mounts a child Scene. Bounds use normalized `{x, y, width, height}` from the frame's top left. `scene:scene_transition(stages, options)` plays a sequence, with each incoming stage starting at local time zero. Finish authoring children and stages before mounting: successful attachment seals and transfers them, so they cannot be edited or reused in another mount.
 
 Transition styles are match, fade, slide, zoom_in, and zoom_out. `hold` sets fully shown time; `live = false` shows completed stages. `from` chooses a slide side, `area` chooses a zoom region, `area_margin` adds object padding, and `match` carries equal-ID objects. `styles` sets each transition separately:
 

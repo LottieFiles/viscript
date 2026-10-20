@@ -82,7 +82,7 @@ return scene;
 
 ## Entrances and emphasis
 
-<p>Entrances hide their target until their scheduled start; objects without one are visible from <code>t = 0</code>.</p>
+<p>Entrances hide their target until their scheduled start. Objects without an entrance become visible at the cursor time when they are created.</p>
 <table>
 <tr><th>Call</th><th>Effect</th><th>Best for</th></tr>
 <tr><td><code>create</code></td><td>Draws the stroke on</td><td>Lines, outlines, plots</td></tr>
@@ -153,7 +153,7 @@ return scene;
 
 ### Staggering with lag
 
-Pass an array and a fourth argument, `lag`, to start each item that many seconds after the previous one. The whole span is `duration + lag × (n − 1)` — here `0.8 + 0.2 × 5 = 1.8` s for the lower row.
+Pass an array and a fourth argument, `lag`, to delay each item by that fraction of `duration`. The whole span is `duration × (1 + lag × (n − 1))` — here `0.8 × (1 + 0.25 × 5) = 1.8` s for the lower row, with starts 0.2 s apart.
 
 ```lua live
 local scene = vis.scene {}
@@ -166,7 +166,7 @@ for i = 1, 6 do
 end
 
 scene:draw_border_then_fill(together, 0.8)              -- lag 0: all at once
-scene:draw_border_then_fill(staggered, 0.8, "smooth", 0.2)  -- each starts 0.2 s later
+scene:draw_border_then_fill(staggered, 0.8, "smooth", 0.25)  -- each starts 0.8 * 0.25 = 0.2 s later
 scene:wait(0.5)
 
 return scene
@@ -183,7 +183,7 @@ for (let i = 1; i <= 6; i++) {
 }
 
 scene.drawBorderThenFill(together, 0.8);              // lag 0: all at once
-scene.drawBorderThenFill(staggered, 0.8, "smooth", 0.2);  // each starts 0.2 s later
+scene.drawBorderThenFill(staggered, 0.8, "smooth", 0.25);  // each starts 0.8 * 0.25 = 0.2 s later
 scene.wait(0.5);
 
 return scene;

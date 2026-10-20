@@ -17,8 +17,8 @@
 //             A group draws nothing itself; a space is a group with axes that places by its ranges.
 //   tag       an object's name, unique among the objects attached to a scene; object(tag) finds it.
 //   cursor    where the next play, look, wait or add starts in time; wait() and seek() move it.
-//   clip      one animated change of one object's property over a span of time; a play adds one per
-//             target, and clipCount() counts them.
+//   clip      one object's animated change over a span of time, affecting one or more channels.
+//             A play adds one per target, plus inherited group-style changes; clipCount() counts them.
 //   channel   the property a clip animates: model, opacity, stroke, fill, width, geometry and more.
 //             On one object, channels other than the model cannot overlap in time.
 //   family    an object with everything below it, as plays, fades and handoffs treat it.
@@ -1911,7 +1911,7 @@ struct MatchOptions
     // The central angle in radians of the arc each traveling piece follows, counterclockwise
     // about +z and strictly between -2 * pi and 2 * pi; zero travels straight.
     float arc = 0.0f;
-    // Delays each later piece of either object as play() delays each later target.
+    // Each later piece of either object starts duration * lag seconds after the previous one.
     float lag = 0.0f;
     // Explicit alternating source/target piece pairs, pairCount pairs. Circles/rectangles
     // interpolate one shape; other nonmatching pieces cross-fade while traveling.
@@ -2266,6 +2266,7 @@ struct Scene
     Result restore(Object* const* targets, uint32_t count, float duration = 0.0f,
                    const AnimCurve& curve = {}, float lag = 0.0f) noexcept;
     // Validates and reserves the whole command atomically; targets are distinct scene objects.
+    // lag is a nonnegative fraction of duration: each later target starts duration * lag later.
     // Non-model channels require chronological nonoverlap. Model motion may layer with
     // invertible authored models; shift needs no inverse. Times need distinct finite float
     // boundaries. Family birth/removal gates apply; remove waits for active clips.

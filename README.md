@@ -106,7 +106,7 @@ Meson uses a system ThorVG 1.2.0 or newer; without one, add `-Dbundled_thorvg=tr
 The scene above uses `scene:tex`, so build it with the TeX module:
 
 ```sh
-meson setup build -Dmodules=tex
+meson configure build -Dmodules=tex
 meson compile -C build
 ```
 
@@ -120,17 +120,18 @@ Save the Lua scene as `scene.lua`. Text and formulas are measured with the bundl
 so pass them with `--font` (the presets use Pretendard for text and JetBrains Mono for code):
 
 ```sh
-FONTS="--font src/examples/assets/Pretendard.ttf --font src/examples/assets/JetBrainsMono.ttf"
+set -- --font src/examples/assets/Pretendard.ttf --font src/examples/assets/JetBrainsMono.ttf
 
-build/viscript render scene.lua --time 3.8 -o frame.png $FONTS   # one frame
-build/viscript render scene.lua --fps 30 -o scene.mp4 $FONTS     # video
-build/viscript render scene.lua --fps 20 -o scene.gif $FONTS     # GIF
-build/viscript inspect scene.lua                                 # objects and timeline
-build/viscript audit scene.lua $FONTS                            # layout problems
-build/viscript benchmark scene.lua --frames 120
+build/viscript render scene.lua --time 3.8 -o frame.png "$@"   # one frame
+build/viscript render scene.lua --fps 30 -o scene.mp4 "$@"     # video
+build/viscript render scene.lua --fps 20 -o scene.gif "$@"     # GIF
+build/viscript inspect scene.lua "$@"                         # objects and timeline
+build/viscript audit scene.lua "$@"                           # layout problems
+build/viscript benchmark scene.lua --frames 120 "$@"
 ```
 
-- **Video:** `.mp4` and `.gif` export run FFmpeg, so it must be on `PATH`. PNG needs nothing extra.
+- **Video:** `.mp4` and `.gif` export run FFmpeg on macOS and Linux, so it must be on `PATH`.
+  The native savers do not support these formats on Windows or in WASM. PNG needs nothing extra.
 - **Audio:** add narration with `--audio narration.mp3`. A build with the Audio module also
   mixes the scene's own sound cues into the soundtrack.
 
@@ -217,7 +218,7 @@ Build and install it from the checkout:
 
 ```sh
 cd tools/vscode
-npm ci
+npm ci && npm ci --prefix ../player
 npm run package                                # creates vis-preview-<version>.vsix
 code --install-extension vis-preview-*.vsix
 ```
@@ -325,8 +326,8 @@ viscript is released under the [MIT License](LICENSE).
 | [Noto Sans Math](https://github.com/notofonts/math) | OFL 1.1 | A subset is embedded in the runtime for the math symbols other fonts lack |
 | [Pretendard](https://github.com/orioncactus/pretendard) | OFL 1.1 | Bundled font; a subset of Pretendard Std is the runtime's default font, and the docs site ships Pretendard Std |
 | [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) | OFL 1.1 | Bundled font |
-| [Source Serif 4](https://github.com/adobe-fonts/source-serif) | OFL 1.1 | Bundled font (runtime bundles and the Obsidian plugin) |
-| [FFmpeg](https://ffmpeg.org) | LGPL/GPL | Optional MP4 export, run as an external program; not linked or distributed |
+| [Source Serif 4](https://github.com/adobe-fonts/source-serif) | OFL 1.1 | Bundled font (runtime bundles and the VS Code extension) |
+| [FFmpeg](https://ffmpeg.org) | LGPL/GPL | Optional native GIF and MP4 export, run as an external program; not linked or distributed |
 
 The VS Code extension also bundles gifenc (MIT), Mediabunny (MPL-2.0) and Shiki (MIT);
 see [THIRD_PARTY_NOTICES](tools/vscode/THIRD_PARTY_NOTICES.md). The Obsidian plugin also bundles

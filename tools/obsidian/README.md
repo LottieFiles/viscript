@@ -2,8 +2,8 @@
 
 Plays viscript scenes, animated explanations written in Lua or JavaScript, in your notes: as
 code blocks, as embedded `.lua` files, and in a tab of their own with the source beside them.
-The viscript WebAssembly runtime draws them in a render worker through the shared player in
-[`tools/player`](../player), so notes stay responsive while scenes play.
+The viscript WebAssembly runtime draws them through the shared player in
+[`tools/player`](../player), using a render worker when available. Sound scenes use the main thread.
 
 ## Install
 
@@ -83,7 +83,8 @@ leaves the block.
 
 Turn on **Show source** in the plugin settings to keep each note player's script below it.
 The code button on a player shows or hides that script; **Copy source** copies the original
-Lua or JavaScript. These panels are read-only: edit the Markdown code block to change a scene.
+Lua or JavaScript. These panels are read-only: edit the Markdown code block or original `.lua`
+file to change a scene.
 While a block is being edited, Obsidian's editor supplies the source and the player above it
 shows no second copy.
 
@@ -118,7 +119,8 @@ draws the same on a computer, a phone or a tablet. A scene can also name another
 - **A font a scene names** is looked for in the font folder, by its name or its file's name,
   then on [Fontsource](https://fontsource.org). Failing those, its text is drawn in the text font,
   or in the code font for a name that reads as a monospaced font's, such as Fira Code; the scene
-  plays either way. The names the themes use always take the bundled fonts.
+  plays either way. The theme names `Pretendard` and `JetBrainsMono` take the configured
+  text and code fonts, including when a scene requests those names explicitly.
 - **Font folder**: a vault folder of fonts for scenes to name. It syncs with the vault, so your
   other devices have the same fonts.
 - **Download fonts**, on unless you turn it off: a font that is not in the folder is downloaded
@@ -148,7 +150,8 @@ The plugin uses the network only to download fonts, and only while **Download fo
 a font a scene or the settings name that is not in the font folder, it asks Fontsource's API
 (`api.fontsource.org`) whether it has the font, and downloads the font's file from jsDelivr
 (`cdn.jsdelivr.net`). The requests carry the font's name and nothing else from your notes or
-settings. The fonts the themes use ship with the plugin and are never downloaded.
+settings. The default text and code fonts ship with the plugin; a custom text or code font
+may be downloaded under the same setting.
 
 Downloaded fonts are saved in the font folder and found there from then on. A download that fails
 leaves the text in the text font until **Look for fonts again**. With **Download fonts** off, the
@@ -197,7 +200,6 @@ skipped.
 
 ## Limits
 
-- Sounds that scenes start are not played.
 - The sandbox for JavaScript scenes is tested on the desktop app. On phones and tablets they run
   only where the system holds the sandbox's workers to its policy.
 

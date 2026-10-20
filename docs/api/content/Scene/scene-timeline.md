@@ -13,7 +13,7 @@ Control the authoring cursor in seconds. Markers name times; callbacks place wor
 
 | Lua | JavaScript | Purpose |
 | --- | --- | --- |
-| `scene:wait(duration?)` | `scene.wait(duration?)` | Advance the cursor, leaving the frame unchanged; default 1, zero allowed. |
+| `scene:wait(duration?)` | `scene.wait(duration?)` | Advance the cursor without scheduling an animation; default 1, zero allowed. Existing clips continue normally. |
 | `scene:mark(name)` | `scene.mark(name)` | Name the current cursor time. |
 | `scene:at(timeOrMarker, fn)` | `scene.at(timeOrMarker, fn)` | Author the callback at an absolute time or marker, then restore the cursor. The callback receives the scene. |
 | `scene:parallel(fn, ...)`<br />`scene:parallel(functions)` | `scene.parallel(...functions)`<br />`scene.parallel(functions)` | Start each callback together; continue after the longest track. |

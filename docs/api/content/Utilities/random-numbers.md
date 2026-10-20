@@ -7,7 +7,7 @@ parent: utilities
 
 # Deterministic Randomness
 
-Lua starts from seed 0 for every Scene. JavaScript generators are independent; equal seeds produce the same sequence as Lua.
+Lua starts from seed 0 for every script load; scenes created in that script share its generator. JavaScript generators are independent; equal seeds produce the same sequence as Lua.
 
 ## Functions
 

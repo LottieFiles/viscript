@@ -8,7 +8,7 @@ Open [`content/`](content) as an Obsidian vault. Each category has an `index.md`
 and focused child pages. Use ordinary relative Markdown links or Obsidian
 wikilinks. The Viscript Obsidian plugin renders the scene fences in the vault.
 
-To install the bundled plugin and prepare this vault, run from the repository root:
+To build the plugin from the checkout and prepare this vault, run from the repository root:
 
 ```sh
 npm ci --prefix tools/player
@@ -17,8 +17,8 @@ npm run vault:setup --prefix docs/api
 ```
 
 In Obsidian, choose **Open folder as vault** and select `docs/api/content`.
-The setup opens **Shapes** in reading view, with the overview in another tab and
-the graph beside it. **Show source** is enabled for the API vault, so scenes appear
+On a fresh vault, setup opens **Shapes** in reading view, with the overview in another tab and
+the graph beside it. **Show source** defaults to enabled for the API vault, so scenes appear
 with their scripts. Use the player's code button or the plugin's **Show source**
 setting to hide them. Lua/JS counterparts share one player with language buttons.
 Viscript is installed and listed as enabled. On the first
