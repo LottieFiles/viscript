@@ -216,6 +216,7 @@ void sceneThemes(Renderer* renderer)
         CHECK(filledSurface->style.fill.a == 255u);
     }
     CHECK(scene->theme(proBlack) == Result::InsufficientCondition);
+    CHECK(scene->diagnostic() && std::strstr(scene->diagnostic(), "the theme must come before objects"));
     delete scene;
 
     auto editorial = proWhite;
@@ -252,6 +253,7 @@ void sceneThemes(Renderer* renderer)
     scene = Scene::gen();
     CHECK(scene != nullptr);
     if (scene) CHECK(scene->theme(invalid) == Result::InvalidArguments);
+    if (scene) CHECK(scene->diagnostic() && std::strstr(scene->diagnostic(), "1 to 10 object colors"));
     delete scene;
 
     invalid = proBlack;

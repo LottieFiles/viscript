@@ -591,6 +591,10 @@ return scene
         CHECK(controller->input(key(InputKind::KeyDown, Key::ArrowRight, 0.0f)).handled);
     }
     delete scene;
+    // A key that is not a string is named as the option, not by its place on the stack.
+    _scriptError("local s=vis.scene{}; local c=s:circle{}; "
+                 "vis.input.controller(s):key_move{target=c, key=true, shift={1,0}}; return s",
+                 "diagnostic.lua:1: key must be a string, got boolean");
 }
 
 #if defined(VIS_UI)

@@ -788,8 +788,7 @@ Result Space::voxel(VoxelSampler callback, Group*& voxels, void* data,
     return sample(callback, voxels, data, mode, padding, time, true);
 }
 
-static Result _timeFrames(const SampleTime& time, uint64_t volume,
-                          uint32_t& frames) noexcept
+Result timeFrames(const SampleTime& time, uint64_t volume, uint32_t& frames) noexcept
 {
     static constexpr uint64_t MaxColors = 262144u;
     if (!std::isfinite(time.duration) || time.duration < 0.0f || !time.fps) {
@@ -835,7 +834,7 @@ Result Space::sample(VoxelSampler callback, Group*& output, void* data,
     auto volume = slice * counts[2];
     if (slice > 16384u || volume > 65536u) return Result::InsufficientCondition;
     uint32_t frames;
-    result = _timeFrames(time, volume, frames);
+    result = timeFrames(time, volume, frames);
     if (result != Result::Success) return result;
 
     auto group = Group::gen();

@@ -15,12 +15,19 @@ struct DisplayList;
 
 // A billboard's font grows by the lesser XY stretch since its reference model was authored.
 float billboardScale(const Mat4& reference, const Mat4& model, float fallback) noexcept;
+// World units a pixel spans at the camera of config, at its target for a perspective camera, as
+// Scene::measure() converts the sizes of billboard text.
+float pixelWorld(const Config& config) noexcept;
 
 bool valid(const Config& config) noexcept;
 bool valid(const Object* object) noexcept;
 const Color* sampleColors(const Cell* cell, uint32_t frame) noexcept;
 uint32_t sampleFrames(const Cell* cell) noexcept;
 float sampleDuration(const Object* object) noexcept;
+// The frames a cell or voxel field samples over time, volume samples each: InvalidArguments for
+// a negative or unbounded duration or no fps, InsufficientCondition past 4096 frames or 262144
+// colors in all.
+Result timeFrames(const SampleTime& time, uint64_t volume, uint32_t& frames) noexcept;
 Gradient mix(const Gradient& from, const Gradient& to, float progress) noexcept;
 uint64_t fingerprint(const Object* object) noexcept;
 bool localBounds(const Object* object, Bounds& bounds) noexcept;

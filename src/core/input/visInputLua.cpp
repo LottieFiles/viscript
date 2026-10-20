@@ -134,7 +134,7 @@ static int _open(lua_State* lua, void* data)
 Key lua_extension::luaKey(lua_State* lua, int index)
 {
     size_t size;
-    auto name = luaL_checklstring(lua, index, &size);
+    auto name = _checkString(lua, index, "key", &size);
     if (auto found = _findName(name, size, KEYS)) return found->value;
     if (size == 1u) {
         auto c = name[0] >= 'a' && name[0] <= 'z' ? name[0] - 'a' + 'A' : name[0];

@@ -4504,12 +4504,11 @@ static bool _contourSample(double x, double y, double& value, void* data) noexce
     return number && std::fabs(value) <= FLT_MAX;
 }
 
+// Raises what stopped the contour function, as calling it directly would have: what it raised,
+// which names its own line, or a refused value at the line of the call.
 static int _contourError(const LuaContour& context)
 {
-    if (context.raised) {
-        auto message = lua_tostring(context.lua, -1);
-        return luaL_error(context.lua, "%s", message ? message : "contour fn failed");
-    }
+    if (context.raised) return lua_error(context.lua);
     return luaL_error(context.lua, "contour fn must return a finite number; at (%f, %f) it did not",
                       static_cast<lua_Number>(context.x), static_cast<lua_Number>(context.y));
 }
@@ -5682,33 +5681,16 @@ static Result _sampleDimensions(const Space* space, uint32_t* counts, bool spati
     return Result::Success;
 }
 
-static Result _sampleFrames(const SampleTime& time, uint64_t volume,
-                            uint32_t& frames)
-{
-    static constexpr uint64_t MaxColors = 262144u;
-    if (!std::isfinite(time.duration) || time.duration < 0.0f || !time.fps) {
-        return Result::InvalidArguments;
-    }
-    if (time.duration == 0.0f) {
-        frames = 1u;
-    } else {
-        auto intervals = std::ceil(static_cast<double>(time.duration) * time.fps);
-        if (!std::isfinite(intervals) || intervals < 1.0 || intervals > 4095.0) {
-            return Result::InsufficientCondition;
-        }
-        frames = static_cast<uint32_t>(intervals) + 1u;
-    }
-    if (volume > MaxColors / frames) return Result::InsufficientCondition;
-    return Result::Success;
-}
-
+// The color function of a cell or voxel field. Nothing may raise through the core, so the
+// sampler leaves what the function raises on the stack, or names the color it did not return,
+// for _sampleGen to raise once the core call returns.
 struct LuaSample
 {
     lua_State* lua = nullptr;
     LuaScene* scene = nullptr;
     int callback = 0;
-    const char* name = nullptr;
-    bool failed = false;
+    bool raised = false;
+    const char* refused = nullptr;
 };
 
 static bool _sample(float x, float y, float z, float time, Color& color,
@@ -5722,27 +5704,16 @@ static bool _sample(float x, float y, float z, float time, Color& color,
     if (spatial) lua_pushnumber(lua, z);
     lua_pushnumber(lua, time);
     if (_sampleCall(lua, context->scene, spatial ? 4 : 3, 1) != LUA_OK) {
-        context->failed = true;
+        context->raised = true;
         return false;
     }
-    if (lua_type(lua, -1) != LUA_TSTRING) {
-        lua_pop(lua, 1);
-        lua_pushfstring(lua, "%s callback must return a color string", context->name);
-        context->failed = true;
-        return false;
-    }
-    size_t size;
-    auto value = lua_tolstring(lua, -1, &size);
-    if (!_hex(value, size)) {
-        lua_pop(lua, 1);
-        lua_pushfstring(lua, "%s callback must return a #rgb, #rgba, #rrggbb or #rrggbbaa color",
-                        context->name);
-        context->failed = true;
-        return false;
-    }
-    color = Color::hex(value);
+    size_t size = 0;
+    auto value = lua_type(lua, -1) == LUA_TSTRING ? lua_tolstring(lua, -1, &size) : nullptr;
+    if (!value) context->refused = "color string";
+    else if (!_hex(value, size)) context->refused = "#rgb, #rgba, #rrggbb or #rrggbbaa color";
+    else color = Color::hex(value);
     lua_pop(lua, 1);
-    return true;
+    return !context->refused;
 }
 
 static bool _sampleCell(float x, float y, float time, Color& color, void* data) noexcept
@@ -5788,28 +5759,26 @@ static int _sampleGen(lua_State* lua, bool spatial)
     }
     auto volume = static_cast<uint64_t>(counts[0]) * counts[1] * counts[2];
     uint32_t frames;
-    status = _sampleFrames(time, volume, frames);
+    status = timeFrames(time, volume, frames);
     if (status != Result::Success) {
         return luaL_error(lua, "could not sample %s over time: %s", name,
                           status == Result::InvalidArguments
-                              ? "the duration and fps give too many frames for the sampled volume"
-                              : _explain(status));
+                              ? "the duration must be non-negative"
+                              : "the duration and fps give more than 4096 frames or 262144 colors in all");
     }
     auto scene = handle->scene;
     LuaCharge charge{512u + counts[2] * uint64_t{512} + volume * frames * sizeof(Color), counts[2] + 1u};
     _fit(lua, scene, charge);
 
-    auto context = LuaSample{lua, scene, lua_absindex(lua, 2), name};
+    auto context = LuaSample{lua, scene, lua_absindex(lua, 2)};
     Group* field = nullptr;
     if (spatial) {
         status = space->voxel(_sampleVoxel, field, &context, mode, padding, time);
     } else {
         status = space->cell(_sampleCell, field, &context, mode, padding, time);
     }
-    if (context.failed) {
-        auto message = lua_tostring(lua, -1);
-        return luaL_error(lua, "%s", message ? message : "sampling callback failed");
-    }
+    if (context.raised) return lua_error(lua);
+    if (context.refused) return luaL_error(lua, "%s callback must return a %s", name, context.refused);
     if (status != Result::Success || !field) {
         return luaL_error(lua, "could not create %s field: %s", name, _reason(scene->scene, status));
     }
@@ -6065,18 +6034,6 @@ static int _charge(lua_State* lua, LuaScene* box, uint32_t before, size_t string
 
 // ---------- Braces ----------
 
-// World units a pixel spans at the camera as authored so far, at its target for a perspective
-// camera, as Scene::measure converts the sizes of billboard text.
-static float _pixelWorld(const Config& config)
-{
-    auto& camera = config.camera;
-    auto height = static_cast<float>(config.height);
-    if (camera.projection == Projection::Perspective) {
-        return 2.0f * std::tan(camera.fov * 0.5f) * (camera.target - camera.eye).length() / height;
-    }
-    return camera.orthoHeight / height;
-}
-
 // Where a brace stands: its ends lie on the line from start along across, width apart, and its
 // tip points along out, across and out being unit vectors in the xy plane of its space.
 struct LuaBraceFrame
@@ -6252,7 +6209,7 @@ static int _brace(lua_State* lua)
     if (!text) return luaL_error(lua, "could not create brace label: out of memory");
     _text(lua, 2, text);
     auto size = text->size > 0.0f ? text->size : _roleTheme(scene->theme(), text->role).size;
-    auto em = text->orientation == TextOrientation::Plane ? size : size * _pixelWorld(scene->config());
+    auto em = text->orientation == TextOrientation::Plane ? size : size * pixelWorld(scene->config());
     auto offset = _fieldNumber(lua, 2, "offset", 0.25f * em);
     auto depth = _fieldNumber(lua, 2, "depth", 0.4f * em);
     auto gap = _fieldNumber(lua, 2, "gap", 0.2f * em);
@@ -7640,10 +7597,7 @@ static int _warp(lua_State* lua)
     auto clips = scene->clipCount();
     auto result = scene->warp(targets, count, _warpPoint, &context, duration, curve, step);
     switch (context.failure) {
-        case LuaWarpFailure::Raised: {
-            auto message = lua_tostring(lua, -1);
-            return luaL_error(lua, "%s", message ? message : "warp fn failed");
-        }
+        case LuaWarpFailure::Raised: return lua_error(lua);
         case LuaWarpFailure::Value:
             return luaL_error(lua, "warp fn must return x and y, or x, y and z, as numbers or {x, y, z}; at (%f, %f, %f) it did not",
                               static_cast<lua_Number>(context.at.x), static_cast<lua_Number>(context.at.y),

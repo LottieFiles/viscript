@@ -448,6 +448,24 @@ void sceneTransitions(Renderer* renderer)
               == Result::InvalidArguments);
         CHECK(root->transition(duplicate, 2u, {}, 1.0f, 0.25f, AnimCurve::preset(AnimCurvePreset::Linear))
               == Result::InvalidArguments);
+        CHECK(root->diagnostic() && std::strstr(root->diagnostic(), "distinct scenes"));
+        // A stage that already nests viewports 16 scenes deep leaves the transition no room.
+        auto deep = Scene::gen(config);
+        for (auto level = 1u; level < 16u; level++) {
+            auto above = Scene::gen(config);
+            CHECK(above && above->viewport(deep, {}) == Result::Success);
+            deep = above;
+        }
+        Scene* nested[] = {first, deep};
+        CHECK(root->transition(nested, 2u) == Result::InvalidArguments);
+        CHECK(root->diagnostic() && std::strstr(root->diagnostic(), "16 scenes deep"));
+        delete deep;
+        // A transition or a hold that would end past the largest time says so.
+        float holds[] = {0.25f, 3.0e38f};
+        CHECK(root->transition(stages, 2u, {}, 3.0e38f, 3.0e38f) == Result::InvalidArguments);
+        CHECK(root->diagnostic() && std::strstr(root->diagnostic(), "representable time range"));
+        CHECK(root->transition(stages, 2u, {}, 3.0e38f, holds, 2u, {}) == Result::InvalidArguments);
+        CHECK(root->diagnostic() && std::strstr(root->diagnostic(), "representable time range"));
         CHECK(root->transition(stages, 2u, {}, 1.0f, 0.25f, AnimCurve::preset(AnimCurvePreset::Linear))
               == Result::Success);
         CHECK(near(root->duration(), 1.5f));

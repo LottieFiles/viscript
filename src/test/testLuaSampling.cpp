@@ -1285,15 +1285,25 @@ return s
 void _samplingCallbacks()
 {
     // Every function the binding samples runs as a sampling callback, which cannot author its
-    // scene: a call that would names the line of the callback, also when a bind inside one
+    // scene: a call that would names the line of the callback, once, also when a bind inside one
     // samples a function of its own.
     static constexpr auto prefix = "local s=vis.scene{fps=4}; local c=s:circle{radius=0.5}; local armed=false\n"
                                    "local function author(x) if armed then s:circle{} end return x end\n";
-    auto fails = [](const char* body, const char* expected = "diagnostic.lua:2: scene authoring is unavailable "
-                                                              "inside a sampling callback") {
+    // The script stops with exactly the message expected.
+    auto stops = [](const char* script, const char* expected) {
+        char error[1024] = {};
+        Scene* scene = nullptr;
+        detail::LuaHostContext context;
+        CHECK(_load(script, "diagnostic.lua", scene, error, sizeof(error), context) == Result::ScriptError);
+        CHECK(std::strcmp(error, expected) == 0);
+        if (std::strcmp(error, expected) != 0) std::fprintf(stderr, "  expected '%s', got: %s\n", expected, error);
+        delete scene;
+    };
+    auto fails = [&](const char* body, const char* expected = "diagnostic.lua:2: scene authoring is unavailable "
+                                                               "inside a sampling callback") {
         char script[1024];
         std::snprintf(script, sizeof(script), "%sarmed=true\n%s\nreturn s", prefix, body);
-        _scriptError(script, expected);
+        stops(script, expected);
     };
     fails("s:plot{fn=author, x_range={0,1,0.5}}");
     fails("local p=s:plot{points={{0,0},{1,1}}}; s:play({target=p, fn=author, x_range={0,1,0.5}}, 1)");
@@ -1306,15 +1316,27 @@ void _samplingCallbacks()
     fails("s:surface{points={{0,0,0},{1,0,0},{0,1,0},{1,1,0}}, size={2,2},\n"
           "colors=function(x) return author('#fff') end}");
     fails("s:bind(c, s:tracker(0), function(v) return {opacity=author(1)} end)");
+    fails("s:contour{fn=function(x) return author(x) end, x_range={0,1,1}, y_range={0,1,1}, levels={0.5}}");
+    fails("s:warp(c, function(x, y) return author(x), y end)");
+    fails("s:space{}:cell(function() return author('#fff') end)");
+    fails("s:space{}:voxel(function() return author('#fff') end)");
     fails("s:plot{x_range={0,1,1}, fn=function(x)\n"
           "s:bind(c, s:tracker(0), function() return {opacity=1} end) return x end}",
           "diagnostic.lua:5: scene authoring is unavailable inside a sampling callback");
+    // An error a callback raises reaches the script as raised, at its own line; a value the
+    // binding refuses names the line of the call.
+    fails("s:contour{fn=function()\nerror('boom') end, x_range={0,1,1}, y_range={0,1,1}, levels={0.5}}",
+          "diagnostic.lua:5: boom");
+    fails("s:warp(c, function()\nerror('boom') end)", "diagnostic.lua:5: boom");
+    fails("s:space{}:cell(function()\nerror('boom') end)", "diagnostic.lua:5: boom");
+    fails("s:space{}:voxel(function()\nerror('boom') end)", "diagnostic.lua:5: boom");
+    fails("s:space{}:cell(function()\nreturn 1 end)", "diagnostic.lua:4: cell callback must return a color string");
     // A function the binding samples again later: the colors of two surfaces where they morph,
     // a bound function where a track moves its tracker and where tracks that wait play.
-    auto later = [](const char* setup, const char* body) {
+    auto later = [&](const char* setup, const char* body) {
         char script[1024];
         std::snprintf(script, sizeof(script), "%s%s\narmed=true\n%s\nreturn s", prefix, setup, body);
-        _scriptError(script, "diagnostic.lua:2: scene authoring is unavailable inside a sampling callback");
+        stops(script, "diagnostic.lua:2: scene authoring is unavailable inside a sampling callback");
     };
     later("local p={{0,0,0},{1,0,0},{0,1,0},{1,1,0}}; local function f() return author('#fff') end\n"
           "local a=s:surface{points=p, size={2,2}, colors=f}; local b=s:surface{points=p, size={2,2}, colors=f}",

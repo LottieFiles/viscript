@@ -3490,14 +3490,22 @@ Scene* Scene::gen(const Config& config) noexcept
     return nullptr;
 }
 
+static constexpr auto THEME_VALUES =
+    "the theme needs named fonts, finite positive text sizes and object width, a roundness from 0 "
+    "to 0.5 and 1 to 10 object colors";
+static constexpr auto THEME_LATE =
+    "the theme must come before objects, viewports, a transition and the first play, wait, look "
+    "or remove";
+
 Result Scene::theme(const Theme& theme) noexcept
 {
-    if (!_valid(theme)) return Result::InvalidArguments;
-    if (pImpl->owner || pImpl->objectCnt || pImpl->viewportCnt || pImpl->sequence
-        || pImpl->definitionsSealed) {
-        return Result::InsufficientCondition;
+    pImpl->diagnostic = nullptr;
+    if (!_valid(theme)) return pImpl->fail(Result::InvalidArguments, THEME_VALUES);
+    if (pImpl->owner) return pImpl->fail(Result::InsufficientCondition, SCENE_MOUNTED);
+    if (pImpl->objectCnt || pImpl->viewportCnt || pImpl->sequence || pImpl->definitionsSealed) {
+        return pImpl->fail(Result::InsufficientCondition, THEME_LATE);
     }
-    if (!pImpl->assign(theme)) return Result::OutOfMemory;
+    if (!pImpl->assign(theme)) return pImpl->fail(Result::OutOfMemory, SCENE_MEMORY);
     return Result::Success;
 }
 
@@ -4471,8 +4479,7 @@ static constexpr auto MEASURE_FONT = "the text's font cannot set it at its size"
 
 // ---------- Placement, measuring and viewports ----------
 
-// World units per pixel at the camera; a perspective camera measures at its target.
-static float _pixelWorld(const Config& config)
+float pixelWorld(const Config& config) noexcept
 {
     auto& camera = config.camera;
     auto height = static_cast<float>(config.height);
@@ -4533,7 +4540,7 @@ Result Space::place(Object* label, uint8_t axis, float value, const Vec3& direct
     auto run = inverse * (tick + unit) - from;
     auto runLength = run.length();
     if (!std::isfinite(runLength) || runLength <= 1.0e-12f) return fail(Result::InvalidArguments, PLACE_PARENT);
-    auto to = from + run * ((tickLength * 0.5f + gap) * _pixelWorld(objOwner->pImpl->cfg));
+    auto to = from + run * ((tickLength * 0.5f + gap) * pixelWorld(objOwner->pImpl->cfg));
     // A text without a box bounds only its point, so it pins the side of its glyphs that faces
     // the tick there instead, the way unit runs on screen.
     auto text = label->type() == Type::Text ? static_cast<Text*>(label) : nullptr;
@@ -4627,7 +4634,7 @@ Result Scene::measure(const Text* text, const char* sample, TextExtent& output) 
     if (result == Result::InsufficientCondition) return pImpl->fail(result, "no font is loaded, not even the default one");
     if (result != Result::Success) return pImpl->fail(result, MEASURE_FONT);
     if (text->orientation == TextOrientation::Billboard) {
-        auto scale = _pixelWorld(pImpl->cfg);
+        auto scale = pixelWorld(pImpl->cfg);
         output.width *= scale;
         output.height *= scale;
         output.ascent *= scale;
@@ -4819,12 +4826,12 @@ Result Scene::transition(Scene* const* scenes, uint32_t count, const Viewport& v
     if (pImpl->sequence) return pImpl->fail(Result::InsufficientCondition, TRANSITION_TWICE);
     for (auto i = 0u; i < count; i++) {
         auto scene = scenes[i];
-        if (!scene || scene == this || scene->pImpl->owner
-            || !valid(scene->pImpl->cfg) || depth(scene) >= MAX_VIEWPORT_DEPTH) {
-            return Result::InvalidArguments;
+        if (!scene || scene == this || scene->pImpl->owner || !valid(scene->pImpl->cfg)) {
+            return pImpl->fail(Result::InvalidArguments, TRANSITION_SCENES);
         }
+        if (depth(scene) >= MAX_VIEWPORT_DEPTH) return pImpl->fail(Result::InvalidArguments, VIEWPORT_LIMIT);
         for (auto j = i + 1u; j < count; j++) {
-            if (scene == scenes[j]) return Result::InvalidArguments;
+            if (scene == scenes[j]) return pImpl->fail(Result::InvalidArguments, TRANSITION_SCENES);
         }
     }
     if (styleCount && (!styles || (styleCount != 1u && styleCount != count - 1u))) {
@@ -4931,7 +4938,7 @@ Result Scene::transition(Scene* const* scenes, uint32_t count, const Viewport& v
         auto hold = holds[holdCount == 1u ? 0u : i];
         if (hold > 0.0f && !_timeline(cursor, hold, 0.0f, 1u, stage.end)) {
             delete sequence;
-            return Result::InvalidArguments;
+            return pImpl->fail(Result::InvalidArguments, TIMELINE_RANGE);
         }
         cursor = stage.end;
         if (i + 1u >= count) continue;
@@ -4939,7 +4946,7 @@ Result Scene::transition(Scene* const* scenes, uint32_t count, const Viewport& v
         transition.begin = cursor;
         if (!_timeline(cursor, duration, 0.0f, 1u, transition.end)) {
             delete sequence;
-            return Result::InvalidArguments;
+            return pImpl->fail(Result::InvalidArguments, TIMELINE_RANGE);
         }
         transition.curve = curve;
         auto style = styleCount ? styles[styleCount == 1u ? 0u : i] : TransitionStyle{};

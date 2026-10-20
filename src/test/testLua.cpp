@@ -924,18 +924,20 @@ return s
     _error("local s=vis.scene{}; local g=s:space{}; "
            "g:voxel(function() return '#fff' end,{padding=.5}); return s",
            "voxel-padding.lua");
-    _error("local s=vis.scene{}; local g=s:space{}; "
-           "g:cell(function() return '#fff' end,{duration=-1}); return s",
-           "cell-duration.lua");
+    _scriptError("local s=vis.scene{}; local g=s:space{}; "
+                 "g:cell(function() return '#fff' end,{duration=-1}); return s", "cell-duration.lua",
+                 "cell-duration.lua:1: could not sample cell over time: the duration must be non-negative");
     _error("local s=vis.scene{}; local g=s:space{}; "
            "g:voxel(function() return '#fff' end,{duration=1,fps=0}); return s",
            "voxel-fps.lua");
-    _error("local s=vis.scene{}; local g=s:space{}; "
-           "g:voxel(function() return '#fff' end,{duration=200,fps=30}); return s",
-           "voxel-frame-limit.lua");
-    _error("local s=vis.scene{}; local g=s:space{x={-25,25,1},y={-25,25,1}}; "
-           "g:cell(function() return '#fff' end,{duration=4,fps=30}); return s",
-           "cell-color-limit.lua");
+    _scriptError("local s=vis.scene{}; local g=s:space{}; "
+                 "g:voxel(function() return '#fff' end,{duration=200,fps=30}); return s", "voxel-frame-limit.lua",
+                 "voxel-frame-limit.lua:1: could not sample voxel over time: the duration and fps give more "
+                 "than 4096 frames or 262144 colors in all");
+    _scriptError("local s=vis.scene{}; local g=s:space{x={-25,25,1},y={-25,25,1}}; "
+                 "g:cell(function() return '#fff' end,{duration=4,fps=30}); return s", "cell-color-limit.lua",
+                 "cell-color-limit.lua:1: could not sample cell over time: the duration and fps give more "
+                 "than 4096 frames or 262144 colors in all");
     _error(R"lua(
 local s = vis.scene {}
 local g = s:space {x = {0, 0, 1}, y = {0, 0, 1}}
