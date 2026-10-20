@@ -11,6 +11,7 @@
 - Follow the editor theme in scenes that name no theme, which are now `adaptive`.
 - Draw scenes that name no size at 960×540, the size the documentation and skills write them at.
 - Show 6 world units vertically through a camera that names no height, as the documentation's scenes do.
+- Animate descriptors with `scene:tween` (`scene.tween` in JavaScript), the new name of `scene:play`, which is gone.
 
 ## 0.7.79
 

@@ -36,7 +36,7 @@ for _, h in ipairs(effect) do scene:set({target = h, opacity = 0}) end
 local function fade(hs, v, d)
   local t = {}
   for k, h in ipairs(hs) do t[k] = {target = h, opacity = v} end
-  scene:play(t, d)
+  scene:tween(t, d)
 end
 
 local CAM = {duration = 0.7, curve = "ease_in_out"}
@@ -48,7 +48,7 @@ scene:set({target = wire, opacity = 1})
 scene:create(wire, {duration = 0.4, curve = "ease_out"})
 scene:set({target = dot, opacity = 1})
 scene:grow_from_center(dot, {duration = 0.4, curve = {preset = "back", strength = 1.4}})
-scene:play({target = dot, shift = {2.4, 0}, arc = -2}, 0.6, "ease_in_out")
+scene:tween({target = dot, shift = {2.4, 0}, arc = -2}, 0.6, "ease_in_out")
 scene:set({target = ok, opacity = 1})
 scene:write(ok, 0.4)
 scene:wait(1.0)

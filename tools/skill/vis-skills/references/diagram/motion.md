@@ -29,7 +29,7 @@ For one discrete arrival, animate a deliberately named payload only when the pay
 
 ## Stable topology and state
 
-During an ordinary trace, do not move nodes, resize containers, reroute corridors, or change camera framing. Spatial memory is the reader's index. A request, response, error, or state write should receive distinct treatment only when their distinction supports the claim. Advance authored stages deterministically, and let arrival trigger the smallest truthful state change. When a route, affected node or field, and explanatory Text must change as one semantic identity, recolor them together in one `play` array.
+During an ordinary trace, do not move nodes, resize containers, reroute corridors, or change camera framing. Spatial memory is the reader's index. A request, response, error, or state write should receive distinct treatment only when their distinction supports the claim. Advance authored stages deterministically, and let arrival trigger the smallest truthful state change. When a route, affected node or field, and explanatory Text must change as one semantic identity, recolor them together in one `tween` array.
 
 Animate topology only when reconfiguration, failover, migration, regrouping, or a before/after layout is the subject. Show and hold the complete before state; preserve stable IDs and unchanged nodes; replace or move only changed structures; reroute affected edges as one semantic transition; then show and hold the complete after state.
 

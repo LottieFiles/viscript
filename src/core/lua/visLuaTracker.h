@@ -6,7 +6,7 @@
 namespace vis
 {
 
-// The keys a state that a bound function returns may set, each a property of a play descriptor.
+// The keys a state that a bound function returns may set, each a property of a tween descriptor.
 // The prelude copies all but shift into the descriptors of the segments it plays, and gives shift
 // as the change since the segment before.
 static constexpr const char* STATE_KEYS[] = {
@@ -196,7 +196,7 @@ local function playGroup(group)
         local state = evaluate(binding, args, 1)
         local duration = to.time - from.time
         scene:seek(from.time)
-        scene:play({descriptor(binding, state)}, duration, "linear")
+        scene:tween({descriptor(binding, state)}, duration, "linear")
     end
 end
 
@@ -229,7 +229,7 @@ local function run()
             end
             if #batch > 0 then
                 scene:seek(track.bounds[step - 1])
-                scene:play(batch, track.bounds[step] - track.bounds[step - 1], "linear")
+                scene:tween(batch, track.bounds[step] - track.bounds[step - 1], "linear")
             end
         end
         for _, binding in ipairs(track.affected) do

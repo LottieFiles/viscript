@@ -57,7 +57,7 @@ local function attach(i, d)
       function()
         local t = {{target = tiles[i], opacity = 1}, {target = labels[i], fill = INK}}
         if subs[i] then t[#t + 1] = {target = subs[i], fill = INK} end
-        scene:play(t, d, "ease_out")
+        scene:tween(t, d, "ease_out")
       end)
   end
 end
@@ -74,7 +74,7 @@ scene:parallel(attach(1, 0.45), function() scene:wait(0.12); attach(2, 0.45)() e
 scene:wait(0.4)
 -- Reconfigure with all modules: the rest attach in a wave.
 scene:focus(nil, CAM)
-scene:play({target = cmd1, text = "$ meson setup build -Dmodules=all", retype = true}, 0.7)
+scene:tween({target = cmd1, text = "$ meson setup build -Dmodules=all", retype = true}, 0.7)
 local wave = {}
 for k, i in ipairs({3, 4}) do wave[k] = function() scene:wait((k - 1) * 0.1); attach(i, 0.4)() end end
 scene:parallel(table.unpack(wave))
@@ -82,12 +82,12 @@ scene:wait(0.3)
 -- Compile.
 scene:set({target = cmd2, opacity = 1})
 scene:write(cmd2, 0.6)
-scene:play({target = bar, opacity = 1}, 0.1)
+scene:tween({target = bar, opacity = 1}, 0.1)
 scene:parallel(
-  function() scene:play({target = bar, size = {BAR_W, 0.32}, shift = {BAR_W / 2, 0}}, 1.2, "ease_in_out") end,
-  function() scene:wait(0.9); scene:play({target = core, stroke = "success", width = 3.5}, 0.3, "ease_out") end)
+  function() scene:tween({target = bar, size = {BAR_W, 0.32}, shift = {BAR_W / 2, 0}}, 1.2, "ease_in_out") end,
+  function() scene:wait(0.9); scene:tween({target = core, stroke = "success", width = 3.5}, 0.3, "ease_out") end)
 scene:set({target = done, opacity = 1})
 scene:write(done, 0.4)
-scene:play({target = core, stroke = INK, width = 3}, 0.4)
+scene:tween({target = core, stroke = INK, width = 3}, 0.4)
 scene:wait(1.2)
 return scene

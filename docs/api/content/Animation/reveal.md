@@ -27,7 +27,7 @@ parent: animation
 | --- | --- | --- |
 | `progress` | `progress` | Outline drawing progress. |
 
-Use this field in a [play / set descriptor](./state-scheduling.md) to choose the outline progress directly.
+Use this field in a [tween / set descriptor](./state-scheduling.md) to choose the outline progress directly.
 
 ## Examples
 
@@ -152,7 +152,7 @@ scene.write(subject, 1.4);
 return scene;
 ```
 
-### play · progress
+### tween · progress
 
 <!-- api-example: property.progress -->
 
@@ -162,9 +162,9 @@ local scene = vis.scene {
     height = 540,
 }
 
-scene:text {id = "caption", text = "play: progress", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
+scene:text {id = "caption", text = "tween: progress", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
 local subject = scene:circle {id = "subject", radius = 1.1, stroke = "accent", fill = "#00000000", width = 3}
-scene:play({target = subject, progress = 0.15}, 1.4)
+scene:tween({target = subject, progress = 0.15}, 1.4)
 
 return scene
 ```
@@ -175,9 +175,9 @@ const scene = vis.scene({
     height: 540,
 });
 
-scene.text({id: "caption", text: "play: progress", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
+scene.text({id: "caption", text: "tween: progress", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
 const subject = scene.circle({id: "subject", radius: 1.1, stroke: "accent", fill: "#00000000", width: 3});
-scene.play({target: subject, progress: 0.15}, 1.4);
+scene.tween({target: subject, progress: 0.15}, 1.4);
 
 return scene;
 ```

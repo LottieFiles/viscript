@@ -25,7 +25,7 @@ Use the state ledger in code rather than hand-authored distances:
 ```lua
 local function swap_ids(a, b)
   local sa, sb = slot_of[a], slot_of[b]
-  scene:play({
+  scene:tween({
     {target=owners[a], position={slot_x[sb], slot_y}},
     {target=owners[b], position={slot_x[sa], slot_y}},
   }, swap_time, "ease_in_out", 0)

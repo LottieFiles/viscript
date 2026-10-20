@@ -15,7 +15,7 @@ local wave = s:plot {points = {{-3, 2}, {0, 2}, {3, 2}}, id = "wave"}
 s:bind(wave, x, function(v) return {points = {{-3, 2}, {0, 2 + v}, {3, 2}}, opacity = 1 - v / 4} end)
 s:track(x, 2, 1, "linear")
 local wedge = s:polygon {points = {{0, 0}, {1, 0}, {0, 1}}, id = "wedge"}
-s:play({target = wedge, points = {{0, 0}, {2, 0}, {0, 2}}}, 0.5)
+s:tween({target = wedge, points = {{0, 0}, {2, 0}, {0, 2}}}, 0.5)
 local pointer = s:arrow {from = {0, 0}, to = {1, 0}, id = "pointer"}
 s:set {target = pointer, to = {0, 1}}
 return s
@@ -67,19 +67,19 @@ return s
                  "s:bind(c, t, function(v) return {from = {v, 0}} end) return s",
                  "from needs a line, arrow, curve or angle; move other objects with shift");
     _scriptError("local s = vis.scene {} local l = s:line {from = {0, 0}, to = {1, 0}} "
-                 "s:play({target = l, origin = {1, 1}}, 1) return s", "origin needs a vector");
+                 "s:tween({target = l, origin = {1, 1}}, 1) return s", "origin needs a vector");
     _scriptError("local s = vis.scene {} local l = s:line {from = {0, 0}, to = {1, 0}} "
                  "s:set {target = l, control1 = {1, 1}} return s", "control1 needs a curve");
     _scriptError("local s = vis.scene {} local l = s:line {from = {0, 0}, to = {1, 0}} "
-                 "s:play({target = l, points = {{1, 1}, {2, 2}}}, 1) return s",
+                 "s:tween({target = l, points = {{1, 1}, {2, 2}}}, 1) return s",
                  "points needs a polygon, plot, route or path of one contour");
     _scriptError("local s = vis.scene {} local p = s:path {commands = {{type = 'move', to = {0, 0}}, "
                  "{type = 'line', to = {1, 0}}, {type = 'line', to = {0, 1}}, {type = 'close'}, "
                  "{type = 'move', to = {2, 0}}, {type = 'line', to = {3, 0}}, {type = 'line', to = {2, 1}}, "
-                 "{type = 'close'}}} s:play({target = p, points = {}}, 1) return s",
+                 "{type = 'close'}}} s:tween({target = p, points = {}}, 1) return s",
                  "points cannot reshape a path of several contours");
     _scriptError("local s = vis.scene {} local l = s:line {from = {0, 0}, to = {1, 0}} "
-                 "s:play({target = l, to = {0 / 0, 1}}, 1) return s", "vector component must be a finite number");
+                 "s:tween({target = l, to = {0 / 0, 1}}, 1) return s", "vector component must be a finite number");
 
     // A copy keeps the points a bound shape shows as it is made, and a warp maps the points a
     // track ends at.
@@ -570,7 +570,7 @@ return s
     _error("local s = vis.scene {} local c = s:circle {radius = 1} local t = s:tracker(0) "
            "s:bind(c, t, function(v) return {spin = v} end) return s", "bind-unknown-key.lua");
 
-    // A bound state applies every play property, also once the timeline has started.
+    // A bound state applies every tween property, also once the timeline has started.
     static constexpr auto late = R"lua(
 local s = vis.scene {width = 160, height = 90, fps = 10}
 local dot = s:circle {radius = 0.2, id = "dot"}

@@ -7,11 +7,11 @@ parent: overview
 
 # Animation
 
-Schedule one change or combine related changes in a `play` descriptor. Each page groups one kind of animation with its functions, editable example scene and matching properties.
+Schedule one change or combine related changes in a `tween` descriptor. Each page groups one kind of animation with its functions, editable example scene and matching properties.
 
 | Page | Functions and properties |
 | --- | --- |
-| [State & Scheduling](./state-scheduling.md) | `play`, `set`, `save` / `restore`, draw order. |
+| [State & Scheduling](./state-scheduling.md) | `tween`, `set`, `save` / `restore`, draw order. |
 | [Reveal](./reveal.md) | `create` / `uncreate`, fill reveal, borders, writing, outline progress. |
 | [Growth](./growth.md) | Grow from a center or edge; shrink to the center. |
 | [Movement](./movement.md) | Shift, transform, rotate, scale, arrange and movement descriptors. |

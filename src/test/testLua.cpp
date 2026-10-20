@@ -92,7 +92,7 @@ local route = axes:route {
 }
 local marker = axes:point {point = {0, 0}, radius = 4, fill = "#ffd166"}
 s:create({axes, route, marker}, 0.5, "linear")
-s:play({target = route, dash_offset = -8, tail = 14, tip = 22}, 0.5, "linear")
+s:tween({target = route, dash_offset = -8, tail = 14, tip = 22}, 0.5, "linear")
 return s
 )lua";
 
@@ -236,7 +236,7 @@ static void _diagnostics()
                  "morph outlines must both be closed (circle, rectangle, polygon) or both be open");
     _scriptError("local s=vis.scene{}; local a=s:circle{radius=1}; local b=s:circle{radius=1};"
                  " s:wait(1); a:next_to(b,{1,0}); return s",
-                 "could not place object: layout and direct edits must come before the first play");
+                 "could not place object: layout and direct edits must come before the first animation");
     _scriptError("local s=vis.scene{}; local a=s:circle{radius=1}; local b=s:circle{radius=1};"
                  " s:fade_in({a,b}); return s",
                  "expected one object handle, got a table");
@@ -246,7 +246,7 @@ static void _diagnostics()
                  " s:fade_in(b); s:fade_transform(a,b,1); return s",
                  "add the replacing object right before the cross-fade");
     _scriptError("local s=vis.scene{}; local a=s:circle{radius=1};"
-                 " s:play({target=a,tip=4},1); return s",
+                 " s:tween({target=a,tip=4},1); return s",
                  "tail and tip need an arrow, vector, connector or route");
     _scriptError("local s=vis.scene{}; local a=s:circle{radius=1}; a:next_to(a,{1,0}); return s",
                  "could not place object: the reference must be a different object with the same parent");
@@ -706,9 +706,9 @@ int main()
     _error("local s=vis.scene{}; s:circle{dash={4,-1}}; return s", "dash-negative.lua");
     _error("local s=vis.scene{}; s:circle{dash_offset=1}; return s", "dash-offset.lua");
     _error("local s=vis.scene{}; s:route{points={{0,0},{1,0}},tip=-1}; return s", "route-tip.lua");
-    _error("local s=vis.scene{}; local r=s:rectangle{}; s:play({target=r,tip=2}); return s", "play-tip-target.lua");
-    _error("local s=vis.scene{}; local a=s:arrow{}; s:play({target=a,tail=-1}); return s", "play-tail-negative.lua");
-    _error("local s=vis.scene{}; local l=s:line{}; s:play({target=l,dash_offset=1}); return s", "dash-play-solid.lua");
+    _error("local s=vis.scene{}; local r=s:rectangle{}; s:tween({target=r,tip=2}); return s", "tween-tip-target.lua");
+    _error("local s=vis.scene{}; local a=s:arrow{}; s:tween({target=a,tail=-1}); return s", "tween-tail-negative.lua");
+    _error("local s=vis.scene{}; local l=s:line{}; s:tween({target=l,dash_offset=1}); return s", "dash-play-solid.lua");
     _error("local s=vis.scene{}; s:space{matrixx={}}; return s", "object-option.lua");
     _error("local s=vis.scene{}; local g=s:space{}; g:arrow{from={0,0},to={1,0},tail=-1}; return s", "tail.lua");
     _error("local s=vis.scene{}; local g=s:space{}; local a=g:point{}; local b=g:point{}; s:transition(a,b); return s", "transition-opacity.lua");
@@ -773,59 +773,59 @@ return a
     _error(R"lua(
 local s = vis.scene {}
 local r = s:rectangle {}
-s:play({
+s:tween({
     {target = r, shift = {1, 0}},
     {target = r, opacity = 0.5}
 })
 return s
 )lua",
-           "play-duplicate-target.lua");
+           "tween-duplicate-target.lua");
     _error(R"lua(
 local s = vis.scene {}
-s:play({{shift = {1, 0}}})
+s:tween({{shift = {1, 0}}})
 return s
 )lua",
-           "play-missing-target.lua");
+           "tween-missing-target.lua");
     _error(R"lua(
 local s = vis.scene {}
 local r = s:rectangle {}
-s:play({target = r})
+s:tween({target = r})
 return s
 )lua",
-           "play-no-property.lua");
+           "tween-no-property.lua");
     _error(R"lua(
 local s = vis.scene {}
 local r = s:rectangle {}
-s:play({
+s:tween({
     target = r,
     shift = {1, 0},
     transform = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}
 })
 return s
 )lua",
-           "play-shift-transform.lua");
+           "tween-shift-transform.lua");
     _error(R"lua(
 local a = vis.scene {}
 local b = vis.scene {}
 local r = a:rectangle {}
-b:play({target = r, shift = {1, 0}})
+b:tween({target = r, shift = {1, 0}})
 return b
 )lua",
-           "play-foreign-target.lua");
+           "tween-foreign-target.lua");
     _error(R"lua(
 local s = vis.scene {}
 local r = s:rectangle {}
-s:play({target = r, opacity = 0 / 0})
+s:tween({target = r, opacity = 0 / 0})
 return s
 )lua",
-           "play-nonfinite.lua");
+           "tween-nonfinite.lua");
     _error(R"lua(
 local s = vis.scene {}
 local r = s:rectangle {}
-s:play({target = r, opacity = 1.1})
+s:tween({target = r, opacity = 1.1})
 return s
 )lua",
-           "play-opacity.lua");
+           "tween-opacity.lua");
     _error(R"lua(
 local a = vis.scene {}
 local b = vis.scene {}

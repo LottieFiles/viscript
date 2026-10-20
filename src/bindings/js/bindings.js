@@ -26,7 +26,7 @@ const OBJECTS = [
 // Region factories combine closed shapes into one retained path.
 const REGIONS = ["union", "intersection", "difference", "exclusion"];
 const FACTORIES = ["group", "space", ...OBJECTS, ...REGIONS];
-const PLAY_PROPERTIES = [
+const TWEEN_PROPERTIES = [
     "shift",
     "transform",
     "position",
@@ -94,8 +94,8 @@ const PIVOT_ANCHORS = new Set([
     "bottom_right",
 ]);
 // The properties a bound state may set besides shift (an offset, see _boundDescriptor): those of
-// play but position, arc, text, retype and layer. And the per-track segment budget.
-const TRACKER_KEYS = PLAY_PROPERTIES.filter(
+// tween but position, arc, text, retype and layer. And the per-track segment budget.
+const TRACKER_KEYS = TWEEN_PROPERTIES.filter(
     (key) => !["shift", "position", "arc", "text", "retype", "layer"].includes(key),
 );
 const TRACKER_CLIP_LIMIT = 65536;
@@ -1878,7 +1878,7 @@ function _boundState(scene, binding, values = binding.trackers.map((tracker) => 
     return state;
 }
 
-// A bound state as a play descriptor. Its shift is the offset from where the object was when it
+// A bound state as a tween descriptor. Its shift is the offset from where the object was when it
 // was bound, so the descriptor moves by the difference from the shift the binding gave last.
 function _boundDescriptor(binding, state) {
     const descriptor = { target: binding.target };
@@ -2001,11 +2001,11 @@ function _playGroup(scene, group, lines) {
         const from = kept[i - 1];
         const to = kept[i];
         const state = _boundState(scene, binding, binding.trackers.map((tracker) => _valueAt(group, tracker, to.time)));
-        const [descriptor] = scene._descriptors([_boundDescriptor(binding, state)], "play");
+        const [descriptor] = scene._descriptors([_boundDescriptor(binding, state)], "tween");
         lines.push((name) => {
             const begin = `times[${from.track.first + from.step}]`;
             const duration = `times[${to.track.first + to.step}]-${begin}`;
-            return `${name}:seek(${begin});${name}:play({${descriptor}},${duration},"linear",0)`;
+            return `${name}:seek(${begin});${name}:tween({${descriptor}},${duration},"linear",0)`;
         });
     }
 }
@@ -2037,7 +2037,7 @@ function _flushTracks(scene) {
                 track.affected.forEach((binding, index) => {
                     if (row[index] && !track.groups.has(binding)) batch.push(_boundDescriptor(binding, row[index]));
                 });
-                return batch.length ? scene._descriptors(batch, "play") : null;
+                return batch.length ? scene._descriptors(batch, "tween") : null;
             });
             for (let step = 0; step < steps.length; step++) {
                 const batch = steps[step];
@@ -2045,7 +2045,7 @@ function _flushTracks(scene) {
                     lines.push((name) => {
                         const begin = `times[${track.first + step}]`;
                         const end = `times[${track.first + step + 1}]`;
-                        return `${name}:seek(${begin});${name}:play({${batch.join(",")}},${end}-${begin},"linear",0)`;
+                        return `${name}:seek(${begin});${name}:tween({${batch.join(",")}},${end}-${begin},"linear",0)`;
                     });
                 }
             }
@@ -3445,14 +3445,14 @@ export class SceneBuilder {
         return this._call("transition", this._target(from), this._target(to), _lua(duration), _lua(curve));
     }
 
-    play(specification, duration = 1, curve = "smooth", lag = 0) {
+    tween(specification, duration = 1, curve = "smooth", lag = 0) {
         ({duration, curve, lag} = _timingArguments(arguments, 1, {duration, curve, lag}, ["lag"]));
         const timing = SCENE_TRACKERS.get(this);
         const { anchor, time } = timing.clock;
         this._assertMutable();
-        const descriptors = this._descriptors(specification, "play");
-        this._call("play", `{${descriptors.join(",")}}`, _lua(duration), _lua(curve), _lua(lag));
-        // A play lasts its duration and the lag of each later target, as the scene counts it.
+        const descriptors = this._descriptors(specification, "tween");
+        this._call("tween", `{${descriptors.join(",")}}`, _lua(duration), _lua(curve), _lua(lag));
+        // A tween lasts its duration and the lag of each later target, as the scene counts it.
         if (Number.isFinite(duration) && duration > 0 && Number.isFinite(lag) && lag >= 0) {
             const span = _decimal(duration) * (1 + _decimal(lag) * (descriptors.length - 1));
             timing.clock = { anchor, time: Math.fround(_decimal(time) + span) };
@@ -3630,7 +3630,7 @@ export class SceneBuilder {
                     row[index] = _boundState(this, binding);
                     checks.push(_boundDescriptor({ target: binding.target, shift: [0, 0, 0] }, row[index]));
                 });
-                if (checks.length) this._descriptors(checks, "play");
+                if (checks.length) this._descriptors(checks, "tween");
                 states.push(row);
                 bounds.push(Math.fround(start + duration * (step / steps)));
             }
@@ -3683,12 +3683,12 @@ export class SceneBuilder {
             if (!_plain(descriptor)) {
                 throw new TypeError("Animation descriptors must be plain objects");
             }
-            _known(descriptor, ["target", ...PLAY_PROPERTIES], "Unknown animation property");
+            _known(descriptor, ["target", ...TWEEN_PROPERTIES], "Unknown animation property");
             const targetName = this._handle(descriptor.target);
             if (targets.has(targetName)) throw new TypeError(`Animation ${verb} cannot contain duplicate targets`);
             targets.add(targetName);
 
-            const properties = PLAY_PROPERTIES.filter((key) => Object.hasOwn(descriptor, key));
+            const properties = TWEEN_PROPERTIES.filter((key) => Object.hasOwn(descriptor, key));
             if (!properties.length) throw new TypeError("Animation descriptors require at least one property");
             if (Object.hasOwn(descriptor, "shift") && Object.hasOwn(descriptor, "transform")) {
                 throw new TypeError("Animation descriptors cannot combine shift and transform");

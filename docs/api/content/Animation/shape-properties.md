@@ -7,7 +7,7 @@ parent: animation
 
 # Shape Properties
 
-These [play / set descriptor](./state-scheduling.md) fields change an object's own geometry. Coordinates use world units unless the description states pixels.
+These [tween / set descriptor](./state-scheduling.md) fields change an object's own geometry. Coordinates use world units unless the description states pixels.
 
 ## Circle, arc and angle
 
@@ -42,7 +42,7 @@ For plot samples and fields, see [Plot & Field Properties](./plot-properties.md)
 
 ## Examples
 
-### play · radius
+### tween · radius
 
 <!-- api-example: property.radius -->
 
@@ -52,9 +52,9 @@ local scene = vis.scene {
     height = 540,
 }
 
-scene:text {id = "caption", text = "play: radius", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
+scene:text {id = "caption", text = "tween: radius", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
 local subject = scene:circle {id = "subject", radius = 1.1, stroke = "accent", fill = "#00000000", width = 3}
-scene:play({target = subject, radius = 1.8}, 1.4)
+scene:tween({target = subject, radius = 1.8}, 1.4)
 
 return scene
 ```
@@ -65,14 +65,14 @@ const scene = vis.scene({
     height: 540,
 });
 
-scene.text({id: "caption", text: "play: radius", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
+scene.text({id: "caption", text: "tween: radius", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
 const subject = scene.circle({id: "subject", radius: 1.1, stroke: "accent", fill: "#00000000", width: 3});
-scene.play({target: subject, radius: 1.8}, 1.4);
+scene.tween({target: subject, radius: 1.8}, 1.4);
 
 return scene;
 ```
 
-### play · center
+### tween · center
 
 <!-- api-example: property.center -->
 
@@ -82,9 +82,9 @@ local scene = vis.scene {
     height = 540,
 }
 
-scene:text {id = "caption", text = "play: center", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
+scene:text {id = "caption", text = "tween: center", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
 local subject = scene:arc {id = "subject", radius = 1.2, start = 0, angle = math.pi, stroke = "accent", width = 4}
-scene:play({target = subject, center = {1.2, -0.7}}, 1.4)
+scene:tween({target = subject, center = {1.2, -0.7}}, 1.4)
 
 return scene
 ```
@@ -95,14 +95,14 @@ const scene = vis.scene({
     height: 540,
 });
 
-scene.text({id: "caption", text: "play: center", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
+scene.text({id: "caption", text: "tween: center", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
 const subject = scene.arc({id: "subject", radius: 1.2, start: 0, angle: Math.PI, stroke: "accent", width: 4});
-scene.play({target: subject, center: [1.2, -0.7]}, 1.4);
+scene.tween({target: subject, center: [1.2, -0.7]}, 1.4);
 
 return scene;
 ```
 
-### play · start
+### tween · start
 
 <!-- api-example: property.start -->
 
@@ -112,9 +112,9 @@ local scene = vis.scene {
     height = 540,
 }
 
-scene:text {id = "caption", text = "play: start", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
+scene:text {id = "caption", text = "tween: start", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
 local subject = scene:arc {id = "subject", radius = 1.2, start = 0, angle = math.pi, stroke = "accent", width = 4}
-scene:play({target = subject, start = math.pi}, 1.4)
+scene:tween({target = subject, start = math.pi}, 1.4)
 
 return scene
 ```
@@ -125,14 +125,14 @@ const scene = vis.scene({
     height: 540,
 });
 
-scene.text({id: "caption", text: "play: start", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
+scene.text({id: "caption", text: "tween: start", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
 const subject = scene.arc({id: "subject", radius: 1.2, start: 0, angle: Math.PI, stroke: "accent", width: 4});
-scene.play({target: subject, start: Math.PI}, 1.4);
+scene.tween({target: subject, start: Math.PI}, 1.4);
 
 return scene;
 ```
 
-### play · angle
+### tween · angle
 
 <!-- api-example: property.angle -->
 
@@ -142,9 +142,9 @@ local scene = vis.scene {
     height = 540,
 }
 
-scene:text {id = "caption", text = "play: angle", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
+scene:text {id = "caption", text = "tween: angle", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
 local subject = scene:arc {id = "subject", radius = 1.2, start = 0, angle = math.pi, stroke = "accent", width = 4}
-scene:play({target = subject, angle = 1.8 * math.pi}, 1.4)
+scene:tween({target = subject, angle = 1.8 * math.pi}, 1.4)
 
 return scene
 ```
@@ -155,14 +155,14 @@ const scene = vis.scene({
     height: 540,
 });
 
-scene.text({id: "caption", text: "play: angle", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
+scene.text({id: "caption", text: "tween: angle", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
 const subject = scene.arc({id: "subject", radius: 1.2, start: 0, angle: Math.PI, stroke: "accent", width: 4});
-scene.play({target: subject, angle: 1.8 * Math.PI}, 1.4);
+scene.tween({target: subject, angle: 1.8 * Math.PI}, 1.4);
 
 return scene;
 ```
 
-### play · vertex
+### tween · vertex
 
 <!-- api-example: property.vertex -->
 
@@ -172,9 +172,9 @@ local scene = vis.scene {
     height = 540,
 }
 
-scene:text {id = "caption", text = "play: vertex", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
+scene:text {id = "caption", text = "tween: vertex", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
 local subject = scene:angle {id = "subject", vertex = {-1, -0.5}, from = {2, -0.5}, to = {1, 1}, radius = 0.7, stroke = "accent", width = 4}
-scene:play({target = subject, vertex = {0, -1.2}}, 1.4)
+scene:tween({target = subject, vertex = {0, -1.2}}, 1.4)
 
 return scene
 ```
@@ -185,14 +185,14 @@ const scene = vis.scene({
     height: 540,
 });
 
-scene.text({id: "caption", text: "play: vertex", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
+scene.text({id: "caption", text: "tween: vertex", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
 const subject = scene.angle({id: "subject", vertex: [-1, -0.5], from: [2, -0.5], to: [1, 1], radius: 0.7, stroke: "accent", width: 4});
-scene.play({target: subject, vertex: [0, -1.2]}, 1.4);
+scene.tween({target: subject, vertex: [0, -1.2]}, 1.4);
 
 return scene;
 ```
 
-### play · size
+### tween · size
 
 <!-- api-example: property.size -->
 
@@ -202,9 +202,9 @@ local scene = vis.scene {
     height = 540,
 }
 
-scene:text {id = "caption", text = "play: size", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
+scene:text {id = "caption", text = "tween: size", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
 local subject = scene:rectangle {id = "subject", size = {2.6, 1.5}, stroke = "accent", fill = "accent", width = 3}
-scene:play({target = subject, size = {4, 0.6}}, 1.4)
+scene:tween({target = subject, size = {4, 0.6}}, 1.4)
 
 return scene
 ```
@@ -215,14 +215,14 @@ const scene = vis.scene({
     height: 540,
 });
 
-scene.text({id: "caption", text: "play: size", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
+scene.text({id: "caption", text: "tween: size", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
 const subject = scene.rectangle({id: "subject", size: [2.6, 1.5], stroke: "accent", fill: "accent", width: 3});
-scene.play({target: subject, size: [4, 0.6]}, 1.4);
+scene.tween({target: subject, size: [4, 0.6]}, 1.4);
 
 return scene;
 ```
 
-### play · corner
+### tween · corner
 
 <!-- api-example: property.corner -->
 
@@ -232,9 +232,9 @@ local scene = vis.scene {
     height = 540,
 }
 
-scene:text {id = "caption", text = "play: corner", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
+scene:text {id = "caption", text = "tween: corner", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
 local subject = scene:rectangle {id = "subject", size = {2.6, 1.5}, stroke = "accent", fill = "accent", width = 3}
-scene:play({target = subject, corner = 0.7}, 1.4)
+scene:tween({target = subject, corner = 0.7}, 1.4)
 
 return scene
 ```
@@ -245,14 +245,14 @@ const scene = vis.scene({
     height: 540,
 });
 
-scene.text({id: "caption", text: "play: corner", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
+scene.text({id: "caption", text: "tween: corner", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
 const subject = scene.rectangle({id: "subject", size: [2.6, 1.5], stroke: "accent", fill: "accent", width: 3});
-scene.play({target: subject, corner: 0.7}, 1.4);
+scene.tween({target: subject, corner: 0.7}, 1.4);
 
 return scene;
 ```
 
-### play · trim_distance
+### tween · trim_distance
 
 <!-- api-example: property.trim_distance -->
 
@@ -262,9 +262,9 @@ local scene = vis.scene {
     height = 540,
 }
 
-scene:text {id = "caption", text = "play: trim_distance", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
+scene:text {id = "caption", text = "tween: trim_distance", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
 local subject = scene:arrow {id = "subject", from = {-2, 0}, to = {2, 0}, stroke = "accent", width = 3, tip = 10}
-scene:play({target = subject, trim_distance = {0.8, 0.8}}, 1.4)
+scene:tween({target = subject, trim_distance = {0.8, 0.8}}, 1.4)
 
 return scene
 ```
@@ -275,14 +275,14 @@ const scene = vis.scene({
     height: 540,
 });
 
-scene.text({id: "caption", text: "play: trim_distance", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
+scene.text({id: "caption", text: "tween: trim_distance", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
 const subject = scene.arrow({id: "subject", from: [-2, 0], to: [2, 0], stroke: "accent", width: 3, tip: 10});
-scene.play({target: subject, trimDistance: [0.8, 0.8]}, 1.4);
+scene.tween({target: subject, trimDistance: [0.8, 0.8]}, 1.4);
 
 return scene;
 ```
 
-### play · points
+### tween · points
 
 <!-- api-example: property.points -->
 
@@ -292,9 +292,9 @@ local scene = vis.scene {
     height = 540,
 }
 
-scene:text {id = "caption", text = "play: points", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
+scene:text {id = "caption", text = "tween: points", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
 local subject = scene:polygon {id = "subject", points = {{-1,-1}, {1,-1}, {0,1}}, fill = "accent"}
-scene:play({target = subject, points = {{-2,-0.6}, {2,-0.6}, {1,1.4}}}, 1.4)
+scene:tween({target = subject, points = {{-2,-0.6}, {2,-0.6}, {1,1.4}}}, 1.4)
 
 return scene
 ```
@@ -305,14 +305,14 @@ const scene = vis.scene({
     height: 540,
 });
 
-scene.text({id: "caption", text: "play: points", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
+scene.text({id: "caption", text: "tween: points", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
 const subject = scene.polygon({id: "subject", points: [[-1,-1], [1,-1], [0,1]], fill: "accent"});
-scene.play({target: subject, points: [[-2,-0.6], [2,-0.6], [1,1.4]]}, 1.4);
+scene.tween({target: subject, points: [[-2,-0.6], [2,-0.6], [1,1.4]]}, 1.4);
 
 return scene;
 ```
 
-### play · from
+### tween · from
 
 <!-- api-example: property.from -->
 
@@ -322,9 +322,9 @@ local scene = vis.scene {
     height = 540,
 }
 
-scene:text {id = "caption", text = "play: from", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
+scene:text {id = "caption", text = "tween: from", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
 local subject = scene:arrow {id = "subject", from = {-2, 0}, to = {2, 0}, stroke = "accent", width = 3, tip = 10}
-scene:play({target = subject, from = {-1, -1.4}}, 1.4)
+scene:tween({target = subject, from = {-1, -1.4}}, 1.4)
 
 return scene
 ```
@@ -335,14 +335,14 @@ const scene = vis.scene({
     height: 540,
 });
 
-scene.text({id: "caption", text: "play: from", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
+scene.text({id: "caption", text: "tween: from", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
 const subject = scene.arrow({id: "subject", from: [-2, 0], to: [2, 0], stroke: "accent", width: 3, tip: 10});
-scene.play({target: subject, from: [-1, -1.4]}, 1.4);
+scene.tween({target: subject, from: [-1, -1.4]}, 1.4);
 
 return scene;
 ```
 
-### play · to
+### tween · to
 
 <!-- api-example: property.to -->
 
@@ -352,9 +352,9 @@ local scene = vis.scene {
     height = 540,
 }
 
-scene:text {id = "caption", text = "play: to", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
+scene:text {id = "caption", text = "tween: to", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
 local subject = scene:arrow {id = "subject", from = {-2, 0}, to = {2, 0}, stroke = "accent", width = 3, tip = 10}
-scene:play({target = subject, to = {1, 1.4}}, 1.4)
+scene:tween({target = subject, to = {1, 1.4}}, 1.4)
 
 return scene
 ```
@@ -365,14 +365,14 @@ const scene = vis.scene({
     height: 540,
 });
 
-scene.text({id: "caption", text: "play: to", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
+scene.text({id: "caption", text: "tween: to", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
 const subject = scene.arrow({id: "subject", from: [-2, 0], to: [2, 0], stroke: "accent", width: 3, tip: 10});
-scene.play({target: subject, to: [1, 1.4]}, 1.4);
+scene.tween({target: subject, to: [1, 1.4]}, 1.4);
 
 return scene;
 ```
 
-### play · origin
+### tween · origin
 
 <!-- api-example: property.origin -->
 
@@ -382,9 +382,9 @@ local scene = vis.scene {
     height = 540,
 }
 
-scene:text {id = "caption", text = "play: origin", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
+scene:text {id = "caption", text = "tween: origin", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
 local subject = scene:vector {id = "subject", value = {2, 1}, origin = {-1, -0.5}, stroke = "accent", width = 3, tip = 10}
-scene:play({target = subject, origin = {0, -1.5}}, 1.4)
+scene:tween({target = subject, origin = {0, -1.5}}, 1.4)
 
 return scene
 ```
@@ -395,14 +395,14 @@ const scene = vis.scene({
     height: 540,
 });
 
-scene.text({id: "caption", text: "play: origin", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
+scene.text({id: "caption", text: "tween: origin", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
 const subject = scene.vector({id: "subject", value: [2, 1], origin: [-1, -0.5], stroke: "accent", width: 3, tip: 10});
-scene.play({target: subject, origin: [0, -1.5]}, 1.4);
+scene.tween({target: subject, origin: [0, -1.5]}, 1.4);
 
 return scene;
 ```
 
-### play · control1
+### tween · control1
 
 <!-- api-example: property.control1 -->
 
@@ -412,9 +412,9 @@ local scene = vis.scene {
     height = 540,
 }
 
-scene:text {id = "caption", text = "play: control1", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
+scene:text {id = "caption", text = "tween: control1", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
 local subject = scene:curve {id = "subject", from = {-2, -0.6}, control1 = {-1, 1.5}, control2 = {1, -1.5}, to = {2, 0.6}, stroke = "accent", width = 4}
-scene:play({target = subject, control1 = {-1, -1.5}}, 1.4)
+scene:tween({target = subject, control1 = {-1, -1.5}}, 1.4)
 
 return scene
 ```
@@ -425,14 +425,14 @@ const scene = vis.scene({
     height: 540,
 });
 
-scene.text({id: "caption", text: "play: control1", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
+scene.text({id: "caption", text: "tween: control1", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
 const subject = scene.curve({id: "subject", from: [-2, -0.6], control1: [-1, 1.5], control2: [1, -1.5], to: [2, 0.6], stroke: "accent", width: 4});
-scene.play({target: subject, control1: [-1, -1.5]}, 1.4);
+scene.tween({target: subject, control1: [-1, -1.5]}, 1.4);
 
 return scene;
 ```
 
-### play · control2
+### tween · control2
 
 <!-- api-example: property.control2 -->
 
@@ -442,9 +442,9 @@ local scene = vis.scene {
     height = 540,
 }
 
-scene:text {id = "caption", text = "play: control2", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
+scene:text {id = "caption", text = "tween: control2", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
 local subject = scene:curve {id = "subject", from = {-2, -0.6}, control1 = {-1, 1.5}, control2 = {1, -1.5}, to = {2, 0.6}, stroke = "accent", width = 4}
-scene:play({target = subject, control2 = {1, 1.5}}, 1.4)
+scene:tween({target = subject, control2 = {1, 1.5}}, 1.4)
 
 return scene
 ```
@@ -455,9 +455,9 @@ const scene = vis.scene({
     height: 540,
 });
 
-scene.text({id: "caption", text: "play: control2", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
+scene.text({id: "caption", text: "tween: control2", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
 const subject = scene.curve({id: "subject", from: [-2, -0.6], control1: [-1, 1.5], control2: [1, -1.5], to: [2, 0.6], stroke: "accent", width: 4});
-scene.play({target: subject, control2: [1, 1.5]}, 1.4);
+scene.tween({target: subject, control2: [1, 1.5]}, 1.4);
 
 return scene;
 ```

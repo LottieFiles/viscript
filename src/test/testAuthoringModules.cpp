@@ -37,7 +37,7 @@ diagram:zone {id = "frontend", label = "Frontend", members = {parser, lower}}
 local built_diagram = diagram:build()
 scene:fade_in(built_diagram:nodes(), {duration = 0.2})
 scene:create(built_diagram:routes(), 0.2, "linear")
-scene:play({target = built_diagram:edge(edge), dash_offset = -0.36}, 0.2, "linear")
+scene:tween({target = built_diagram:edge(edge), dash_offset = -0.36}, 0.2, "linear")
 scene:indicate(built_diagram:node(lower), {duration = 0.2, scale = 1.05})
 
 if vis.ui then

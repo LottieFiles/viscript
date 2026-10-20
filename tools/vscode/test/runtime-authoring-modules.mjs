@@ -61,7 +61,7 @@ built_diagram:node_body(input):label {
     role = "text", fill = "focus", id = "wasm-object-label",
 }
 
-scene:play({target = built_diagram:edge(edge), dash_offset = -9}, 0.4, "linear")
+scene:tween({target = built_diagram:edge(edge), dash_offset = -9}, 0.4, "linear")
 return scene
 `, "runtime-authoring-modules.lua");
 

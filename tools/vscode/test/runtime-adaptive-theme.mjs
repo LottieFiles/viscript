@@ -142,7 +142,7 @@ assert.ok(runtime.render(0).some((value, index) => index % 4 !== 3 && value !== 
 runtime.load(`
 local scene = vis.scene {width = 240, height = 120, theme = "adaptive", camera = {height = 4}}
 local later = scene:text {text = "English first", point = {0, 0}, align = {0.5, 0.5}, role = "text"}
-scene:play({target = later, text = "\ub098\uc911\uc5d0 \ud55c\uae00"}, 0.5)
+scene:tween({target = later, text = "\ub098\uc911\uc5d0 \ud55c\uae00"}, 0.5)
 return scene
 `, "adaptive-later-korean.lua");
 const ink = (pixels) => {

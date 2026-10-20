@@ -76,7 +76,7 @@ if not rawequal(hyp:part("2"), scene:find("hyp/2")) or not rawequal(eq:part("2",
 end
 if not rawequal(eq:part(" b ^ 2 "), scene:find("eq/3")) then error("part reads TeX without blanks") end
 scene:write(eq, 1)
-scene:play({target = eq:part("+"), fill = "#0000ff"}, 0.5)
+scene:tween({target = eq:part("+"), fill = "#0000ff"}, 0.5)
 scene:indicate(eq:part("="), {color = "#ff00ff", duration = 0.5})
 return scene
 )lua";
@@ -691,7 +691,7 @@ local s = vis.scene {width = 1280, height = 720, camera = {mode = "fixed", view 
 local m = s:matrix {rows = {{1, "x^2", "\\frac{1}{2}"}, {"", "y_i", 3}}, size = 30, color = "#336699", id = "m"}
 if not rawequal(m:entry(1, 2), s:find("m/1/2")) then error("a formula entry keeps its name") end
 if not rawequal(m:entry(1, 2):part("x"), s:find("m/1/2/1")) then error("part finds a glyph of an entry") end
-s:play({target = m:entry(1, 1), value = 7}, 1)
+s:tween({target = m:entry(1, 1), value = 7}, 1)
 return s
 )lua";
     auto scene = _loaded(source, "tex-matrix.lua");

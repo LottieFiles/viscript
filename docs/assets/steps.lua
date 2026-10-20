@@ -17,7 +17,7 @@ local function panel(x, title, id)
   titles[#titles + 1] = TEXT {text = title, point = {x - PANEL / 2, 2.35}, align = {0, 0.5}, size = 12, role = "code", fill = INK, id = id .. ":title"}
   return TEXT {text = "step 0", point = {x + PANEL / 2, 2.35}, align = {1, 0.5}, size = 11, role = "code", fill = "muted", id = id .. ":step"}
 end
-local function counter(h, n) scene:play({target = h, text = "step " .. n}, 0.01) end
+local function counter(h, n) scene:tween({target = h, text = "step " .. n}, 0.01) end
 
 -- A. Sorting pass (bubble sort trace).
 local stepA = panel(CX[1], "SORTING PASS", "sort")
@@ -128,15 +128,15 @@ scene:parallel(
     for n, s in ipairs(trace) do
       local L, R = order[s.j], order[s.j + 1]
       counter(stepA, n)
-      scene:play({lit(rects[L], true), lit(rects[R], true)}, S * 0.5, "smooth")
+      scene:tween({lit(rects[L], true), lit(rects[R], true)}, S * 0.5, "smooth")
       if s.swap then
-        scene:play({{target = bars[L], shift = {SLOT, 0}, arc = -1.2}, {target = bars[R], shift = {-SLOT, 0}, arc = -1.2}}, S, "ease_in_out")
+        scene:tween({{target = bars[L], shift = {SLOT, 0}, arc = -1.2}, {target = bars[R], shift = {-SLOT, 0}, arc = -1.2}}, S, "ease_in_out")
         order[s.j], order[s.j + 1] = R, L
       end
-      scene:play({lit(rects[order[s.j]], false), lit(rects[order[s.j + 1]], false)}, S * 0.3, "smooth")
-      if s.done then scene:play({target = rects[order[s.done]], fill = "accent"}, 0.12) end
+      scene:tween({lit(rects[order[s.j]], false), lit(rects[order[s.j + 1]], false)}, S * 0.3, "smooth")
+      if s.done then scene:tween({target = rects[order[s.done]], fill = "accent"}, 0.12) end
     end
-    scene:play({target = rects[order[1]], fill = "accent"}, 0.12)
+    scene:tween({target = rects[order[1]], fill = "accent"}, 0.12)
   end,
   function()  -- B
     local maxl = 0
@@ -149,12 +149,12 @@ scene:parallel(
         local a, b = LEVEL[e[1]], LEVEL[e[2]]
         if math.max(a, b) == l and math.abs(a - b) == 1 then tree[#tree + 1] = {target = edges[i], stroke = INK, width = 3} end
       end
-      if #tree > 0 then scene:play(tree, 0.4, "ease_out") end
-      scene:play(frontier, {duration = 0.35, curve = "ease_out", lag = 0.05})
+      if #tree > 0 then scene:tween(tree, 0.4, "ease_out") end
+      scene:tween(frontier, {duration = 0.35, curve = "ease_out", lag = 0.05})
       scene:wait(0.5)
       local settle = {}
       for i, d in ipairs(LEVEL) do if d == l then settle[#settle + 1] = {target = nodes[i], fill = "accent", stroke = INK} end end
-      scene:play(settle, 0.25)
+      scene:tween(settle, 0.25)
     end
   end,
   function()  -- C
@@ -167,23 +167,23 @@ scene:parallel(
         local d = math.sqrt((p[1] - CX[3]) ^ 2 + (p[2] + 0.2) ^ 2)
         if d <= CR then fill[#fill + 1] = {target = cellsC[r][c].h, fill = "accent"} end
       end
-      scene:play(show, {duration = 0.18, lag = 0.012})
-      if #fill > 0 then scene:play(fill, 0.15) end
+      scene:tween(show, {duration = 0.18, lag = 0.012})
+      if #fill > 0 then scene:tween(fill, 0.15) end
       scene:wait(0.12)
     end
   end,
   function()  -- D
-    scene:play({target = scan, opacity = 1}, 0.15)
+    scene:tween({target = scan, opacity = 1}, 0.15)
     for r = N, 1, -1 do
       counter(stepD, N - r + 1)
       local fill = {}
       for c = 1, N do
         if inside(cellsD[r][c].p, TRI[1], TRI[2], TRI[3]) then fill[#fill + 1] = {target = cellsD[r][c].h, fill = "accent"} end
       end
-      if #fill > 0 then scene:play(fill, {duration = 0.25, lag = 0.03, curve = "ease_out"}) else scene:wait(0.25) end
-      if r > 1 then scene:play({target = scan, shift = {0, CELL}}, 0.18, "ease_in_out") end
+      if #fill > 0 then scene:tween(fill, {duration = 0.25, lag = 0.03, curve = "ease_out"}) else scene:wait(0.25) end
+      if r > 1 then scene:tween({target = scan, shift = {0, CELL}}, 0.18, "ease_in_out") end
     end
-    scene:play({target = scan, opacity = 0}, 0.2)
+    scene:tween({target = scan, opacity = 0}, 0.2)
   end)
 scene:wait(1.2)
 return scene

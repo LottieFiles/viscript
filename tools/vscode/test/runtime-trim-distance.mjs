@@ -14,7 +14,7 @@ authored.set({target: vector, trimDistance: 1});
 const tracker = authored.tracker(0);
 authored.bind(line, tracker, (t) => ({to: [4, 6 * t], trimDistance: [1 + t, 2 - t]}));
 authored.track(tracker, 1, {duration: 1, curve: "linear"});
-authored.play({target: line, trimDistance: 0.5}, {duration: 1, curve: "linear"});
+authored.tween({target: line, trimDistance: 0.5}, {duration: 1, curve: "linear"});
 
 const source = `
 local s = vis.scene {width = 200, height = 100, fps = 10, camera = {view = "2d", height = 10}}
@@ -28,7 +28,7 @@ s:set {target = vector, trim_distance = 1}
 local tracker = s:tracker(0)
 s:bind(line, tracker, function(t) return {to = {4, 6 * t}, trim_distance = {1 + t, 2 - t}} end)
 s:track(tracker, 1, {duration = 1, curve = "linear"})
-s:play({target = line, trim_distance = 0.5}, {duration = 1, curve = "linear"})
+s:tween({target = line, trim_distance = 0.5}, {duration = 1, curve = "linear"})
 return s
 `;
 const runtimes = [];
@@ -52,7 +52,7 @@ try {
         "s:vector {value={1,0}, buff=1}",
         "s:brace {from={0,0}, to={1,0}, buff=1}",
         "s:rectangle {size={1,1}, buff=1}",
-        "local l=s:line {from={0,0}, to={1,0}} s:play({target=l, buff=1}, 1)",
+        "local l=s:line {from={0,0}, to={1,0}} s:tween({target=l, buff=1}, 1)",
         "local l=s:line {from={0,0}, to={1,0}} local t=s:tracker(0) s:bind(l,t,function(v) return {buff=v} end)",
     ]) {
         assert.throws(() => runtimes[0].load(`local s=vis.scene{} ${body} return s`),

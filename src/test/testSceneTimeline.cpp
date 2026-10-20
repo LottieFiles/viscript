@@ -542,7 +542,7 @@ void timelineDiagnostics()
     CHECK(scene->play(Animation::fade(circle, 0.5f), 1.0f) == Result::Success);
     CHECK(scene->diagnostic() == nullptr);
     CHECK(circle->moveTo({2.0f, 0.0f, 0.0f}) == Result::InsufficientCondition);
-    CHECK(_says(scene, "must come before the first play"));
+    CHECK(_says(scene, "must come before the first animation"));
     CHECK(scene->remove(circle) == Result::Success);
     CHECK(scene->play(Animation::fade(circle, 1.0f), 1.0f) == Result::InvalidArguments);
     CHECK(_says(scene, "removed earlier"));

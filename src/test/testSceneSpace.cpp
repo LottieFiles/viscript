@@ -336,7 +336,7 @@ void spaceLabels()
     // Once the timeline begins, an attached text can no longer be placed and keeps its align,
     // while one not attached yet still can.
     CHECK(scene->play(Animation::fadeIn(right), 0.5f) == Result::Success);
-    CHECK(refused(space->place(right, 0u, 1.0f), Result::InsufficientCondition, "before the first play"));
+    CHECK(refused(space->place(right, 0u, 1.0f), Result::InsufficientCondition, "before the first animation"));
     CHECK(near(right->align.x, 0.0f) && near(right->align.y, 0.5f));
     auto late = Text::gen("f");
     CHECK(late && space->place(late, 1u, 1.0f) == Result::Success && space->add(late) == Result::Success);

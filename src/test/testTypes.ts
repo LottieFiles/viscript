@@ -206,7 +206,7 @@ const trimmedLine = definition.line({from: [0, 0], to: [4, 0], trimDistance: [0.
 definition.arrow({from: [0, 0], to: [4, 0], trimDistance: 0.5});
 definition.vector({value: [4, 0], trimDistance: [1, 0.5]});
 definition.set({target: trimmedLine, trimDistance: 0.25});
-definition.play({target: trimmedLine, trimDistance: [0.5, 0.25]}, {duration: 1});
+definition.tween({target: trimmedLine, trimDistance: [0.5, 0.25]}, {duration: 1});
 // @ts-expect-error Endpoint distances are a number or a pair.
 definition.line({from: [0, 0], to: [4, 0], trimDistance: [1, 2, 3]});
 // @ts-expect-error Endpoint trimming uses trimDistance.
@@ -214,7 +214,7 @@ definition.line({from: [0, 0], to: [4, 0], buff: 1});
 // @ts-expect-error Brace spacing uses offset.
 group.brace({around: rectangle, buff: 1});
 // @ts-expect-error Animation endpoint trimming uses trimDistance.
-definition.play({target: trimmedLine, buff: 1});
+definition.tween({target: trimmedLine, buff: 1});
 const bracing: readonly ObjectHandle[] = [brace, braceLabel];
 group.brace({from: [-1, 0], to: [1, 0], direction: [0, 1], depth: 0.2, gap: 0.1, label: sibling});
 const [, noLabel] = definition.brace({around: rectangle, direction: "left", fill: "#e9c46a", role: "code"});
@@ -226,7 +226,7 @@ definition.brace({around: rectangle, direction: "north"});
 definition.brace({around: rectangle, label: 3});
 definition.line({from: [-2, -1], to: [2, -1], dash: [8, 4], dash_offset: 2});
 const flowing = definition.line({from: [-2, -1.5], to: [2, -1.5], dash: [8, 4]});
-definition.play({target: flowing, dash_offset: -12}, 0.8, "linear");
+definition.tween({target: flowing, dash_offset: -12}, 0.8, "linear");
 rectangle.moveTo([-1.25, 0]).nextTo(sibling, [1, 0], 0.4).alignTo(sibling, [0, 1, 0]);
 group.arrange().arrange([1, 0, 0], 0.3).arrangeGrid(2, 0.2, 0.4);
 rectangle.group().rectangle().circle().point({point: [0, 0]});
@@ -287,9 +287,9 @@ definition.text({text: "boxed", measure: true});
 // @ts-expect-error measure is a flag.
 definition.text({text: "boxed", measure: "yes"});
 const counter: ObjectHandle = definition.number({value: 0, decimals: 1, separator: ",", prefix: "$"});
-definition.play({target: counter, value: 99.5}, 2);
+definition.tween({target: counter, value: 99.5}, 2);
 definition.set({target: counter, value: 3});
-definition.play({target: counter, layer: 2, shift: [0, 1]}, 1);
+definition.tween({target: counter, layer: 2, shift: [0, 1]}, 1);
 definition.set({target: counter, layer: -1});
 definition.save(counter).save([counter]);
 definition.restore(counter).restore([counter], 1, "linear", 0.25);
@@ -321,7 +321,7 @@ const bent = definition.curve({from: [-2, 0], control1: [-1, 1], control2: [1, 1
 definition.bind(bent, along, (v) => ({control2: [1, v], to: {x: 2, y: v / 2}}));
 definition.bind(flowing, slope, (k) => ({from: [-2, k], width: 2 + k}));
 definition.bind(morphSource, along, (v) => ({points: [[-1, -1], [1, -1], [0, 1 + v]]}));
-definition.play({target: definition.vector({value: [1, 0]}), value: [0, 1], origin: [1, 1, 0]}, 1);
+definition.tween({target: definition.vector({value: [1, 0]}), value: [0, 1], origin: [1, 1, 0]}, 1);
 definition.set({target: morphTarget, points: [[-1, 0], [1, -1], [1, 2]]});
 // @ts-expect-error points is a list of points.
 definition.set({target: morphTarget, points: [1, 2]});
@@ -354,7 +354,7 @@ const terms: TexHandle = paragraph.tex({
     fill: "#ffffff",
 });
 const square: TexHandle = terms.part("c^2").part("2", 1);
-definition.play({target: square, fill: "#00ff00"}, 0.5);
+definition.tween({target: square, fill: "#00ff00"}, 0.5);
 definition.matchTransform(formula, terms, 1, "smooth", {arc: 0.5, pairs: [[formula.part("c"), terms.part("c^2")]]});
 // @ts-expect-error a formula draws filled glyphs and shapes, which have no stroke.
 definition.tex({tex: "x", stroke: "#ff0000"});
@@ -406,10 +406,10 @@ definition.contour({values: [[1, 2]], levels: [0], x_range: [0, 1, 1], y_range: 
 definition.contour({fn: (x, y) => x+y, values: [0, 1, 1, 2], levels: [0], x_range: [0, 1, 1], y_range: [0, 1, 1]});
 const contourAxis = definition.tracker(1);
 definition.bind(contours.children()[0], contourAxis, (a: number) => ({fn: (x: number, y: number) => x*x/(a*a)+y*y}));
-definition.play({target: contours.children()[0], fn: (x: number, y: number) => x*x+y*y, level: 2}, 1);
+definition.tween({target: contours.children()[0], fn: (x: number, y: number) => x*x+y*y, level: 2}, 1);
 definition.set({target: contours.children()[0], values: [0, 1, 1, 2], x_range: [0, 1, 1], y_range: [0, 1, 1]});
 // @ts-expect-error one contour child takes one scalar level.
-definition.play({target: contours.children()[0], level: [1, 2]}, 1);
+definition.tween({target: contours.children()[0], level: [1, 2]}, 1);
 const arrows: GroupHandle = definition.vectorField({
     fn: (x, y) => [-y, x],
     x_range: [-2, 2, 0.5],
@@ -492,7 +492,7 @@ const entries: GroupHandle = definition.matrix({
     id: "m",
 });
 paragraph.matrix({rows: [[1]], gap: 0.3, justify: "right", stroke: "#ff0000", width: 3});
-definition.play({target: entries.entry(2, 1), value: 7}, 1);
+definition.tween({target: entries.entry(2, 1), value: 7}, 1);
 definition.rectangle({around: entries.row(2), fill: "#dbeafe", layer: -1});
 // @ts-expect-error the brackets are one of four kinds.
 definition.matrix({rows: [[1]], brackets: "curly"});
@@ -513,7 +513,7 @@ const ledger: GroupHandle = definition.table({
     id: "t",
 });
 paragraph.table({rows: [["a"]], stripes: "surface", padding: 0, rules: "none"});
-definition.play({target: ledger.entry(4, 2), value: 16}, 1);
+definition.tween({target: ledger.entry(4, 2), value: 16}, 1);
 definition.rectangle({around: ledger.row(3), fill: "#dbeafe", layer: -1});
 // @ts-expect-error the rules are one of five kinds.
 definition.table({rows: [[1]], rules: "dots"});
@@ -552,8 +552,8 @@ definition.picture({pixels: ["#ff0000"], size: [1, 1]});
 definition.cell({size: [2, 2]});
 definition.connector(rectangle, sibling);
 const animation: AnimationSpec = {target: rectangle, shift: [0.5, 0], opacity: 0.5, fill: "#f4a261"};
-definition.play(animation, 0.8, "ease_out", 0.1);
-definition.play([
+definition.tween(animation, 0.8, "ease_out", 0.1);
+definition.tween([
     {target: sibling, transform: matrix},
     {target: connector, stroke: "#e76f51", tail: 10, tip: 16},
 ] as const, 1.2, "ease_in_out", 0.2);
@@ -606,17 +606,17 @@ definition.view({x: 0, y: 0, width: 0.25, height: 0.25}, {camera: {view: "3d", e
 definition.view({x: 0, y: 0, width: 0.5, height: 0.5}, {zoom: 4});
 // @ts-expect-error A view is not a scene.
 inset.wait(1);
-definition.play({target: rectangle, shift: [1, 0], arc: Math.PI / 2}, 1);
-definition.play({target: sibling, transform: matrix, arc: -Math.PI / 4}, 1);
-definition.play({target: rectangle, position: [1, 0], arc: Math.PI / 2, opacity: 0.5}, 1);
+definition.tween({target: rectangle, shift: [1, 0], arc: Math.PI / 2}, 1);
+definition.tween({target: sibling, transform: matrix, arc: -Math.PI / 4}, 1);
+definition.tween({target: rectangle, position: [1, 0], arc: Math.PI / 2, opacity: 0.5}, 1);
 definition.set({target: sibling, position: {x: 0, y: 1, z: 0}});
-definition.play([
+definition.tween([
     {target: rectangle, size: [2, 1], corner: 0.2, width: 4},
     {target: point, radius: 8, progress: 0.5},
     {target: label, size: 32},
     {target: sibling, gradient: {type: "linear", stops: ["accent", "warning"]}},
 ] as const, 1);
-definition.play({target: sibling, gradient: "#00ff00"}, 1);
+definition.tween({target: sibling, gradient: "#00ff00"}, 1);
 definition.set([{target: rectangle, opacity: 0.5}, {target: sibling, shift: [1, 0], radius: 0.75}] as const);
 definition.group({id: "isolated-card", isolate: true, opacity: 0.5});
 const maskTarget = definition.circle({radius: 0.5});
@@ -625,7 +625,7 @@ definition.rectangle({size: [2, 2], mask: maskTarget});
 definition.rectangle({size: [2, 2], mask: {target: wipeTarget, mode: "inverse_alpha"}}).mask(null);
 definition.circle({radius: 0.5, blend: "multiply"});
 const shadowed = definition.rectangle({size: [2, 1], blur: 2, shadow: {color: "#00000066", offset: [0, -4], blur: 8}});
-definition.play({target: shadowed, blur: 0, shadow: {offset: [0, -12]}}, 1);
+definition.tween({target: shadowed, blur: 0, shadow: {offset: [0, -12]}}, 1);
 // @ts-expect-error Shadow options are color, offset and blur.
 definition.rectangle({size: [2, 1], shadow: {spread: 2}});
 // @ts-expect-error Blend modes are named.
@@ -674,20 +674,20 @@ rectangle.cell(() => "#fff");
 world.cell(() => 42);
 // @ts-expect-error A voxel callback returns a color string.
 world.voxel(() => 42);
-// @ts-expect-error A play descriptor must animate at least one property.
-definition.play({target: rectangle});
+// @ts-expect-error A tween descriptor must animate at least one property.
+definition.tween({target: rectangle});
 // @ts-expect-error shift and transform are mutually exclusive for one target.
-definition.play({target: rectangle, shift: [1, 0], transform: matrix});
+definition.tween({target: rectangle, shift: [1, 0], transform: matrix});
 // @ts-expect-error position replaces a shift.
-definition.play({target: rectangle, shift: [1, 0], position: [0, 0]});
+definition.tween({target: rectangle, shift: [1, 0], position: [0, 0]});
 // @ts-expect-error position replaces a transform.
 definition.set({target: rectangle, transform: matrix, position: [0, 0]});
-// @ts-expect-error play targets must be object handles.
-definition.play({target: definition, opacity: 0.5});
+// @ts-expect-error tween targets must be object handles.
+definition.tween({target: definition, opacity: 0.5});
 // @ts-expect-error Unknown animation properties are rejected.
-definition.play({target: rectangle, opacity: 0.5, spin: 1});
+definition.tween({target: rectangle, opacity: 0.5, spin: 1});
 // @ts-expect-error A gradient cannot be switched on or off by an animation.
-definition.play({target: rectangle, gradient: true});
+definition.tween({target: rectangle, gradient: true});
 // @ts-expect-error set applies values at once and takes no arc.
 definition.set({target: rectangle, shift: [1, 0], arc: 1});
 // @ts-expect-error Create direction is a closed string union.
@@ -697,7 +697,7 @@ definition.fadeIn(rectangle, {scale: "small"});
 // @ts-expect-error Fade options reject unknown properties.
 definition.fadeOut(rectangle, {spin: 1});
 // @ts-expect-error A travel arc bends only a shift or a transform.
-definition.play({target: rectangle, opacity: 0.5, arc: 1});
+definition.tween({target: rectangle, opacity: 0.5, arc: 1});
 // @ts-expect-error Pivot anchors are a closed string union.
 definition.scale(rectangle, 2, {about: "middle"});
 // @ts-expect-error Rotation options take their curve as curve, not easing.
@@ -823,7 +823,7 @@ const timing: TimingOptions = {duration: 0.4, curve: "linear"};
 const stagger: AnimationOptions = {...timing, lag: 0.25};
 definition.create([rectangle, sibling], stagger).write(rectangle, {...stagger, direction: "reverse"});
 definition.shift(rectangle, [0, 1], timing).fade(rectangle, 0.3, timing);
-definition.play({target: rectangle, opacity: 0.5}, stagger).restore(rectangle, stagger);
+definition.tween({target: rectangle, opacity: 0.5}, stagger).restore(rectangle, stagger);
 definition.morph(rectangle, sibling, {...stagger, copy: true});
 definition.matchTransform(rectangle, sibling, {...stagger, copy: true});
 definition.arrange([rectangle, sibling], {...timing, gap: 0.5});

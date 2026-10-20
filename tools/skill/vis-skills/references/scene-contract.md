@@ -33,8 +33,8 @@ Leave out every option that equals its default; write a default only beside vari
 - Register the selected fonts through the host. Verify meaning-bearing glyphs (`∇`, `±`, `θ`, Korean) in the raster; otherwise spell them plainly.
 - Text roles: `h1`, `h2`, `h3`, `text`, `code`. `point` is the anchor and alignment defaults to centered; set `align={0,0.5}` for left-anchored titles and margin labels.
 - Theme colors: `background`, `foreground`, `muted`, `accent`, `secondary`, `success`, `warning`, `danger`, `info`, `surface`, `border`, `result`, `focus` (no `object1`). Omitting paint cycles peer colors.
-- One identity keeps one color across its mark, label, formula term, and proxies; change them together in one `play`. `result` is persistent, `focus` transient. Never rely on color alone.
-- Text over a filled shape needs strong contrast: when a box gets a strong highlight fill, recolor its text (e.g. `background`) in the same `play`; otherwise highlight with stroke only.
+- One identity keeps one color across its mark, label, formula term, and proxies; change them together in one `tween`. `result` is persistent, `focus` transient. Never rely on color alone.
+- Text over a filled shape needs strong contrast: when a box gets a strong highlight fill, recolor its text (e.g. `background`) in the same `tween`; otherwise highlight with stroke only.
 
 ## Figure style
 

@@ -20,7 +20,7 @@ Matrices are row-major and transform column vectors. Translation occupies entrie
 local matrix = {1,0,0,tx, 0,1,0,ty, 0,0,1,tz, 0,0,0,1}
 ```
 
-Use this absolute local-to-parent transform for Group/Space `matrix`, `play`'s `transform`, and `scene:transform`.
+Use this absolute local-to-parent transform for Group/Space `matrix`, `tween`'s `transform`, and `scene:transform`.
 
 ## Objects
 
@@ -150,13 +150,13 @@ Positional duration and curve calls remain supported.
 | Emphasize | `indicate`, `wiggle`, `circumscribe`, `passing_flash`, `flash`, `ripple` |
 | Move/style | `shift`, `rotate`, `scale`, `transform`, `move_along`, `fade`, `stroke`, `fill` |
 | Replace | `morph`, `fade_transform`, `match_transform`, `transition` |
-| State | `play`, `set`, `save`, `restore`, `clone`, `warp`, `remove` |
+| State | `tween`, `set`, `save`, `restore`, `clone`, `warp`, `remove` |
 
-`play` accepts one descriptor or a list. Each names `target` and properties such as shift, transform, position, opacity, colors, points, text, value, and layer. `shift` moves by a vector and `transform` sets the local matrix; `position` moves the center of the target's bounds to a point in its parent's space, from wherever earlier clips left it, and fails on an object without bounds. A descriptor takes only one of the three. `lag` offsets successive targets. `set` applies a state immediately; `save` and `restore` keep a stack of states per target.
+`tween` accepts one descriptor or a list. Each names `target` and properties such as shift, transform, position, opacity, colors, points, text, value, and layer. `shift` moves by a vector and `transform` sets the local matrix; `position` moves the center of the target's bounds to a point in its parent's space, from wherever earlier clips left it, and fails on an object without bounds. A descriptor takes only one of the three. `lag` offsets successive targets. `set` applies a state immediately; `save` and `restore` keep a stack of states per target.
 
 ```lua
-scene:play({target = ball, shift = {2, 0}, fill = "success"}, 1, "smooth")
-scene:play({target = ball, position = {0, 1}, arc = math.pi / 2}, 1)
+scene:tween({target = ball, shift = {2, 0}, fill = "success"}, 1, "smooth")
+scene:tween({target = ball, position = {0, 1}, arc = math.pi / 2}, 1)
 scene:save(ball)
 scene:indicate(ball)
 scene:restore(ball, 0.5)

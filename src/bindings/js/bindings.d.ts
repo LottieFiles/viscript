@@ -284,7 +284,7 @@ export interface TextOptions extends Omit<Style, "gradient"> {
     /** Pin the first baseline at point, measured as the text is made; align then places it only along the line. */
     baseline?: boolean;
 }
-/** A text that writes a number; play, set and trackers animate it as `value`. */
+/** A text that writes a number; tween, set and trackers animate it as `value`. */
 export interface NumberOptions extends Omit<Style, "gradient"> {
     value?: number;
     /** Digits after the decimal point, 0 to 6. */
@@ -889,7 +889,7 @@ export interface SpaceHandle extends ObjectHandle {
     voxel(callback: VoxelSampler, options?: VoxelSampleOptions): GroupHandle;
     /**
      * Place labels beside the ticks of this space and return their handles in order. A string may come at any
-     * time; a handle must be placed before the first play, as layout must.
+     * time; a handle must be placed before the first animation, as layout must.
      * With a space id, generated texts have ids <space-id>/label/<axis>/N, using the first free N from 1.
      */
     labels(options: SpaceLabelsOptions): ObjectHandle[];
@@ -1088,8 +1088,8 @@ interface AnimationProperties {
      */
     text: string;
     /**
-     * The draw layer (see `layer` on factories). It changes at a step: while a play runs, the
-     * object draws at the higher of its two layers, so it comes forward as the play begins and
+     * The draw layer (see `layer` on factories). It changes at a step: while a tween runs, the
+     * object draws at the higher of its two layers, so it comes forward as the tween begins and
      * goes back as it ends. The objects below the target move by as many layers as it does.
      */
     layer: number;
@@ -1125,7 +1125,7 @@ export interface Tracker {
     get(): number;
 }
 /**
- * What a bound object shows for its trackers' values: any play property except position, arc,
+ * What a bound object shows for its trackers' values: any tween property except position, arc,
  * text and layer, the points of a shape and a plot's fn among them. The shift is the offset from
  * where the object was when it was bound; a transform is absolute.
  */
@@ -1349,8 +1349,8 @@ export class SceneBuilder {
     stroke(target: Handle, color: Color, options: TimingOptions): this;
     fill(target: Handle, color: Color, duration?: number, curve?: AnimCurve): this;
     fill(target: Handle, color: Color, options: TimingOptions): this;
-    play(specification: AnimationSpec | readonly AnimationSpec[], duration?: number, curve?: AnimCurve, lag?: number): this;
-    play(specification: AnimationSpec | readonly AnimationSpec[], options: AnimationOptions): this;
+    tween(specification: AnimationSpec | readonly AnimationSpec[], duration?: number, curve?: AnimCurve, lag?: number): this;
+    tween(specification: AnimationSpec | readonly AnimationSpec[], options: AnimationOptions): this;
     /** Applies the values at once: as the starting state before the timeline starts, at the cursor afterwards. */
     set(specification: SetSpec | readonly SetSpec[]): this;
     /**

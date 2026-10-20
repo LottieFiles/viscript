@@ -106,7 +106,7 @@ local graph = s:plot {id="graph", fn=function(x) return 2*x end,
     x_range={-2,2,1}, y_range={-1,1}, endpoint_radius=3, width=0, progress=0}
 s:clone(graph, {id="copy", shift={0,2}})
 s:wait(1)
-s:play({target=graph, fn=function(x) return 2*x+1 end}, 1, "linear")
+s:tween({target=graph, fn=function(x) return 2*x+1 end}, 1, "linear")
 s:wait(1)
 s:set {target=graph, points={{-1,0},{1,0}}}
 s:wait(1)
@@ -160,12 +160,12 @@ local reset=s:plot{id="reset",points={{-2,-2.5},{2,-2.5}},endpoint_radius=4,widt
 local future=s:plot{id="future",points={{-1,0},{1,0}},endpoint_radius=4,width=0,progress=0}
 s:uncreate(reset,1,"linear")
 s:at(1,function()
-    s:play({{target=down,progress=0},{target=up,progress=1},{target=stay,progress=0}},1,"linear")
+    s:tween({{target=down,progress=0},{target=up,progress=1},{target=stay,progress=0}},1,"linear")
 end)
 s:at(1,function() s:create({group,space},1,"linear") end)
-s:at(1.5,function() s:play({target=reset,progress=0},1,"linear") end)
+s:at(1.5,function() s:tween({target=reset,progress=0},1,"linear") end)
 s:at(2,function() s:uncreate({group,space},1,"linear") end)
-s:at(1,function() s:play({target=future,progress=0},1,"linear") end)
+s:at(1,function() s:tween({target=future,progress=0},1,"linear") end)
 s:at(3,function() s:create(future,1,"linear") end)
 s:at(3.5,function() s:create(reset,1,"linear") end)
 s:at(4,function() s:create({group,space},1,"linear") end)
@@ -399,7 +399,7 @@ return s
     fails("local g = s:group{}; local v = g:space{}; v:labels{x = {{1, g}}}", "not the space or one above it");
     fails("local o = vis.scene{}; w:labels{x = {{1, o:rectangle{}}}}", "handle belongs to another scene");
     fails("local r = s:rectangle{}; s:wait(1); w:labels{x = {{1, r}}}",
-          "could not place label: layout and direct edits must come before the first play");
+          "could not place label: layout and direct edits must come before the first animation");
 }
 
 void _spaceScreenLabels(Renderer* renderer)
@@ -460,7 +460,7 @@ return s
     _scriptError("local s=vis.scene{}; local a=s:space{}; a:labels{placement='screen',x={{1,a:text{text='x',orientation='plane'}}}}; return s",
                  "a screen label must use billboard orientation");
     _scriptError("local s=vis.scene{}; local a=s:space{}; local t=a:text{text='x'}; s:wait(1); a:labels{placement='screen',x={{1,t}}}; return s",
-                 "before the first play");
+                 "before the first animation");
     _scriptError("local s=vis.scene{}; local a=s:space{}; s:warp(a,function(x,y,z) return x+3,y,z end); a:labels{placement='screen',x={{-2,'late'}}}; return s",
                  "before the space's first warp");
     _scriptError("local s=vis.scene{}; local a=s:space{}; a:labels{placement='screen',x={{-2,'x'}}}; s:warp(a,function(x,y,z) return x+3,y,z end); a:labels{placement='screen',x={{-2,'late'}}}; return s",
@@ -861,8 +861,8 @@ local empty = s:contour {id="empty", fn=function(x,y) return (x*x-1)^2+y*y end,
 assert(#empty:children()[1]:children()==0)
 s:set {target=empty:children()[1], fn=function(x,y) return (x*x-1)^2+y*y end, level=0.5}
 assert(#empty:children()[1]:children()==2)
-s:play({target=empty:children()[1], fn=function(x,y) return (x*x-1)^2+y*y end, level=1.5}, 0.5, "linear")
-s:play({target=empty:children()[1], fn=function(x,y) return (x*x-1)^2+y*y end, level=-1}, 0.5, "linear")
+s:tween({target=empty:children()[1], fn=function(x,y) return (x*x-1)^2+y*y end, level=1.5}, 0.5, "linear")
+s:tween({target=empty:children()[1], fn=function(x,y) return (x*x-1)^2+y*y end, level=-1}, 0.5, "linear")
 return s
 )lua";
     auto scene = _loaded(source, "contour-labels.lua");
@@ -923,7 +923,7 @@ s:track(k, -0.2, 0.25, "linear")
 s:track(k, 0.5, 0.25, "linear")
 local copy = s:clone(child, {id = "copy", opacity = 0})
 s:set {target = copy, values = {0,1,1,2}, level = 0.5, x_range = {0,1,1}, y_range = {0,1,1}}
-s:play({target = copy, values = {0,1,1,2}, level = 1.5}, 0.25, "linear")
+s:tween({target = copy, values = {0,1,1,2}, level = 1.5}, 0.25, "linear")
 return s
 )lua";
     auto scene = _loaded(source, "bound-contour.lua");
@@ -1306,7 +1306,7 @@ void _samplingCallbacks()
         stops(script, expected);
     };
     fails("s:plot{fn=author, x_range={0,1,0.5}}");
-    fails("local p=s:plot{points={{0,0},{1,1}}}; s:play({target=p, fn=author, x_range={0,1,0.5}}, 1)");
+    fails("local p=s:plot{points={{0,0},{1,1}}}; s:tween({target=p, fn=author, x_range={0,1,0.5}}, 1)");
     fails("s:area{fn=author, x_range={0,1,0.5}}");
     fails("s:area{fn=function() return 1 end, base=author, x_range={0,1,0.5}}");
     fails("s:riemann{fn=author, x_range={0,1,0.5}}");

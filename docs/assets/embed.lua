@@ -86,7 +86,7 @@ end
 scene:parallel(table.unpack(fs))
 local on = {}
 for i = 1, #dots do on[i] = {target = dots[i], opacity = 1} end
-scene:play(on, 0.2)
+scene:tween(on, 0.2)
 local ride = {}
 for i = 1, #dots do ride[i] = function() scene:move_along(dots[i], waves[i], {duration = 1.8, curve = "ease_in_out"}) end end
 scene:parallel(table.unpack(ride))

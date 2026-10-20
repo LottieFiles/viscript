@@ -28,7 +28,7 @@ for (const [op, v] of OPS) {
         point();
     } else {
         const o = S.pop();
-        scene.play({target: o.b, stroke: C.warn}, 0.15);
+        scene.tween({target: o.b, stroke: C.warn}, 0.15);
         scene.parallel(() => scene.fadeOut(o.g, {shift: [2.2, 0.6], duration: 0.3}), point);
     }
     scene.wait(0.15);
@@ -60,12 +60,12 @@ for (const [op, v] of OPS) {
         rpos = i;
     } else {
         const o = Q.shift();
-        scene.play({target: o.b, stroke: C.accent}, 0.12);
+        scene.tween({target: o.b, stroke: C.accent}, 0.12);
         const m = Q.map((q) => toward(q, q.x - gap, q.y));
         m.push({target: rear, shift: [-gap, 0]});
         rpos -= 1;
         scene.parallel(() => scene.fadeOut(o.g, {shift: [-1.2, 0], duration: 0.3}),
-                       () => scene.play(m, 0.3, "smooth"));
+                       () => scene.tween(m, 0.3, "smooth"));
     }
     scene.wait(0.15);
 }
@@ -151,7 +151,7 @@ function compare(s, x, y, color) {
                  fill: "#000000", stroke: C.none, layer: L.focus - 1});
     T(g, "cmp:" + cmpN + ":text", s, 0, 0, 15, color, undefined, L.focus);
     if (cmpCur) scene.fadeOut(cmpCur, {duration: 0.15});
-    scene.play({target: g, opacity: 1}, 0.2);
+    scene.tween({target: g, opacity: 1}, 0.2);
     cmpCur = g;
 }
 function compareClear() {
@@ -163,14 +163,14 @@ TRACE.forEach((e, k) => {
     const i = k + 1;
     const probe = row[k];
     say(null);
-    scene.play({target: probe.b, stroke: C.warn}, 0.15);
+    scene.tween({target: probe.b, stroke: C.warn}, 0.15);
     let x = 0, y = 1.45, span = 2.2;
     if (e.path.length === 0) say("empty tree: " + e.key + " becomes the root", 0, 0.75);
     for (const p of e.path) {
         const nd = placed[p.node];
         // stand beside the node on the side the key is about to take
         const side = p.go === "left" ? -1 : 1;
-        scene.play(toward(probe, nd.x + side * 0.8, nd.y + 0.05), 0.32, "smooth");
+        scene.tween(toward(probe, nd.x + side * 0.8, nd.y + 0.05), 0.32, "smooth");
         const lt = p.go === "left";
         say(null);
         compare(\`\${e.key} \${lt ? "<" : ">"} \${p.node}  →  \${p.go}\`,
@@ -183,7 +183,7 @@ TRACE.forEach((e, k) => {
     }
     const parent = e.path[e.path.length - 1];
     compareClear();
-    scene.play(toward(probe, x, y), 0.35, "smooth");
+    scene.tween(toward(probe, x, y), 0.35, "smooth");
     if (parent) say(\`empty slot: \${parent.go} child of \${parent.node}\`, x, y - 0.52, C.ok);
     total += e.path.length;
     const nc = T(scene, "bst:count:" + i, \`\${i} keys · \${total} comparison\${total === 1 ? "" : "s"}\`, 5.1, -2.8, 13, C.mute, [1, 0.5]);
@@ -273,7 +273,7 @@ function swap(i, j) {
     const [xi, yi] = pos(i);
     const [xj, yj] = pos(j);
     // tree tokens pass each other on opposite arcs; in the array both values hop, one higher
-    scene.play([toward(N[i], xj, yj, 0.9), toward(N[j], xi, yi, 0.9),
+    scene.tween([toward(N[i], xj, yj, 0.9), toward(N[j], xi, yi, 0.9),
                 {target: A[i], shift: [(j - i) * aw, 0], arc: hop(i - j, 0.74)},
                 {target: A[j], shift: [(i - j) * aw, 0], arc: -hop(i - j, 0.36)}], 0.45, "smooth");
     [N[i], N[j]] = [N[j], N[i]];
@@ -288,13 +288,13 @@ for (const e of TRACE.slice(PRE)) {
              () => scene.fadeIn(A[e.at], {shift: [0, 0.3], duration: 0.3}),
              () => scene.create(ed, 0.3));
     for (const s of e.steps) {
-        scene.play([{target: N[s.i].b, stroke: C.warn}, {target: N[s.p].b, stroke: C.warn}], 0.15);
+        scene.tween([{target: N[s.i].b, stroke: C.warn}, {target: N[s.p].b, stroke: C.warn}], 0.15);
         if (s.swap) swap(s.i, s.p); else scene.wait(0.15);
-        scene.play([{target: N[s.i].b, stroke: C.accent}, {target: N[s.p].b, stroke: C.accent}], 0.12);
+        scene.tween([{target: N[s.i].b, stroke: C.accent}, {target: N[s.p].b, stroke: C.accent}], 0.12);
     }
     scene.wait(0.15);
 }
-scene.play({target: N[1].b, stroke: C.ok, fill: "#1c3a26"}, 0.3);
+scene.tween({target: N[1].b, stroke: C.ok, fill: "#1c3a26"}, 0.3);
 const [rx, ry] = pos(1);
 say("min", rx + 0.5, ry, C.ok, [0, 0.5]);
 scene.indicate(N[1].b, {color: C.ok, scale: 1.15, duration: 0.6});
@@ -320,7 +320,7 @@ const pend = keys.map((key, k) => token("key:" + key, key, -1.6 + k * 1.0, 2.55,
 const sx = 3.4, sy = 0.5;   // where a key is hashed
 function hashAt(o, key) {
     const hv = h(key);
-    scene.play(toward(o, sx, sy), 0.4, "smooth");
+    scene.tween(toward(o, sx, sy), 0.4, "smooth");
     say(\`h(\${key}) = \${hv},  \${hv} mod \${M} = \${hv % M}\`, sx, sy - 0.55);
     return hv % M;
 }
@@ -332,7 +332,7 @@ keys.forEach((key, k) => {
     const x = bx + 1.25 + chains[i].length * 1.35, y = by0 - i * bh;
     const fx = chains[i].length === 0 ? bx + 0.37 : x - 1.35 + 0.45;
     say(null);
-    scene.play([toward(o, x, y), {target: o.b, stroke: C.accent}], 0.45, "smooth");
+    scene.tween([toward(o, x, y), {target: o.b, stroke: C.accent}], 0.45, "smooth");
     const a = scene.arrow({id: "link:" + key, from: [fx, y], to: [x - 0.45, y], stroke: C.line, width: 1.5, tip: 7, layer: L.edge});
     scene.parallel(() => scene.create(a, 0.2), () => scene.stroke(B[i], C.line, 0.2));
     chains[i].push({o, k: key});
@@ -344,18 +344,18 @@ const i = hashAt(probe, q);
 scene.stroke(B[i], C.warn, 0.2);
 let hit = false;
 for (const c of chains[i]) {
-    scene.play({target: c.o.b, stroke: C.warn}, 0.2);
+    scene.tween({target: c.o.b, stroke: C.warn}, 0.2);
     if (c.k === q) {
         hit = true;
-        together(() => scene.play({target: c.o.b, stroke: C.ok, fill: "#1c3a26"}, 0.3),
+        together(() => scene.tween({target: c.o.b, stroke: C.ok, fill: "#1c3a26"}, 0.3),
                  () => scene.stroke(probe.b, C.ok, 0.3),
                  () => say("found in bucket " + i, sx, sy - 0.55, C.ok));
         break;
     }
-    scene.play({target: c.o.b, stroke: C.accent}, 0.15);
+    scene.tween({target: c.o.b, stroke: C.accent}, 0.15);
 }
 if (!hit) {
-    together(() => scene.play({target: B[i], stroke: C.danger}, 0.3),
+    together(() => scene.tween({target: B[i], stroke: C.danger}, 0.3),
              () => say("not in the table", sx, sy - 0.55, C.danger));
 }
 scene.wait(2.4);

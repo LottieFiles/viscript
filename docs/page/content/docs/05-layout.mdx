@@ -309,8 +309,8 @@ local scene = vis.scene {}
 local v = scene:vector {origin = {0, 0}, value = {2, 1}, stroke = "danger", width = 4}
 
 scene:create(v, 0.5)
-scene:play({target = v, value = {-1, 2}}, 1)
-scene:play({target = v, value = {2.5, -1.5}}, 1)
+scene:tween({target = v, value = {-1, 2}}, 1)
+scene:tween({target = v, value = {2.5, -1.5}}, 1)
 
 return scene
 ```
@@ -321,8 +321,8 @@ const scene = vis.scene();
 const v = scene.vector({origin: [0, 0], value: [2, 1], stroke: "danger", width: 4});
 
 scene.create(v, 0.5);
-scene.play({target: v, value: [-1, 2]}, 1);
-scene.play({target: v, value: [2.5, -1.5]}, 1);
+scene.tween({target: v, value: [-1, 2]}, 1);
+scene.tween({target: v, value: [2.5, -1.5]}, 1);
 
 return scene;
 ```

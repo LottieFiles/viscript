@@ -49,7 +49,7 @@ scene:focus(nil, {duration = 0.9, curve = "smooth"})  -- back to the opening cam
 scene:fade(curve, 1, 0.4, "smooth")
 scene:track(x, 0, 2, "smooth")
 -- The answer caption: the label that named the slope now states where it vanishes.
-scene:play({target = slope, text = "slope = 0 at the minimum"}, 0.6, "ease_in_out")
+scene:tween({target = slope, text = "slope = 0 at the minimum"}, 0.6, "ease_in_out")
 scene:indicate(ball, {duration = 0.6})
 scene:wait(2)
 return scene

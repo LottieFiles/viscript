@@ -110,7 +110,7 @@ return scene;
 
 <p><code>blur = sigma</code> (screen pixels) blurs an object with its descendants. <code>shadow = &#123;color, offset, blur&#125;</code> casts a
 shadow beneath it.<br />
-Omitted fields default to 40% black, <code>&#123;0, -4&#125;</code> and <code>8</code>. Both animate through <code>play</code>.</p>
+Omitted fields default to 40% black, <code>&#123;0, -4&#125;</code> and <code>8</code>. Both animate through <code>tween</code>.</p>
 
 ```lua live
 local scene = vis.scene {}
@@ -118,9 +118,9 @@ local scene = vis.scene {}
 local card = scene:rectangle {center = {-2.5, 0}, size = {3, 2}, corner = 0.15, fill = "#e6e8ee"}
 local soft = scene:circle {center = {2.5, 0}, radius = 1.1, fill = "accent"}
 
-scene:play({target = card, shadow = {blur = 24, offset = {0, -12}, color = "#000000cc"}}, 1)
-scene:play({target = soft, blur = 18}, 1)
-scene:play({target = soft, blur = 0}, 0.8)
+scene:tween({target = card, shadow = {blur = 24, offset = {0, -12}, color = "#000000cc"}}, 1)
+scene:tween({target = soft, blur = 18}, 1)
+scene:tween({target = soft, blur = 0}, 0.8)
 
 return scene
 ```
@@ -131,9 +131,9 @@ const scene = vis.scene();
 const card = scene.rectangle({center: [-2.5, 0], size: [3, 2], corner: 0.15, fill: "#e6e8ee"});
 const soft = scene.circle({center: [2.5, 0], radius: 1.1, fill: "accent"});
 
-scene.play({target: card, shadow: {blur: 24, offset: [0, -12], color: "#000000cc"}}, 1);
-scene.play({target: soft, blur: 18}, 1);
-scene.play({target: soft, blur: 0}, 0.8);
+scene.tween({target: card, shadow: {blur: 24, offset: [0, -12], color: "#000000cc"}}, 1);
+scene.tween({target: soft, blur: 18}, 1);
+scene.tween({target: soft, blur: 0}, 0.8);
 
 return scene;
 ```

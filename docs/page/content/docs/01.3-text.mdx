@@ -149,7 +149,7 @@ local inline = scene:tex {tex = "\\sum_{k=1}^{n} k = \\frac{n(n+1)}{2}", display
 
 scene:write(identity, 1)
 scene:write(pythagoras, 1)
-scene:play({target = pythagoras:part("c^2"), fill = "accent"}, 0.5)
+scene:tween({target = pythagoras:part("c^2"), fill = "accent"}, 0.5)
 scene:fade_in(inline, {duration = 0.5})
 
 return scene
@@ -168,7 +168,7 @@ const inline = scene.tex({tex: "\\sum_{k=1}^{n} k = \\frac{n(n+1)}{2}", display:
 
 scene.write(identity, 1);
 scene.write(pythagoras, 1);
-scene.play({target: pythagoras.part("c^2"), fill: "accent"}, 0.5);
+scene.tween({target: pythagoras.part("c^2"), fill: "accent"}, 0.5);
 scene.fadeIn(inline, {duration: 0.5});
 
 return scene;
@@ -244,7 +244,7 @@ return scene;
 
 `matrix` and `table` lay out rows of numbers or strings.
 
-In a `matrix`, a string entry is TeX: `"\\cos\\theta"` or `"x^2"` is set as inline math, as a cell of a TeX matrix is, while numbers stay texts that `play {value = ...}` can count. Without the TeX module, string entries fall back to plain text.
+In a `matrix`, a string entry is TeX: `"\\cos\\theta"` or `"x^2"` is set as inline math, as a cell of a TeX matrix is, while numbers stay texts that `tween {value = ...}` can count. Without the TeX module, string entries fall back to plain text.
 
 A `table` always sets strings as text.
 

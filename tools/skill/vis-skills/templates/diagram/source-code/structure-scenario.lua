@@ -228,12 +228,12 @@ slotFinal:text {
     layer = LAYER.text, id = "field:observers:slot:2:final",
 }
 scene:fade_transform(slotInitial, slotFinal, 0.38, "ease_in_out")
-scene:play({
+scene:tween({
     {target = divRelation, opacity = 0},
     {target = modRelationInitial, opacity = 0},
 }, 0.36, "ease_in_out", 0)
 scene:create(modRelationFinal, 0.40, "ease_out")
-scene:play({
+scene:tween({
     {target = divObject.body, opacity = 0.4},
     {target = divObject.title, opacity = 0.4},
     {target = divObject.detail, opacity = 0.4},
@@ -257,7 +257,7 @@ scene:wait(0.50)
 scene:create(notifyMessage.route, 0.48, "ease_out")
 scene:fade_in(notifyMessage.label, {shift = {0, -3}, duration = 0.22, curve = "gentle"})
 -- The receiver takes the result hue only when the callback reaches it.
-scene:play({
+scene:tween({
     {target = modObject.body, stroke = "result", width = 1.5},
     {target = modObject.title, fill = "result"},
     {target = actorHandles.mod.body, stroke = "result", width = 1.5},

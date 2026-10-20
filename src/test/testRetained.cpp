@@ -146,12 +146,12 @@ local mono = s:text {text = "a\u{2090} \u{2220}x", point = {60, 60}, size = 18, 
 local figures = s:text {text = "12 \u{2220} 3", point = {0, 0}, size = 18, font = "Pretendard", tabular = true}
 local lines = s:text {text = "\u{2220}AB\n\u{22a5}CD", point = {0, -60}, size = 16, font = "Pretendard"}
 local listed = s:text {text = "mono", point = {100, -60}, size = 16, font = "Missing, JetBrainsMono, Pretendard"}
-s:play({target = angle, fill = "#ffd166", shift = {20, 0}}, 1, "smooth")
-s:play({target = mono, text = "b\u{2091} \u{2245}y"}, 1)
+s:tween({target = angle, fill = "#ffd166", shift = {20, 0}}, 1, "smooth")
+s:tween({target = mono, text = "b\u{2091} \u{2245}y"}, 1)
 s:fade(figures, 0.3, 1)
-s:play({target = lines, text = "plain"}, 1)
-s:play({target = lines, text = "\u{2220}AB again"}, 1)
-s:play({target = listed, text = "mono \u{d55c}", fill = "#06d6a0"}, 1)
+s:tween({target = lines, text = "plain"}, 1)
+s:tween({target = lines, text = "\u{2220}AB again"}, 1)
+s:tween({target = listed, text = "mono \u{d55c}", fill = "#06d6a0"}, 1)
 return s
 )";
     char error[1024] = {};

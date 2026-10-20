@@ -45,7 +45,7 @@ scene:fade_in(built:nodes(), {duration = 0.6, curve = "ease_out"})
 scene:fade_in(built:routes(), {duration = 0.65, curve = "ease_out"})
 scene:fade_in(built:annotations(), {duration = 0.3, curve = "gentle"})
 -- Native flow edges use one directed Object with a {5, 4} shaft dash; one full period keeps the seam exact.
-scene:play({
+scene:tween({
     {target = flows[1], dash_offset = -9},
     {target = flows[2], dash_offset = -9},
     {target = flows[3], dash_offset = -9},

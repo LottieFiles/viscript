@@ -7,7 +7,7 @@ parent: animation
 
 # Movement
 
-Move, rotate, scale or arrange existing objects. Use descriptor fields when combining movement with other property changes in one `play` call.
+Move, rotate, scale or arrange existing objects. Use descriptor fields when combining movement with other property changes in one `tween` call.
 
 ## Transform and arrange
 
@@ -191,7 +191,7 @@ scene.arrange(items, {gap: 0.5, center: [0, 0], duration: 1.2});
 return scene;
 ```
 
-### play · shift
+### tween · shift
 
 <!-- api-example: property.shift -->
 
@@ -201,9 +201,9 @@ local scene = vis.scene {
     height = 540,
 }
 
-scene:text {id = "caption", text = "play: shift", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
+scene:text {id = "caption", text = "tween: shift", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
 local subject = scene:rectangle {id = "subject", size = {2.6, 1.5}, stroke = "accent", fill = "accent", width = 3}
-scene:play({target = subject, shift = {2, 0}}, 1.4)
+scene:tween({target = subject, shift = {2, 0}}, 1.4)
 
 return scene
 ```
@@ -214,14 +214,14 @@ const scene = vis.scene({
     height: 540,
 });
 
-scene.text({id: "caption", text: "play: shift", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
+scene.text({id: "caption", text: "tween: shift", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
 const subject = scene.rectangle({id: "subject", size: [2.6, 1.5], stroke: "accent", fill: "accent", width: 3});
-scene.play({target: subject, shift: [2, 0]}, 1.4);
+scene.tween({target: subject, shift: [2, 0]}, 1.4);
 
 return scene;
 ```
 
-### play · transform
+### tween · transform
 
 <!-- api-example: property.transform -->
 
@@ -231,9 +231,9 @@ local scene = vis.scene {
     height = 540,
 }
 
-scene:text {id = "caption", text = "play: transform", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
+scene:text {id = "caption", text = "tween: transform", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
 local subject = scene:rectangle {id = "subject", size = {2.6, 1.5}, stroke = "accent", fill = "accent", width = 3}
-scene:play({target = subject, transform = {0,-1,0,1, 1,0,0,0, 0,0,1,0, 0,0,0,1}}, 1.4)
+scene:tween({target = subject, transform = {0,-1,0,1, 1,0,0,0, 0,0,1,0, 0,0,0,1}}, 1.4)
 
 return scene
 ```
@@ -244,14 +244,14 @@ const scene = vis.scene({
     height: 540,
 });
 
-scene.text({id: "caption", text: "play: transform", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
+scene.text({id: "caption", text: "tween: transform", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
 const subject = scene.rectangle({id: "subject", size: [2.6, 1.5], stroke: "accent", fill: "accent", width: 3});
-scene.play({target: subject, transform: [0,-1,0,1, 1,0,0,0, 0,0,1,0, 0,0,0,1]}, 1.4);
+scene.tween({target: subject, transform: [0,-1,0,1, 1,0,0,0, 0,0,1,0, 0,0,0,1]}, 1.4);
 
 return scene;
 ```
 
-### play · position
+### tween · position
 
 <!-- api-example: property.position -->
 
@@ -261,9 +261,9 @@ local scene = vis.scene {
     height = 540,
 }
 
-scene:text {id = "caption", text = "play: position", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
+scene:text {id = "caption", text = "tween: position", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
 local subject = scene:rectangle {id = "subject", size = {2.6, 1.5}, stroke = "accent", fill = "accent", width = 3}
-scene:play({target = subject, position = {2, 0}}, 1.4)
+scene:tween({target = subject, position = {2, 0}}, 1.4)
 
 return scene
 ```
@@ -274,14 +274,14 @@ const scene = vis.scene({
     height: 540,
 });
 
-scene.text({id: "caption", text: "play: position", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
+scene.text({id: "caption", text: "tween: position", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
 const subject = scene.rectangle({id: "subject", size: [2.6, 1.5], stroke: "accent", fill: "accent", width: 3});
-scene.play({target: subject, position: [2, 0]}, 1.4);
+scene.tween({target: subject, position: [2, 0]}, 1.4);
 
 return scene;
 ```
 
-### play · arc
+### tween · arc
 
 <!-- api-example: property.arc -->
 
@@ -291,9 +291,9 @@ local scene = vis.scene {
     height = 540,
 }
 
-scene:text {id = "caption", text = "play: arc", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
+scene:text {id = "caption", text = "tween: arc", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
 local subject = scene:circle {id = "subject", center = {-2, 0}, radius = 0.3, fill = "accent"}
-scene:play({target = subject, position = {2, 0}, arc = math.pi / 2}, 1.4)
+scene:tween({target = subject, position = {2, 0}, arc = math.pi / 2}, 1.4)
 
 return scene
 ```
@@ -304,9 +304,9 @@ const scene = vis.scene({
     height: 540,
 });
 
-scene.text({id: "caption", text: "play: arc", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
+scene.text({id: "caption", text: "tween: arc", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
 const subject = scene.circle({id: "subject", center: [-2, 0], radius: 0.3, fill: "accent"});
-scene.play({target: subject, position: [2, 0], arc: Math.PI / 2}, 1.4);
+scene.tween({target: subject, position: [2, 0], arc: Math.PI / 2}, 1.4);
 
 return scene;
 ```

@@ -51,7 +51,7 @@ scene:wait(1)
 scene:text {text = "한글 설명", point = {0, 0.4}, align = {0.5, 0.5}, role = "text"}
 scene:wait(1)
 scene:text {text = "local fonts = {}", point = {0, -0.5}, align = {0.5, 0.5}, role = "code"}
-scene:play({target = label, text = "글꼴"}, 0.5)
+scene:tween({target = label, text = "글꼴"}, 0.5)
 scene:wait(0.5)
 return scene`,
     },

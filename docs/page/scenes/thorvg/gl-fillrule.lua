@@ -132,7 +132,7 @@ local function runTracks(tracks,beat)
       local k=b-1
       if k<math.floor(len/#t)*#t then for _,x in ipairs(t[k%#t+1]) do q[#q+1]=x end end
     end
-    if #q>0 then scene:play(q,beat) else scene:wait(beat) end
+    if #q>0 then scene:tween(q,beat) else scene:wait(beat) end
   end
 end
 
@@ -292,10 +292,10 @@ local eo=mini("EO",400,function(v) return v%2==1 end,"FillEvenOdd","stencilFunc(
 
 for t=1,3 do
   -- Clear the outgoing caption before the next one appears in the same position.
-  if t>1 then scene:play({O(tcnt[t-1],0)},0.12) end
+  if t>1 then scene:tween({O(tcnt[t-1],0)},0.12) end
   local w={O(triP[t],0.4),O(tcnt[t],1),O(wind[t],1)}
   if t>1 then w[#w+1]=O(triP[t-1],0) w[#w+1]=O(tcnt[t-1],0) w[#w+1]=O(wind[t-1],0) end
-  scene:play(w,t>1 and 0.38 or 0.5)
+  scene:tween(w,t>1 and 0.38 or 0.5)
   scene:wait(0.5)
   local q={}
   local leave={}
@@ -303,8 +303,8 @@ for t=1,3 do
     if o.obj then q[#q+1]=O(o.obj,1) end
     if o.prev then leave[#leave+1]=O(o.prev,0) end
   end
-  if #leave>0 then scene:play(leave,0.12) end
-  scene:play(q,#leave>0 and 0.48 or 0.6)
+  if #leave>0 then scene:tween(leave,0.12) end
+  scene:tween(q,#leave>0 and 0.48 or 0.6)
   scene:wait(0.6)
 end
 local T={}

@@ -109,7 +109,7 @@ scene.text({id: "caption", text: "Eight midpoint rectangles approximate the area
 return scene;
 ```
 
-### play · fn
+### tween · fn
 
 <!-- api-example: property.fn -->
 
@@ -119,9 +119,9 @@ local scene = vis.scene {
     height = 540,
 }
 
-scene:text {id = "caption", text = "play: fn", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
+scene:text {id = "caption", text = "tween: fn", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
 local subject = scene:plot {id = "subject", fn = function(x) return math.sin(x) end, x_range = {-3, 3, 0.05}, stroke = "accent", width = 3}
-scene:play({target = subject, fn = function(x) return math.cos(x) end}, 1.4)
+scene:tween({target = subject, fn = function(x) return math.cos(x) end}, 1.4)
 
 return scene
 ```
@@ -132,14 +132,14 @@ const scene = vis.scene({
     height: 540,
 });
 
-scene.text({id: "caption", text: "play: fn", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
+scene.text({id: "caption", text: "tween: fn", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
 const subject = scene.plot({id: "subject", fn: Math.sin, x_range: [-3, 3, 0.05], stroke: "accent", width: 3});
-scene.play({target: subject, fn: Math.cos}, 1.4);
+scene.tween({target: subject, fn: Math.cos}, 1.4);
 
 return scene;
 ```
 
-### play · x_range
+### tween · x_range
 
 <!-- api-example: property.x_range -->
 
@@ -149,9 +149,9 @@ local scene = vis.scene {
     height = 540,
 }
 
-scene:text {id = "caption", text = "play: x_range", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
+scene:text {id = "caption", text = "tween: x_range", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
 local subject = scene:plot {id = "subject", fn = function(x) return 0.4*x end, x_range = {-1,1,0.05}, stroke = "accent", width = 3}
-scene:play({target = subject, fn = function(x) return 0.4*x end, x_range = {-3,3,0.05}}, 1.4)
+scene:tween({target = subject, fn = function(x) return 0.4*x end, x_range = {-3,3,0.05}}, 1.4)
 
 return scene
 ```
@@ -162,14 +162,14 @@ const scene = vis.scene({
     height: 540,
 });
 
-scene.text({id: "caption", text: "play: x_range", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
+scene.text({id: "caption", text: "tween: x_range", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
 const subject = scene.plot({id: "subject", fn: (x) => 0.4*x, x_range: [-1,1,0.05], stroke: "accent", width: 3});
-scene.play({target: subject, fn: (x) => 0.4*x, x_range: [-3,3,0.05]}, 1.4);
+scene.tween({target: subject, fn: (x) => 0.4*x, x_range: [-3,3,0.05]}, 1.4);
 
 return scene;
 ```
 
-### play · y_range
+### tween · y_range
 
 <!-- api-example: property.y_range -->
 
@@ -179,9 +179,9 @@ local scene = vis.scene {
     height = 540,
 }
 
-scene:text {id = "caption", text = "play: y_range", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
+scene:text {id = "caption", text = "tween: y_range", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
 local subject = scene:plot {id = "subject", fn = function(x) return x*x - 1 end, x_range = {-2,2,0.05}, y_range = {-0.5,0.5}, stroke = "accent", width = 3}
-scene:play({target = subject, fn = function(x) return x*x - 1 end, y_range = {-1.5,1.5}}, 1.4)
+scene:tween({target = subject, fn = function(x) return x*x - 1 end, y_range = {-1.5,1.5}}, 1.4)
 
 return scene
 ```
@@ -192,14 +192,14 @@ const scene = vis.scene({
     height: 540,
 });
 
-scene.text({id: "caption", text: "play: y_range", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
+scene.text({id: "caption", text: "tween: y_range", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
 const subject = scene.plot({id: "subject", fn: (x) => x*x - 1, x_range: [-2,2,0.05], y_range: [-0.5,0.5], stroke: "accent", width: 3});
-scene.play({target: subject, fn: (x) => x*x - 1, y_range: [-1.5,1.5]}, 1.4);
+scene.tween({target: subject, fn: (x) => x*x - 1, y_range: [-1.5,1.5]}, 1.4);
 
 return scene;
 ```
 
-### play · discontinuities
+### tween · discontinuities
 
 <!-- api-example: property.discontinuities -->
 
@@ -209,9 +209,9 @@ local scene = vis.scene {
     height = 540,
 }
 
-scene:text {id = "caption", text = "play: discontinuities", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
+scene:text {id = "caption", text = "tween: discontinuities", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
 local subject = scene:plot {id = "subject", fn = function(x) if x < 0 then return -1 else return 1 end end, x_range = {-3,3,1.5}, stroke = "accent", width = 3}
-scene:play({target = subject, fn = function(x) if x < 0 then return -1 else return 1 end end, discontinuities = {0}}, 1.4)
+scene:tween({target = subject, fn = function(x) if x < 0 then return -1 else return 1 end end, discontinuities = {0}}, 1.4)
 
 return scene
 ```
@@ -222,9 +222,9 @@ const scene = vis.scene({
     height: 540,
 });
 
-scene.text({id: "caption", text: "play: discontinuities", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
+scene.text({id: "caption", text: "tween: discontinuities", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
 const subject = scene.plot({id: "subject", fn: (x) => x < 0 ? -1 : 1, x_range: [-3,3,1.5], stroke: "accent", width: 3});
-scene.play({target: subject, fn: (x) => x < 0 ? -1 : 1, discontinuities: [0]}, 1.4);
+scene.tween({target: subject, fn: (x) => x < 0 ? -1 : 1, discontinuities: [0]}, 1.4);
 
 return scene;
 ```

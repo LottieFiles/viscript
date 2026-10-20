@@ -361,13 +361,13 @@ local cursorPosition = 0
 for index, prefix in ipairs(prefixData) do
     local delta = prefix[2] - cursorPosition
     if index > 1 then
-        scene:play({
+        scene:tween({
             { target = prefixes[index - 1], opacity = 0 },
             { target = cursor, shift = { delta / 3, 0 } },
         }, 0.025, "linear", 0)
         cursorPosition = cursorPosition + delta / 3
     end
-    scene:play({
+    scene:tween({
         { target = prefixes[index], opacity = 1 },
         { target = cursor, shift = { prefix[2] - cursorPosition, 0 } },
     }, index > 1 and 0.05 or 0.075, "linear", 0)

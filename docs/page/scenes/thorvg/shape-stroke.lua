@@ -218,7 +218,7 @@ end
 -- ------------------------------------------------------------------ timeline helpers (durations x SL)
 local function wait(d) scene:wait(d * SL) end
 local function play(list, d, curve)
-  if #list > 0 then scene:play(list, d * SL, curve or "linear") else scene:wait(d * SL) end
+  if #list > 0 then scene:tween(list, d * SL, curve or "linear") else scene:wait(d * SL) end
 end
 local function create(list, d, curve, lag) scene:create(list, d * SL, curve or "linear", (lag or 0) * SL) end
 local function grow(o, d) scene:grow_from_center(o, d * SL, "ease_out") end

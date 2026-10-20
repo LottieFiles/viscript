@@ -1163,7 +1163,7 @@ static const char* _fieldText(lua_State* lua, int index, const char* name)
     return value;
 }
 
-// scene:number{...}: a text that writes a number, which play, set and trackers animate as
+// scene:number{...}: a text that writes a number, which tween, set and trackers animate as
 // value, so it counts through every number on the way.
 static int _numberText(lua_State* lua)
 {
@@ -6669,7 +6669,7 @@ static bool _geometry(lua_State* lua, LuaScene* box, int index, Object* object, 
     return true;
 }
 
-// The values a number property of a play descriptor may take.
+// The values a number property of a tween descriptor may take.
 enum class LuaRange : uint8_t
 {
     Any,
@@ -6678,7 +6678,7 @@ enum class LuaRange : uint8_t
     Unit
 };
 
-// The number properties of a play descriptor that one setter each changes.
+// The number properties of a tween descriptor that one setter each changes.
 struct LuaNumberProperty
 {
     const char* name;
@@ -6722,7 +6722,7 @@ static bool _unknownKey(lua_State* lua, int index, std::initializer_list<const c
     return false;
 }
 
-// Parses a play descriptor. A text change adds the bytes of its string to strings; the
+// Parses a tween descriptor. A text change adds the bytes of its string to strings; the
 // string stays in the descriptor, which the call's arguments hold until the scene copies it.
 // The points of a geometry change go into the table at anchor (see _geometry), and those a plot
 // may grow by add to grown.
@@ -6910,7 +6910,7 @@ static Object** _handles(lua_State* lua, Scene* scene, int index, uint32_t& coun
     return objects;
 }
 
-static int _playTargets(lua_State* lua)
+static int _tweenTargets(lua_State* lua)
 {
     detail::luaTiming(lua, 3, 0, true);
     auto box = _scene(lua);
@@ -6939,13 +6939,13 @@ static int _playTargets(lua_State* lua)
     return _play(lua, box, targets, static_cast<uint32_t>(size), duration, curve, lag, strings, grown);
 }
 
-// scene:set(descriptor_or_array) gives objects the values of play descriptors at once: as their
+// scene:set(descriptor_or_array) gives objects the values of tween descriptors at once: as their
 // starting state before the timeline starts, and at the cursor afterwards.
 static int _setTargets(lua_State* lua)
 {
     auto box = _scene(lua);
     luaL_checktype(lua, 2, LUA_TTABLE);
-    if (!lua_isnone(lua, 3)) return luaL_error(lua, "set takes only descriptors; use play to animate the change");
+    if (!lua_isnone(lua, 3)) return luaL_error(lua, "set takes only descriptors; use tween to animate the change");
     auto single = _has(lua, 2, "target");
     auto size = single ? size_t{1} : lua_rawlen(lua, 2);
     if (!size) return luaL_error(lua, "animation descriptor array cannot be empty");
@@ -9400,7 +9400,7 @@ static int _trackerApply(lua_State* lua)
     auto anchor = lua_gettop(lua);
     size_t strings = 0;
     uint32_t grown = 0;
-    // Validates the descriptor exactly like a composite play entry.
+    // Validates the descriptor exactly like a tween entry.
     auto target = _animationTarget(lua, box, 2, object, anchor, &strings, &grown);
     _fit(lua, box, {strings});
     _fit(lua, box, {0, 0, grown});
@@ -9944,7 +9944,7 @@ static const luaL_Reg SCENE_METHODS[] = {
     {"viewport", _viewport},
     {"view", _sceneView},
     {"scene_transition", _sceneTransition},
-    {"play", _playTargets},
+    {"tween", _tweenTargets},
     {"set", _setTargets},
     {"save", _save},
     {"restore", _restore},

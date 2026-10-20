@@ -47,7 +47,7 @@ local marker = s:surface {points = sphere, size = {25, 13}, fill = "#ff3030", mo
 local k = s:tracker(0)
 s:bind(marker, k, function(v) return {shift = {0, 0, height(1, 1, v) - height(1, 1, 0)}} end)
 s:fade(axes, 1, 1)
-s:play({{target = bowl, opacity = 1}, {target = marker, opacity = 1}}, 1)
+s:tween({{target = bowl, opacity = 1}, {target = marker, opacity = 1}}, 1)
 s:wait(0.5)
 local saddle = surface(1, "saddle", 1)
 s:parallel(function() s:morph(bowl, saddle, 2.5, "smooth") end,

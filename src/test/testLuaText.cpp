@@ -63,7 +63,7 @@ row:arrange({1, 0}, 0.1)
 s:text {text = "anchor", point = {1, 2}, align = {0, 1}, measure = true, id = "corner"}
 s:fade_in(row)
 local late = s:text {text = "late", point = {0, -2}, measure = true, id = "late"}
-s:play({target = late, opacity = 0.5}, 0.5)
+s:tween({target = late, opacity = 0.5}, 0.5)
 return s
 )lua";
     scene = _loaded(boxed, "boxed.lua");
@@ -650,7 +650,7 @@ local n=s:number{value=1,tabular=true,reserve="0000",align={1,0.5},id="n"}
 s:text{text="1 9",tabular=true,measure=true,id="t"}
 s:group{}:label{text="0",tabular=true,id="l"}
 s:matrix{rows={{1,"9"}},tabular=true,reserve="0000",id="m"}
-s:play({target=n,value=1000},1,"linear")
+s:tween({target=n,value=1000},1,"linear")
 return s
 )lua";
         auto scene = _loaded(source, "tabular.lua");
@@ -685,7 +685,7 @@ s:text {text = "500", point = {3, 1}, size = 28, id = "half"}
 s:text {text = "1,000", point = {3, -2}, size = 28, id = "whole"}
 local x = s:tracker(-2)
 s:bind(label, x, function(v) return {value = v, shift = {v, 0}} end)
-s:play({target = counter, value = 1000}, 2, "linear")
+s:tween({target = counter, value = 1000}, 2, "linear")
 s:track(x, 1.5, 1, "linear")
 return s
 )lua";
@@ -717,7 +717,7 @@ return s
     }
     delete scene;
 
-    _scriptError("local s=vis.scene{}; local c=s:circle{radius=1}; s:play({target=c, value=3}, 1); return s",
+    _scriptError("local s=vis.scene{}; local c=s:circle{radius=1}; s:tween({target=c, value=3}, 1); return s",
                  "value needs a number from scene:number");
     _scriptError("local s=vis.scene{}; local t=s:text{text='7'}; s:set{target=t, value=3}; return s",
                  "value needs a number from scene:number");
@@ -740,11 +740,11 @@ local box = s:rectangle {size = {1, 1}, id = "box"}
 box:label {text = "Hello world", point = {0, -1}, size = 18, id = "tag"}
 local start = s:text {text = "x", point = {0, -2}, size = 18, id = "start"}
 s:set {target = start, text = "abc"}
-s:play({{target = word, text = "horse", shift = {1, 0}},
+s:tween({{target = word, text = "horse", shift = {1, 0}},
         {target = s:find("tag"), text = "Hello there", retype = true}}, 1, "linear")
 s:at(0.5, function() s:fade(word, 0.5, 1) end)
 s:set {target = start, text = "done"}
-s:play({target = word, text = ""}, 1, "linear")
+s:tween({target = word, text = ""}, 1, "linear")
 return s
 )lua";
     auto scene = _loaded(source, "text.lua");
@@ -772,32 +772,32 @@ return s
     }
     delete scene;
 
-    _scriptError("local s=vis.scene{}; local c=s:circle{radius=1}; s:play({target=c, text='a'}, 1); return s",
+    _scriptError("local s=vis.scene{}; local c=s:circle{radius=1}; s:tween({target=c, text='a'}, 1); return s",
                  "text needs a text or label");
-    _scriptError("local s=vis.scene{}; local n=s:number{value=1}; s:play({target=n, text='a'}, 1); return s",
+    _scriptError("local s=vis.scene{}; local n=s:number{value=1}; s:tween({target=n, text='a'}, 1); return s",
                  "text cannot change a number from scene:number; animate its value");
     _scriptError("local s=vis.scene{}; local g=s:group{typeset=true}; g:text{text='a'}; "
-                 "s:play({target=g, text='b'}, 1); return s",
+                 "s:tween({target=g, text='b'}, 1); return s",
                  "text changes one text, and a spans row or other block of texts holds several");
-    _scriptError("local s=vis.scene{}; local t=s:text{text='a'}; s:play({target=t, text=5}, 1); return s",
+    _scriptError("local s=vis.scene{}; local t=s:text{text='a'}; s:tween({target=t, text=5}, 1); return s",
                  "text must be a string");
     _scriptError("local s=vis.scene{}; local t=s:text{text='a'}; s:set{target=t, text='a\\0b'}; return s",
                  "text cannot contain zero bytes");
     _scriptError("local s=vis.scene{}; local t=s:text{text='a'}; "
-                 "s:play({target=t, text=string.rep('a', 1048577)}, 1); return s",
+                 "s:tween({target=t, text=string.rep('a', 1048577)}, 1); return s",
                  "text exceeds the 1 MiB limit");
-    _scriptError("local s=vis.scene{}; local t=s:text{text='a'}; s:play({target=t, opacity=0, retype=true}, 1); "
+    _scriptError("local s=vis.scene{}; local t=s:text{text='a'}; s:tween({target=t, opacity=0, retype=true}, 1); "
                  "return s",
                  "retype needs text");
-    _scriptError("local s=vis.scene{}; local t=s:text{text='a'}; s:play({target=t, text='b', retype=1}, 1); return s",
+    _scriptError("local s=vis.scene{}; local t=s:text{text='a'}; s:tween({target=t, text='b', retype=1}, 1); return s",
                  "retype must be a boolean");
-    _scriptError("local s=vis.scene{}; local t=s:text{text='a'}; s:play({target=t, text='b'}, 2); "
-                 "s:at(1, function() s:play({target=t, text='c'}, 1) end); return s",
+    _scriptError("local s=vis.scene{}; local t=s:text{text='a'}; s:tween({target=t, text='b'}, 2); "
+                 "s:at(1, function() s:tween({target=t, text='c'}, 1) end); return s",
                  "already animates its text until 2.00 s");
     _scriptError("local s=vis.scene{}; local x=s:tracker(0); local t=s:text{text='7'}; "
                  "s:bind(t, x, function(v) return {text='a'} end); return s",
                  "a bound state cannot set 'text'");
-    _scriptError("local s=vis.scene{}; local r=s:spans{'a ', 'b', size=28}; s:play({target=r, text='c'}, 1); "
+    _scriptError("local s=vis.scene{}; local r=s:spans{'a ', 'b', size=28}; s:tween({target=r, text='c'}, 1); "
                  "return s",
                  "text changes one text, and a spans row or other block of texts holds several");
 }
@@ -948,7 +948,7 @@ local n = s:number{value=1.5,decimals=2,reserve="-000.00",align={1,0.5},id="n"}
 s:text{text="x",reserve="long text",id="t"}
 local m = s:matrix{rows={{1,2},{3,4}},reserve={"-000.00","00"},justify="right",id="m"}
 s:matrix{rows={{1},{2}},reserve="-000.00",id="u"}
-s:play({target=n,value=12345678},1,"linear")
+s:tween({target=n,value=12345678},1,"linear")
 return s
 )lua";
         auto reserved = _loaded(source, "reserved.lua");
@@ -982,7 +982,7 @@ s:group {}:matrix {rows = {{1, 2}}}
 if m:entry(2, 3) ~= s:find("m/2/3") or m:row(1) ~= s:find("m/1") then error("names") end
 if #m:children() ~= 5 or m:children()[4] ~= s:find("m/left") then error("rows, then brackets") end
 if #m:column(2) ~= 3 or m:column(2)[3] ~= s:find("m/3/2") then error("a column") end
-s:play({target = m:entry(2, 3), value = 7}, 1)
+s:tween({target = m:entry(2, 3), value = 7}, 1)
 return s
 )lua";
     auto scene = _loaded(source, "matrix.lua");
@@ -1102,7 +1102,7 @@ s:table {rows = {{"a", "bb"}, {"ccc", "d"}}, point = {2, 1}, padding = {0.2, 0.1
 s:table {rows = {{1}}, point = {2, -2}, align = {0, 1}, padding = 0, size = 20, id = "bare"}
 if t:row(1) ~= s:find("t/1") or t:entry(4, 2) ~= s:find("t/4/2") then error("names") end
 if #t:column(1) ~= 4 or #t:children() ~= 7 then error("the header is the first row, then stripes and rules") end
-s:play({target = s:find("bare/1/1"), value = 16}, 1)
+s:tween({target = s:find("bare/1/1"), value = 16}, 1)
 return s
 )lua";
     auto scene = _loaded(source, "table.lua");

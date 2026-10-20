@@ -37,7 +37,7 @@ local sum = scene:tex {
     point = {0, -0.6}, role = "h2", id = "sum",
 }
 scene:write(identity, 1)
-scene:play({target = sum:part("c^2"), fill = "accent"}, 0.5)
+scene:tween({target = sum:part("c^2"), fill = "accent"}, 0.5)
 scene:wait(0.3)
 return scene
 ```
@@ -119,7 +119,7 @@ const sum = scene.tex({
     tex: ["a^2", "+", {text: "b^2", color: "danger"}, "=", "c^2"],
     id: "sum", role: "h2",
 });
-scene.play({target: sum.part("c^2"), fill: "accent"}, 0.5);
+scene.tween({target: sum.part("c^2"), fill: "accent"}, 0.5);
 
 const proof = scene.spans([
     "For a right triangle, ", {tex: "a^2 + b^2 = c^2", id: "pyth"}, ".",

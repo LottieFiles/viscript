@@ -132,7 +132,7 @@ local function runTracks(tracks,beat)
       local k=b-1
       if k<math.floor(len/#t)*#t then for _,x in ipairs(t[k%#t+1]) do q[#q+1]=x end end
     end
-    if #q>0 then scene:play(q,beat) else scene:wait(beat) end
+    if #q>0 then scene:tween(q,beat) else scene:wait(beat) end
   end
 end
 

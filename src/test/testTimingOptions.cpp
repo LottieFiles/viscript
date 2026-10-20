@@ -43,7 +43,7 @@ static void _lua(Renderer* renderer)
         {"s:match_transform(a,b,.4,'linear',{lag=.25,copy=true})", "s:match_transform(a,b,{duration=.4,curve='linear',lag=.25,copy=true})"},
         {"s:arrange({a,b},.4,'linear',{gap=.5})", "s:arrange({a,b},{duration=.4,curve='linear',gap=.5})"},
         {"s:warp(a,function(x,y,z) return x+.2,y,z end,.4,'linear',{step=.1})", "s:warp(a,function(x,y,z) return x+.2,y,z end,{duration=.4,curve='linear',step=.1})"},
-        {"s:play({{target=a,shift={0,1}},{target=b,opacity=.3}},.4,'linear',.25)", "s:play({{target=a,shift={0,1}},{target=b,opacity=.3}},stagger)"},
+        {"s:tween({{target=a,shift={0,1}},{target=b,opacity=.3}},.4,'linear',.25)", "s:tween({{target=a,shift={0,1}},{target=b,opacity=.3}},stagger)"},
         {"s:save({a,b}); s:shift(a,{0,1}); s:restore({a,b},.4,'linear',.25)", "s:save({a,b}); s:shift(a,{0,1}); s:restore({a,b},stagger)"},
         {"s:save(a); s:shift(a,{0,1}); s:restore(a)", "s:save(a); s:shift(a,{0,1}); s:restore(a,{})"},
         {"s:look({target={1,0},height=4},.4,'linear')", "s:look({target={1,0},height=4},timing)"},

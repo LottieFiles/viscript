@@ -130,7 +130,7 @@ end
 local leftHead, rightHead, outputHead = 1, 1, 1
 local function compareAndEmit(event, message)
     setStatus(message)
-    scene:play({
+    scene:tween({
         {target = leftBodies[leftHead], stroke = "focus", width = 2},
         {target = rightBodies[rightHead], stroke = "focus", width = 2},
     }, 0.28, "ease_in_out", 0)
@@ -141,7 +141,7 @@ local function compareAndEmit(event, message)
         token, body = rightTokens[rightHead], rightBodies[rightHead]
         sourceX = -INPUT_X[4 - rightHead]
     end
-    scene:play({
+    scene:tween({
         {target = token, shift = {OUTPUT_X[outputHead] - sourceX, OUTPUT_Y - INPUT_Y}},
         {target = body, stroke = "result", width = 1.5},
         {target = event.side == "left" and rightBodies[rightHead] or leftBodies[leftHead], stroke = "foreground", width = 1.25},
@@ -159,7 +159,7 @@ local function drain(event, message)
     else
         token, body, sourceX = rightTokens[rightHead], rightBodies[rightHead], -INPUT_X[4 - rightHead]
     end
-    scene:play({
+    scene:tween({
         {target = token, shift = {OUTPUT_X[outputHead] - sourceX, OUTPUT_Y - INPUT_Y}},
         {target = body, stroke = "result", width = 1.5},
         {target = outputSlots[outputHead], stroke = "result"},

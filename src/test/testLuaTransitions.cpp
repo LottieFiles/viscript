@@ -421,7 +421,7 @@ scene:connector {
     stroke = "#ffffff", width = 3, id = "connector"
 }
 
-scene:play({
+scene:tween({
     {target = box, shift = {0.5, 0}, opacity = 0.6,
      stroke = "#ffd166", fill = "#40d890"},
     {target = mixed, shift = {-0.5, 0}, fill = "#b060e8"}

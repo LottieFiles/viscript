@@ -17,9 +17,9 @@ local scene = vis.scene {}
 
 local line = scene:text {text = "", point = {-4, 0}, align = {0, 0.5}, size = 40}
 
-scene:play({target = line, text = "Hello, viscript"}, 1.2, "linear")
+scene:tween({target = line, text = "Hello, viscript"}, 1.2, "linear")
 scene:wait(0.5)
-scene:play({target = line, text = "Hello, world", retype = true}, 1, "linear")
+scene:tween({target = line, text = "Hello, world", retype = true}, 1, "linear")
 scene:wait(0.8)
 
 return scene
@@ -30,9 +30,9 @@ const scene = vis.scene();
 
 const line = scene.text({text: "", point: [-4, 0], align: [0, 0.5], size: 40});
 
-scene.play({target: line, text: "Hello, viscript"}, 1.2, "linear");
+scene.tween({target: line, text: "Hello, viscript"}, 1.2, "linear");
 scene.wait(0.5);
-scene.play({target: line, text: "Hello, world", retype: true}, 1, "linear");
+scene.tween({target: line, text: "Hello, world", retype: true}, 1, "linear");
 scene.wait(0.8);
 
 return scene;
@@ -48,7 +48,7 @@ local scene = vis.scene {}
 local n = scene:number {value = 0, point = {0, 0}, align = {0.5, 0.5}, size = 72,
                         decimals = 1, suffix = " %", tabular = true}
 
-scene:play({target = n, value = 99.9}, 2, "ease_out")
+scene:tween({target = n, value = 99.9}, 2, "ease_out")
 scene:wait(0.8)
 
 return scene
@@ -60,7 +60,7 @@ const scene = vis.scene();
 const n = scene.number({value: 0, point: [0, 0], align: [0.5, 0.5], size: 72,
                          decimals: 1, suffix: " %", tabular: true});
 
-scene.play({target: n, value: 99.9}, 2, "ease_out");
+scene.tween({target: n, value: 99.9}, 2, "ease_out");
 scene.wait(0.8);
 
 return scene;

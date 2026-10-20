@@ -331,7 +331,7 @@ local flow = scene:line {
     from = {-2, 0}, to = {2, 0}, stroke = "#4cc9f0", width = 8,
     dash = {20, 12}, dash_offset = 0, id = "flow"
 }
-scene:play({target = flow, dash_offset = -32}, 1, "linear")
+scene:tween({target = flow, dash_offset = -32}, 1, "linear")
 return scene
 )lua";
     auto scene = _loaded(source, "dash-timeline.lua");
@@ -367,7 +367,7 @@ local sun = s:circle {center = {-3, -1}, radius = 0.1, id = "sun"}
 local planet = s:circle(shape {center = {-2.5, -1}, radius = 0.05, id = "planet"})
 s:parallel(
     function() s:rotate(box, math.pi / 2, {about = "bottom_left", duration = 1, curve = "linear"}) end,
-    function() s:play({target = dot, shift = {-2, 0}, arc = math.pi}, 1, "linear") end,
+    function() s:tween({target = dot, shift = {-2, 0}, arc = math.pi}, 1, "linear") end,
     function() s:move_along(car, ring, {orient = true, duration = 1, curve = "linear"}) end,
     function() s:rotate(planet, 2 * math.pi, {about = sun, duration = 1, curve = "linear"}) end)
 s:scale(box, 2, {about = {-3.5, -0.5}})
@@ -432,7 +432,7 @@ s:parallel(
     function() s:shift(bar, {4, 0}, 2, "linear") end,
     function()
         s:wait(0.5)
-        s:play({target = bar, transform = {0, -1, 0, 2, 1, 0, 0, 2, 0, 0, 1, 0, 0, 0, 0, 1}, arc = math.pi / 2}, 1,
+        s:tween({target = bar, transform = {0, -1, 0, 2, 1, 0, 0, 2, 0, 0, 1, 0, 0, 0, 0, 1}, arc = math.pi / 2}, 1,
                "linear")
     end)
 s:shift(bar, {0, -1}, 1, "linear")
@@ -559,9 +559,9 @@ return s
            "move-along-self.lua");
     _error("local s = vis.scene {} local a = s:rectangle {} local c = s:circle {} "
            "s:move_along(a, c, {from = 2}) return s", "move-along-from.lua");
-    _error("local s = vis.scene {} local a = s:rectangle {} s:play({target = a, opacity = 0.5, arc = 1}) return s",
+    _error("local s = vis.scene {} local a = s:rectangle {} s:tween({target = a, opacity = 0.5, arc = 1}) return s",
            "arc-without-travel.lua");
-    _error("local s = vis.scene {} local a = s:rectangle {} s:play({target = a, shift = {1, 0}, arc = 7}) return s",
+    _error("local s = vis.scene {} local a = s:rectangle {} s:tween({target = a, shift = {1, 0}, arc = 7}) return s",
            "arc-range.lua");
     _error("local s = vis.scene {} local a = s:rectangle {} s:rotate(a, 1, {about = 'middle'}) return s",
            "rotate-about.lua");
@@ -595,14 +595,14 @@ local low = s:rectangle {center = {-2, 0}, size = {2, 2}, id = "low"}
 local card = s:group {id = "card"}
 card:rectangle {center = {2, 0}, size = {2, 2}, id = "face", layer = 1}
 s:set {target = card, layer = 2}
-s:play({target = low, layer = 4}, 1)
+s:tween({target = low, layer = 4}, 1)
 s:set {target = card, layer = 0}
-s:play({target = low, layer = -1, shift = {0, 0.5}}, 1)
+s:tween({target = low, layer = -1, shift = {0, 0.5}}, 1)
 return s
 )lua";
     auto scene = _loaded(source, "layers.lua");
     if (scene) {
-        // A higher layer applies as the play begins and a lower one as it ends.
+        // A higher layer applies as the tween begins and a lower one as it ends.
         CHECK(_layerAt(renderer, scene, "low", 0.0f) == 4);
         CHECK(_layerAt(renderer, scene, "low", 1.5f) == 4);
         CHECK(_layerAt(renderer, scene, "low", 2.0f) == -1);
@@ -617,11 +617,11 @@ return s
     }
     delete scene;
 
-    _scriptError("local s=vis.scene{}; local c=s:circle{}; s:play({target=c, layer=1.5}, 1); return s",
+    _scriptError("local s=vis.scene{}; local c=s:circle{}; s:tween({target=c, layer=1.5}, 1); return s",
                  "layer must be an integer");
     _scriptError("local s=vis.scene{}; local c=s:circle{}; s:set{target=c, layer=math.maxinteger}; return s",
                  "layer is out of range");
-    _scriptError("local s=vis.scene{}; local c=s:circle{}; s:play({target=c, layer=1}, 2); "
+    _scriptError("local s=vis.scene{}; local c=s:circle{}; s:tween({target=c, layer=1}, 2); "
                  "s:at(1, function() s:set{target=c, layer=2} end); return s",
                  "already animates its layer until 2.00 s");
     _scriptError("local s=vis.scene{}; local x=s:tracker(0); local c=s:circle{}; "
@@ -691,12 +691,12 @@ return s
     fails("{pairs={{3,1}}}", "morph pairs need distinct piece indices within each outline");
     fails("{pairs={{1,1},{1,2}}}", "morph pairs need distinct piece indices within each outline");
     fails("{pairs={{1,1},{2,1}}}", "morph pairs need distinct piece indices within each outline");
-    // Morph and play refuse more pairs or descriptors than a group holds before they read any, as
+    // Morph and tween refuse more pairs or descriptors than a group holds before they read any, as
     // set does.
     _scriptError("local s=vis.scene{}; local l={}; for i=1,1025 do l[i]=5 end; s:morph(l, l); return s",
                  "animation group limit exceeded");
     _scriptError("local s=vis.scene{}; local c=s:circle{}; local l={}; "
-                 "for i=1,1025 do l[i]={target=c, opacity=0.5} end; s:play(l); return s",
+                 "for i=1,1025 do l[i]={target=c, opacity=0.5} end; s:tween(l); return s",
                  "animation group limit exceeded");
 }
 
@@ -780,22 +780,22 @@ local dot = s:circle {center = {2, 0}, radius = 0.5, fill = "#0000ff", id = "dot
 s:save {card, word, total}
 s:save(dot)
 s:set {target = word, text = "dog"}
-s:play({{target = card, shift = {1, 1}, fill = "#00ff00", size = {2, 1}, corner = 0.25},
+s:tween({{target = card, shift = {1, 1}, fill = "#00ff00", size = {2, 1}, corner = 0.25},
         {target = word, text = "horse"}, {target = total, value = 100},
         {target = dot, opacity = 0.25, layer = 3}}, 1, "linear")
 s:restore({card, word, total}, 1, "linear")
 s:restore(dot)
 s:save(card)
-s:play({target = card, fill = "#0000ff"}, 1)
+s:tween({target = card, fill = "#0000ff"}, 1)
 s:save(card)
-s:play({target = card, shift = {0, 1}, opacity = 0.5}, 1)
+s:tween({target = card, shift = {0, 1}, opacity = 0.5}, 1)
 s:restore(card)
 s:restore(card, 1)
 s:save {card, dot}
-s:play({{target = card, shift = {0, 1}}, {target = dot, shift = {0, 1}}}, 1)
+s:tween({{target = card, shift = {0, 1}}, {target = dot, shift = {0, 1}}}, 1)
 s:restore({card, dot}, 1, "linear", 0.5)
 s:save(card)
-s:play({target = card, shift = {2, 0}}, 2, "linear")
+s:tween({target = card, shift = {2, 0}}, 2, "linear")
 s:at(8.5, function() s:restore(card, 1, "linear") end)
 return s
 )lua";
@@ -860,7 +860,7 @@ return s
                  "duration must be non-negative");
     _scriptError("local s=vis.scene{}; local c=s:circle{}; s:save(c); s:restore(c, 1, 'linear', -1); return s",
                  "lag cannot be negative");
-    _scriptError("local s=vis.scene{}; local c=s:circle{}; s:save(c); s:play({target=c, fill='#ff0000'}, 2); "
+    _scriptError("local s=vis.scene{}; local c=s:circle{}; s:save(c); s:tween({target=c, fill='#ff0000'}, 2); "
                  "s:at(1, function() s:restore(c) end); return s",
                  "already animates its fill color until 2.00 s");
     // Each save is charged to the script by the objects it records.
@@ -882,9 +882,9 @@ local dot = s:rectangle {id = "dot", center = {2, -2}, size = {1, 1}, fill = sol
 local card = s:group {id = "card"}
 card:rectangle {id = "face", size = {1, 0.5}, fill = solid.fill, stroke = solid.stroke}
 s:set {{target = box, position = {-1, 2}}, {target = card, position = {0, 3}}}
-s:play({{target = box, position = {3, 2}, opacity = 0.5}, {target = dot, position = {-2, -2}, arc = math.pi}},
+s:tween({{target = box, position = {3, 2}, opacity = 0.5}, {target = dot, position = {-2, -2}, arc = math.pi}},
     2, "linear")
-s:at(1, function() s:play({target = box, position = {3, -1}}, 2, "linear") end)
+s:at(1, function() s:tween({target = box, position = {3, -1}}, 2, "linear") end)
 s:at(2.5, function() s:set {target = card, position = {-3, -3}} end)
 return s
 )lua";
@@ -903,7 +903,7 @@ return s
         Bounds bounds;
         auto box = scene->object("box");
         CHECK(box && box->bounds(bounds) && std::fabs(bounds.center().z) < 1.0e-4f);
-        // A play is halfway at half time, and an arc of a half turn passes over the top.
+        // A tween is halfway at half time, and an arc of a half turn passes over the top.
         CHECK(at("box", 1.0f, 1.0f, 2.0f) && at("dot", 1.0f, 0.0f, 0.0f) && at("dot", 2.0f, -2.0f, -2.0f));
         CHECK(box && _near(box->opacity, 0.5f));
         // One begun while the first runs adds to it and still ends on its point.
@@ -918,13 +918,13 @@ return s
         std::snprintf(script, sizeof(script), "%s%s return s", prefix, body);
         _scriptError(script, expected);
     };
-    fails("s:play({target=r, shift={1, 0}, position={0, 0}})",
+    fails("s:tween({target=r, shift={1, 0}, position={0, 0}})",
           "animation descriptor cannot contain both shift and position");
     fails("s:set({target=r, transform={1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1}, position={0, 0}})",
           "animation descriptor cannot contain both transform and position");
-    fails("s:play({target=r, opacity=0.5, arc=1})", "arc requires shift, transform or position");
-    fails("s:play({target=r, position={1}})", "position must contain 2 or 3 numbers");
-    fails("s:play({target=g, position={0, 0}})",
+    fails("s:tween({target=r, opacity=0.5, arc=1})", "arc requires shift, transform or position");
+    fails("s:tween({target=r, position={1}})", "position must contain 2 or 3 numbers");
+    fails("s:tween({target=g, position={0, 0}})",
           "could not play animation: the object has no bounds yet to move to a position");
     fails("s:set({target=g, position={0, 0}})", "could not set values: the object has no bounds yet");
     fails("local x=s:tracker(0); s:bind(r, x, function(v) return {position={v, 0}} end)",

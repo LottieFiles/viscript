@@ -133,7 +133,7 @@ local function runTracks(tracks,beat)
       local k=b-1
       if k<math.floor(len/#t)*#t then for _,x in ipairs(t[k%#t+1]) do q[#q+1]=x end end
     end
-    if #q>0 then scene:play(q,beat) else scene:wait(beat) end
+    if #q>0 then scene:tween(q,beat) else scene:wait(beat) end
   end
 end
 
@@ -349,37 +349,37 @@ for stage=1,4 do
     reset[#reset+1]=O(row.read,0)
     reset[#reset+1]=O(row.focus,0)
   end
-  scene:play(reset,0.10)
+  scene:tween(reset,0.10)
   local select={O(groups[stage],1)}
   for i=1,4 do select[#select+1]=FK(tabs[i],i==stage and "surface" or "background",i==stage and "accent" or "border") select[#select+1]=F(heads[i],i==stage and "accent" or "foreground") end
-  scene:play(select,0.10)
+  scene:tween(select,0.10)
   if stage==1 then
-    for _,h in ipairs(fans) do scene:play(O(h,0.12),0.28) end
+    for _,h in ipairs(fans) do scene:tween(O(h,0.12),0.28) end
     for _,row in ipairs(rows) do
       if row.covered>0 then
         local hide,write={},{O(row.mask,1)}
         for _,c in ipairs(row.changed) do hide[#hide+1]=O(c.zero,0) write[#write+1]=O(c.old,1) end
-        if #hide>0 then scene:play(hide,0.10) else scene:wait(0.10) end
-        scene:play(write,0.24)
+        if #hide>0 then scene:tween(hide,0.10) else scene:wait(0.10) end
+        scene:tween(write,0.24)
       else scene:wait(0.34) end
     end
   elseif stage==2 then
     scene:wait(0.40)
-    for _,row in ipairs(rows) do scene:play(O(row.read,1),0.28) end
+    for _,row in ipairs(rows) do scene:tween(O(row.read,1),0.28) end
   elseif stage==3 then
-    scene:play({O(quad,1),O(diagonal,1)},0.45)
+    scene:tween({O(quad,1),O(diagonal,1)},0.45)
     for _,row in ipairs(rows) do
-      scene:play(O(row.tests,1),0.28)
+      scene:tween(O(row.tests,1),0.28)
       if row.covered>0 then
         local hide,write={O(row.mask,0)},{O(row.writes,1)}
         for _,c in ipairs(row.changed) do hide[#hide+1]=O(c.old,0) write[#write+1]=O(c.zero,1) end
-        scene:play(hide,0.10) scene:play(write,0.22)
+        scene:tween(hide,0.10) scene:tween(write,0.22)
       else scene:wait(0.32) end
     end
   else
     for _,row in ipairs(rows) do
-      scene:play(O(row.focus,1),0.14)
-      scene:play(O(row.focus,0),0.14)
+      scene:tween(O(row.focus,1),0.14)
+      scene:tween(O(row.focus,0),0.14)
     end
     scene:wait(0.40)
   end

@@ -18,7 +18,7 @@ local built = diagram:build()
 
 scene:fade_in(built:nodes(), {duration = 0.35, curve = "gentle"})
 scene:create(built:routes(), 0.55, "ease_out")
-scene:play({
+scene:tween({
     {target = built:edge(first), dash_offset = -9},
     {target = built:edge(second), dash_offset = -9},
 }, 1.1, "linear")

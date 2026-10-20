@@ -3,7 +3,7 @@
 // the structure, tokens with identity travel along real edges, one short phrase names each step.
 import {PRELUDE as SHARED} from "./prelude.js";
 
-const PRELUDE = SHARED + `local function go(o, x, y, d, arc) scene:play(toward(o, x, y, arc), d or 0.45, "smooth") end
+const PRELUDE = SHARED + `local function go(o, x, y, d, arc) scene:tween(toward(o, x, y, arc), d or 0.45, "smooth") end
 `;
 
 // ---------------------------------------------------------------- 1. HTTP request lifecycle
@@ -263,7 +263,7 @@ local function out(s, from)
     go(o, -4.75 + (outN - 1) * 0.6, -1.95, 0.55)
 end
 local function line(i)
-    scene:play({target = cursor, position = {-3.25, code[i].y}, opacity = 1}, 0.25, "smooth")
+    scene:tween({target = cursor, position = {-3.25, code[i].y}, opacity = 1}, 0.25, "smooth")
 end
 local function cb(id, label, color, x, y)
     local o = token(id, label, x, y, {size = {1.1, 0.36}, text = 13, stroke = color})
@@ -530,7 +530,7 @@ local function flow(dur, speed)
     for _, id in ipairs(ORDER) do
         offset[id] = (offset[id] or 0) - (speed and speed[id] or 48) * dur
         local o = offset[id]
-        tracks[#tracks + 1] = function() scene:play({target = E[id], dash_offset = o}, dur, "linear") end
+        tracks[#tracks + 1] = function() scene:tween({target = E[id], dash_offset = o}, dur, "linear") end
     end
     together(table.unpack(tracks))
 end

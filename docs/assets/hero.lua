@@ -89,9 +89,9 @@ for i = 2, #acts do scene:set({target = acts[i].g, shift = {SLIDE, 0}, opacity =
 local IN = {duration = 0.6, curve = "ease_out"}
 local OUT = {duration = 0.45, curve = "ease_in"}
 local function enter(i)
-  scene:play({{target = acts[i].g, shift = {-SLIDE, 0}, opacity = 1}, {target = chip, text = acts[i].name:upper()}}, IN)
+  scene:tween({{target = acts[i].g, shift = {-SLIDE, 0}, opacity = 1}, {target = chip, text = acts[i].name:upper()}}, IN)
 end
-local function leave(i) scene:play({target = acts[i].g, shift = {-SLIDE, 0}, opacity = 0}, OUT) end
+local function leave(i) scene:tween({target = acts[i].g, shift = {-SLIDE, 0}, opacity = 0}, OUT) end
 
 -- 1. Math
 scene:wait(0.3)
@@ -118,13 +118,13 @@ leave(3)
 enter(4)
 scene:create(rose, {duration = 1.8, curve = "ease_in_out"})
 scene:parallel(
-  function() scene:play({target = rose, fill = "#0a66c233"}, 0.5, "ease_out") end,
-  function() scene:play({target = core, opacity = 1}, 0.3, "ease_out") end,
+  function() scene:tween({target = rose, fill = "#0a66c233"}, 0.5, "ease_out") end,
+  function() scene:tween({target = core, opacity = 1}, 0.3, "ease_out") end,
   function() scene:rotate(A4, math.pi / 4, {about = {0, SY}, duration = 1.2, curve = "ease_in_out"}) end)
 scene:wait(1.4)
 leave(4)
 -- Back to the opening act for the loop: reset it off-stage, then slide it in.
 scene:track(theta, 0, 0.01)
-scene:play({{target = wave, progress = 0}, {target = acts[1].g, shift = {2 * SLIDE, 0}}}, 0.01)
+scene:tween({{target = wave, progress = 0}, {target = acts[1].g, shift = {2 * SLIDE, 0}}}, 0.01)
 enter(1)
 return scene

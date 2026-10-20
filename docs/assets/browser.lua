@@ -36,25 +36,25 @@ scene:set({target = clock, opacity = 0})
 
 -- Load the page.
 scene:wait(0.2)
-scene:play({target = loading, progress = 1}, 0.6, "ease_out")
-scene:play({{target = loading, opacity = 0}, {target = canvas, opacity = 1}, {target = tag, opacity = 1}, {target = clock, opacity = 1}}, 0.25)
+scene:tween({target = loading, progress = 1}, 0.6, "ease_out")
+scene:tween({{target = loading, opacity = 0}, {target = canvas, opacity = 1}, {target = tag, opacity = 1}, {target = clock, opacity = 1}}, 0.25)
 
 -- The scene plays; the clock reports the sampled time.
 local T0 = scene:time()
 local PLAY = 0.1 + 1 + 0.5 + 1.8 + 0.6
-scene:at(T0, function() scene:play({target = clock, value = PLAY}, PLAY, "linear") end)
+scene:at(T0, function() scene:tween({target = clock, value = PLAY}, PLAY, "linear") end)
 scene:wait(0.1)
 scene:set({target = title, opacity = 1})
 scene:write(title, 1)
 scene:set({target = circle, opacity = 1})
 scene:parallel(
   function() scene:grow_from_center(circle, {duration = 0.5, curve = {preset = "back", strength = 1.4}}) end,
-  function() scene:play({target = shadow, opacity = 1}, 0.5) end)
+  function() scene:tween({target = shadow, opacity = 1}, 0.5) end)
 -- Three hops to the right, each with a squash on landing.
 for _ = 1, 3 do
   scene:parallel(
-    function() scene:play({target = circle, shift = {4 / 3, 0}, arc = -2.2}, 0.45, "ease_in_out") end,
-    function() scene:play({target = shadow, shift = {4 / 3, 0}}, 0.45, "ease_in_out") end)
+    function() scene:tween({target = circle, shift = {4 / 3, 0}, arc = -2.2}, 0.45, "ease_in_out") end,
+    function() scene:tween({target = shadow, shift = {4 / 3, 0}}, 0.45, "ease_in_out") end)
   scene:scale(circle, {1.18, 0.82, 1}, {duration = 0.08, curve = "ease_out"})
   scene:scale(circle, {1 / 1.18, 1 / 0.82, 1}, {duration = 0.12, curve = "ease_out"})
 end

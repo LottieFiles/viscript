@@ -37,7 +37,7 @@ local built = d:build()
 
 scene:fade_in(built:nodes(), {duration = 0.4})
 scene:create(built:routes(), 0.6, "ease_out")
-scene:play({{target = built:edge(e1), dash_offset = -18},
+scene:tween({{target = built:edge(e1), dash_offset = -18},
             {target = built:edge(e2), dash_offset = -18}}, 1.5, "linear")
 scene:indicate(built:node_body(output), {color = "success", duration = 0.5})
 

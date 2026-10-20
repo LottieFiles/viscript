@@ -209,7 +209,7 @@ local changes = {
 for index, object in ipairs(faceObjects) do
     changes[#changes + 1] = {target = object, fill = faceColorsB[index]}
 end
-spatial:play(changes, 1.45, "ease_in_out", 0)
+spatial:tween(changes, 1.45, "ease_in_out", 0)
 local lightMoveEnd = spatial:duration()
 spatial:wait(2.15)
 local spatialEnd = spatial:duration()

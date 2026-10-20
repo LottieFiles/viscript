@@ -3,7 +3,7 @@ import {markdownToHtml} from "../media/markdown.mjs";
 
 const html = markdownToHtml(`# Title
 
-An **animated** description with \`scene:play()\`.
+An **animated** description with \`scene:tween()\`.
 
 - First source
 - [Documentation](https://example.com/docs)
@@ -16,7 +16,7 @@ return vis.scene {}
 
 assert.match(html, /<h1>Title<\/h1>/);
 assert.match(html, /<strong>animated<\/strong>/);
-assert.match(html, /<code>scene:play\(\)<\/code>/);
+assert.match(html, /<code>scene:tween\(\)<\/code>/);
 assert.match(html, /<ul>/);
 assert.match(html, /href="https:\/\/example\.com\/docs"/);
 assert.match(html, /<pre><code data-language="lua">/);

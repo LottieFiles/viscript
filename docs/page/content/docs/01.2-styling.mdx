@@ -6,7 +6,7 @@ parent: scenes
 
 # Styling
 
-Every shape takes the same style fields, and every one of them can be animated with `play`.
+Every shape takes the same style fields, and every one of them can be animated with `tween`.
 
 ## Colors
 
@@ -88,9 +88,9 @@ for _, item in ipairs({{-3.4, "width"}, {0, "dash"}, {3.4, "opacity"}}) do
 end
 
 scene:parallel(
-    function() scene:play({target = solid, width = 10}, 1.5, "ease_in_out") end,
-    function() scene:play({target = dashed, dash_offset = 44}, 2, "linear") end,
-    function() scene:play({target = faded, opacity = 0.2}, 1.5, "ease_in_out") end)
+    function() scene:tween({target = solid, width = 10}, 1.5, "ease_in_out") end,
+    function() scene:tween({target = dashed, dash_offset = 44}, 2, "linear") end,
+    function() scene:tween({target = faded, opacity = 0.2}, 1.5, "ease_in_out") end)
 
 return scene
 ```
@@ -108,9 +108,9 @@ for (const [x, name] of [[-3.4, "width"], [0, "dash"], [3.4, "opacity"]]) {
 }
 
 scene.parallel(
-    () => scene.play({target: solid, width: 10}, 1.5, "ease_in_out"),
-    () => scene.play({target: dashed, dash_offset: 44}, 2, "linear"),
-    () => scene.play({target: faded, opacity: 0.2}, 1.5, "ease_in_out"));
+    () => scene.tween({target: solid, width: 10}, 1.5, "ease_in_out"),
+    () => scene.tween({target: dashed, dash_offset: 44}, 2, "linear"),
+    () => scene.tween({target: faded, opacity: 0.2}, 1.5, "ease_in_out"));
 
 return scene;
 ```

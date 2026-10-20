@@ -7,7 +7,7 @@ parent: animation
 
 # Text & Values
 
-Change text, animate numbers or update a vector value with [play / set descriptors](./state-scheduling.md).
+Change text, animate numbers or update a vector value with [tween / set descriptors](./state-scheduling.md).
 
 ## Replace and type text
 
@@ -28,7 +28,7 @@ Text size uses the [`size` descriptor](./shape-properties.md). For animated code
 
 ## Examples
 
-### play · text
+### tween · text
 
 <!-- api-example: property.text -->
 
@@ -38,9 +38,9 @@ local scene = vis.scene {
     height = 540,
 }
 
-scene:text {id = "caption", text = "play: text", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
+scene:text {id = "caption", text = "tween: text", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
 local subject = scene:text {id = "subject", text = "VISCRIPT", size = 42, font = "Pretendard", fill = "accent"}
-scene:play({target = subject, text = "Hello, API"}, 1.4)
+scene:tween({target = subject, text = "Hello, API"}, 1.4)
 
 return scene
 ```
@@ -51,14 +51,14 @@ const scene = vis.scene({
     height: 540,
 });
 
-scene.text({id: "caption", text: "play: text", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
+scene.text({id: "caption", text: "tween: text", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
 const subject = scene.text({id: "subject", text: "VISCRIPT", size: 42, font: "Pretendard", fill: "accent"});
-scene.play({target: subject, text: "Hello, API"}, 1.4);
+scene.tween({target: subject, text: "Hello, API"}, 1.4);
 
 return scene;
 ```
 
-### play · retype
+### tween · retype
 
 <!-- api-example: property.retype -->
 
@@ -68,9 +68,9 @@ local scene = vis.scene {
     height = 540,
 }
 
-scene:text {id = "caption", text = "play: retype", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
+scene:text {id = "caption", text = "tween: retype", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
 local subject = scene:text {id = "subject", text = "vis.scene", size = 38, font = "JetBrainsMono", fill = "accent"}
-scene:play({target = subject, text = "vis.script", retype = true}, 1.4)
+scene:tween({target = subject, text = "vis.script", retype = true}, 1.4)
 
 return scene
 ```
@@ -81,14 +81,14 @@ const scene = vis.scene({
     height: 540,
 });
 
-scene.text({id: "caption", text: "play: retype", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
+scene.text({id: "caption", text: "tween: retype", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
 const subject = scene.text({id: "subject", text: "vis.scene", size: 38, font: "JetBrainsMono", fill: "accent"});
-scene.play({target: subject, text: "vis.script", retype: true}, 1.4);
+scene.tween({target: subject, text: "vis.script", retype: true}, 1.4);
 
 return scene;
 ```
 
-### play · value
+### tween · value
 
 <!-- api-example: property.value -->
 
@@ -98,9 +98,9 @@ local scene = vis.scene {
     height = 540,
 }
 
-scene:text {id = "caption", text = "play: value", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
+scene:text {id = "caption", text = "tween: value", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
 local subject = scene:vector {id = "subject", value = {2, 1}, origin = {-1, -0.5}, stroke = "accent", width = 3, tip = 10}
-scene:play({target = subject, value = {-1, 2}}, 1.4)
+scene:tween({target = subject, value = {-1, 2}}, 1.4)
 
 return scene
 ```
@@ -111,9 +111,9 @@ const scene = vis.scene({
     height: 540,
 });
 
-scene.text({id: "caption", text: "play: value", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
+scene.text({id: "caption", text: "tween: value", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
 const subject = scene.vector({id: "subject", value: [2, 1], origin: [-1, -0.5], stroke: "accent", width: 3, tip: 10});
-scene.play({target: subject, value: [-1, 2]}, 1.4);
+scene.tween({target: subject, value: [-1, 2]}, 1.4);
 
 return scene;
 ```

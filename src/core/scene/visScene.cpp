@@ -1720,7 +1720,7 @@ static constexpr auto EMPHASIS_OUTLINE =
     "the target has no outline of one stroke at the cursor for a passing flash to run along";
 static constexpr auto REMOVE_GONE = "the object is not in the scene or was already removed";
 static constexpr auto LAYOUT_SEALED =
-    "layout and direct edits must come before the first play, wait, look or remove; animate the "
+    "layout and direct edits must come before the first animation, wait, look or remove; animate the "
     "change instead";
 static constexpr auto LAYOUT_ANIMATED = "the object already animates; animate the change instead";
 static constexpr auto LAYOUT_ARC = "the values apply at once, so there is no travel for an arc to carry";
@@ -3438,7 +3438,7 @@ static constexpr auto THEME_VALUES =
     "the theme needs named fonts, finite positive text sizes and object width, a roundness from 0 "
     "to 0.5 and 1 to 10 object colors";
 static constexpr auto THEME_LATE =
-    "the theme must come before objects, viewports, a transition and the first play, wait, look "
+    "the theme must come before objects, viewports, a transition and the first animation, wait, look "
     "or remove";
 
 Result Scene::theme(const Theme& theme) noexcept

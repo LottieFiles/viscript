@@ -55,23 +55,23 @@ for _, event in ipairs(TRACE) do
         setStatus("call " .. event.frame .. " · create a distinct activation")
         local enter = {{target = frameBody[event.frame], opacity = 1, stroke = "focus", width = 2}, {target = frameLabel[event.frame], opacity = 1}}
         if active then enter[#enter + 1] = {target = active, stroke = "foreground", width = 1.25} end
-        scene:play(enter, 0.30, "ease_out", 0)
+        scene:tween(enter, 0.30, "ease_out", 0)
         active = frameBody[event.frame]
         local labelId = event.frame
-        scene:play({{target = frameDetail[labelId], opacity = 1}}, 0.16, "gentle", 0)
+        scene:tween({{target = frameDetail[labelId], opacity = 1}}, 0.16, "gentle", 0)
         setDetail(event.frame, event.detail)
     elseif event.kind == "allocate" then
         setStatus("buildUser allocates user@A0 on the heap")
-        scene:play({{target = objectBody, opacity = 1}, {target = objectAddress, opacity = 1}, {target = objectValue, opacity = 1}}, 0.36, "ease_out", 0)
+        scene:tween({{target = objectBody, opacity = 1}, {target = objectAddress, opacity = 1}, {target = objectValue, opacity = 1}}, 0.36, "ease_out", 0)
     elseif event.kind == "write" then
         setStatus("normalize result becomes the object's field")
         local nextValue = scene:text {text = event.value, point = {260, -10}, role = "code", fill = "result", layer = LAYER.text, id = "object:user:value:1"}
         scene:fade_transform(objectValue, nextValue, 0.22, "gentle"); objectValue = nextValue
-        scene:play({{target = objectBody, stroke = "result", width = 1.5}}, 0.24, "ease_in_out", 0)
+        scene:tween({{target = objectBody, stroke = "result", width = 1.5}}, 0.24, "ease_in_out", 0)
     else
         setStatus(event.frame .. " returns " .. event.value)
         setDetail(event.frame, "return " .. event.value, "foreground")
-        if event.frame == "build" then scene:play({{target = returnRoute, opacity = 1}}, 0.34, "ease_out", 0) end
+        if event.frame == "build" then scene:tween({{target = returnRoute, opacity = 1}}, 0.34, "ease_out", 0) end
         -- The returning frame dims and hands the focus back to its caller; main's return clears it.
         local done = {{target = frameBody[event.frame], stroke = "foreground", width = 1.25}}
         if event.frame ~= "main" then
@@ -79,7 +79,7 @@ for _, event in ipairs(TRACE) do
             done[#done + 1] = {target = frameDetail[event.frame], opacity = 0.4}
             done[#done + 1] = {target = frameBody[event.to], stroke = "focus", width = 2}
         end
-        scene:play(done, 0.28, "ease_in_out", 0)
+        scene:tween(done, 0.28, "ease_in_out", 0)
         active = frameBody[event.to]
     end
     scene:wait(0.18)

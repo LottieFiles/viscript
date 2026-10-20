@@ -48,7 +48,7 @@ local g = scene:group {stroke = "#00ff00", fill = "#ff0000", width = 6, id = "g"
 g:circle {radius = 1, center = {-2, 0}, id = "circle"}
 g:rectangle {size = {1, 1}, center = {2, 0}, stroke = "#ffff00", id = "own"}
 g:text {text = "label", id = "label"}
-scene:play({target = g, fill = "#0000ff"}, 1)
+scene:tween({target = g, fill = "#0000ff"}, 1)
 scene:stroke(g, "#ffffff", 0.5)
 return scene
 )lua";
@@ -75,7 +75,7 @@ inner:text {text = "own", color = "#ffff00", id = "ownText"}
 local outer = scene:group {fill = "#ff00ff", id = "outer"}
 outer:group {typeset = true, id = "plain"}:text {text = "plain", id = "plainText"}
 local row = scene:spans {"alpha ", {"beta", color = "#00ffff", id = "beta"}, split = "words", id = "row"}
-scene:play({target = row, fill = "#0000ff"}, 1)
+scene:tween({target = row, fill = "#0000ff"}, 1)
 scene:set {target = inner, fill = "#ffffff"}
 return scene
 )lua";
@@ -92,7 +92,7 @@ return scene
         CHECK(_spanTexts(scene, "row", words, 2) == 2u);
         CHECK(words[0] && same(words[0]->style.fill, Color::hex("#0000ff")));
         CHECK(words[1] && same(words[1]->style.fill, Color::hex("#00ffff")));
-        // The play adds a clip for the row and its first word, the set one for the group and its text.
+        // The tween adds a clip for the row and its first word, the set one for the group and its text.
         CHECK(scene->clipCount() == 4u);
     }
     delete scene;
@@ -105,7 +105,7 @@ return scene
                  "gradient is supported only by vector Shapes");
     // Every shape that takes the group's color adds a clip to the script's budget.
     _scriptError("local s=vis.scene{}; local g=s:group{}; for i=1,1000 do g:point{point={0,0}} end;"
-                 " for i=1,66 do s:play({target=g, fill=i%2==0 and '#ff0000' or '#00ff00'}, 0.1) end; return s",
+                 " for i=1,66 do s:tween({target=g, fill=i%2==0 and '#ff0000' or '#00ff00'}, 0.1) end; return s",
                  "scene animation limit exceeded");
 }
 
@@ -131,10 +131,10 @@ return s
     delete scene;
     // Each move of a group of a thousand points is read for the group and each point.
     _scriptError("local s=vis.scene{}; local g=s:group{}; for i=1,1000 do g:point{point={0,0}} end;"
-                 " for i=1,4000 do s:play({target=g, shift={0.001, 0}}, 0.01) end; return s",
+                 " for i=1,4000 do s:tween({target=g, shift={0.001, 0}}, 0.01) end; return s",
                  "scene evaluation limit exceeded");
     _scriptError("local s=vis.scene{}; local g=s:group{};"
-                 " for i=1,4000 do s:play({target=g, shift={0.001, 0}}, 0.01) end;"
+                 " for i=1,4000 do s:tween({target=g, shift={0.001, 0}}, 0.01) end;"
                  " for i=1,1000 do g:point{point={0,0}} end; return s",
                  "scene evaluation limit exceeded");
     // The scenes of viewports add their work to the scene that shows them.
@@ -143,7 +143,7 @@ local function half()
     local s = vis.scene {}
     local g = s:group {}
     for i = 1, 500 do g:point {point = {0, 0}} end
-    for i = 1, 4000 do s:play({target = g, shift = {0.001, 0}}, 0.01) end
+    for i = 1, 4000 do s:tween({target = g, shift = {0.001, 0}}, 0.01) end
     return s
 end
 local root = vis.scene {}
@@ -172,7 +172,7 @@ scene:circle {radius = 0.5, blend = "color_dodge", id = "shade"}
 local card2 = scene:rectangle {size = {2, 1}, shadow = {}, id = "card2"}
 local glass = scene:rectangle {size = {2, 1}, blur = 3, shadow = {color = "#ff000080", offset = {6, -2}, blur = 0},
                                id = "glass"}
-scene:play({{target = card2, blur = 5, shadow = {offset = {0, -12}}}, {target = glass, shadow = {blur = 10}}}, 1)
+scene:tween({{target = card2, blur = 5, shadow = {offset = {0, -12}}}, {target = glass, shadow = {blur = 10}}}, 1)
 return scene
 )lua";
     auto scene = _loaded(source, "composition.lua");
@@ -192,7 +192,7 @@ return scene
         auto shade = scene->object("shade");
         CHECK(shade && shade->blend() == BlendMode::ColorDodge);
         CHECK(card && card->blend() == BlendMode::Normal);
-        // Objects hold the values at the cursor, after the play.
+        // Objects hold the values at the cursor, after the tween.
         auto card2 = scene->object("card2");
         CHECK(card2 && card2->blur == 5.0f && card2->shadow.color.a == 102 && card2->shadow.offset.x == 0.0f
               && card2->shadow.offset.y == -12.0f && card2->shadow.blur == 8.0f);
@@ -207,7 +207,7 @@ return scene
     _scriptError("local s=vis.scene{}; s:circle{shadow={spread=2}}; return s", "unknown option 'spread'");
     _scriptError("local s=vis.scene{}; s:circle{shadow={blur=-1}}; return s",
                  "shadow blur must be between 0 and 256 pixels");
-    _scriptError("local s=vis.scene{}; local c=s:circle{}; s:play({target=c, blur=-2}); return s",
+    _scriptError("local s=vis.scene{}; local c=s:circle{}; s:tween({target=c, blur=-2}); return s",
                  "blur must be between 0 and 256 pixels");
     _scriptError("local s=vis.scene{}; s:circle{blend=1}; return s", "blend must be a string");
     _scriptError("local s=vis.scene{}; s:circle{blend='glow'}; return s", "blend must be 'normal', 'multiply'");
@@ -256,7 +256,7 @@ return s
     _scriptError("local s = vis.scene {} s:angle {label = 1} return s", "label must be text or a text or tex table");
     _scriptError("local s = vis.scene {} s:angle {label = {text = 'x', size = 'big'}} return s",
                  "diagnostic.lua:1: size must be a number, got string");
-    _scriptError("local s = vis.scene {} local a = s:circle {} s:play {target = a, start = 1} return s", "start needs an arc and finite radians");
+    _scriptError("local s = vis.scene {} local a = s:circle {} s:tween {target = a, start = 1} return s", "start needs an arc and finite radians");
 }
 
 void _shapeProperties()
@@ -272,7 +272,7 @@ g:line {from = {-1, -2}, to = {1, -2}, id = "heir"}
 local bar = scene:rectangle {size = {4, 1}, fill = "#ffffff", id = "bar",
     gradient = {type = "linear", stops = {"#ff0000", "#0000ff"}}}
 local ramp = scene:rectangle {size = {4, 1}, fill = "#ff0000", gradient = "#0000ff", id = "ramp"}
-scene:play({
+scene:tween({
     {target = c, radius = 1.5},
     {target = r, size = {3, 2}, corner = 0.5},
     {target = t, size = 40},
@@ -281,7 +281,7 @@ scene:play({
     {target = bar, gradient = {type = "linear", stops = {"#00ff00", "#ffff00"}}},
     {target = ramp, gradient = "#00ff00"},
 }, 1)
-scene:play({target = r, size = 2}, 1)
+scene:tween({target = r, size = 2}, 1)
 return scene
 )lua";
     auto scene = _loaded(source, "shape-properties.lua");
@@ -302,28 +302,28 @@ return scene
         CHECK(ramp && same(ramp->style.gradientEnd, Color::hex("#00ff00")));
     }
     delete scene;
-    _scriptError("local s=vis.scene{}; local c=s:circle{radius=1}; s:play({target=c, size=2}, 1); return s",
+    _scriptError("local s=vis.scene{}; local c=s:circle{radius=1}; s:tween({target=c, size=2}, 1); return s",
                  "could not play animation: size needs a rectangle");
-    _scriptError("local s=vis.scene{}; local l=s:line{from={0,0},to={1,0}}; s:play({target=l, radius=1}, 1);"
+    _scriptError("local s=vis.scene{}; local l=s:line{from={0,0},to={1,0}}; s:tween({target=l, radius=1}, 1);"
                  " return s",
                  "could not play animation: radius needs a circle");
-    _scriptError("local s=vis.scene{}; local r=s:rectangle{size={1,1}}; s:play({target=r, corner=0.8}, 1);"
+    _scriptError("local s=vis.scene{}; local r=s:rectangle{size={1,1}}; s:tween({target=r, corner=0.8}, 1);"
                  " return s",
                  "half the rectangle's shorter side");
     _scriptError("local s=vis.scene{}; local r=s:rectangle{size={1,1}, gradient={type='linear', stops={'#000', '#fff'}}};"
-                 " s:play({target=r, gradient={type='radial', stops={'#000', '#fff'}}}, 1); return s",
+                 " s:tween({target=r, gradient={type='radial', stops={'#000', '#fff'}}}, 1); return s",
                  "keep the current gradient's type");
-    _scriptError("local s=vis.scene{}; local r=s:rectangle{size={1,1}}; s:play({target=r, size=true}, 1); return s",
+    _scriptError("local s=vis.scene{}; local r=s:rectangle{size={1,1}}; s:tween({target=r, size=true}, 1); return s",
                  "size must be a number for text or {width, height} for a rectangle");
-    _scriptError("local s=vis.scene{}; local r=s:rectangle{size={1,1}}; s:play({target=r, size={1}}, 1); return s",
+    _scriptError("local s=vis.scene{}; local r=s:rectangle{size={1,1}}; s:tween({target=r, size={1}}, 1); return s",
                  "size must contain exactly 2 numbers");
-    _scriptError("local s=vis.scene{}; local c=s:circle{radius=1}; s:play({target=c, radius=0}, 1); return s",
+    _scriptError("local s=vis.scene{}; local c=s:circle{radius=1}; s:tween({target=c, radius=0}, 1); return s",
                  "radius must be positive");
-    _scriptError("local s=vis.scene{}; local r=s:rectangle{size={1,1}}; s:play({target=r, corner=-1}, 1); return s",
+    _scriptError("local s=vis.scene{}; local r=s:rectangle{size={1,1}}; s:tween({target=r, corner=-1}, 1); return s",
                  "corner cannot be negative");
-    _scriptError("local s=vis.scene{}; local c=s:circle{radius=1}; s:play({target=c, width=-1}, 1); return s",
+    _scriptError("local s=vis.scene{}; local c=s:circle{radius=1}; s:tween({target=c, width=-1}, 1); return s",
                  "width cannot be negative");
-    _scriptError("local s=vis.scene{}; local c=s:circle{radius=1}; s:play({target=c, gradient=true}, 1); return s",
+    _scriptError("local s=vis.scene{}; local c=s:circle{radius=1}; s:tween({target=c, gradient=true}, 1); return s",
                  "gradient must be an end-stop color or a gradient table");
 }
 
@@ -336,7 +336,7 @@ local r = s:rectangle {size = {1, 1}, id = "r"}
 local g = s:group {}
 g:line {from = {0, 0}, to = {1, 0}, id = "heir"}
 s:set {target = c, opacity = 0.5, radius = 1}
-s:play({target = r, fill = "#ff0000"}, 1)
+s:tween({target = r, fill = "#ff0000"}, 1)
 s:set {{target = r, size = {2, 1}}, {target = g, width = 5}}
 return s
 )lua";
@@ -348,12 +348,12 @@ return s
         CHECK(circle && circle->opacity == 0.5f && circle->radius == 1.0f);
         CHECK(box && box->size.x == 2.0f && box->size.y == 1.0f);
         CHECK(heir && heir->style.width == 5.0f);
-        // The play adds one clip; the later set adds one for the rectangle, the group and its line.
+        // The tween adds one clip; the later set adds one for the rectangle, the group and its line.
         CHECK(scene->clipCount() == 4u && scene->duration() == 1.0f);
     }
     delete scene;
     _scriptError("local s=vis.scene{}; local c=s:circle{radius=1}; s:set({target=c, opacity=0.5}, 1); return s",
-                 "set takes only descriptors; use play to animate the change");
+                 "set takes only descriptors; use tween to animate the change");
     _scriptError("local s=vis.scene{}; local c=s:circle{radius=1};"
                  " s:set{{target=c, opacity=1}, {target=c, fill='#ffffff'}}; return s",
                  "animation targets must be distinct");

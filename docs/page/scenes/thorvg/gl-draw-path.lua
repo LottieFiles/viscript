@@ -132,7 +132,7 @@ local function runTracks(tracks,beat)
       local k=b-1
       if k<math.floor(len/#t)*#t then for _,x in ipairs(t[k%#t+1]) do q[#q+1]=x end end
     end
-    if #q>0 then scene:play(q,beat) else scene:wait(beat) end
+    if #q>0 then scene:tween(q,beat) else scene:wait(beat) end
   end
 end
 
@@ -307,7 +307,7 @@ for k,path in ipairs(paths) do
     setup[#setup+1]=FK(n[id],selected[id] and "surface" or "background",selected[id] and "accent" or "border")
   end
   for id,r in ipairs(routes) do setup[#setup+1]=K(r,selectedRoutes[id] and "accent" or "border") end
-  scene:play(setup,0.20)
+  scene:tween(setup,0.20)
   local grow,settle={},{}
   for _,id in ipairs(path) do
     local cx,cy=centers[id][1],centers[id][2]
@@ -315,8 +315,8 @@ for k,path in ipairs(paths) do
     grow[#grow+1]={target=groups[id],transform={1.035,0,0,x,0,1.035,0,y,0,0,1,0,0,0,0,1}}
     settle[#settle+1]={target=groups[id],transform=M(cx,cy)}
   end
-  scene:play(grow,0.18,"ease_out")
-  scene:play(settle,0.18,"ease_in_out")
+  scene:tween(grow,0.18,"ease_out")
+  scene:tween(settle,0.18,"ease_in_out")
   scene:wait(0.04)
 end
 

@@ -40,7 +40,7 @@ if s:find("body") ~= body or s:find("card") ~= card or s:find("missing") ~= nil 
 local seen = {[body] = true}
 if not seen[s:find("body")] then error("table key") end
 s:find("card"):arrange({1, 0}, 0.2)
-s:play({{target = s:find("body"), fill = "#ff0000"}, {target = kids[2], opacity = 0.5}}, 1)
+s:tween({{target = s:find("body"), fill = "#ff0000"}, {target = kids[2], opacity = 0.5}}, 1)
 return s
 )lua";
     auto scene = _loaded(source, "queries.lua");
@@ -69,7 +69,7 @@ if #first ~= 2 or first[1] ~= a1 or first[2] ~= b1 then error("the first column"
 local second = grid:column(2)
 if #second ~= 1 or second[1] ~= a2 then error("a shorter row has no entry there") end
 if grid:children()[2] ~= between then error("the rectangle stays a child") end
-s:play({{target = grid:entry(1, 2), fill = "#ff0000"}, {target = grid:row(2), opacity = 0.5}}, 1)
+s:tween({{target = grid:entry(1, 2), fill = "#ff0000"}, {target = grid:row(2), opacity = 0.5}}, 1)
 return s
 )lua";
     auto scene = _loaded(source, "rows.lua");

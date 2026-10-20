@@ -93,7 +93,7 @@ A tracker is a number that objects follow.
 
 Create it with `scene:tracker(value)`, bind each dependent once with `scene:bind(object, tracker, fn)`, then animate only the number with `scene:track`.
 
-The bind function returns any `play` property; `shift` is relative to where the object was when bound.<br />
+The bind function returns any `tween` property; `shift` is relative to where the object was when bound.<br />
 `track` bakes its samples into the timeline, so every frame is still seekable.
 
 ```lua live

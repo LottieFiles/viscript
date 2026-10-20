@@ -25,7 +25,7 @@ s:clone(row, {id = "pair", stroke = "#ff0000", shift = {0, -2}, opacity = 0.5})
 local inside = s:clone(a, {parent = twin})
 if inside ~= s:find("row/a:copy") or #twin:children() ~= 3 then error("the given parent") end
 s:clone(word, {id = "masked", mask = r})
-s:play({{target = word, text = "horse"}, {target = n, value = 100}, {target = a, shift = {2, 0}}}, 1, "linear")
+s:tween({{target = word, text = "horse"}, {target = n, value = 100}, {target = a, shift = {2, 0}}}, 1, "linear")
 s:at(0.5, function()
     s:clone(word, {id = "half"})
     s:clone(n, {id = "count"})
@@ -456,7 +456,7 @@ return s
           "could not warp: a warp cannot bend cells or surfaces");
     fails("s:warp(s:line{from={0,0}, to={3,0}}, F, 1, 'linear', {step = 1e-6})",
           "could not warp: the scene warps too many points; raise the step or warp fewer objects");
-    fails("local c=s:circle{}; s:warp(c, F); s:play({target=c, radius=2})",
+    fails("local c=s:circle{}; s:warp(c, F); s:tween({target=c, radius=2})",
           "keeps the outline its warp gave, so its radius, size and corner no longer change");
     // Images sampled on a grid cover every point they map, two samples or more a side.
     fails("s:warp(a, {y_range={0,1,1}, values={}})", "warp samples require x_range");

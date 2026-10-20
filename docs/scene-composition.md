@@ -103,7 +103,7 @@ local value = scene:number {
     value = 0, reserve = "-000.00", decimals = 2,
     point = {0, 0}, align = {1, 0}, baseline = true, id = "value",
 }
-scene:play({target = value, value = 42.5}, 1)
+scene:tween({target = value, value = 42.5}, 1)
 ```
 
 `spans` measures styled Text parts and places them on shared baselines. `wrap` sets
@@ -182,10 +182,10 @@ scene:parallel(
 scene:at("label", function() scene:create(arrow, 0.6) end)
 ```
 
-A `play` descriptor changes several properties together:
+A `tween` descriptor changes several properties together:
 
 ```lua
-scene:play({
+scene:tween({
     {target = left, shift = {-1, 0}, fill = "accent", opacity = 0.8},
     {target = right, shift = {1, 0}, stroke = "danger"},
 }, 0.8, "ease_in_out", 0.15)

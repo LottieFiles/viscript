@@ -21,7 +21,7 @@ Edges identify their relation, endpoints, ports, route style, and optional waypo
 
 Directed edges lower to one object containing shaft and markers: Arrow for straight edges, Route for dashed orthogonal edges, and filled Path for undashed orthogonal edges. `flow` animates a route's dash. Zones derive their bounds from member nodes.
 
-Lowered objects follow the Scene Theme. Corners use its `roundness`, which is 0 (square) in the pro presets, unless the config sets `corner` explicitly. Every node kind gets a `background` fill and an ink outline, and zones get a hairline outline with no fill. Edges stay gray except `error` (danger) and flowing `directed` edges (accent). Node kinds are therefore told apart by their labels, not by hue. To mark the node or edge the reader must find, recolor `built:node_body(node)` or `built:edge(edge)` with `set` or `play`.
+Lowered objects follow the Scene Theme. Corners use its `roundness`, which is 0 (square) in the pro presets, unless the config sets `corner` explicitly. Every node kind gets a `background` fill and an ink outline, and zones get a hairline outline with no fill. Edges stay gray except `error` (danger) and flowing `directed` edges (accent). Node kinds are therefore told apart by their labels, not by hue. To mark the node or edge the reader must find, recolor `built:node_body(node)` or `built:edge(edge)` with `set` or `tween`.
 
 Read API comments for builder ownership, accepted fields, validation, and search budgets.
 

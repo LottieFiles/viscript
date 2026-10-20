@@ -1,7 +1,7 @@
 // JavaScript versions of the "diagrams" examples, keyed by episode id.
 import {PRELUDE as SHARED} from "./prelude.js";
 
-const PRELUDE = SHARED + `const go = (o, x, y, d = 0.45, arc) => scene.play(toward(o, x, y, arc), d, "smooth");
+const PRELUDE = SHARED + `const go = (o, x, y, d = 0.45, arc) => scene.tween(toward(o, x, y, arc), d, "smooth");
 `;
 
 const DIAGRAM = `
@@ -274,7 +274,7 @@ function out(s, from) {
     go(o, -4.75 + (outN - 1) * 0.6, -1.95, 0.55);
 }
 function line(i) {
-    scene.play({target: cursor, position: [-3.25, code[i].y], opacity: 1}, 0.25, "smooth");
+    scene.tween({target: cursor, position: [-3.25, code[i].y], opacity: 1}, 0.25, "smooth");
 }
 function cb(id, label, color, x, y) {
     const o = token(id, label, x, y, {size: [1.1, 0.36], text: 13, stroke: color});
@@ -519,7 +519,7 @@ function flow(dur, speed = {}) {
     together(...ORDER.map((id) => {
         offset[id] = (offset[id] ?? 0) - (speed[id] ?? 48) * dur;
         const o = offset[id];
-        return () => scene.play({target: E[id], dash_offset: o}, dur, "linear");
+        return () => scene.tween({target: E[id], dash_offset: o}, dur, "linear");
     }));
 }
 const tint = (ids, color) => together(...ids.map((id) => () => scene.stroke(E[id], color, 0.3)));

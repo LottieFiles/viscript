@@ -116,7 +116,7 @@ end
 
 for step, event in ipairs(TRACE) do
     setStatus(event, step)
-    scene:play({
+    scene:tween({
         {target = bodies[event.mid + 1], stroke = "focus", width = 2},
         {target = values[event.mid + 1], fill = "focus"},
     }, 0.42, "ease_in_out", 0)
@@ -130,7 +130,7 @@ for step, event in ipairs(TRACE) do
         for logical = event.rejectedLo, event.rejectedHi do
             reject[#reject + 1] = {target = cells[logical + 1], opacity = 0.4}
         end
-        scene:play(reject, 0.45, "ease_in_out", 0)
+        scene:tween(reject, 0.45, "ease_in_out", 0)
         local nextRange = rangeBox(event.nextLo, event.nextHi, "range:step-" .. (step + 1))
         scene:fade_transform(range, nextRange, 0.30, "ease_in_out")
         range = nextRange
@@ -147,10 +147,10 @@ local result = scene:text {
 scene:fade_transform(status, result, 0.22, "gentle")
 local finish = {{target = range, stroke = "result"}}
 if FOUND_INDEX then
-    -- A stroke highlight, with the value recolored in the same play, keeps the text readable.
+    -- A stroke highlight, with the value recolored in the same tween, keeps the text readable.
     finish[#finish + 1] = {target = bodies[FOUND_INDEX + 1], stroke = "result", width = 2}
     finish[#finish + 1] = {target = values[FOUND_INDEX + 1], fill = "result"}
 end
-scene:play(finish, 0.48, "ease_in_out", 0)
+scene:tween(finish, 0.48, "ease_in_out", 0)
 scene:wait(2.2)
 return scene

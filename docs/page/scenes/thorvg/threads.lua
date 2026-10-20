@@ -320,11 +320,11 @@ for i = 1, #bp - 1 do
       d[#d + 1] = {target = a.a, stroke = C.hair}
     end
   end
-  scene:play(d, (xb - xa) / SPEED, "linear")
+  scene:tween(d, (xb - xa) / SPEED, "linear")
 end
 local rest = {}
 for _, a in ipairs(arrows) do if not a.settled then a.settled = true; rest[#rest + 1] = {target = a.a, stroke = C.hair} end end
-if #rest > 0 then scene:play(rest, 0.4, "smooth") end
+if #rest > 0 then scene:tween(rest, 0.4, "smooth") end
 scene:wait(1.0)
 -- return: cursor moves back to X0; each block shrinks to its start and each arrow fades as the cursor passes it
 local BACK = (X1 - X0) / 1.6
@@ -347,7 +347,7 @@ for i = #bp, 2, -1 do
   for _, a in ipairs(arrows) do
     if near(a.x, xa) then d[#d + 1] = {target = a.a, opacity = 0, stroke = C.accent} end
   end
-  scene:play(d, (xb - xa) / BACK, "linear")
+  scene:tween(d, (xb - xa) / BACK, "linear")
 end
 scene:wait(0.4)
 return scene

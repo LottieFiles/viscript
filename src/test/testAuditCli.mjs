@@ -338,7 +338,7 @@ return scene
 local scene = vis.scene {width=400, height=240, fps=20, theme="pro_white"}
 local into = scene:text {id="into", text="A and B", point={0,0.8}}
 local away = scene:text {id="away", text="A ∪ B", point={0,-0.8}}
-scene:play({{target=into, text="A ∩ B"}, {target=away, text="A or B", retype=true}}, 1)
+scene:tween({{target=into, text="A ∩ B"}, {target=away, text="A or B", retype=true}}, 1)
 return scene
 `);
     const changingIssues = JSON.parse(run(changing, [], 1).stdout).issues
