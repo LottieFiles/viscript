@@ -25,7 +25,7 @@ Create plain text, formatted numeric values, and object labels. Text defaults to
 
 A label is a child of its receiver and contributes to its semantic bounds. Use [Rich Text & TeX](./rich-text-tex.md) for mixed styles or formulas.
 
-The `tween` examples change text, retype a string or count a numeric value. See [Text & Values](../Animation/text-properties.md) for those animation fields.
+The `tween` examples fade between whole strings, sweep characters, retype a string or count a numeric value. See [Text & Values](../Animation/text-properties.md) for those animation fields.
 
 ## Examples
 
@@ -164,6 +164,36 @@ const scene = vis.scene({
 scene.text({id: "caption", text: "tween: text", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
 const subject = scene.text({id: "subject", text: "VISCRIPT", size: 42, font: "Pretendard", fill: "accent"});
 scene.tween({target: subject, text: "Hello, API"}, 1.4);
+
+return scene;
+```
+
+### tween · sweep
+
+<!-- api-example: property.sweep -->
+
+```viscript
+local scene = vis.scene {
+    width = 960,
+    height = 540,
+}
+
+scene:text {id = "caption", text = "tween: sweep", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
+local subject = scene:text {id = "subject", text = "LOADING", size = 42, font = "JetBrainsMono", fill = "accent"}
+scene:tween({target = subject, text = "SUCCESS", sweep = true}, 1.4, "linear")
+
+return scene
+```
+
+```viscript-js
+const scene = vis.scene({
+    width: 960,
+    height: 540,
+});
+
+scene.text({id: "caption", text: "tween: sweep", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
+const subject = scene.text({id: "subject", text: "LOADING", size: 42, font: "JetBrainsMono", fill: "accent"});
+scene.tween({target: subject, text: "SUCCESS", sweep: true}, 1.4, "linear");
 
 return scene;
 ```

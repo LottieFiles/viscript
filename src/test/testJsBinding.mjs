@@ -2655,10 +2655,29 @@ assert.match(
     retitledLua,
     /scene:tween\(\{\{target=objects\[1\],shift=\{1,0\},text="horse"\},\{target=objects\[3\],text="Hello there",retype=true\}\},1,"linear",0\)/,
 );
+const textModes = vis.scene({ width: 320, height: 180 });
+const textMode = textModes.text({ text: "VISCRIPT", id: "sentence" });
+textModes.tween({ target: textMode, text: "Hello, API" }, 1, "linear");
+textModes.tween({ target: textMode, text: "Fade", retype: false, sweep: false }, 1, "linear");
+textModes.tween({ target: textMode, text: "Sweep", sweep: true, retype: false }, 1, "linear");
+textModes.tween({ target: textMode, text: "Retype", retype: true, sweep: false }, 1, "linear");
+const textModesLua = compileScene(textModes);
+assert.match(textModesLua, /text="Hello, API"\}\}/);
+assert.match(textModesLua, /text="Fade",retype=false,sweep=false/);
+assert.match(textModesLua, /text="Sweep",retype=false,sweep=true/);
+assert.match(textModesLua, /text="Retype",retype=true,sweep=false/);
 assert.throws(() => retitled.tween({ target: title, text: 5 }), /Animation text must be a string/);
 assert.throws(() => retitled.tween({ target: title, text: "a\0b" }), /Strings cannot contain zero bytes/);
 assert.throws(() => retitled.tween({ target: title, opacity: 0, retype: true }), /Animation retype needs text/);
 assert.throws(() => retitled.tween({ target: title, text: "a", retype: 1 }), /Animation retype must be a boolean/);
+assert.throws(() => retitled.tween({ target: title, opacity: 0, retype: false }), /Animation retype needs text/);
+assert.throws(() => retitled.tween({ target: title, opacity: 0, sweep: true }), /Animation sweep needs text/);
+assert.throws(() => retitled.tween({ target: title, opacity: 0, sweep: false }), /Animation sweep needs text/);
+assert.throws(() => retitled.tween({ target: title, text: "a", sweep: 1 }), /Animation sweep must be a boolean/);
+assert.throws(() => retitled.tween({ target: title, text: "a", sweep: true, retype: true }),
+    /Animation retype and sweep cannot both be true/);
+assert.throws(() => retitled.bind(title, retitled.tracker(0), () => ({ sweep: true })),
+    /A bound state cannot set 'sweep'/);
 assert.throws(() => retitled.tween({ target: retitled.number({ value: 1 }), text: "a" }),
     /Animation text cannot change a number; animate its value/);
 assert.throws(() => retitled.tween({ target: retitled.spans(["a ", "b"]), text: "c" }),
@@ -3732,6 +3751,7 @@ try {
     assert.equal(inspectScript("counting.lua", countingLua).scene.duration, 2);
 
     assert.equal(inspectScript("retitled.lua", retitledLua).scene.duration, 1);
+    assert.equal(inspectScript("text-modes.lua", textModesLua).scene.duration, 4);
 
     // The back rectangle keeps its higher layer until the tween ends, and the front circle
     // switches at the cursor.

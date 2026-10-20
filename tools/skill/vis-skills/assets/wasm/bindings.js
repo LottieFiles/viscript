@@ -49,6 +49,7 @@ const TWEEN_PROPERTIES = [
     "value",
     "text",
     "retype",
+    "sweep",
     "layer",
     "points",
     "from",
@@ -94,9 +95,9 @@ const PIVOT_ANCHORS = new Set([
     "bottom_right",
 ]);
 // The properties a bound state may set besides shift (an offset, see _boundDescriptor): those of
-// tween but position, arc, text, retype and layer. And the per-track segment budget.
+// tween but position, arc, text, retype, sweep and layer. And the per-track segment budget.
 const TRACKER_KEYS = TWEEN_PROPERTIES.filter(
-    (key) => !["shift", "position", "arc", "text", "retype", "layer"].includes(key),
+    (key) => !["shift", "position", "arc", "text", "retype", "sweep", "layer"].includes(key),
 );
 const TRACKER_CLIP_LIMIT = 65536;
 // Treat sub-tolerance intervals as one instant when checking track overlap.
@@ -3724,9 +3725,13 @@ export class SceneBuilder {
                 if (type !== "text" && type !== "label") throw new TypeError("Animation text needs a text or label");
                 if (typeof descriptor.text !== "string") throw new TypeError("Animation text must be a string");
             }
-            if (Object.hasOwn(descriptor, "retype")) {
-                if (!Object.hasOwn(descriptor, "text")) throw new TypeError("Animation retype needs text");
-                if (typeof descriptor.retype !== "boolean") throw new TypeError("Animation retype must be a boolean");
+            for (const mode of ["retype", "sweep"]) {
+                if (!Object.hasOwn(descriptor, mode)) continue;
+                if (!Object.hasOwn(descriptor, "text")) throw new TypeError(`Animation ${mode} needs text`);
+                if (typeof descriptor[mode] !== "boolean") throw new TypeError(`Animation ${mode} must be a boolean`);
+            }
+            if (descriptor.retype === true && descriptor.sweep === true) {
+                throw new TypeError("Animation retype and sweep cannot both be true");
             }
             if (Object.hasOwn(descriptor, "layer")) {
                 if (!Number.isInteger(descriptor.layer)) throw new TypeError("Animation layer must be an integer");

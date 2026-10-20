@@ -303,6 +303,47 @@ test("playback ends, loops and plays ranges as asked", async () => {
     await page.close();
 });
 
+test("default replay shows the first frame without blending the previous loop", async () => {
+    for (const mode of ["auto", "inline"]) {
+        const {page, errors} = await open(`?mode=${mode}`);
+        const source = `local s = vis.scene {width = 64, height = 64}
+local box = s:rectangle {size = {12, 12}, fill = "#ff0000"}
+s:wait(0.8)
+s:set {target = box, fill = "#0000ff"}
+s:wait(0.4)
+return s`;
+        await page.evaluate((source) => window.e2e.make("a", {source}, {autoplay: false}), source);
+        await until(page, "a", "paused");
+        await page.evaluate(() => {
+            const player = window.e2e.players.a;
+            player.addEventListener("loop", () => {
+                queueMicrotask(() => player.pause());
+                window.e2e.restarted = true;
+            }, {once: true});
+            player.seek(0.9);
+            player.play();
+        });
+        await page.waitForFunction(() => window.e2e.restarted);
+        await page.waitForTimeout(100); // Let the worker present the paused restart frame.
+        // Read the displayed canvas, including any compositor effect, rather than an engine capture.
+        const png = await shot(page, "a");
+        const pixel = await page.evaluate(async (url) => {
+            const image = new Image();
+            image.src = url;
+            await image.decode();
+            const canvas = document.createElement("canvas");
+            canvas.width = image.naturalWidth;
+            canvas.height = image.naturalHeight;
+            const context = canvas.getContext("2d");
+            context.drawImage(image, 0, 0);
+            return [...context.getImageData(canvas.width >> 1, canvas.height >> 1, 1, 1).data];
+        }, `data:image/png;base64,${png.toString("base64")}`);
+        assert.deepEqual(pixel, [255, 0, 0, 255], `${mode}: the blue final frame must not linger over the red start`);
+        assert.deepEqual(errors, []);
+        await page.close();
+    }
+});
+
 test("playback runs at the rate asked, within the rates the runtime's audio takes", async () => {
     const {page, errors} = await open();
     const scene = "local s = vis.scene {width = 64, height = 64}\ns:circle {center = {0, 0}, radius = 0.5}\ns:wait(60)\nreturn s";

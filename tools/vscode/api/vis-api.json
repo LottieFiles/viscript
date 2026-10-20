@@ -421,8 +421,9 @@
       "origin": {"type": "Vec2|Vec3", "description": "Target origin of a vector."},
       "control1": {"type": "Vec2|Vec3", "description": "Target first control point of a curve."},
       "control2": {"type": "Vec2|Vec3", "description": "Target second control point of a curve."},
-      "text": {"type": "string", "description": "Target string of a text or label; characters turn from the left while the length moves to the new string's."},
-      "retype": {"type": "boolean", "description": "With text, erase back to the beginning both strings share, then type the rest."},
+      "text": {"type": "string", "description": "Target string of a text or label; the old string fades out, then the new string fades in."},
+      "retype": {"type": "boolean", "description": "With text, erase back to the beginning both strings share, then type the rest. Cannot be true with sweep."},
+      "sweep": {"type": "boolean", "description": "With text, sweep characters while the length moves to the new string's. Cannot be true with retype."},
       "layer": {"type": "integer", "description": "Target draw layer; the higher of the two holds while the tween runs, and the objects below move with it."}
     },
     "DiagramLayersConfig": {

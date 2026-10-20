@@ -45,3 +45,9 @@ test("stored settings are checked one by one", () => {
     assert.equal(readSettings({maxFps: 30}).maxFps, 30);
     assert.equal(readSettings({maxFps: Number.POSITIVE_INFINITY}).maxFps, 0);
 });
+
+test("removed replay modes fall back to replay at once", () => {
+    assert.equal(readSettings({end: "auto"}).end, "loop");
+    assert.equal(readSettings({end: "crossfade"}).end, "loop");
+    assert.equal(readSettings({end: "stop"}).end, "stop");
+});

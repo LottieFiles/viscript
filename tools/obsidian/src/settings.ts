@@ -24,7 +24,7 @@ export interface ViscriptSettings extends FontSettings {
 
 export const DEFAULT_SETTINGS: ViscriptSettings = {
     autoplay: true,
-    end: "auto",
+    end: "loop",
     controls: "hover",
     showSource: false,
     maxFps: 0,
@@ -40,7 +40,7 @@ export const DEFAULT_SETTINGS: ViscriptSettings = {
 };
 
 const CHOICES: {readonly [K in keyof ViscriptSettings]?: readonly ViscriptSettings[K][]} = {
-    end: ["auto", "loop", "crossfade", "stop"],
+    end: ["loop", "stop"],
     controls: ["hover", "always", "never"],
     quality: ["auto", "high"],
     textFont: ["default", "custom"],

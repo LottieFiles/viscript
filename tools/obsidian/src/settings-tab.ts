@@ -54,8 +54,7 @@ export class ViscriptSettingTab extends PluginSettingTab {
                 desc: "What a scene does when it reaches its last frame.",
                 control: {
                     type: "dropdown", key: "end",
-                    options: {auto: "Replay, looping seamlessly where the scene loops", crossfade: "Replay, fading into the start",
-                        loop: "Replay at once", stop: "Stop on the last frame"},
+                    options: {loop: "Replay at once", stop: "Stop on the last frame"},
                 },
             },
             {

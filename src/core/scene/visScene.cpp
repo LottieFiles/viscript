@@ -4148,6 +4148,7 @@ Object* Scene::Impl::replica(const Object* source, const VisualState& state, Obj
     // The copy's string is its own; the state points at the source's. So are its points: those
     // the source shows, on their way too, which the copy keeps as its own geometry.
     auto values = state;
+    if (source->type() == Type::Text) values.opacity *= textOpacity(state);
     values.text = nullptr;
     values.textFrom = nullptr;
     values.geometry = nullptr;
@@ -6525,7 +6526,8 @@ const char* Scene::Impl::unanimatable(const AnimationTarget& target) noexcept
         if (object->type() != Type::Text || static_cast<const Text*>(object)->counting() || !target.targetText) {
             return VALUE_TEXT;
         }
-        if (target.targetTextChange != TextChange::Sweep && target.targetTextChange != TextChange::Retype) {
+        if (target.targetTextChange != TextChange::Sweep && target.targetTextChange != TextChange::Retype
+            && target.targetTextChange != TextChange::Fade) {
             return VALUE_TEXT_CHANGE;
         }
     }
@@ -8031,7 +8033,7 @@ Result Scene::restore(Object* const* targets, uint32_t count, float duration, co
             clip.to.text = item.text;
             clip.to.textFrom = item.text;
             clip.to.textProgress = 1.0f;
-            clip.to.textChange = TextChange::Sweep;
+            clip.to.textChange = TextChange::Fade;
         }
         // The saved values become the object's latest authored state.
         auto authored = _state(item.object);

@@ -2093,7 +2093,8 @@ Result Scene::Impl::bounds(const Object* object, float time, Bounds& bounds, boo
     auto visible = false;
     auto result = world(object, time, state, visible);
     if (result != Result::Success) return result;
-    if (visible && (hidden || (state.opacity > 0.0f && (state.progress > 0.0f || plotEndpoint(object, time, state)))) && object->type() != Type::Connector) {
+    if (visible && (hidden || (state.opacity * textOpacity(state) > 0.0f
+        && (state.progress > 0.0f || plotEndpoint(object, time, state)))) && object->type() != Type::Connector) {
         if (state.morph) {
             auto shape = state.morphShape;
             if (!shape || !shape->count) return Result::NonSupport;
@@ -2506,6 +2507,8 @@ Result Scene::Impl::build(float time, DisplayList& list, bool sort, const ViewFr
             }
             case Type::Text: {
                 auto text = static_cast<Text*>(object);
+                auto alpha = textOpacity(state);
+                if (alpha <= 0.0f) break;
                 Vec2 pixel;
                 float depth;
                 // The string this time shows: a counting text's number, or a text change on its
@@ -2516,7 +2519,9 @@ Result Scene::Impl::build(float time, DisplayList& list, bool sort, const ViewFr
                 if (result != Result::Success) return result;
                 auto anchor = _anchored(state, text->point);
                 if (_point(anchor, state.model, config, pixel, depth)) {
-                    style.fill = _opacity(style.fill, progress);
+                    style.fill = alpha < 1.0f
+                               ? _opacity(state.fill, state.opacity * state.fillProgress * progress * alpha)
+                               : _opacity(style.fill, progress);
                     if (text->orientation == TextOrientation::Plane) {
                         // The model carries every scaling of a plane text, an effect's too.
                         constexpr auto ReferenceSize = 100.0f;

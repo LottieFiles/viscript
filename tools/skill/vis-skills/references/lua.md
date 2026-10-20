@@ -166,7 +166,15 @@ scene:parallel(
 )
 ```
 
-Text changes interpolate characters. `retype = true` erases to the shared prefix before typing the new suffix. Geometry descriptors use the factory's names, such as `points`, `from`, `to`, `control1`, `control2`, `size`, and `radius`. `center` animates arcs only; move other shapes with `shift`, `position`, or `transform`. `arc` bends movement by a central angle. Layer changes use the higher layer during the transition.
+Playing `text` fades out the whole old string, then fades in the whole replacement. `retype = true` erases to the shared prefix before typing the new suffix; use it when typing from an empty string too. `sweep = true` opts into a character sweep that mixes both strings. Both flags require `text` and cannot both be true. Numeric `value` still interpolates continuously.
+
+```lua
+scene:tween({target = caption, text = "Ready to play"}, 1)
+scene:tween({target = caption, text = "Ready to export", retype = true}, 1)
+scene:tween({target = caption, text = "EXPORTED", sweep = true}, 1)
+```
+
+Geometry descriptors use the factory's names, such as `points`, `from`, `to`, `control1`, `control2`, `size`, and `radius`. `center` animates arcs only; move other shapes with `shift`, `position`, or `transform`. `arc` bends movement by a central angle. Layer changes use the higher layer during the transition.
 
 A curve can be a preset (`"linear"`, `"smooth"`, `"gentle"`, `"ease_in_out"`, and others), a cubic Bézier table, or a preset table with strength and reverse settings. A table such as `{preset = "back", strength = 0.6}` tunes a preset; `{bezier = {x1, y1, x2, y2}, strength = 1}` defines a custom curve.
 

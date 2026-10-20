@@ -6731,8 +6731,8 @@ static AnimationTarget _animationTarget(lua_State* lua, LuaScene* box, int index
 {
     luaL_checktype(lua, index, LUA_TTABLE);
     index = lua_absindex(lua, index);
-    // A descriptor takes the state keys and the six of its own.
-    if (_unknownKey(lua, index, {"target", "position", "arc", "text", "retype", "layer"})) {
+    // A descriptor takes the state keys and the seven of its own.
+    if (_unknownKey(lua, index, {"target", "position", "arc", "text", "retype", "sweep", "layer"})) {
         if (lua_type(lua, -2) != LUA_TSTRING) luaL_error(lua, "option names must be strings");
         luaL_error(lua, "unknown option '%s'", lua_tostring(lua, -1));
     }
@@ -6859,11 +6859,15 @@ static AnimationTarget _animationTarget(lua_State* lua, LuaScene* box, int index
         if (std::strlen(value) != length) luaL_error(lua, "text cannot contain zero bytes");
         if (length > LUA_TEXT_LIMIT) luaL_error(lua, "text exceeds the 1 MiB limit");
         auto retype = _fieldBool(lua, index, "retype", false);
-        target.text(value, retype ? TextChange::Retype : TextChange::Sweep);
+        auto sweep = _fieldBool(lua, index, "sweep", false);
+        if (retype && sweep) luaL_error(lua, "retype and sweep cannot both be true");
+        target.text(value, retype ? TextChange::Retype : sweep ? TextChange::Sweep : TextChange::Fade);
         if (strings) *strings += length + 1u;
         changed = true;
     } else if (_has(lua, index, "retype")) {
         luaL_error(lua, "retype needs text");
+    } else if (_has(lua, index, "sweep")) {
+        luaL_error(lua, "sweep needs text");
     }
     lua_pop(lua, 1);
     if (_has(lua, index, "layer")) {

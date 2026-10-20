@@ -1781,16 +1781,18 @@ struct Animation
                             float swings = 6.0f) noexcept;
 };
 
-// How a text change (AnimationTarget::text) turns one string into another. It counts in
-// characters, never splitting one: combining marks stay with the character they mark, and
-// an emoji with the modifiers and joined emoji that make it one picture.
+// How a text change (AnimationTarget::text) turns one string into another. Character changes
+// never split combining marks or an emoji with its modifiers and joined emoji.
 enum struct TextChange : uint8_t
 {
     // Replaces characters left to right as length changes; shortening replaces from the right.
     Sweep,
     // Erases back to the characters both strings begin with, then types the rest of the new
     // string, one character at a time.
-    Retype
+    Retype,
+    // Fades the whole old string out, then the whole new string in. An empty endpoint
+    // fades the other string over the full duration; equal strings remain visible.
+    Fade
 };
 
 struct AnimationTarget
@@ -1842,9 +1844,9 @@ struct AnimationTarget
     // The number a counting text shows (see Text::count). It follows the curve past its ends,
     // so a back or elastic curve counts beyond the value and returns.
     AnimationTarget& value(float number) noexcept;
-    // Animates plain Text content by Unicode clusters; counting Text uses value instead.
+    // Fades between whole plain Text strings by default; counting Text uses value instead.
     // May overlap motion/fade/color. The string must remain valid until play() copies it.
-    AnimationTarget& text(const char* value, TextChange change = TextChange::Sweep) noexcept;
+    AnimationTarget& text(const char* value, TextChange change = TextChange::Fade) noexcept;
     // Uses the higher endpoint layer during the clip, then switches to the final layer.
     // Descendant layers shift equally, preserving their relative order.
     AnimationTarget& layer(int32_t value) noexcept;
@@ -1888,7 +1890,7 @@ private:
     Shadow targetShadow;
     float targetValue = 0.0f;
     const char* targetText = nullptr;
-    TextChange targetTextChange = TextChange::Sweep;
+    TextChange targetTextChange = TextChange::Fade;
     int32_t targetLayer = 0;
     const Vec3* targetGeometry = nullptr;
     uint32_t targetGeometryCount = 0;

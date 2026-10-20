@@ -385,7 +385,7 @@ export class RenderServer {
         }
         try {
             if (frame.camera?.length) result = {...result, cameraView: engine.cameraView};
-            session.surface.present(engine, frame.time, frame.plan, frame.crossfade);
+            session.surface.present(engine, frame.time, frame.plan);
         } catch (error) {
             this.#pool.report(lease, error);
             this.#fail(session, seq, "render", error);

@@ -864,6 +864,12 @@ test("the settings show the plugin's tab with a font preview", options, async ()
         .filter((item) => item.offsetParent !== null).map((item) => item.querySelector(".setting-item-name")?.textContent));
     assert.ok(["Text font", "Code font", "Font folder", "Download fonts", "Show source"].every((name) => names.includes(name)), names.join(", "));
     assert.ok(!names.includes("Text font name"), "the font's name is asked for only with another font chosen");
+    // Obsidian also inserts an aria-hidden select to measure the current option's label.
+    const endControl = settings.locator(".setting-item").filter({has: settings.locator(".setting-item-name", {hasText: /^At the end$/})})
+        .locator("select:not([aria-hidden='true'])");
+    assert.deepEqual(await endControl.locator("option").evaluateAll((options) => options.map((option) => option.value)), ["loop", "stop"],
+        "replay offers only an immediate restart or a stop");
+    assert.equal(await endControl.inputValue(), "loop", "scenes replay at once by default");
     assert.equal(await settings.locator(".viscript-preview .viscript-source-tools, .viscript-preview .viscript-source-panel").count(), 0,
         "the font preview does not repeat its sample source");
     const sourceToggle = settings.locator(".setting-item").filter({has: settings.locator(".setting-item-name", {hasText: /^Show source$/})})

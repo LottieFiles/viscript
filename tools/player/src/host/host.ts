@@ -162,7 +162,6 @@ export function merge(older: FrameRequest | null, newer: FrameRequest): FrameReq
         ...(input.length ? {input} : {}),
         ...(live ? {advance: (older.advance ?? 0) + (newer.advance ?? 0)} : {}),
         ...(older.releaseInput || newer.releaseInput ? {releaseInput: true} : {}),
-        ...(newer.crossfade ?? older.crossfade ? {crossfade: newer.crossfade ?? older.crossfade} : {}),
         ...(camera.length ? {camera} : {}),
         ...(audio ? {audio} : {}),
     };

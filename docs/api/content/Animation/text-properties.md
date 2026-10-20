@@ -9,14 +9,17 @@ parent: animation
 
 Change text, animate numbers or update a vector value with [tween / set descriptors](./state-scheduling.md).
 
-## Replace and type text
+## Replace, type, and sweep text
 
 | Lua | JavaScript | Purpose |
 | --- | --- | --- |
-| `text` | `text` | Replacement string for text or labels. |
+| `text` | `text` | Fade out the old string, then fade in the replacement. |
 | `retype` | `retype` | With `text`, erase to the shared prefix and type the remainder. |
+| `sweep` | `sweep` | With `text`, sweep through character positions, mixing both strings. |
 
-Plain text animation changes characters and length progressively; `retype` chooses erase-and-type behavior.
+`tween` keeps each whole string intact during the default fade. Use `retype = true` / `retype: true` for typing, including from an empty string, or `sweep = true` / `sweep: true` for a stylized character sweep. Both flags require `text` and cannot both be true. `set` replaces text immediately.
+
+An empty source or replacement uses the full duration to fade in or out; identical strings stay visible without fading.
 
 ## Numbers and vectors
 
@@ -54,6 +57,36 @@ const scene = vis.scene({
 scene.text({id: "caption", text: "tween: text", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
 const subject = scene.text({id: "subject", text: "VISCRIPT", size: 42, font: "Pretendard", fill: "accent"});
 scene.tween({target: subject, text: "Hello, API"}, 1.4);
+
+return scene;
+```
+
+### tween · sweep
+
+<!-- api-example: property.sweep -->
+
+```viscript
+local scene = vis.scene {
+    width = 960,
+    height = 540,
+}
+
+scene:text {id = "caption", text = "tween: sweep", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
+local subject = scene:text {id = "subject", text = "LOADING", size = 42, font = "JetBrainsMono", fill = "accent"}
+scene:tween({target = subject, text = "SUCCESS", sweep = true}, 1.4, "linear")
+
+return scene
+```
+
+```viscript-js
+const scene = vis.scene({
+    width: 960,
+    height: 540,
+});
+
+scene.text({id: "caption", text: "tween: sweep", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
+const subject = scene.text({id: "subject", text: "LOADING", size: 42, font: "JetBrainsMono", fill: "accent"});
+scene.tween({target: subject, text: "SUCCESS", sweep: true}, 1.4, "linear");
 
 return scene;
 ```

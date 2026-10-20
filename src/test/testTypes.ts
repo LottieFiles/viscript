@@ -284,6 +284,19 @@ definition.surface({points: [[-1, 0], [1, 0], [-1, 1], [1, 1]], size: [2, 2], mo
 definition.text({text: "root", orientation: "plane", size: 0.5, role: "code"});
 definition.text({text: "leaning", slant: 0.2});
 definition.text({text: "boxed", measure: true});
+const changingText = definition.text({text: "VISCRIPT"});
+definition.tween({target: changingText, text: "Hello, API"}, 1);
+definition.tween({target: changingText, text: "Fade", retype: false, sweep: false}, 1);
+definition.tween({target: changingText, text: "Sweep", sweep: true, retype: false}, 1);
+definition.tween({target: changingText, text: "Retype", retype: true, sweep: false}, 1);
+// @ts-expect-error text modes require a text change, even when false.
+definition.tween({target: changingText, opacity: 0.5, sweep: false});
+// @ts-expect-error text modes require a text change, even when false.
+definition.set({target: changingText, opacity: 0.5, retype: false});
+// @ts-expect-error sweep is a boolean.
+definition.tween({target: changingText, text: "changed", sweep: 1});
+// @ts-expect-error text cannot sweep and retype at once.
+definition.tween({target: changingText, text: "changed", sweep: true, retype: true});
 // @ts-expect-error measure is a flag.
 definition.text({text: "boxed", measure: "yes"});
 const counter: ObjectHandle = definition.number({value: 0, decimals: 1, separator: ",", prefix: "$"});

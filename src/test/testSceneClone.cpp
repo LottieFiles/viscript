@@ -207,7 +207,7 @@ void clonedObjects(Renderer* renderer)
     CHECK(scene->play(AnimationTarget::from(dot).shift({2.0f, 0.0f, 0.0f}).opacity(0.5f), 2.0f, linear)
           == Result::Success);
     CHECK(scene->seek(0.0f) == Result::Success);
-    CHECK(scene->play(AnimationTarget::from(word).text("horse"), 1.0f, linear) == Result::Success);
+    CHECK(scene->play(AnimationTarget::from(word).text("horse", TextChange::Sweep), 1.0f, linear) == Result::Success);
     CHECK(scene->seek(0.0f) == Result::Success);
     CHECK(scene->play(AnimationTarget::from(counter).value(100.0f), 1.0f, linear) == Result::Success);
     CHECK(scene->seek(0.5f) == Result::Success);

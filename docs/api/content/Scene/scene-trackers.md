@@ -18,7 +18,7 @@ Trackers drive sampled object properties. Callbacks return a state table/object 
 | `scene:bind(target, trackers, fn)` | `scene.bind(target, trackers, fn)` | Bind one object to one tracker or a list; apply the initial state and return the object. |
 | `scene:track(tracker, value, duration, curve?)`<br />`scene:track(tracker, value, timing)`<br />`scene:track(moves, duration, curve?)`<br />`scene:track(moves, timing)` | `scene.track(tracker, value, duration, curve?)`<br />`scene.track(tracker, value, timing)`<br />`scene.track(moves, duration, curve?)`<br />`scene.track(moves, timing)` | Move one tracker, or a list of tracker/value pairs, while baking bound states at scene fps. |
 
-Bindings accept the [animation descriptor properties](../Animation/index.md) except `position`, `arc`, `text`, `retype`, and `layer`. One object has one binding; different trackers can overlap on shared objects, but one tracker cannot run overlapping tracks.
+Bindings accept the [animation descriptor properties](../Animation/index.md) except `position`, `arc`, `text`, `retype`, `sweep`, and `layer`. One object has one binding; different trackers can overlap on shared objects, but one tracker cannot run overlapping tracks.
 
 ## Examples
 

@@ -399,7 +399,7 @@ struct VisualState
     const char* text = nullptr;
     const char* textFrom = nullptr;
     float textProgress = 1.0f;
-    TextChange textChange = TextChange::Sweep;
+    TextChange textChange = TextChange::Fade;
     // The object's own draw layer. world() adds how far the groups above it moved theirs.
     int32_t layer = 0;
     // The points that define the shape (see AnimationTarget::geometry): geometry, on its way
@@ -451,6 +451,8 @@ void plotSamplesAt(const VisualState& state, Vec3* points) noexcept;
 // change has reached. When the string has to be written, value points into written, which
 // the caller deletes; otherwise written is null.
 Result shown(const Text* text, const VisualState& state, const char*& value, char*& written) noexcept;
+// The opacity of a whole-string fade, independent of the object's opacity channel.
+float textOpacity(const VisualState& state) noexcept;
 
 // The largest blur and shadow sigma, in screen pixels.
 static constexpr float EFFECT_SIGMA_LIMIT = 256.0f;

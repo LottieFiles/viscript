@@ -6,18 +6,40 @@ parent: animation
 
 # Text
 
-Text has its own ways to change over time. `write` only fades text in, so these usually read better.
+Use `tween` to replace a string, `retype` to type it, or `value` to count numbers.
+
+## Replacing text
+
+Playing a new `text` fades out the old whole string, then fades in the new one. The text handle and styling stay the same.
+
+```lua live
+local scene = vis.scene {}
+
+local line = scene:text {text = "VISCRIPT", size = 42, fill = "accent"}
+scene:tween({target = line, text = "Hello, API"}, 1.4)
+
+return scene
+```
+
+```js live
+const scene = vis.scene();
+
+const line = scene.text({text: "VISCRIPT", size: 42, fill: "accent"});
+scene.tween({target: line, text: "Hello, API"}, 1.4);
+
+return scene;
+```
 
 ## Typing
 
-Playing a new `text` types it character by character. With `retype = true` it first erases back to the shared prefix (`Hello, `), then types the rest.
+Use `retype = true` / `retype: true` to erase back to the shared prefix (`Hello, `), then type the rest. Set it when typing from an empty string too.
 
 ```lua live
 local scene = vis.scene {}
 
 local line = scene:text {text = "", point = {-4, 0}, align = {0, 0.5}, size = 40}
 
-scene:tween({target = line, text = "Hello, viscript"}, 1.2, "linear")
+scene:tween({target = line, text = "Hello, viscript", retype = true}, 1.2, "linear")
 scene:wait(0.5)
 scene:tween({target = line, text = "Hello, world", retype = true}, 1, "linear")
 scene:wait(0.8)
@@ -30,10 +52,32 @@ const scene = vis.scene();
 
 const line = scene.text({text: "", point: [-4, 0], align: [0, 0.5], size: 40});
 
-scene.tween({target: line, text: "Hello, viscript"}, 1.2, "linear");
+scene.tween({target: line, text: "Hello, viscript", retype: true}, 1.2, "linear");
 scene.wait(0.5);
 scene.tween({target: line, text: "Hello, world", retype: true}, 1, "linear");
 scene.wait(0.8);
+
+return scene;
+```
+
+## Character sweep
+
+Use `sweep = true` / `sweep: true` for a stylized character sweep that temporarily mixes both strings. `sweep` and `retype` require `text` and cannot both be true.
+
+```lua live
+local scene = vis.scene {}
+
+local line = scene:text {text = "LOADING", size = 42, font = "JetBrainsMono", fill = "accent"}
+scene:tween({target = line, text = "SUCCESS", sweep = true}, 1.4, "linear")
+
+return scene
+```
+
+```js live
+const scene = vis.scene();
+
+const line = scene.text({text: "LOADING", size: 42, font: "JetBrainsMono", fill: "accent"});
+scene.tween({target: line, text: "SUCCESS", sweep: true}, 1.4, "linear");
 
 return scene;
 ```
@@ -94,7 +138,7 @@ return scene;
 
 ## Replacing a label
 
-`fade_transform` swaps one text for another in place — the usual way to step through a list of captions. Create the new text right before the call.
+`fade_transform` swaps two separate text objects in place, including their styles and layout. Create the new text right before the call.
 
 ```lua live
 local scene = vis.scene {}

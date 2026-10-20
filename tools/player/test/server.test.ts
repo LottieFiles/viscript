@@ -395,7 +395,7 @@ test("a binary that could not be fetched is fatal until one arrives", async () =
     stop();
 });
 
-test("a crossfade keeps the frame on screen and dissolves it into the new ones", async () => {
+test("a replay replaces the last frame immediately and draws nothing further while paused", async () => {
     const {send, canvas, next, serve} = fixture();
     const target = canvas();
     send({type: "init", wasm: WASM});
@@ -405,12 +405,11 @@ test("a crossfade keeps the frame on screen and dissolves it into the new ones",
     await next("loaded");
     stop();
     send({type: "frame", session: 1, seq: 2, frame: {time: 3.9, plan: PLAN}});
-    send({type: "frame", session: 1, seq: 3, frame: {time: 0, plan: PLAN, crossfade: 40}});
+    send({type: "frame", session: 1, seq: 3, frame: {time: 0, plan: PLAN}});
     await next("framed", (message) => message.seq === 3);
-    // The last frame is copied out, the new one drawn aside, and both composited on the canvas.
-    assert.deepEqual(target.calls, ["draw 3.9", "clear", "image", "image"]);
-    await new Promise((resolve) => setTimeout(resolve, 80));
-    assert.deepEqual(target.calls.slice(-2), ["clear", "image"], "the fade finishes on its own");
+    assert.deepEqual(target.calls, ["draw 3.9", "draw 0"]);
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    assert.deepEqual(target.calls, ["draw 3.9", "draw 0"], "only requested timeline frames are drawn");
 });
 
 test("camera moves apply in order before the frame is drawn; one the camera does not make changes nothing", async () => {

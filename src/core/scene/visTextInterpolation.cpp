@@ -156,6 +156,16 @@ static size_t _lerpText(const char* from, const char* to, double progress, TextC
     return static_cast<size_t>(at - output);
 }
 
+float textOpacity(const VisualState& state) noexcept
+{
+    if (state.textChange != TextChange::Fade || !state.textFrom || !state.text
+        || state.textFrom == state.text || std::strcmp(state.textFrom, state.text) == 0) return 1.0f;
+    auto progress = std::fmin(1.0f, std::fmax(0.0f, state.textProgress));
+    if (!*state.textFrom) return progress;
+    if (!*state.text) return 1.0f - progress;
+    return std::fabs(1.0f - 2.0f * progress);
+}
+
 Result shown(const Text* text, const VisualState& state, const char*& value, char*& written) noexcept
 {
     value = text->text();
@@ -179,6 +189,10 @@ Result shown(const Text* text, const VisualState& state, const char*& value, cha
     if (!state.textFrom || state.textFrom == state.text || state.textProgress >= 1.0f) return Result::Success;
     if (state.textProgress <= 0.0f) {
         value = state.textFrom;
+        return Result::Success;
+    }
+    if (state.textChange == TextChange::Fade) {
+        if (*state.textFrom && (!*state.text || state.textProgress < 0.5f)) value = state.textFrom;
         return Result::Success;
     }
     auto fromLength = std::strlen(state.textFrom);

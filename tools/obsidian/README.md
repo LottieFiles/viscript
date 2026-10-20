@@ -54,7 +54,7 @@ Words after the code block's language, or in the embed's alias, set options:
 | Words | Option |
 |---|---|
 | `600` | Width in pixels; the scene keeps its proportions |
-| `loop`, `crossfade`, `once` or `stop` | What happens at the end |
+| `loop`, `once` or `stop` | What happens at the end |
 | `autoplay` or `play`, `paused` or `still` | Whether the scene plays as soon as it is seen |
 | `controls`, `nocontrols` | Always show the play bar, or hide it |
 | `left`, `center`, `right` | Alignment |
@@ -145,7 +145,7 @@ plugin stays off the network.
 | Setting | |
 |---|---|
 | Autoplay | Play scenes as soon as they appear; scenes start paused when the system asks for reduced motion |
-| At the end | Replay, seamlessly where the scene loops, fading into the start or at once; or stop on the last frame |
+| At the end | Replay at once (the default), or stop on the last frame |
 | Controls | The play bar on hover, always, or never |
 | Show source | Show each note player's script by default; its code button can also show or hide it |
 | Frame rate | Up to 60 frames a second (30 on phones), or 30, 24 or 15 |

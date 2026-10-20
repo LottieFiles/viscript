@@ -63,7 +63,7 @@ const host = createRenderHost({
 const player = new VisPlayer({
     host, container: document.querySelector("#figure"),
     resources: (source, language) => catalog.resources(source, language),
-    end: "crossfade",
+    end: "loop",
 });
 player.addEventListener("error", ({detail}) => console.warn(detail.phase, detail.message));
 player.load({source: luaSource, language: "lua", name: "scene.lua"});
@@ -100,7 +100,7 @@ bundles the sources, as the Obsidian plugin does, imports the other modules itse
 
 `new VisPlayer({host, canvas | container, resources, …})` takes a canvas, or makes one in
 `container`; `resources` lists the images each scene loads. Options: `autoplay`, `end`
-(`"auto"`, `"loop"`, `"crossfade"`, `"stop"`), `rate` (0.125 to 8), `camera`, `maxFps`,
+(`"loop"` by default, or `"stop"` to hold the last frame), `rate` (0.125 to 8), `camera`, `maxFps`,
 `quality` (`"auto"` or `"high"`), `maxRatio`, `interactive`, `audio`, `theme` (colors for scenes
 that adapt to the host), `label`, `releaseDelay` (2000 milliseconds out of view before the engine
 is freed; `Infinity` keeps it) and `rootMargin`. A click on the canvas plays or pauses the scene,

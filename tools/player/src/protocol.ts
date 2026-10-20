@@ -91,8 +91,6 @@ export interface FrameRequest {
     readonly advance?: number;
     /** Release every held key and button first, as after the canvas lost focus. */
     readonly releaseInput?: boolean;
-    /** Dissolve the frame on screen into this one over so many milliseconds. */
-    readonly crossfade?: number;
     /** Camera moves, applied in order before the frame is drawn. */
     readonly camera?: readonly CameraMove[];
     /** Where the scene's sound should be; sent once the browser lets the page play audio. */

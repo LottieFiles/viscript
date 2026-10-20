@@ -1082,9 +1082,8 @@ interface AnimationProperties {
     /** With `fn` or `points`, the x where a plot's new graph must not join; the plot keeps them. */
     discontinuities: readonly number[];
     /**
-     * The string a `text` or `label` changes into: from the left, characters turn into the new
-     * string's while the length moves to its length. It is a property of its own, so a move,
-     * fade or recolor may run beside it.
+     * The string a `text` or `label` changes into: the old string fades out, then the new
+     * string fades in. A move, opacity change or recolor may run beside it.
      */
     text: string;
     /**
@@ -1099,8 +1098,15 @@ type AtLeastOne<T> = {
     [Key in keyof T]: Required<Pick<T, Key>> & Partial<Omit<T, Key>>
 }[keyof T];
 
-/** `retype: true` erases back to the beginning both strings share, then types the rest. */
-type TextChoice = {retype?: never} | {text: string; retype?: boolean};
+/**
+ * Text fades by default. `sweep: true` sweeps characters while the length
+ * moves to the new string's. `retype: true` erases to the shared prefix, then types the rest.
+ * Either option requires text, and both cannot be true.
+ */
+type TextChoice =
+    {retype?: never; sweep?: never} |
+    {text: string; retype?: false; sweep?: boolean} |
+    {text: string; retype?: boolean; sweep?: false};
 
 export type AnimationSpec = {target: ObjectHandle} & AtLeastOne<AnimationProperties> & TextChoice & (
     {shift?: WorldVector; transform?: never; position?: never; arc?: never} |

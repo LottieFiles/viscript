@@ -17,11 +17,10 @@ import {schedulerFor, type Scheduler, type Tickable} from "./scheduler.ts";
 export type PlayerState = "loading" | "playing" | "paused" | "stopped" | "frozen" | "error" | "destroyed";
 
 /**
- * What happens at the end of the timeline. "loop" wraps at once, for scenes that end where they
- * start; "crossfade" replays with the last frame dissolving over the start; "stop" holds the last
- * frame. "auto" loops scenes that declare `loop` and crossfades the others.
+ * What happens at the end of the timeline. "loop" restarts immediately; "stop" holds the last
+ * frame.
  */
-export type EndBehavior = "auto" | "loop" | "crossfade" | "stop";
+export type EndBehavior = "loop" | "stop";
 
 export interface PlayerScene {
     readonly source: string;
@@ -34,6 +33,7 @@ export interface PlayerScene {
 }
 
 export interface PlaybackOptions {
+    /** Restart immediately at the end, or hold the last frame; "loop" unless given. */
     readonly end?: EndBehavior;
     /** How fast the timeline and the retained runtime run, from 0.125 to 8; 1 unless given. */
     readonly rate?: number;
@@ -147,8 +147,6 @@ interface Scene {
 }
 
 const PLACEHOLDER_SIZE = [960, 540] as const;
-// Milliseconds a crossfade replay takes.
-const CROSSFADE = 700;
 const NO_RESOURCES: SceneResources = {assets: []};
 // The rates the runtime's audio takes.
 const MIN_RATE = 0.125, MAX_RATE = 8;
@@ -202,7 +200,6 @@ export class VisPlayer extends EventTarget implements Tickable {
     #input: InputEvent[] = [];
     #advance = 0;
     #releaseInput = false;
-    #crossfadeNext = false;
     #cameraMoves: CameraMove[] = [];
     #cameraView: "2d" | "3d" = "2d";
     /** The page may play audio, after a click or a key press. */
@@ -227,7 +224,7 @@ export class VisPlayer extends EventTarget implements Tickable {
         this.#releaseDelay = options.releaseDelay ?? 2000;
         this.#rootMargin = options.rootMargin ?? "0px";
         this.#playing = options.autoplay ?? true;
-        this.#playback = {end: "auto", rate: 1, camera: false, quality: "auto", maxRatio: 3};
+        this.#playback = {end: "loop", rate: 1, camera: false, quality: "auto", maxRatio: 3};
 
         let canvas = options.canvas;
         if (!canvas) {
@@ -509,7 +506,7 @@ export class VisPlayer extends EventTarget implements Tickable {
 
     #step(elapsed: number, duration: number): void {
         let time = this.#time + elapsed;
-        if (this.#range || this.#endBehavior() === "stop") {
+        if (this.#range || this.#playback.end === "stop") {
             const end = this.#end(duration);
             if (time >= end) {
                 this.#time = end;
@@ -518,17 +515,10 @@ export class VisPlayer extends EventTarget implements Tickable {
             }
         } else if (time >= duration) {
             time %= duration;
-            if (this.#endBehavior() === "crossfade") this.#crossfadeNext = true;
             this.#audioSeek = true;
             this.#emit("loop");
         }
         this.#time = time;
-    }
-
-    #endBehavior(): Exclude<EndBehavior, "auto"> {
-        const end = this.#playback.end;
-        if (end !== "auto") return end;
-        return this.#info?.loop ? "loop" : "crossfade";
     }
 
     #complete(): void {
@@ -554,7 +544,6 @@ export class VisPlayer extends EventTarget implements Tickable {
             ...(this.#live ? {advance: this.#advance} : {}),
             ...(this.#input.length ? {input: this.#input} : {}),
             ...(this.#releaseInput ? {releaseInput: true} : {}),
-            ...(this.#crossfadeNext ? {crossfade: CROSSFADE} : {}),
             ...(this.#cameraMoves.length ? {camera: this.#cameraMoves} : {}),
             ...(this.#plays() && this.#audioAllowed
                 ? {audio: {playing: this.#playing, rate: this.#playback.rate, seek: this.#audioSeek}} : {}),
@@ -562,7 +551,6 @@ export class VisPlayer extends EventTarget implements Tickable {
         this.#input = [];
         this.#advance = 0;
         this.#releaseInput = false;
-        this.#crossfadeNext = false;
         this.#cameraMoves = [];
         if (frame.audio) this.#audioSeek = false;
         this.#session.frame(frame);

@@ -118,7 +118,9 @@ Positional duration and curve calls remain supported.
 | Replacement | `morph`, `fadeTransform`, `matchTransform`, `transition` |
 | State | `tween`, `set`, `save`, `restore`, `clone`, `warp`, `remove` |
 
-`tween` accepts property descriptors with a target; `set` applies them immediately. `shift` is relative and `transform` is absolute; `position` moves the center of the target's bounds to a point in its parent's space, from wherever earlier clips left it. A descriptor takes only one of the three, and a bound state cannot use `position`. `arc` bends movement, `lag` offsets successive targets, and `retype` erases text to its shared prefix before typing the new suffix. `save`/`restore` keep target state stacks.
+`tween` accepts property descriptors with a target; `set` applies them immediately. `shift` is relative and `transform` is absolute; `position` moves the center of the target's bounds to a point in its parent's space, from wherever earlier clips left it. A descriptor takes only one of the three, and a bound state cannot use `position`. `arc` bends movement and `lag` offsets successive targets. `save`/`restore` keep target state stacks.
+
+Playing `text` fades out the whole old string, then fades in the whole replacement. `retype: true` erases to the shared prefix before typing the new suffix; use it when typing from an empty string too. `sweep: true` opts into a character sweep that mixes both strings. Both flags require `text` and cannot both be true. Numeric `value` still interpolates continuously.
 
 ```js
 definition.tween({target: vector, shift: [1, 0], stroke: "success"}, 1, "smooth");
@@ -127,6 +129,12 @@ definition.parallel(
     (scene) => scene.shift(vector, [-1, 0], 1),
     (scene) => scene.fade(vector, 0.5, 1),
 );
+```
+
+```js
+definition.tween({target: caption, text: "Ready to play"}, 1);
+definition.tween({target: caption, text: "Ready to export", retype: true}, 1);
+definition.tween({target: caption, text: "EXPORTED", sweep: true}, 1);
 ```
 
 `morph` resamples outlines to turn source into target; contour `pairs` override automatic matching. `{copy: true}` preserves the source. `clone` snapshots a family at the current time. `fadeTransform` cross-fades source into target; `transition` cross-fades without consuming it. `matchTransform` carries matching text, TeX, and optional shapes, with arc or path detours and independent unmatched fades.

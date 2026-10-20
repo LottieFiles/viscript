@@ -295,6 +295,7 @@ Result Scene::Impl::contourPlacements(const Plot* plot, float time, ContourPlace
                 VisualState textState;
                 auto textEntry = entry(text);
                 if (!textEntry || !sample(*textEntry, time, textState)) continue;
+                if (textOpacity(textState) <= 0.0f) continue;
                 textState.value = static_cast<float>(grid.level);
                 const char* value;
                 char* written;

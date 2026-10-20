@@ -19,7 +19,6 @@ export interface SceneOptions {
 
 const WORDS: Readonly<Record<string, Partial<SceneOptions>>> = {
     loop: {end: "loop"},
-    crossfade: {end: "crossfade"},
     once: {end: "stop"},
     stop: {end: "stop"},
     autoplay: {autoplay: true},

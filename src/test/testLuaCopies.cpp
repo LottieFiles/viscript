@@ -25,7 +25,7 @@ s:clone(row, {id = "pair", stroke = "#ff0000", shift = {0, -2}, opacity = 0.5})
 local inside = s:clone(a, {parent = twin})
 if inside ~= s:find("row/a:copy") or #twin:children() ~= 3 then error("the given parent") end
 s:clone(word, {id = "masked", mask = r})
-s:tween({{target = word, text = "horse"}, {target = n, value = 100}, {target = a, shift = {2, 0}}}, 1, "linear")
+s:tween({{target = word, text = "horse", sweep = true}, {target = n, value = 100}, {target = a, shift = {2, 0}}}, 1, "linear")
 s:at(0.5, function()
     s:clone(word, {id = "half"})
     s:clone(n, {id = "count"})

@@ -215,10 +215,13 @@ scene:create(path, 0.8, "linear")
 scene:fill_reveal(path, 0.35, "ease_out")
 ```
 
-A plain Text can animate to another string; `retype=true` erases their differing
-suffix and types the replacement. Geometry descriptors change retained points or
-resample a function plot. `warp` bakes a point map into geometry and animates each
-point toward its image.
+A plain Text changes strings by fading out the whole old string, then fading in
+the whole replacement. `retype=true` erases to their shared prefix and types the
+new suffix; use it with an empty source for typing. `sweep=true` opts into a
+character sweep that mixes both strings. Both flags require `text` and cannot
+both be true. Numeric `value` still interpolates continuously. Geometry descriptors
+change retained points or resample a function plot. `warp` bakes a point map into
+geometry and animates each point toward its image.
 
 ## Replacement and matching
 

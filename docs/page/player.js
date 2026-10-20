@@ -89,7 +89,7 @@ export function setLang(next) {
 
 const STACK_LINES = 15;
 
-export function createPlayer(el, source, {js = null, editable = false, name = "scene.lua", loop = false, interactive = false, clips = [], maxRatio = 3, maxFps, quality = "auto"} = {}) {
+export function createPlayer(el, source, {js = null, editable = false, name = "scene.lua", interactive = false, clips = [], maxRatio = 3, maxFps, quality = "auto"} = {}) {
   const originals = {lua: source, js};
   let mine = js && lang === "js" ? "js" : "lua";
   let code = themeAdapt(originals[mine]), debounce = 0;
@@ -109,11 +109,10 @@ export function createPlayer(el, source, {js = null, editable = false, name = "s
   canvas.width = 960; canvas.height = 540;
   const err = $(".err", el), scrub = $("input", el), timeEl = $(".t", el), pp = $(".pp", el), bar = $(".progress", el);
 
-  // Sections play once and hold their last frame; whole scenes replay, the last frame dissolving
-  // over the restart, unless they loop seamlessly.
+  // Sections hold their last frame; whole scenes replay immediately.
   const player = new VisPlayer({
     host: host(), canvas, resources: (text, language) => catalog.resources(text, language), theme: siteTheme,
-    autoplay: !clips.length, end: loop ? "loop" : "crossfade", interactive, maxFps, quality, maxRatio,
+    autoplay: !clips.length, end: "loop", interactive, maxFps, quality, maxRatio,
     label: name.replace(/\.lua$/, "").replace(/[-_]/g, " ") + " animation",
   });
   const load = () => {

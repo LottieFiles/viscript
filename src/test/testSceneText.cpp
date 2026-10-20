@@ -215,8 +215,91 @@ static void _textChange(const char* from, const char* to, TextChange change, con
     delete scene;
 }
 
+static void _fadingText(Renderer* renderer)
+{
+    Config config;
+    config.width = 320;
+    config.height = 180;
+    const char* from[] = {"old sentence", "", "old sentence", "same sentence"};
+    const char* to[] = {"new sentence", "new sentence", "", "same sentence"};
+    for (auto example = 0u; example < 4u; example++) {
+        auto scene = Scene::gen(config);
+        auto text = Text::gen(from[example]);
+        CHECK(scene && text && scene->add(text) == Result::Success);
+        if (!scene || !text) { delete scene; delete text; continue; }
+        auto linear = AnimCurve::preset(AnimCurvePreset::Linear);
+        CHECK(scene->play(AnimationTarget::from(text).text(to[example]), 1.0f, linear) == Result::Success);
+        // Opacity and motion remain independent of the content transition.
+        CHECK(scene->seek(0.0f) == Result::Success);
+        CHECK(scene->play(AnimationTarget::from(text).opacity(0.5f).shift({1.0f, 0.0f, 0.0f}), 1.0f, linear)
+              == Result::Success);
+        // Sample out of order as a player does after scrubbing.
+        const float times[] = {1.0f, 0.25f, 0.5f, 0.0f, 0.75f};
+        for (auto time : times) {
+            auto value = example == 0u ? (time < 0.5f ? from[example] : to[example])
+                       : example == 1u ? (time == 0.0f ? "" : to[example])
+                       : example == 2u ? (time == 1.0f ? "" : from[example]) : from[example];
+            auto alpha = example == 0u ? std::fabs(1.0f - 2.0f * time)
+                       : example == 1u ? time : example == 2u ? 1.0f - time : 1.0f;
+            CHECK(std::strcmp(_shown(scene, text, time), value) == 0);
+            auto expected = Scene::gen(config);
+            auto still = Text::gen(value);
+            CHECK(expected && still);
+            if (!expected || !still) { delete expected; delete still; continue; }
+            still->opacity = (1.0f - time * 0.5f) * alpha;
+            still->model = Mat4::translate({time, 0.0f, 0.0f});
+            CHECK(expected->add(still) == Result::Success);
+            Surface actual, reference;
+            CHECK(renderer->render(scene, time, actual) == Result::Success);
+            CHECK(renderer->render(expected, 0.0f, reference) == Result::Success);
+            CHECK(checksum(actual) == checksum(reference));
+            BBox bounds;
+            CHECK(renderer->bounds(scene, text, time, bounds)
+                  == (alpha == 0.0f || !*value ? Result::InsufficientCondition : Result::Success));
+            delete expected;
+        }
+        if (example == 0u) {
+            for (auto time : {0.25f, 0.5f, 0.75f}) {
+                CHECK(scene->seek(time) == Result::Success);
+                Object* copy = nullptr;
+                CHECK(scene->clone(text, copy) == Result::Success);
+                auto value = time < 0.5f ? from[example] : to[example];
+                CHECK(copy && std::strcmp(static_cast<Text*>(copy)->text(), value) == 0);
+                CHECK(copy && near(copy->opacity, (1.0f - time * 0.5f) * std::fabs(1.0f - 2.0f * time))
+                      && near(copy->model.e[3], time));
+            }
+        }
+        delete scene;
+    }
+    // Text effects must disappear with their source at the replacement midpoint.
+    auto scene = Scene::gen(config);
+    auto text = Text::gen("old sentence");
+    text->blur = 1.0f;
+    text->shadow = {Color{0, 0, 0, 255}, {8.0f, 8.0f}, 2.0f};
+    CHECK(scene->add(text) == Result::Success);
+    CHECK(scene->play(AnimationTarget::from(text).text("new sentence"), 1.0f,
+                      AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
+    Surface midpoint;
+    CHECK(renderer->render(scene, 0.25f, midpoint) == Result::Success);
+    CHECK(extent(midpoint, config.background).valid);
+    CHECK(renderer->render(scene, 0.5f, midpoint) == Result::Success);
+    CHECK(!extent(midpoint, config.background).valid);
+    // The same fade applies when the text itself supplies an alpha mask.
+    auto card = Rectangle::gen({}, {8.0f, 4.0f});
+    card->fill(Color{255, 0, 0, 255});
+    CHECK(scene->seek(0.0f) == Result::Success && scene->add(card) == Result::Success);
+    CHECK(card->mask(text) == Result::Success);
+    CHECK(renderer->render(scene, 0.25f, midpoint) == Result::Success);
+    CHECK(extent(midpoint, config.background).valid);
+    CHECK(renderer->render(scene, 0.5f, midpoint) == Result::Success);
+    CHECK(!extent(midpoint, config.background).valid);
+    delete scene;
+}
+
 void textChanges(Renderer* renderer)
 {
+    _fadingText(renderer);
+    _textChange("old sentence", "new sentence", TextChange::Fade, "old sentence", "new sentence", "new sentence");
     // Sweep replaces characters from the left; shortening removes them from the right.
     _textChange("cat", "horse", TextChange::Sweep, "hat", "hots", "horse");
     _textChange("horse", "cat", TextChange::Sweep, "horse", "hors", "hat");
@@ -265,14 +348,14 @@ void textChanges(Renderer* renderer)
     CHECK(std::strcmp(label->text(), "cat") == 0 && std::strcmp(_shown(scene, label, 0.0f), "cat") == 0);
     CHECK(label->texts(nullptr, 0u) == 1u);
     // Text content is a channel of its own: a move, a fade and a recolor run beside it.
-    AnimationTarget beside[] = {AnimationTarget::from(label).text("horse"),
-                                AnimationTarget::from(left).text("horse"),
+    AnimationTarget beside[] = {AnimationTarget::from(label).text("horse", TextChange::Sweep),
+                                AnimationTarget::from(left).text("horse", TextChange::Sweep),
                                 AnimationTarget::from(circle).fill({255, 0, 0, 255})};
     CHECK(scene->play(beside, 3u, 1.0f, linear) == Result::Success);
     CHECK(scene->seek(0.0f) == Result::Success);
     CHECK(scene->play(AnimationTarget::from(label).shift({1.0f, 0.0f, 0.0f}).opacity(0.5f), 1.0f, linear)
           == Result::Success);
-    CHECK(scene->play(AnimationTarget::from(label).fill({0, 0, 255, 255}).text("cat"), 1.0f, linear)
+    CHECK(scene->play(AnimationTarget::from(label).fill({0, 0, 255, 255}).text("cat", TextChange::Sweep), 1.0f, linear)
           == Result::Success);
     CHECK(std::strcmp(_shown(scene, label, 0.5f), "hots") == 0);
     CHECK(std::strcmp(_shown(scene, label, 1.5f), "hors") == 0);

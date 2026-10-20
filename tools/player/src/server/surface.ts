@@ -17,51 +17,25 @@ function resize(canvas: Canvas, width: number, height: number): void {
     if (canvas.height !== height) canvas.height = height;
 }
 
-// A smoothstep, near the CSS `ease` curve, which a ghost of the previous frame fades out along.
-const ease = (t: number): number => t * t * (3 - 2 * t);
-
-interface Ghost {
-    readonly canvas: Canvas;
-    readonly start: number;
-    readonly duration: number;
-}
-
 export class Surface {
     readonly #canvas: Canvas;
     readonly #scratch: () => Canvas;
     /** The integer-scale WASM raster, before it is resampled to the backing store. */
     #source: Canvas | null = null;
     #half: Canvas | null = null;
-    /** The newest frame, kept apart while a ghost fades over it. */
-    #frame: Canvas | null = null;
-    #ghost: Ghost | null = null;
-    #timer: ReturnType<typeof setTimeout> | undefined;
 
     constructor(canvas: Canvas, scratch: () => Canvas) {
         this.#canvas = canvas;
         this.#scratch = scratch;
     }
 
-    /**
-     * Draws `engine` at `time`. With `crossfade`, the frame on screen is kept and dissolved into
-     * the new ones over that many milliseconds, so a replay starts without a cut.
-     */
-    present(engine: VisScene, time: number, plan: FramePlan, crossfade = 0): void {
-        if (crossfade > 0 && this.#canvas.width > 0 && this.#canvas.height > 0) this.#hold(crossfade);
-        if (!this.#ghost) {
-            this.#draw(engine, time, plan, this.#canvas);
-            return;
-        }
-        this.#frame ??= this.#scratch();
-        this.#draw(engine, time, plan, this.#frame);
-        this.#composite();
+    /** Draws `engine` at `time`, replacing the frame on screen immediately. */
+    present(engine: VisScene, time: number, plan: FramePlan): void {
+        this.#draw(engine, time, plan, this.#canvas);
     }
 
     dispose(): void {
-        clearTimeout(this.#timer);
-        this.#timer = undefined;
-        this.#ghost = null;
-        this.#source = this.#half = this.#frame = null;
+        this.#source = this.#half = null;
     }
 
     // WASM rasterizes at a positive integer scale only. When that is not the backing store's
@@ -97,37 +71,5 @@ export class Surface {
         // otherwise show the frame before it.
         ctx.clearRect(0, 0, width, height);
         ctx.drawImage(from, 0, 0, fromWidth, fromHeight, 0, 0, width, height);
-    }
-
-    #hold(duration: number): void {
-        const ghost = this.#ghost?.canvas ?? this.#scratch();
-        resize(ghost, this.#canvas.width, this.#canvas.height);
-        const ctx = context(ghost);
-        ctx.clearRect(0, 0, ghost.width, ghost.height);
-        ctx.drawImage(this.#canvas, 0, 0);
-        this.#ghost = {canvas: ghost, start: performance.now(), duration};
-    }
-
-    // The fade finishes on its own clock: a paused player sends no more frames, and the ghost
-    // must not stay half visible.
-    #composite(): void {
-        const ghost = this.#ghost, frame = this.#frame;
-        if (!ghost || !frame) return;
-        const progress = Math.min(1, (performance.now() - ghost.start) / ghost.duration);
-        resize(this.#canvas, frame.width, frame.height);
-        const ctx = context(this.#canvas);
-        ctx.clearRect(0, 0, frame.width, frame.height);
-        ctx.drawImage(frame, 0, 0);
-        if (progress >= 1) {
-            this.#ghost = null;
-            return;
-        }
-        ctx.globalAlpha = 1 - ease(progress);
-        ctx.drawImage(ghost.canvas, 0, 0, frame.width, frame.height);
-        ctx.globalAlpha = 1;
-        this.#timer ??= setTimeout(() => {
-            this.#timer = undefined;
-            this.#composite();
-        }, 16);
     }
 }

@@ -76,7 +76,6 @@ test("merging keeps the newest time and plan and queues input and runtime steps"
     assert.deepEqual(merge(older, newer), {time: 2, plan: {...PLAN, width: 320},
         input: [{type: "keydown", key: "A"}, {type: "keyup", key: "A"}], advance: 0.1 + 0.2});
     assert.deepEqual(merge(null, newer), newer);
-    assert.deepEqual(merge({time: 1, plan: PLAN, crossfade: 700}, {time: 0, plan: PLAN}), {time: 0, plan: PLAN, crossfade: 700});
 });
 
 test("merging queues camera moves, and keeps a jump in the sound for the frame that follows it", () => {

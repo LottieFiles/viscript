@@ -739,12 +739,16 @@ local word = s:text {text = "cat", point = {0, 1}, size = 24, id = "word"}
 local box = s:rectangle {size = {1, 1}, id = "box"}
 box:label {text = "Hello world", point = {0, -1}, size = 18, id = "tag"}
 local start = s:text {text = "x", point = {0, -2}, size = 18, id = "start"}
+local sentence = s:text {text = "VISCRIPT", size = 18, id = "sentence"}
+local defaults = s:text {text = "old words", size = 18, id = "defaults"}
 s:set {target = start, text = "abc"}
-s:tween({{target = word, text = "horse", shift = {1, 0}},
-        {target = s:find("tag"), text = "Hello there", retype = true}}, 1, "linear")
+s:tween({{target = word, text = "horse", shift = {1, 0}, sweep = true, retype = false},
+        {target = s:find("tag"), text = "Hello there", retype = true, sweep = false},
+        {target = sentence, text = "Hello, API"},
+        {target = defaults, text = "new words", retype = false, sweep = false}}, 1, "linear")
 s:at(0.5, function() s:fade(word, 0.5, 1) end)
 s:set {target = start, text = "done"}
-s:tween({target = word, text = ""}, 1, "linear")
+s:tween({{target = word, text = "", sweep = true}, {target = sentence, text = ""}}, 1, "linear")
 return s
 )lua";
     auto scene = _loaded(source, "text.lua");
@@ -760,6 +764,15 @@ return s
         CHECK(std::strcmp(_shows(scene, "tag", 0.25f), "Hello wor") == 0);
         CHECK(std::strcmp(_shows(scene, "tag", 0.5f), "Hello ") == 0);
         CHECK(std::strcmp(_shows(scene, "tag", 0.75f), "Hello th") == 0);
+        // The default fade keeps each sentence whole, including when neither optional mode is chosen.
+        CHECK(std::strcmp(_shows(scene, "sentence", 0.0f), "VISCRIPT") == 0);
+        CHECK(std::strcmp(_shows(scene, "sentence", 0.25f), "VISCRIPT") == 0);
+        CHECK(std::strcmp(_shows(scene, "sentence", 0.75f), "Hello, API") == 0);
+        CHECK(std::strcmp(_shows(scene, "sentence", 1.0f), "Hello, API") == 0);
+        CHECK(std::strcmp(_shows(scene, "sentence", 1.5f), "Hello, API") == 0);
+        CHECK(std::strcmp(_shows(scene, "sentence", 2.0f), "") == 0);
+        CHECK(std::strcmp(_shows(scene, "defaults", 0.25f), "old words") == 0);
+        CHECK(std::strcmp(_shows(scene, "defaults", 0.75f), "new words") == 0);
         // set gives the starting string before the timeline and switches it at the cursor after.
         CHECK(std::strcmp(_shows(scene, "start", 0.0f), "abc") == 0);
         CHECK(std::strcmp(_shows(scene, "start", 0.99f), "abc") == 0);
@@ -791,12 +804,26 @@ return s
                  "retype needs text");
     _scriptError("local s=vis.scene{}; local t=s:text{text='a'}; s:tween({target=t, text='b', retype=1}, 1); return s",
                  "retype must be a boolean");
+    _scriptError("local s=vis.scene{}; local t=s:text{text='a'}; s:tween({target=t, opacity=0, retype=false}, 1); "
+                 "return s", "retype needs text");
+    _scriptError("local s=vis.scene{}; local t=s:text{text='a'}; s:tween({target=t, opacity=0, sweep=true}, 1); "
+                 "return s", "sweep needs text");
+    _scriptError("local s=vis.scene{}; local t=s:text{text='a'}; s:tween({target=t, opacity=0, sweep=false}, 1); "
+                 "return s", "sweep needs text");
+    _scriptError("local s=vis.scene{}; local t=s:text{text='a'}; s:tween({target=t, text='b', sweep=1}, 1); return s",
+                 "sweep must be a boolean");
+    _scriptError("local s=vis.scene{}; local t=s:text{text='a'}; "
+                 "s:tween({target=t, text='b', retype=true, sweep=true}, 1); return s",
+                 "retype and sweep cannot both be true");
     _scriptError("local s=vis.scene{}; local t=s:text{text='a'}; s:tween({target=t, text='b'}, 2); "
                  "s:at(1, function() s:tween({target=t, text='c'}, 1) end); return s",
                  "already animates its text until 2.00 s");
     _scriptError("local s=vis.scene{}; local x=s:tracker(0); local t=s:text{text='7'}; "
                  "s:bind(t, x, function(v) return {text='a'} end); return s",
                  "a bound state cannot set 'text'");
+    _scriptError("local s=vis.scene{}; local x=s:tracker(0); local t=s:text{text='7'}; "
+                 "s:bind(t, x, function(v) return {sweep=true} end); return s",
+                 "a bound state cannot set 'sweep'");
     _scriptError("local s=vis.scene{}; local r=s:spans{'a ', 'b', size=28}; s:tween({target=r, text='c'}, 1); "
                  "return s",
                  "text changes one text, and a spans row or other block of texts holds several");
