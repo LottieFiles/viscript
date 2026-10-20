@@ -14,7 +14,6 @@ async function inflate(base64: string): Promise<ArrayBuffer> {
 const FONTS: Readonly<Record<ThemeRole, string>> = {
     text: embedded.textFont,
     code: embedded.codeFont,
-    serif: embedded.serifFont,
 };
 
 let wasm: Promise<ArrayBuffer> | null = null;

@@ -71,16 +71,16 @@ VIS_API VisResult vis_load_font(VisEngine engine, const char* name, const uint8_
 VIS_API const char* vis_missing_fonts(VisEngine engine);
 VIS_API VisResult vis_load_asset(VisEngine engine, const char* name, const uint8_t* data, uint32_t size,
                                        const char* mime);
-/* Host colors, as 0xRRGGBBAA, for the scenes loaded after it that use the adaptive_vscode theme;
-   dark picks the pro_black base over pro_white, and objects holds 1 to 10 object colors.
-   Headings and body text take the font list "Source Serif 4, Pretendard", and code
-   JetBrainsMono. */
+/* The host app's theme for the scenes loaded after it that use the adaptive theme: colors, as
+   0xRRGGBBAA, where dark picks the pro_black base over pro_white and objects holds 1 to 10 object
+   colors, and the font of headings and body text, a name or a comma list of up to 256 bytes, as
+   "Source Serif 4, Pretendard" for the VS Code viewer; NULL or "" keeps the base's Pretendard. */
 VIS_API VisResult vis_host_theme(VisEngine engine, uint8_t dark, uint32_t background, uint32_t foreground,
                                  uint32_t muted, uint32_t accent, uint32_t secondary, uint32_t success,
                                  uint32_t warning, uint32_t danger, uint32_t info, uint32_t surface,
                                  uint32_t line, uint32_t result, uint32_t focus, const uint32_t* objects,
-                                 uint32_t object_count);
-/* 1 when the loaded scene uses the adaptive_vscode theme, and so the host colors; else 0. */
+                                 uint32_t object_count, const char* font);
+/* 1 when the loaded scene uses the adaptive theme, and so the host's; else 0. */
 VIS_API uint8_t vis_adaptive_theme(VisEngine engine);
 /* Renders the frame at time, with pixel_ratio (1 or more) pixels for each scene pixel along each
    axis. */

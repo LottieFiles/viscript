@@ -4,7 +4,7 @@ A code block with Korean, which the bundled fonts have and the code font lacks:
 
 ```viscript loop
 local scene = vis.scene {
-    width = 640, height = 360, theme = "adaptive_vscode",
+    width = 640, height = 360, theme = "adaptive",
     camera = {view = "2d", target = {0, 0}, height = 7},
 }
 local ball = scene:circle {center = {-3, 0}, radius = 0.5, fill = "accent"}
@@ -23,7 +23,7 @@ An embedded scene file:
 A JavaScript scene:
 
 ```viscript-js center 520
-const scene = vis.scene({width: 640, height: 240, theme: "adaptive_vscode", camera: {view: "2d", target: [0, 0], height: 4}});
+const scene = vis.scene({width: 640, height: 240, theme: "adaptive", camera: {view: "2d", target: [0, 0], height: 4}});
 const dot = scene.circle({center: [-2, 0], radius: 0.4, fill: "accent"});
 scene.text({text: "JavaScript", point: [0, 1.3], size: 18});
 scene.growFromCenter(dot, 0.5).shift(dot, [4, 0], 1).wait(0.3);
@@ -34,7 +34,7 @@ Fonts the scene names, one in the font folder and one nowhere, and an image besi
 
 ```viscript
 local scene = vis.scene {
-    width = 640, height = 300, theme = "adaptive_vscode",
+    width = 640, height = 300, theme = "adaptive",
     camera = {view = "2d", target = {0, 0}, height = 6},
 }
 scene:text {text = "Pretendard Std from the folder", point = {0, 2.2}, size = 20, font = "Pretendard Std"}

@@ -73,7 +73,7 @@ export interface CameraTarget {
     far?: number;
 }
 
-export type ThemePreset = "pro_white" | "pro_black" | "adaptive_vscode";
+export type ThemePreset = "pro_white" | "pro_black" | "adaptive";
 export interface TextTheme {
     font?: string;
     size?: number;

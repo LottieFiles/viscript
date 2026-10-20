@@ -26,7 +26,7 @@ Requires VS Code 1.96 or newer.
 ```lua
 local scene = vis.scene {
     width = 960, height = 540, fps = 30, loop = false,
-    theme = "adaptive_vscode",
+    theme = "adaptive",
     camera = {view = "2d", height = 7},
 }
 local circle = scene:circle {radius = 1, fill = "accent", id = "circle"}
@@ -105,7 +105,7 @@ input:key_move {target = player, key = "D", shift = {0.5, 0}, period = 0.12}
 
 Interactive-camera scenes support drag to pan in 2D or orbit in 3D, Shift-drag to pan, arrows to pan, `+`/`-` to zoom, `2`/`3` to switch views, and `R` to reset. The viewer routes controls first and releases held input on focus loss.
 
-Relative `asset` and `texture` paths resolve beside the Lua file. The bundled runtime loads SVG and PNG images and WAV audio; JPG, WebP, MP3 and FLAC need a native build. The viewer has Pretendard, Source Serif 4, and JetBrainsMono, and registers each for the scenes that set text in it. `adaptive_vscode` uses the editor palette and semantic fonts; explicit scene themes and fonts remain authored choices.
+Relative `asset` and `texture` paths resolve beside the Lua file. The bundled runtime loads SVG and PNG images and WAV audio; JPG, WebP, MP3 and FLAC need a native build. The viewer has Pretendard, Source Serif 4, and JetBrainsMono, and registers each for the scenes that set text in it. `adaptive` takes the editor palette, and the viewer sets its headings and body text in Source Serif 4, with Korean in Pretendard; explicit scene themes and fonts remain authored choices.
 
 ## Completion and export
 

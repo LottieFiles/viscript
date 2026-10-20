@@ -10,8 +10,8 @@ This directory is a portable, optimized viscript 0.1.0 browser runtime. Keep all
 - This build enables the optional `tex` module: Lua `scene:tex{...}` and JavaScript `tex()` set TeX math as ordinary Objects in the Scene's fonts, and `{tex}` parts of `spans` set formulas inline.
 - Lua `grow_from_edge` and JavaScript `growFromEdge` keep a selected bounds edge fixed while revealing the perpendicular dimension.
 - Serve browser applications over HTTP so the module can fetch `vis-wasm.wasm`.
-- Register `Pretendard.ttf` as `Pretendard` before rendering body text; it also sets Korean text, including the Korean letters of the VS Code host roles, which name the list `Source Serif 4, Pretendard`.
-- Register `SourceSerif4-Semibold.ttf` as `Source Serif 4` for every semantic Text role in the VS Code host.
+- Register `Pretendard.ttf` as `Pretendard` before rendering body text; it also sets Korean text, including the Korean letters of the list `Source Serif 4, Pretendard` that the VS Code Viewer gives the `adaptive` theme.
+- Register `SourceSerif4-Semibold.ttf` as `Source Serif 4` when the host theme names it, as the VS Code Viewer's does.
 - Use `runtime.layoutReport(time, padding)` for root-pixel collision, clipping, stretch, and parent/child containment review across nested Viewports.
 - UI/Input, action maps, retained Lua runtime, audio, and interaction loops are documented by `vis-interactive`; this bundle README covers only mounting and rendering finished scenes.
 - In Node, pass the contents of `vis-wasm.wasm` as the `wasmBinary` module option.

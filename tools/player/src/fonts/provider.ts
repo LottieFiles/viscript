@@ -27,13 +27,10 @@ export interface FontProvider {
 
 /** The families the engine's themes set text in, which a host's provider answers for. */
 export const THEME_FONTS = {
-    /** Text and headings in every theme but adaptive_vscode, and the Korean letters of
-     * adaptive_vscode's text, which Source Serif 4 lacks. */
+    /** Text and headings in every theme, adaptive included unless its host names another font. */
     text: "Pretendard",
     /** Code, and the code text role, in every theme. */
     code: "JetBrainsMono",
-    /** Text in adaptive_vscode. */
-    serif: "Source Serif 4",
 } as const;
 
 /** "otf" for a font with CFF outlines, "ttf" for any other, from the font's first bytes. */

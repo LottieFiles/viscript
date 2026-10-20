@@ -20,7 +20,7 @@ Templates under `templates/` are working API starting points for each profile. `
 ## Route elsewhere
 
 - `vis-interactive`: UI/Input, retained runtime, audio, interactive state.
-- `vis-vscode`: Preview, manifests, CodeLens/hover, the `adaptive_vscode` host theme.
+- `vis-vscode`: Preview, manifests, CodeLens/hover, the VS Code host's `adaptive` theme.
 - `vis-animation-dev`: engine, bindings, builds, VS Code extension source.
 
 ## Author
@@ -29,7 +29,7 @@ Decide still, motion, or plate, and one Scene or a series, then write the narrat
 
 ## Review
 
-Use [review.md](references/review.md). Each round: `inspect` once, `audit` once over every frame (text only, no images), `layout` at each meaningful animation's start/end, `t=0`, and the exact final time, and a small set of selected images covering the subject and reported defects. Resolve `VIS_FONT` to the font the Theme's text roles name: Pretendard for the presets (`assets/wasm/Pretendard.ttf`), or the user's font. For code or the code text role, also resolve `VIS_CODE_FONT` to the bundled monospaced JetBrains Mono NL font (`assets/wasm/JetBrainsMono.ttf`). The VS Code Viewer sets `adaptive_vscode` headings and body text in Source Serif 4, so a Scene for it also gets the vis-vscode host review.
+Use [review.md](references/review.md). Each round: `inspect` once, `audit` once over every frame (text only, no images), `layout` at each meaningful animation's start/end, `t=0`, and the exact final time, and a small set of selected images covering the subject and reported defects. Resolve `VIS_FONT` to the font the Theme's text roles name: Pretendard for the presets (`assets/wasm/Pretendard.ttf`), or the user's font. For code or the code text role, also resolve `VIS_CODE_FONT` to the bundled monospaced JetBrains Mono NL font (`assets/wasm/JetBrainsMono.ttf`). The VS Code Viewer sets the `adaptive` theme's headings and body text in Source Serif 4, so a Scene for it also gets the vis-vscode host review.
 
 ```sh
 viscript inspect scene.lua --font "$VIS_FONT" --font "$VIS_CODE_FONT" # duration, objects

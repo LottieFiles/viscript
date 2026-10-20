@@ -486,7 +486,7 @@
       "loop": {"type": "boolean", "description": "Whether playback loops."},
       "background": {"type": "Color", "description": "Canvas background color."},
       "antialiasing": {"type": "boolean", "description": "Enable renderer antialiasing."},
-      "theme": {"type": "string|ThemeConfig", "description": "Built-in theme name (including adaptive_vscode in supporting IDE hosts) or custom theme."},
+      "theme": {"type": "string|ThemeConfig", "description": "Built-in theme name (pro_white, pro_black, or adaptive, which takes the host app's colors and font) or custom theme."},
       "camera": {"type": "CameraConfig", "description": "Camera view and interaction settings."}
     },
     "ThemeConfig": {

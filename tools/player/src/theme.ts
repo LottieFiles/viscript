@@ -1,9 +1,9 @@
-// Colors for scenes that follow the host's theme (theme = "adaptive_vscode" and the like), read
-// from the host's CSS custom properties. A color none of its properties give stays unset, and the
-// runtime takes its own light or dark one.
+// Colors for scenes that follow the host's theme (theme = "adaptive"), read from the host's CSS
+// custom properties. A color none of its properties give stays unset, and the runtime takes its
+// own light or dark one.
 import type {HostThemePalette} from "vis-wasm-bundle";
 
-type Color = Exclude<keyof HostThemePalette, "dark" | "objects">;
+type Color = Exclude<keyof HostThemePalette, "dark" | "objects" | "font">;
 
 /** For each color, the custom properties to try in order. */
 export type PaletteVariables = {readonly [K in Color]?: readonly string[]} & {

@@ -1541,7 +1541,7 @@ static void themeCorners()
     const Case cases[] = {
         {Theme::preset(ThemePreset::ProWhite), standard, -1.0f, 0.0f},
         {Theme::preset(ThemePreset::ProBlack), standard, -1.0f, 0.0f},
-        {Theme::preset(ThemePreset::AdaptiveVscode), standard, -1.0f, 0.0f},
+        {Theme::preset(ThemePreset::Adaptive), standard, -1.0f, 0.0f},
         {rounded(), standard, -1.0f, 0.12f},
         {rounded(), {2.0f, 3.0f}, -1.0f, 0.2f},
         {round, {2.0f, 1.0f}, -0.5f, 0.5f},

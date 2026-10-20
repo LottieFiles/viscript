@@ -15,9 +15,65 @@ Colour names such as `"accent"` resolve through it, so changing `theme` restyles
 |---|---|
 | `"pro_white"` | Light background; the default. |
 | `"pro_black"` | Dark background. |
-| `"adaptive_vscode"` | Colours from the VS Code editor theme; the preview rebuilds the scene when it changes. |
+| `"adaptive"` | The colours of the app that shows the scene, light or dark; `pro_white` where there is none. |
 
 The presets set `h1`, `h2`, `h3` and `text` in Pretendard and `code` in JetBrains Mono.
+
+## Adaptive theme
+
+`"adaptive"` takes its colours, and the font of `h1`, `h2`, `h3` and `text`, from the app that shows the scene.<br />
+When the app switches between light and dark, the scene is drawn again in the new colours. Write it with semantic colours, and it fits wherever it is shown.
+
+| Where | Colours | Headings and text | Follows |
+|---|---|---|---|
+| This site | The page's | Pretendard | The light/dark switch at the top right |
+| VS Code | The editor theme's | Source Serif 4, Hangul in Pretendard | The editor theme |
+| Obsidian | The Obsidian theme's | The plugin's text font | The Obsidian theme |
+| CLI | `pro_white`'s | Pretendard | |
+
+Switch this page between light and dark, and the scene below follows.
+
+```lua live
+local scene = vis.scene {
+    width = 960, height = 540, theme = "adaptive",
+    camera = {mode = "fixed", view = "2d", height = 6},
+}
+
+scene:text {text = "adaptive", role = "h2", point = {0, 2}}
+local a = scene:circle {center = {-2.6, 0}, radius = 0.7}
+local b = scene:rectangle {center = {0, 0}, size = {1.4, 1.4}, fill = "accent"}
+local c = scene:circle {center = {2.6, 0}, radius = 0.7}
+scene:text {text = "the page's colours, light or dark", point = {0, -1.8}, color = "muted", size = 20}
+
+scene:create({a, b, c}, 0.6, "smooth", 0.1)
+scene:indicate(b)
+
+return scene
+```
+
+```js live
+const scene = vis.scene({
+    width: 960, height: 540, theme: "adaptive",
+    camera: {mode: "fixed", view: "2d", height: 6},
+});
+
+scene.text({text: "adaptive", role: "h2", point: [0, 2]});
+const a = scene.circle({center: [-2.6, 0], radius: 0.7});
+const b = scene.rectangle({center: [0, 0], size: [1.4, 1.4], fill: "accent"});
+const c = scene.circle({center: [2.6, 0], radius: 0.7});
+scene.text({text: "the page's colours, light or dark", point: [0, -1.8], color: "muted", size: 20});
+
+scene.create([a, b, c], 0.6, "smooth", 0.1);
+scene.indicate(b);
+
+return scene;
+```
+
+An app of your own gives the runtime its theme before it loads a scene. Colours it leaves out are the runtime's light or dark ones, and `font` is Pretendard when left out.
+
+```js
+runtime.hostTheme({dark: true, background: "#1e1e1e", accent: "#4daafc", font: "Source Serif 4, Pretendard"});
+```
 
 ## Semantic colours
 

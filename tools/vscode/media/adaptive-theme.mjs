@@ -1,6 +1,8 @@
 // The host theme from the workbench theme's colors. A color the theme leaves undefined stays
 // unset, and the runtime takes its own light or dark one.
 const firstColor = (read, names) => names.map((name) => read(name)?.trim()).find(Boolean);
+// Headings and body text take the viewer's own font list (main.css), Hangul from Pretendard.
+const VIEWER_FONT = "Source Serif 4, Pretendard";
 
 export function resolveAdaptiveVscodeTheme({dark, read}) {
     return Object.freeze({
@@ -26,6 +28,7 @@ export function resolveAdaptiveVscodeTheme({dark, read}) {
             firstColor(read, ["--vscode-charts-green"]),
             firstColor(read, ["--vscode-charts-purple"]),
         ]),
+        font: VIEWER_FONT,
     });
 }
 

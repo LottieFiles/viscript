@@ -29,6 +29,14 @@ function themeAdapt(src) {
 export function retheme() {
   for (const p of players) p.retheme();
 }
+// Scenes with theme = "adaptive" take the page's own colours, read at each load, so they follow
+// the switch too; a colour left out is the runtime's light or dark one.
+const PAGE_COLORS = {background: "--stage", foreground: "--fg", muted: "--dim", accent: "--accent", surface: "--raise", line: "--line2"};
+function pageTheme() {
+  const style = getComputedStyle(document.documentElement);
+  const colors = Object.entries(PAGE_COLORS).map(([color, name]) => [color, style.getPropertyValue(name).trim()]);
+  return {dark: mode() === "dark", ...Object.fromEntries(colors)};
+}
 
 // ---------- rendering ----------
 // One render worker for the page, started by the first player that comes into view. It asks for
@@ -113,7 +121,7 @@ export function createPlayer(el, source, {js = null, editable = false, name = "s
   // Sections play once and hold their last frame; whole scenes replay, the last frame dissolving
   // over the restart, unless they loop seamlessly.
   const player = new VisPlayer({
-    host: host(), canvas, resources: (text, language) => catalog.resources(text, language),
+    host: host(), canvas, resources: (text, language) => catalog.resources(text, language), theme: pageTheme,
     autoplay: !clips.length, end: loop ? "loop" : "crossfade", interactive, maxFps, quality, maxRatio,
     label: name.replace(/\.lua$/, "").replace(/[-_]/g, " ") + " animation",
   });

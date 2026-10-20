@@ -7,7 +7,7 @@ namespace vis
 Theme Theme::preset(ThemePreset preset) noexcept
 {
     Theme theme;
-    // Pro White is the default Theme, and adaptive_vscode uses it until a host supplies colors.
+    // Pro White is the default Theme, and adaptive uses it until a host supplies its own.
     if (preset != ThemePreset::ProBlack) return theme;
 
     theme.background = Color::hex("#000000");

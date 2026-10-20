@@ -11,7 +11,7 @@
 -- Scene cites its real source through the manifest's links, never in comments.
 -- Edit LOADED, SPAWNS, or FRAMES: every row, ruler, label, and caption is derived from the trace.
 local MODE = "loops"
-local THEME = "adaptive_vscode"
+local THEME = "adaptive"
 
 -- Trace ------------------------------------------------------------------------------------------
 local LOADED = 3          -- sprites in the level when load() runs

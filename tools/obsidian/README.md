@@ -30,7 +30,7 @@ JavaScript; **Insert a scene code block** in the command palette starts one.
 ````markdown
 ```viscript loop
 local scene = vis.scene {
-    width = 640, height = 360, theme = "adaptive_vscode",
+    width = 640, height = 360, theme = "adaptive",
     camera = {view = "2d", target = {0, 0}, height = 7},
 }
 local ball = scene:circle {center = {-3, 0}, radius = 0.5, fill = "accent"}
@@ -60,8 +60,8 @@ Words after the code block's language, or in the embed's alias, set options:
 
 Other words name the scene for screen readers, as an image's alt text does.
 
-Scenes with `theme = "adaptive_vscode"` take their colors from the Obsidian theme and follow it
-between light and dark. A click plays or pauses a scene; the play bar appears on hover, and on
+Scenes with `theme = "adaptive"` take their colors from the Obsidian theme and follow it
+between light and dark, and set their text in the text font below. A click plays or pauses a scene; the play bar appears on hover, and on
 touch screens it stays under the scene. Scenes load when they scroll into view and let go of
 their memory when they leave it.
 
@@ -72,8 +72,8 @@ Commands: **Insert a scene code block**, **Toggle autoplay**, **Reload all scene
 
 Scenes ask for fonts by name, as ThorVG's web players do. The plugin ships the fonts the
 engine's themes set text in, the files the VS Code extension ships: Pretendard for text, Korean
-included, JetBrains Mono NL for code, and Source Serif 4 for the `adaptive_vscode` theme. Fonts installed on the device are never used, so a scene draws the same
-on a computer, a phone or a tablet. A scene can also name another font, as
+included, and JetBrains Mono NL for code. Fonts installed on the device are never used, so a scene
+draws the same on a computer, a phone or a tablet. A scene can also name another font, as
 `font = "Noto Serif KR"`. The plugin gives each name a font:
 
 - **Text font**: the bundled Pretendard, or another font by name.
@@ -132,9 +132,9 @@ plugin stays off the network.
 ## How it is built
 
 `main.js` is the whole plugin: the plugin itself, the render server and the WebAssembly
-runtime, the compiler JavaScript scenes run in, and the four bundled fonts, gzipped into the file
+runtime, the compiler JavaScript scenes run in, and the two bundled fonts, gzipped into the file
 and each unpacked when a scene first needs it, so nothing is downloaded to play scenes. The fonts,
-mostly their Korean letters, make up most of its 4 MB. It needs WebAssembly and
+mostly Pretendard's Korean letters, make up 1.6 MB of its 2.6 MB. It needs WebAssembly and
 `DecompressionStream`, which iPhones and iPads have from iOS 16.4. One render worker draws every
 scene, including those in popout windows and the settings window, and fonts load once into each
 runtime instance that scenes share.
@@ -166,5 +166,5 @@ is skipped.
 
 The plugin is MIT-licensed, as viscript is. `main.js` also includes ThorVG (MIT), Lua (MIT),
 LodePNG (zlib), miniaudio (public domain or MIT-0), CodeMirror's legacy modes (MIT), and the
-fonts Pretendard, Pretendard Std, JetBrains Mono, Source Serif 4 and Noto Sans Math (SIL Open
-Font License 1.1); their notices are at the top of `main.js`.
+fonts Pretendard, Pretendard Std, JetBrains Mono and Noto Sans Math (SIL Open Font License
+1.1); their notices are at the top of `main.js`.

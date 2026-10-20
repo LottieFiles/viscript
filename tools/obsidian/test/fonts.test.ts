@@ -3,7 +3,7 @@ import test from "node:test";
 import {fontFileName, fontProvider, namedFile, type FontSettings, type FontSources, type ThemeRole} from "../src/fonts.ts";
 
 const SETTINGS: FontSettings = {textFont: "default", textFontName: "", codeFont: "default", codeFontName: "", downloadFonts: true};
-const THEME = ["Pretendard", "JetBrainsMono", "Source Serif 4"];
+const THEME = ["Pretendard", "JetBrainsMono"];
 
 interface Fixture {
     folder?: readonly string[];
@@ -40,10 +40,7 @@ async function answers(settings: Partial<FontSettings>, fixture: Fixture, names:
 
 test("the theme's names take the bundled fonts, whatever else the vault or Fontsource has", async () => {
     const {found, downloaded} = await answers({}, {folder: THEME, fontsource: THEME}, THEME);
-    assert.deepEqual(found, {
-        Pretendard: "bundled:text", JetBrainsMono: "bundled:code",
-        "Source Serif 4": "bundled:serif",
-    });
+    assert.deepEqual(found, {Pretendard: "bundled:text", JetBrainsMono: "bundled:code"});
     assert.deepEqual(downloaded, []);
 });
 
@@ -51,11 +48,7 @@ test("a font named in the settings is looked for like one a scene names, else th
     const fixture = {folder: ["Fira Code"], fontsource: ["Noto Sans KR"]};
     const {found} = await answers({textFont: "custom", textFontName: " Noto Sans KR ", codeFont: "custom", codeFontName: "Fira Code"},
         fixture, THEME);
-    // adaptive_vscode's fonts are not the text font's to replace.
-    assert.deepEqual(found, {
-        Pretendard: "fontsource:Noto Sans KR", JetBrainsMono: "folder:Fira Code",
-        "Source Serif 4": "bundled:serif",
-    });
+    assert.deepEqual(found, {Pretendard: "fontsource:Noto Sans KR", JetBrainsMono: "folder:Fira Code"});
     const missing = await answers({codeFont: "custom", codeFontName: "Nowhere Mono"}, fixture, ["JetBrainsMono"]);
     assert.equal(missing.found.JetBrainsMono, "bundled:code");
     // An empty name is the default.

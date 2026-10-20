@@ -9653,14 +9653,14 @@ static ThemePreset _themePreset(lua_State* lua, int index)
 {
     static constexpr LuaName<ThemePreset> PRESETS[] = {
         {"pro_white", ThemePreset::ProWhite}, {"pro_black", ThemePreset::ProBlack},
-        {"adaptive_vscode", ThemePreset::AdaptiveVscode}};
+        {"adaptive", ThemePreset::Adaptive}};
     return _enum(lua, index, "theme preset", PRESETS);
 }
 
 static Theme _themePresetValue(lua_State* lua, int index)
 {
     auto preset = _themePreset(lua, index);
-    if (preset != ThemePreset::AdaptiveVscode) return Theme::preset(preset);
+    if (preset != ThemePreset::Adaptive) return Theme::preset(preset);
     void* memoryData = nullptr;
     lua_getallocf(lua, &memoryData);
     auto memory = static_cast<LuaMemory*>(memoryData);

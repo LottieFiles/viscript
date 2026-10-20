@@ -7,10 +7,10 @@ import type {ViscriptSettings} from "./settings.ts";
 
 type FontNameKey = "textFontName" | "codeFontName";
 
-// The text and code fonts as set, so letters a choice lacks are seen at once. The adaptive theme
-// takes the note's colors; its own text font is set aside for the text font.
-const PREVIEW = `local s = vis.scene {width = 720, height = 132, theme = "adaptive_vscode"}
-s:text {text = "Aa Gg Rr 0123 · 가나다", point = {0, 1.2}, size = 22, font = "Pretendard"}
+// The text and code fonts as set, so letters a choice lacks are seen at once, in the adaptive
+// theme, which takes the note's colors and sets text in the text font.
+const PREVIEW = `local s = vis.scene {width = 720, height = 132, theme = "adaptive"}
+s:text {text = "Aa Gg Rr 0123 · 가나다", point = {0, 1.2}, size = 22}
 s:text {text = "local answer = 42 -- 코드", point = {0, -1.4}, role = "code", size = 18}
 return s`;
 
@@ -179,7 +179,7 @@ export class ViscriptSettingTab extends PluginSettingTab {
             setting.setDesc("Looking for fonts…");
             this.#plugin.fonts.scan().then((scan) => {
                 if (!current) return;
-                const parts = [`${fontCount(scan.folder.size)} in the font folder, besides the four bundled ones`];
+                const parts = [`${fontCount(scan.folder.size)} in the font folder, besides the two bundled ones`];
                 if (scan.unusable) parts.push(`${scan.unusable} files left out as fonts scenes cannot draw`);
                 setting.setDesc(`${parts.join("; ")}.`);
             }, (error: unknown) => {

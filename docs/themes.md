@@ -10,7 +10,7 @@ their own Theme and palette position.
 |---|---|---|
 | `pro_white` | `ProWhite` | Light background; default preset |
 | `pro_black` | `ProBlack` | Dark background |
-| `adaptive_vscode` | `AdaptiveVscode` | Palette supplied by the editor host |
+| `adaptive` | `Adaptive` | Colors and font supplied by the host app; Pro White without one |
 
 The presets use Pretendard for `h1`, `h2`, `h3`, and `text`, and JetBrainsMono for
 `code`. Register the font files before loading scenes that measure text:
@@ -19,10 +19,28 @@ The presets use Pretendard for `h1`, `h2`, `h3`, and `text`, and JetBrainsMono f
 build/viscript render scene.lua -o frame.png   --font src/examples/assets/Pretendard.ttf   --font src/examples/assets/JetBrainsMono.ttf
 ```
 
-The preview host resolves `adaptive_vscode` from the active editor colors, sets
-`h1`, `h2`, `h3`, and `text` in the font list `"Source Serif 4, Pretendard"`,
-and rebuilds adaptive scenes when the editor Theme changes. Direct C++ use defaults
-to Pro White until a host supplies a palette.
+## Adaptive theme
+
+`adaptive` takes its colors, and the font of `h1`, `h2`, `h3`, and `text`, from the
+app that shows the scene, and the app loads the scene again when its own theme
+changes, light or dark:
+
+| Host | Colors | Headings and body text | Follows |
+|---|---|---|---|
+| VS Code preview | The editor theme | `"Source Serif 4, Pretendard"`, as the preview's own text | The editor theme |
+| Obsidian | The Obsidian theme, where the scene is | The plugin's text font, Pretendard by default | The Obsidian theme |
+| Documentation site | The page's light or dark colors | Pretendard | The page's light/dark switch |
+| CLI, C++ without a host | Pro White | Pretendard | |
+
+A host gives its theme before it loads a scene: `hostTheme(palette)` in JavaScript,
+`vis_host_theme` in C, or the `adaptiveTheme` of `Lua::load` in C++. `dark` picks the
+Pro Black base over Pro White, a color the host leaves out is the runtime's light or
+dark one, and `font`, a name or a font list, is Pretendard when left out. `code`
+stays in JetBrainsMono.
+
+```js
+runtime.hostTheme({dark: true, background: "#1e1e1e", accent: "#4daafc", font: "Source Serif 4, Pretendard"});
+```
 
 ## Semantic colors
 

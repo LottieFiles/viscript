@@ -79,10 +79,10 @@ void sceneThemes(Renderer* renderer)
 {
     auto proWhite = Theme::preset(ThemePreset::ProWhite);
     auto proBlack = Theme::preset(ThemePreset::ProBlack);
-    auto adaptiveVscode = Theme::preset(ThemePreset::AdaptiveVscode);
+    auto adaptive = Theme::preset(ThemePreset::Adaptive);
     CHECK(Theme::ColorLimit == 10u);
     Theme implicit;
-    const Theme presets[] = {implicit, proWhite, proBlack, adaptiveVscode};
+    const Theme presets[] = {implicit, proWhite, proBlack, adaptive};
     for (const auto& preset : presets) {
         CHECK(std::strcmp(preset.code.font, "JetBrainsMono") == 0);
     }
@@ -92,9 +92,9 @@ void sceneThemes(Renderer* renderer)
     CHECK(near(proBlack.objectWidth, 1.25f));
     // Every preset keeps structural boxes square; a custom Theme may round them.
     CHECK(implicit.roundness == 0.0f && proWhite.roundness == 0.0f && proBlack.roundness == 0.0f
-          && adaptiveVscode.roundness == 0.0f);
-    CHECK(same(adaptiveVscode.background, proWhite.background));
-    CHECK(same(adaptiveVscode.objects[0], proWhite.objects[0]));
+          && adaptive.roundness == 0.0f);
+    CHECK(same(adaptive.background, proWhite.background));
+    CHECK(same(adaptive.objects[0], proWhite.objects[0]));
     CHECK(same(implicit.background, proWhite.background));
     CHECK(same(implicit.objects[0], proWhite.objects[0]));
     CHECK(same(proWhite.background, Color::hex("#ffffff")));

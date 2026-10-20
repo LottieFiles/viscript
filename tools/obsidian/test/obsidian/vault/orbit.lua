@@ -1,6 +1,6 @@
 -- A scene file: embedded in Scenes.md and opened in its own tab.
 local scene = vis.scene {
-    width = 640, height = 360, theme = "adaptive_vscode",
+    width = 640, height = 360, theme = "adaptive",
     camera = {view = "2d", target = {0, 0}, height = 7},
 }
 local a = scene:circle {center = {-3, 0}, radius = 0.6, fill = "accent"}

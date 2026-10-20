@@ -1,5 +1,5 @@
 // Renders a Lua Scene the way the VS Code Viewer does: the same WASM runtime, the same fonts
-// (Source Serif 4, Korean in Pretendard, for the adaptive_vscode heading and body roles), and the
+// (Source Serif 4, Korean in Pretendard, for the adaptive heading and body roles), and the
 // runtime's light and dark host colors, which approximate the default Light and Dark themes; a
 // workbench theme's own colors can differ. Writes one PNG per time and prints one line per time
 // with the text that overlaps, is clipped, or leaves its box.
@@ -18,6 +18,8 @@ const FONTS = [
     ["JetBrainsMono", "JetBrainsMono.ttf"],
     ["Source Serif 4", "SourceSerif4-Semibold.ttf"],
 ];
+// The font the Viewer gives the adaptive theme's headings and body text (media/adaptive-theme.mjs).
+const VIEWER_FONT = "Source Serif 4, Pretendard";
 
 const USAGE = `Usage: node host-review.mjs <scene.lua> [--time SEC|end]... [--theme light|dark|both]
        [--contain TEXT PANEL [INSET]]... [--padding PX] [--out DIR] [--runtime DIR]
@@ -178,12 +180,12 @@ export async function main(argv) {
     for (const mode of options.themes) {
         const runtime = await createVis({wasmBinary});
         try {
-            runtime.hostTheme({dark: mode === "dark"});
+            runtime.hostTheme({dark: mode === "dark", font: VIEWER_FONT});
             for (const [family, bytes] of fonts) runtime.font(family, bytes, "ttf");
             runtime.load(source, basename(options.scene));
             const [width, height] = runtime.size();
             if (mode === options.themes[0]) {
-                const theme = runtime.adaptiveTheme ? "adaptive_vscode" : "fixed theme, palette unchanged";
+                const theme = runtime.adaptiveTheme ? "adaptive" : "fixed theme, palette unchanged";
                 console.log(`${basename(options.scene)}  ${width}x${height}  ${seconds(runtime.duration)} s`
                     + `${runtime.loop ? "  loop" : ""}  ${theme}`);
             }

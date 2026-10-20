@@ -126,8 +126,8 @@ export interface LayoutReport {
 }
 
 /**
- * Colors for scenes that follow the host's theme. A color left undefined or empty takes the
- * runtime's light or dark one, by `dark`, which are close to VS Code's default themes.
+ * The host app's theme, for scenes with `theme = "adaptive"`. A color left undefined or empty takes
+ * the runtime's light or dark one, by `dark`, which are close to VS Code's default themes.
  */
 export interface HostThemePalette {
     readonly dark: boolean;
@@ -146,6 +146,11 @@ export interface HostThemePalette {
     readonly focus?: string;
     /** 1 to 10 colors, each unset one the runtime's at its index; the runtime's four when left out. */
     readonly objects?: readonly (string | undefined)[];
+    /**
+     * The font of headings and body text, a name or a comma list of up to 256 bytes, as the VS
+     * Code viewer's "Source Serif 4, Pretendard"; "Pretendard" when left out or empty.
+     */
+    readonly font?: string;
 }
 
 export type VisInputType = "pointerdown" | "pointermove" | "pointerup" | "pointercancel" | "wheel" | "keydown" | "keyup";

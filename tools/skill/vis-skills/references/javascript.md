@@ -23,7 +23,7 @@ runtime.load(definition, "vector-scene.js");
 runtime.draw(document.querySelector("canvas"), runtime.duration);
 ```
 
-Scene size is in pixels and object positions are world coordinates. Vectors use arrays, ranges use `[min, max, step]`, and matrices are row-major absolute local-to-parent transforms. Follow [scene-contract.md](scene-contract.md) for camera mapping. Use `"adaptive_vscode"` for the VS Code host; the standalone default is `"pro_white"`.
+Scene size is in pixels and object positions are world coordinates. Vectors use arrays, ranges use `[min, max, step]`, and matrices are row-major absolute local-to-parent transforms. Follow [scene-contract.md](scene-contract.md) for camera mapping. Use `"adaptive"` for a host app, such as VS Code or Obsidian; the standalone default is `"pro_white"`.
 
 ## Objects and layout
 

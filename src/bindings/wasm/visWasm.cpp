@@ -82,6 +82,8 @@ struct Engine
     uint32_t assetCount = 0;
     size_t assetBytes = 0;
     vis::Theme hostTheme;
+    // The font hostTheme names for headings and body text, which the theme points to.
+    char hostFont[257] = {};
     bool hasHostTheme = false;
     bool adaptiveTheme = false;
 #if defined(VIS_AUDIO)
@@ -317,21 +319,22 @@ extern "C" VIS_KEEPALIVE VisResult vis_host_theme(VisEngine handle, uint8_t dark
                                                           uint32_t info, uint32_t surface,
                                                           uint32_t line, uint32_t result,
                                                           uint32_t focus, const uint32_t* objects,
-                                                          uint32_t objectCount)
+                                                          uint32_t objectCount, const char* font)
 {
     auto engine = _engine(handle);
-    if (!engine || !objects || !objectCount || objectCount > vis::Theme::ColorLimit) {
+    if (!engine || !objects || !objectCount || objectCount > vis::Theme::ColorLimit
+        || (font && std::strlen(font) >= sizeof(engine->hostFont))) {
         return VIS_RESULT_INVALID_ARGUMENTS;
     }
     auto theme = vis::Theme::preset(dark ? vis::ThemePreset::ProBlack
                                            : vis::ThemePreset::ProWhite);
-    // Hangul, which Source Serif 4 lacks, comes from Pretendard, as in the extension's CSS.
-    auto serif = "Source Serif 4, Pretendard";
-    theme.h1.font = serif;
-    theme.h2.font = serif;
-    theme.h3.font = serif;
-    theme.text.font = serif;
-    theme.code.font = "JetBrainsMono";
+    if (font && font[0]) {
+        std::snprintf(engine->hostFont, sizeof(engine->hostFont), "%s", font);
+        theme.h1.font = engine->hostFont;
+        theme.h2.font = engine->hostFont;
+        theme.h3.font = engine->hostFont;
+        theme.text.font = engine->hostFont;
+    }
     theme.background = _rgba(background);
     theme.h1.color = _rgba(foreground);
     theme.h2.color = _rgba(foreground);

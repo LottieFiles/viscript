@@ -580,8 +580,11 @@ export async function createVis(...args) {
             color(value, fallbackObjects[index], `Host theme object color ${index + 1}`));
         const colors = Object.entries(fallback).map(([name, otherwise]) =>
             color(palette[name], otherwise, `Host theme ${name} color`));
-        check(withMemory([new Uint8Array(objects.buffer)], (objectsPtr) => module._vis_host_theme(
-            engine, palette.dark ? 1 : 0, ...colors, objectsPtr, objects.length)), "Host theme");
+        if (palette.font !== undefined && typeof palette.font !== "string") throw new TypeError("Host theme font must be a string");
+        const font = encoder.encode(palette.font ?? "");
+        if (font.length > 256 || font.includes(0)) throw new Error("Host theme font must be at most 256 bytes and contain no zero bytes");
+        check(withMemory([new Uint8Array(objects.buffer), font], (objectsPtr, fontPtr) => module._vis_host_theme(
+            engine, palette.dark ? 1 : 0, ...colors, objectsPtr, objects.length, fontPtr)), "Host theme");
     };
 
     return {

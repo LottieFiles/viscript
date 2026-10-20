@@ -37,14 +37,16 @@ assert.deepEqual(dark, {
     result: "#d9b949",
     focus: "#4f9dde",
     objects: ["#e89432", "#ef6464", "#72bd78", "#b390d4"],
+    font: "Source Serif 4, Pretendard",
 });
 
 // A color the theme does not define stays unset for the runtime to fill.
 const unset = resolveAdaptiveVscodeTheme({dark: false, read: (name) => name === "--vscode-charts-red" ? "#ef6464" : ""});
 assert.deepEqual(unset, {
     dark: false,
-    ...Object.fromEntries(Object.keys(dark).filter((key) => key !== "dark" && key !== "objects").map((key) => [key, undefined])),
+    ...Object.fromEntries(Object.keys(dark).filter((key) => !["dark", "objects", "font"].includes(key)).map((key) => [key, undefined])),
     objects: [undefined, "#ef6464", undefined, undefined],
+    font: "Source Serif 4, Pretendard",
 });
 assert.notEqual(adaptiveVscodeThemeKey(dark), adaptiveVscodeThemeKey(unset));
 assert.notEqual(adaptiveVscodeThemeKey(unset), adaptiveVscodeThemeKey({...unset, dark: true}));

@@ -4,7 +4,7 @@
 -- Replace the trace builder when reviewing a half-open or duplicate-selecting implementation.
 local scene = vis.scene {
     width = 960, height = 540, fps = 30, loop = false,
-    theme = "adaptive_vscode",
+    theme = "adaptive",
     camera = {mode = "fixed", view = "2d", target = {0, 0}, height = 540},
 }
 

@@ -21,10 +21,10 @@ const FONT_SETTINGS: readonly (keyof ViscriptSettings)[] = [
 ];
 const PLAYBACK_SETTINGS: readonly (keyof ViscriptSettings)[] = ["autoplay", "end", "controls", "maxFps", "quality"];
 
-// adaptive_vscode takes its colors from the host, here the Obsidian theme.
+// The adaptive theme takes its colors from the host, here the Obsidian theme.
 const TEMPLATE = `\`\`\`viscript
 local scene = vis.scene {
-    width = 640, height = 360, theme = "adaptive_vscode",
+    width = 640, height = 360, theme = "adaptive",
     camera = {view = "2d", target = {0, 0}, height = 7},
 }
 local ball = scene:circle {center = {-3, 0}, radius = 0.5, fill = "accent"}

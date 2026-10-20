@@ -20,7 +20,7 @@ Rules for every viscript scene. Profiles may narrow a default; they never weaken
 
 ## Theme, text, color
 
-- Set `theme` in the config of the root and of every child Scene, before visible objects; a child Scene does not inherit it. Use the user's choice, else `adaptive_vscode` for a VS Code host, else `pro_white`.
+- Set `theme` in the config of the root and of every child Scene, before visible objects; a child Scene does not inherit it. Use the user's choice, else `adaptive` for a host app such as VS Code or Obsidian, else `pro_white`.
 - Register the selected fonts through the host. Verify meaning-bearing glyphs (`∇`, `±`, `θ`, Korean) in the raster; otherwise spell them plainly.
 - Text roles: `h1`, `h2`, `h3`, `text`, `code`. `point` is the anchor and alignment defaults to centered; set `align={0,0.5}` for left-anchored titles and margin labels.
 - Theme colors: `background`, `foreground`, `muted`, `accent`, `secondary`, `success`, `warning`, `danger`, `info`, `surface`, `border`, `result`, `focus` (no `object1`). Omitting paint cycles peer colors.

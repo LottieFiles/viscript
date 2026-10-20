@@ -102,6 +102,7 @@ const HOST_THEME = {
     result: "#edc948",
     focus: "#6ea8fe",
     objects: ["#f28e2b", "#ff6b6b", "#7bc96f", "#c29bc0"],
+    font: "Source Serif 4, Pretendard",
 };
 const BOOTSTRAP = "return vis.scene {width = 16, height = 16, loop = false}";
 const CAMERA = `camera = {mode = "fixed", view = "2d", height = 4}`;
@@ -113,7 +114,7 @@ const SCENES = [
         needs: ["Source Serif 4", "Pretendard", "JetBrainsMono"],
         times: (duration) => [0, 0.5, 1.5, 2.25, duration],
         source: `
-local scene = vis.scene {width = 480, height = 270, theme = "adaptive_vscode", ${CAMERA}}
+local scene = vis.scene {width = 480, height = 270, theme = "adaptive", ${CAMERA}}
 local label = scene:text {text = "Fonts on demand", point = {0, 1.3}, align = {0.5, 0.5}, role = "h2"}
 scene:wait(1)
 scene:text {text = "한글 설명", point = {0, 0.4}, align = {0.5, 0.5}, role = "text"}

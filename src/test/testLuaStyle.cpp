@@ -489,7 +489,7 @@ return scene
     delete scene;
 
     static constexpr auto adaptiveSource = R"lua(
-local scene = vis.scene {theme = "adaptive_vscode"}
+local scene = vis.scene {theme = "adaptive"}
 scene:text {text = "Adaptive", role = "h1", id = "title"}
 scene:line {from = {-1, 0}, to = {1, 0}, id = "line"}
 return scene
@@ -555,7 +555,9 @@ return named
     }
     delete scene;
     _scriptError("return vis.scene {theme = '3_blue_1_eyes'}",
-                 "theme preset must be 'pro_white', 'pro_black' or 'adaptive_vscode'");
+                 "theme preset must be 'pro_white', 'pro_black' or 'adaptive'");
+    _scriptError("return vis.scene {theme = 'adaptive_vscode'}",
+                 "theme preset must be 'pro_white', 'pro_black' or 'adaptive'");
 
     static constexpr auto implicitSource = "return vis.scene {}";
     scene = _loaded(implicitSource, "theme-implicit.lua");

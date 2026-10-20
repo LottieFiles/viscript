@@ -37,8 +37,10 @@ runtime.hostTheme({
     result: "#d9b949",
     focus: "#4f9dde",
     objects: ["#e89432", "#ef6464", "#72bd78", "#b390d4"],
+    // The viewer's font for headings and body text.
+    font: "Source Serif 4, Pretendard",
 });
-runtime.load("local s=vis.scene{width=64,height=64,theme='adaptive_vscode',camera={height=4}}; s:line{from={-1,0},to={1,0},stroke='danger',width=10}; return s", "adaptive.lua");
+runtime.load("local s=vis.scene{width=64,height=64,theme='adaptive',camera={height=4}}; s:line{from={-1,0},to={1,0},stroke='danger',width=10}; return s", "adaptive.lua");
 assert.equal(runtime.adaptiveTheme, true);
 const adaptivePixels = runtime.render(0);
 assert.deepEqual([...adaptivePixels.slice(0, 4)], [16, 24, 32, 255]);
@@ -56,14 +58,14 @@ assert.deepEqual([...runtime.render(0).slice(0, 4)], [255, 255, 255, 255]);
 runtime.load("return vis.scene {width = 8, height = 8, theme = 'pro_black'}", "pro-black.lua");
 assert.equal(runtime.adaptiveTheme, false);
 assert.deepEqual([...runtime.render(0).slice(0, 4)], [0, 0, 0, 255]);
-for (const removed of ["default", "3_blue_1_eyes"]) {
+for (const removed of ["default", "3_blue_1_eyes", "adaptive_vscode"]) {
     assert.throws(
         () => runtime.load(`return vis.scene {theme = '${removed}'}`, "removed-preset.lua"),
-        /theme preset must be 'pro_white', 'pro_black' or 'adaptive_vscode'/,
+        /theme preset must be 'pro_white', 'pro_black' or 'adaptive'/,
     );
 }
 
-runtime.load("return vis.scene {width = 8, height = 8, theme = {preset = 'adaptive_vscode'}}", "adaptive-table.lua");
+runtime.load("return vis.scene {width = 8, height = 8, theme = {preset = 'adaptive'}}", "adaptive-table.lua");
 assert.equal(runtime.adaptiveTheme, true);
 assert.deepEqual([...runtime.render(0).slice(0, 4)], [16, 24, 32, 255]);
 
@@ -72,7 +74,7 @@ local scene = vis.scene {
     width = 320,
     height = 180,
     theme = {
-        preset = "adaptive_vscode",
+        preset = "adaptive",
         text = {
             h1 = {font = "Pretendard"},
             h2 = {font = "Pretendard"},
@@ -92,7 +94,7 @@ local scene = vis.scene {
     width = 320,
     height = 180,
     theme = {
-        preset = "adaptive_vscode",
+        preset = "adaptive",
         text = {
             h1 = {font = "Source Serif 4"},
             h2 = {font = "Source Serif 4"},
@@ -114,7 +116,7 @@ runtime.load(`
 local scene = vis.scene {
     width = 480,
     height = 240,
-    theme = "adaptive_vscode",
+    theme = "adaptive",
     camera = {height = 4},
 }
 scene:text {text = "English explanation", point = {0, 0.9}, align = {0.5, 0.5}, role = "text", id = "automatic-serif-text"}
@@ -130,7 +132,7 @@ assert.ok(runtime.render(0).some((value, index) => index % 4 !== 3 && value !== 
 // The host roles name the list "Source Serif 4, Pretendard", so Hangul that a text shows only
 // later, which Source Serif 4 lacks, is drawn in Pretendard.
 runtime.load(`
-local scene = vis.scene {width = 240, height = 120, theme = "adaptive_vscode", camera = {height = 4}}
+local scene = vis.scene {width = 240, height = 120, theme = "adaptive", camera = {height = 4}}
 local later = scene:text {text = "English first", point = {0, 0}, align = {0.5, 0.5}, role = "text"}
 scene:play({target = later, text = "\ub098\uc911\uc5d0 \ud55c\uae00"}, 0.5)
 return scene
@@ -148,7 +150,7 @@ assert.ok(ink(runtime.render(runtime.duration)) > ink(runtime.render(0)) / 4);
 // keep the number given. Two lines take the first two object colors; the third is the danger color.
 const hostColors = (palette) => {
     runtime.hostTheme(palette);
-    runtime.load(`local s = vis.scene {width = 64, height = 64, theme = "adaptive_vscode", camera = {height = 4}}
+    runtime.load(`local s = vis.scene {width = 64, height = 64, theme = "adaptive", camera = {height = 4}}
 s:line {from = {-2, 1}, to = {2, 1}, width = 8}
 s:line {from = {-2, 0}, to = {2, 0}, width = 8}
 s:line {from = {-2, -1}, to = {2, -1}, stroke = "danger", width = 8}
@@ -167,6 +169,20 @@ assert.deepEqual(
 );
 assert.throws(() => runtime.hostTheme({dark: true, objects: Array(5)}), /Host theme object color 5 must be a CSS color string/);
 assert.throws(() => runtime.hostTheme({background: "#101820"}), /boolean dark value/);
+assert.throws(() => runtime.hostTheme({dark: true, font: 4}), /Host theme font must be a string/);
+assert.throws(() => runtime.hostTheme({dark: true, font: "x".repeat(257)}), /at most 256 bytes/);
 
 runtime.destroy();
+
+// The host names the font of headings and body text; without one they are in Pretendard, as in
+// the presets. A runtime with no fonts names the fonts the scene sets text in.
+const bare = await createVis({wasmBinary});
+const HEADINGS = "local s = vis.scene {width = 64, height = 64, theme = 'adaptive'}; s:text {text = 'Title', role = 'h1'}; return s";
+bare.hostTheme({dark: false});
+bare.load(HEADINGS, "host-font.lua");
+assert.deepEqual(bare.missingFonts(), ["Pretendard"]);
+bare.hostTheme({dark: false, font: "Source Serif 4, Pretendard"});
+bare.load(HEADINGS, "host-font.lua");
+assert.deepEqual(bare.missingFonts().sort(), ["Pretendard", "Source Serif 4"]);
+bare.destroy();
 console.log("Adaptive VS Code WASM theme passed");

@@ -17,8 +17,8 @@ From `tools/vscode/`, run `npm install` and `npm run compile`, press `F5`, and o
 These are the only delivery differences from vis-skills:
 
 - **Canvas.** One fixed logical Canvas. FIT scales it uniformly without cropping or stretching, and resizing never reruns Lua. Display zoom never changes export size.
-- **Theme.** `theme = "adaptive_vscode"` follows the workbench theme and rebuilds when the theme changes. Fixed and custom themes stay Scene-owned.
-- **Fonts.** Pretendard, monospaced JetBrains Mono NL (`JetBrainsMono`, used by code), and Source Serif 4 (used by the `adaptive_vscode` heading and body roles). Those roles name the list `Source Serif 4, Pretendard`, so Korean letters, which Source Serif 4 lacks, come from Pretendard, as in the Viewer's CSS. The CLI has no host, so it sets `adaptive_vscode` in Pretendard with Pro White colors; the host review below measures what the Viewer shows.
+- **Theme.** `theme = "adaptive"` follows the workbench theme and rebuilds when the theme changes. Fixed and custom themes stay Scene-owned.
+- **Fonts.** Pretendard, monospaced JetBrains Mono NL (`JetBrainsMono`, used by code), and Source Serif 4 (used by the `adaptive` heading and body roles). The Viewer gives those roles the list `Source Serif 4, Pretendard`, so Korean letters, which Source Serif 4 lacks, come from Pretendard, as in the Viewer's CSS. The CLI has no host, so it sets `adaptive` in Pretendard with Pro White colors; the host review below measures what the Viewer shows.
 - **Assets.** `asset = "..."` and `texture = "..."` load relative to the Lua file.
 - **Runtime.** The bundled CPU WASM runtime includes Diagram authoring, UI, Input, the retained Lua Runtime, States, and Audio.
 - **Chrome.** The Viewer already shows the manifest title, notes, transport, Related source, and series controls. Do not draw these controls, IDE chrome, file paths, or episode navigation on the Canvas. Exports contain only the Canvas, so the Canvas still carries its own question, values, and captions ([code-evidence.md](code-evidence.md#split-canvas-inspector-and-notes)).

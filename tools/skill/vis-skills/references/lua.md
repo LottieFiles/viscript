@@ -16,7 +16,7 @@ return scene
 
 Scene dimensions are pixels; positions are world coordinates. Follow [scene-contract.md](scene-contract.md) for the mapping. Vectors use `{x, y}` or `{x, y, z}` and numeric indices. Ranges use `{min, max, step}`. Colors use theme roles or hex `#rgb`, `#rgba`, `#rrggbb`, or `#rrggbbaa`.
 
-The standalone theme is `"pro_white"`. VS Code scenes use `"adaptive_vscode"`; the other fixed preset is `"pro_black"`. Camera options include `target`, world-unit `height`, and for 3D, `eye`, `up`, `projection`, `fov`, `near`, and `far`.
+The standalone theme is `"pro_white"`. Scenes for a host app, such as VS Code or Obsidian, use `"adaptive"`, which takes the host's colors and font; the other fixed preset is `"pro_black"`. Camera options include `target`, world-unit `height`, and for 3D, `eye`, `up`, `projection`, `fov`, `near`, and `far`.
 
 Matrices are row-major and transform column vectors. Translation occupies entries 4, 8, and 12:
 

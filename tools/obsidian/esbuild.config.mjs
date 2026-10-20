@@ -26,7 +26,6 @@ const PAYLOAD = {
     wasm: join(runtimeDir, "vis-wasm.wasm"),
     textFont: join(runtimeDir, "Pretendard.ttf"),
     codeFont: join(runtimeDir, "JetBrainsMono.ttf"),
-    serifFont: join(runtimeDir, "SourceSerif4-Semibold.ttf"),
 };
 
 // Everything in main.js whose license asks for its notice to travel with it.
@@ -40,7 +39,6 @@ const NOTICES = [
     ["Pretendard, the bundled text font, and Pretendard Std, built into the runtime as its default font",
         join(runtimeDir, "Pretendard-OFL.txt")],
     ["JetBrains Mono, the bundled code font", join(runtimeDir, "JetBrainsMono-OFL.txt")],
-    ["Source Serif 4, a bundled font of the adaptive_vscode theme", join(runtimeDir, "Source-Serif-4-OFL.txt")],
     ["Noto Sans Math, built into the runtime", join(runtimeDir, "NotoSansMath-OFL.txt")],
 ];
 
