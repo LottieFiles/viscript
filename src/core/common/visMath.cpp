@@ -1,5 +1,6 @@
 // The arithmetic of the value types in vis.h: vectors, matrices, colors, camera projection,
 // animation curves and easing, the spring response, and the names of results.
+#include <algorithm>
 #include <cmath>
 #include <cstring>
 #include <limits>
@@ -44,13 +45,6 @@ static bool _normalized(double x, double y, double z, Vec3& output) noexcept
     z /= scale;
     auto length = std::sqrt(x * x + y * y + z * z);
     return std::isfinite(length) && length > 0.0 && _narrow(x / length, y / length, z / length, output);
-}
-
-static float _clamp(float value) noexcept
-{
-    if (value < 0.0f) return 0.0f;
-    if (value > 1.0f) return 1.0f;
-    return value;
 }
 
 static bool _basis(const Camera& camera, Vec3& forward, Vec3& right, Vec3& correctedUp) noexcept
@@ -407,7 +401,7 @@ static double _bounce(double t) noexcept
 
 float ease(const AnimCurve& curve, float progress) noexcept
 {
-    auto t = static_cast<double>(_clamp(progress));
+    auto t = static_cast<double>(std::clamp(progress, 0.0f, 1.0f));
     if (!curve.valid() || t == 0.0 || t == 1.0) return static_cast<float>(t);
 
     auto sample = curve.reverse ? 1.0 - t : t;

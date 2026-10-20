@@ -6,9 +6,9 @@
 #include <memory>
 #include <new>
 
-#include "visDisplayColor.h"
 #include "visDisplayList.h"
 #include "visScene.h"
+#include "../common/visMix.h"
 
 namespace vis
 {

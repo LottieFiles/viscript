@@ -1,6 +1,6 @@
-// What the UI panel and the Input controller share: the region and family checks of their
-// bindings, whether a camera is one a scene draws through in its view, how a pan, orbit, zoom
-// or change of view moves it, and the drive that adds up their camera actions and moves the
+// What the UI panel and the Input controller share: clamps, the region and family checks of
+// their bindings, whether a camera is one a scene draws through in its view, how a pan, orbit,
+// zoom or change of view moves it, and the drive that adds up their camera actions and moves the
 // scene's camera by them each frame.
 #ifndef _VIS_CONTROL_H_
 #define _VIS_CONTROL_H_
@@ -18,6 +18,7 @@ namespace vis
 // The steepest pitch an orbit reaches, 89 degrees, so the camera never looks along its up vector.
 constexpr float MAX_PITCH = 1.55334306f;
 
+// value within [minimum, maximum], and maximum for NaN.
 static inline float _clamp(float value, float minimum, float maximum) noexcept
 {
     return std::fmax(minimum, std::fmin(maximum, value));
@@ -209,15 +210,6 @@ struct CameraDrive
             case CameraAction::View2D:
             case CameraAction::View3D: forced = action; break;
         }
-        return Result::Success;
-    }
-
-    Result view(CameraView value) noexcept
-    {
-        if (value != CameraView::TwoD && value != CameraView::ThreeD) {
-            return Result::InvalidArguments;
-        }
-        forced = value == CameraView::TwoD ? CameraAction::View2D : CameraAction::View3D;
         return Result::Success;
     }
 

@@ -15,12 +15,12 @@
 #include "visMathFont.h"
 
 #include "vis.h"
-#include "visDisplayColor.h"
 #include "visDisplayList.h"
 #include "visRendererBackend.h"
 #include "visTvgRenderer.h"
 #include "visScene.h"
 #include "../../common/visGrow.h"
+#include "../../common/visMix.h"
 #include "../../common/visString.h"
 
 namespace vis

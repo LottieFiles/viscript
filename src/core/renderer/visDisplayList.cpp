@@ -12,7 +12,7 @@
 #include "../common/visConstants.h"
 #include "../common/visGrow.h"
 #include "../common/visSort.h"
-#include "visDisplayColor.h"
+#include "../common/visMix.h"
 #include "visDisplayList.h"
 #include "visScene.h"
 

@@ -12,6 +12,7 @@
 #include "../common/visString.h"
 #include "../common/visConstants.h"
 #include "../common/visGrow.h"
+#include "../common/visMix.h"
 #include "visRendererBackend.h"
 #include "visScene.h"
 #include "visSceneValidation.h"
@@ -232,23 +233,9 @@ bool Gradient::operator==(const Gradient& other) const noexcept
     return true;
 }
 
-static float _mixValue(float from, float to, float progress)
-{
-    return static_cast<float>(static_cast<double>(from)
-                              + (static_cast<double>(to) - from) * progress);
-}
-
-static uint8_t _mixByte(uint8_t from, uint8_t to, float progress)
-{
-    auto value = static_cast<float>(from) + (static_cast<float>(to) - from) * progress;
-    if (value <= 0.0f) return 0;
-    if (value >= 255.0f) return 255;
-    return static_cast<uint8_t>(value + 0.5f);
-}
-
 Gradient mix(const Gradient& from, const Gradient& to, float progress) noexcept
 {
-    auto bounded = progress < 0.0f ? 0.0f : (progress > 1.0f ? 1.0f : progress);
+    auto bounded = _clamp(progress);
     if (from.type != to.type || from.stopCount != to.stopCount || from.line != to.line
         || from.centered != to.centered || from.sized != to.sized
         || from.focused != to.focused) {
@@ -258,23 +245,19 @@ Gradient mix(const Gradient& from, const Gradient& to, float progress) noexcept
     for (auto i = 0u; i < output.stopCount && i < Gradient::StopLimit; i++) {
         auto& a = from.stops[i];
         auto& b = to.stops[i];
-        output.stops[i].offset = _mixValue(a.offset, b.offset, bounded);
-        output.stops[i].color = {_mixByte(a.color.r, b.color.r, bounded),
-                                 _mixByte(a.color.g, b.color.g, bounded),
-                                 _mixByte(a.color.b, b.color.b, bounded),
-                                 _mixByte(a.color.a, b.color.a, bounded)};
+        output.stops[i].offset = _mix(a.offset, b.offset, bounded);
+        output.stops[i].color = _lerp(a.color, b.color, bounded);
     }
     auto point = [bounded](const Vec3& a, const Vec3& b) {
-        return Vec3{_mixValue(a.x, b.x, bounded), _mixValue(a.y, b.y, bounded),
-                    _mixValue(a.z, b.z, bounded)};
+        return Vec3{_mix(a.x, b.x, bounded), _mix(a.y, b.y, bounded), _mix(a.z, b.z, bounded)};
     };
     output.from = point(from.from, to.from);
     output.to = point(from.to, to.to);
     output.center = point(from.center, to.center);
     output.focal = point(from.focal, to.focal);
-    output.radius = _mixValue(from.radius, to.radius, bounded);
-    output.focalRadius = _mixValue(from.focalRadius, to.focalRadius, bounded);
-    output.angle = _mixValue(from.angle, to.angle, bounded);
+    output.radius = _mix(from.radius, to.radius, bounded);
+    output.focalRadius = _mix(from.focalRadius, to.focalRadius, bounded);
+    output.angle = _mix(from.angle, to.angle, bounded);
     return output;
 }
 
@@ -1425,14 +1408,9 @@ Color colormapColor(Colormap map, float share) noexcept
     auto t = std::isfinite(share) ? std::fmin(std::fmax(share, 0.0f), 1.0f) * 8.0f : 0.0f;
     auto index = std::min(static_cast<uint32_t>(t), 7u);
     auto u = t - static_cast<float>(index);
-    Color color;
-    uint8_t* channels[3] = {&color.r, &color.g, &color.b};
-    for (auto i = 0u; i < 3u; i++) {
-        auto from = static_cast<float>(stops[index][i]);
-        auto to = static_cast<float>(stops[index + 1u][i]);
-        *channels[i] = static_cast<uint8_t>(from + (to - from) * u + 0.5f);
-    }
-    return color;
+    auto& from = stops[index];
+    auto& to = stops[index + 1u];
+    return {_lerp(from[0], to[0], u), _lerp(from[1], to[1], u), _lerp(from[2], to[2], u)};
 }
 
 float colormapShare(const SurfaceColormap& colormap, const Vec3& point) noexcept

@@ -18,6 +18,7 @@
 #include "visTvgRenderer.h"
 #include "../../common/visFinite.h"
 #include "../../common/visLayout.h"
+#include "../../common/visMix.h"
 #include "../../common/visString.h"
 
 namespace vis
@@ -575,14 +576,6 @@ static uint8_t _layoutAlpha(float share)
     return static_cast<uint8_t>(share * 255.0f + 0.5f);
 }
 
-// The alpha progress in [0, 1] of the way from first to second.
-static uint8_t _layoutMix(uint8_t first, uint8_t second, float progress)
-{
-    auto value = static_cast<float>(first)
-               + (static_cast<float>(second) - first) * progress;
-    return static_cast<uint8_t>(value + 0.5f);
-}
-
 static bool _layoutContains(const BBox& outer, const BBox& inner)
 {
     return outer.width > 0.0f && outer.height > 0.0f
@@ -971,7 +964,7 @@ Result Renderer::layout(const Scene* scene, float time, LayoutReport& output,
                                  entry.descendantsOpacity, entry.descendantsKind);
             outgoing.list = &blended;
             outgoing.space = &fromConfig;
-            outgoing.background = _layoutMix(fromConfig.background.a, toConfig.background.a, bounded);
+            outgoing.background = _lerp(fromConfig.background.a, toConfig.background.a, bounded);
             outgoing.descendantsOpacity = _layoutOpacity(entry.descendantsOpacity,
                                                          _layoutAlpha(1.0f - bounded));
             outgoing.descendantsKind = LayoutVisualKind::FadeOut;

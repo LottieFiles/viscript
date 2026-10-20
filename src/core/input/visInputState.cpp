@@ -6,6 +6,7 @@
 
 #include "vis_input.h"
 #include "visInputEvent.h"
+#include "../common/visControl.h"
 #include "../common/visFinite.h"
 #include "../common/visGrow.h"
 
@@ -29,11 +30,6 @@ static uint32_t _length(const char* value) noexcept
         if (!value[length]) return length;
     }
     return 0u;
-}
-
-static float _clamp(float value) noexcept
-{
-    return std::fmax(-1.0f, std::fmin(1.0f, value));
 }
 
 }  // namespace
@@ -344,8 +340,9 @@ Result ActionMap::state(const State* input, const char* action,
         released = released || digital.released;
     }
     if (!found) return Result::InsufficientCondition;
-    sampled.previous = {_clamp(sampled.previous.x), _clamp(sampled.previous.y)};
-    sampled.value = {_clamp(sampled.value.x), _clamp(sampled.value.y)};
+    sampled.previous = {_clamp(sampled.previous.x, -1.0f, 1.0f),
+                        _clamp(sampled.previous.y, -1.0f, 1.0f)};
+    sampled.value = {_clamp(sampled.value.x, -1.0f, 1.0f), _clamp(sampled.value.y, -1.0f, 1.0f)};
     sampled.delta = sampled.value - sampled.previous;
     sampled.down = current;
     sampled.pressed = !previous && (current || pressed);

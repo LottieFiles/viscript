@@ -520,21 +520,6 @@ static bool _equal(const Mat4& first, const Mat4& second)
     return true;
 }
 
-static uint8_t _lerp(uint8_t from, uint8_t to, float progress)
-{
-    auto value = static_cast<float>(from) + (static_cast<float>(to) - static_cast<float>(from)) * progress;
-    return static_cast<uint8_t>(value + 0.5f);
-}
-
-static Color _lerp(const Color& from, const Color& to, float progress)
-{
-    return {
-        _lerp(from.r, to.r, progress),
-        _lerp(from.g, to.g, progress),
-        _lerp(from.b, to.b, progress),
-        _lerp(from.a, to.a, progress)};
-}
-
 static Mat4 _lerp(const Mat4& from, const Mat4& to, float progress)
 {
     Mat4 result;
