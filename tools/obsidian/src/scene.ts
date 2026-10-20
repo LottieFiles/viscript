@@ -7,7 +7,8 @@ import type {SceneLanguage} from "../../player/src/protocol.ts";
 import {paletteKey} from "../../player/src/theme.ts";
 import type ViscriptPlugin from "./main.ts";
 import type {SceneOptions} from "./options.ts";
-import {looksLikeScene, scanSource} from "./scan.ts";
+import {audioNames, looksLikeScene, scanSource} from "./scan.ts";
+import {SourcePanel} from "./source-panel.ts";
 import {obsidianPalette} from "./theme.ts";
 
 export interface SceneSource {
@@ -26,6 +27,8 @@ export interface BlockOptions extends SceneOptions {
     readonly open?: (event: MouseEvent) => void;
     /** Presses on the scene leave the focus where it is, as above a code block being edited. */
     readonly keepFocus?: boolean;
+    /** A source editor is already visible beside this player. */
+    readonly sourceDisplay?: false;
 }
 
 const PLACEHOLDER = [960, 540] as const;
@@ -44,8 +47,12 @@ export class SceneBlock extends MarkdownRenderChild {
     readonly #scrub: HTMLInputElement;
     readonly #time: HTMLElement;
     readonly #error: HTMLElement;
+    readonly #source: SourcePanel | null;
     #player: VisPlayer | null = null;
+    /** Sound scenes use the main thread, where Web Audio is available. */
+    #audio = false;
     #scene: SceneSource | null = null;
+    #variants: readonly SceneSource[] = [];
     /** The palette the scene last loaded with. */
     #palette = "";
     /** Counts starts, so a start that finishes after a later one gives way to it. */
@@ -81,6 +88,9 @@ export class SceneBlock extends MarkdownRenderChild {
             setTooltip(open, "Open the scene");
             open.addEventListener("click", (event) => this.#options.open?.(event));
         }
+        this.#source = options.sourceDisplay === false ? null
+            : new SourcePanel(this.#root, (scene) => this.show(scene, this.#variants));
+        this.#source?.configure(plugin.settings.showSource);
         this.#error = this.#root.createEl("pre", {cls: "viscript-error", attr: {role: "alert"}});
         this.#error.hide();
         if (options.keepFocus) this.#keepFocus();
@@ -109,22 +119,32 @@ export class SceneBlock extends MarkdownRenderChild {
         this.#plugin.blocks.delete(this);
         this.#resize?.disconnect();
         this.#stop();
+        this.#source?.dispose();
         this.#root.remove();
     }
 
     /** Shows `scene`; the same source again changes nothing. */
-    show(scene: SceneSource): void {
+    show(scene: SceneSource, variants: readonly SceneSource[] = [scene]): void {
         const previous = this.#scene;
         this.#scene = scene;
+        this.#variants = variants;
+        this.#source?.set(scene, variants);
         if (previous && previous.source === scene.source && previous.language === scene.language
             && previous.path === scene.path) return;
         this.#load();
     }
 
+    /** Replaces language variants after editing while keeping the selected language. */
+    refreshVariants(variants: readonly SceneSource[]): void {
+        const scene = variants.find((variant) => variant.language === this.#scene?.language) ?? variants[0];
+        if (scene) this.show(scene, variants);
+    }
+
     /** Changes the options an embed's alias gives. */
     setOptions(options: BlockOptions): void {
         const previous = this.#options;
-        this.#options = {...options, layout: previous.layout, open: previous.open, keepFocus: previous.keepFocus};
+        this.#options = {...options, layout: previous.layout, open: previous.open, keepFocus: previous.keepFocus,
+            sourceDisplay: previous.sourceDisplay};
         this.#layout();
         if (previous.interactive !== options.interactive) this.rebuild();
         else this.configure();
@@ -146,6 +166,7 @@ export class SceneBlock extends MarkdownRenderChild {
     /** Applies the playback settings; a changed autoplay setting plays or pauses the scene. */
     configure(autoplayChanged = false): void {
         const settings = this.#plugin.settings;
+        this.#source?.configure(settings.showSource);
         this.#player?.configure({
             end: this.#options.end ?? settings.end,
             maxFps: settings.maxFps || undefined,
@@ -178,9 +199,11 @@ export class SceneBlock extends MarkdownRenderChild {
 
     async #start(): Promise<void> {
         const generation = ++this.#generation;
+        this.#audio = this.#scene !== null
+            && audioNames(scanSource(this.#scene.source, this.#scene.language)).length > 0;
         let host;
         try {
-            host = await this.#plugin.host();
+            host = await this.#plugin.host(this.#audio);
         } catch (error) {
             if (generation === this.#generation && this.#active) this.#showError(`The viscript runtime could not start: ${message(error)}`);
             return;
@@ -215,6 +238,7 @@ export class SceneBlock extends MarkdownRenderChild {
             autoplay: this.#autoplay(),
             end: this.#options.end ?? settings.end,
             interactive: this.#options.interactive ?? false,
+            audio: this.#audio,
             maxFps: settings.maxFps || undefined,
             quality: settings.quality,
             label: this.#label(),
@@ -247,6 +271,10 @@ export class SceneBlock extends MarkdownRenderChild {
         const scene = this.#scene, player = this.#player;
         if (!scene) return;
         const scanned = scanSource(scene.source, scene.language);
+        if ((audioNames(scanned).length > 0) !== this.#audio) {
+            this.rebuild();
+            return;
+        }
         if (!looksLikeScene(scanned)) {
             this.#notice.setText(scene.source.trim()
                 ? `${scene.name} is not a viscript scene: it never calls vis.`

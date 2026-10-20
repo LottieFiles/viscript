@@ -67,6 +67,22 @@ follows what you type once you pause, with any error under it. A click on it pla
 and the timeline seeks without leaving the code; an `interactive` scene takes input once the cursor
 leaves the block.
 
+Turn on **Show source** in the plugin settings to keep each note player's script below it.
+The code button on a player shows or hides that script; **Copy source** copies the original
+Lua or JavaScript. These panels are read-only: edit the Markdown code block to change a scene.
+While a block is being edited, Obsidian's editor supplies the source and the player above it
+shows no second copy.
+
+The API reference marks each example with `<!-- api-example: name -->`. An adjacent Lua
+`viscript` fence and JavaScript `viscript-js` fence under that marker share one player, with
+language buttons to switch the scene and its source. Both sources stay in Markdown. Unmarked
+scenes keep their separate players.
+
+Scene audio cues and runtime sounds can name a `.wav` file in the vault, resolved like a link
+from the note or scene file. Sound scenes render on the main thread for Web Audio; other scenes
+keep the shared render worker. Click the player's play button to start sound. Playback, pause,
+seeking and replay keep the sound in step with the scene.
+
 Scenes that name no theme, or name `adaptive`, take their colors from the Obsidian theme and
 follow it between light and dark, and set their text in the text font below. A click plays or
 pauses a scene; the play bar appears on hover, and on touch screens it stays under the scene.
@@ -131,9 +147,10 @@ plugin stays off the network.
 | Autoplay | Play scenes as soon as they appear; scenes start paused when the system asks for reduced motion |
 | At the end | Replay, seamlessly where the scene loops, fading into the start or at once; or stop on the last frame |
 | Controls | The play bar on hover, always, or never |
+| Show source | Show each note player's script by default; its code button can also show or hide it |
 | Frame rate | Up to 60 frames a second (30 on phones), or 30, 24 or 15 |
 | Sharpness | Balanced, a little under the screen's resolution on dense screens, or Sharpest |
-| Render in a worker | Draw scenes off Obsidian's main thread |
+| Render in a worker | Draw scenes off Obsidian's main thread; sound scenes use the main thread |
 | Open .lua files as scenes | Open `.lua` files in the scene tab; takes effect when Obsidian next starts |
 
 ## How it is built
@@ -142,9 +159,9 @@ plugin stays off the network.
 runtime, the compiler JavaScript scenes run in, and the two bundled fonts, gzipped into the file
 and each unpacked when a scene first needs it, so nothing is downloaded to play scenes. The fonts,
 mostly Pretendard's Korean letters, make up 1.6 MB of its 2.6 MB. It needs WebAssembly and
-`DecompressionStream`, which iPhones and iPads have from iOS 16.4. One render worker draws every
-scene, including those in popout windows and the settings window, and fonts load once into each
-runtime instance that scenes share.
+`DecompressionStream`, which iPhones and iPads have from iOS 16.4. One render worker draws scenes
+without sound, including those in popout windows and the settings window; a shared main-thread
+runtime draws sound scenes. Fonts load once into each runtime instance that scenes share.
 
 ## Test
 

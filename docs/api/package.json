@@ -1,0 +1,21 @@
+{
+  "name": "viscript-api-markdown",
+  "private": true,
+  "version": "4.5.2",
+  "type": "module",
+  "description": "Obsidian Markdown API reference rendered into VISCRIPT content with Quartz",
+  "engines": {
+    "node": ">=22",
+    "npm": ">=10.9.2"
+  },
+  "scripts": {
+    "vault:setup": "node scripts/setup-vault.mjs",
+    "postinstall": "node scripts/setup-quartz.mjs",
+    "quartz:build": "node --no-deprecation quartz/bootstrap-cli.mjs build --directory content --output public",
+    "quartz:watch": "node --no-deprecation quartz/bootstrap-cli.mjs build --directory content --output public --watch"
+  },
+  "dependencies": {
+    "@jackyzha0/quartz": "https://codeload.github.com/jackyzha0/quartz/tar.gz/4923affa7722dfc751f1074348e6dad214fe0c08",
+    "esbuild": "0.25.9"
+  }
+}

@@ -2,8 +2,9 @@
 import {Keymap, MarkdownRenderChild, type App, type Component, type MarkdownPostProcessorContext, type TFile} from "obsidian";
 import type {SceneLanguage} from "../../player/src/protocol.ts";
 import type ViscriptPlugin from "./main.ts";
+import {scenePairAtLine, scenePairs, type ScenePair} from "./code-pairs.ts";
 import {fenceOptions, parseOptions, type SceneOptions} from "./options.ts";
-import {SceneBlock} from "./scene.ts";
+import {SceneBlock, type BlockOptions, type SceneSource} from "./scene.ts";
 
 // Obsidian's embed registry is not in its public typings, but every embed goes through it:
 // reading view, Live Preview and hover popovers alike.
@@ -79,12 +80,59 @@ export class FileEmbed extends MarkdownRenderChild {
     }
 }
 
+const pairedBlocks = new WeakMap<ViscriptPlugin, Set<PairedSceneBlock>>();
+
+/** A pair's Lua fence owns its player even when only the JS fence is edited or redrawn. */
+class PairedSceneBlock extends SceneBlock {
+    readonly pairId: string;
+    readonly sourcePath: string;
+
+    constructor(plugin: ViscriptPlugin, el: HTMLElement, options: BlockOptions, pair: ScenePair, path: string) {
+        super(plugin, el, options);
+        this.pairId = pair.id;
+        this.sourcePath = path;
+        let owners = pairedBlocks.get(plugin);
+        if (!owners) pairedBlocks.set(plugin, owners = new Set());
+        owners.add(this);
+        this.register(() => owners.delete(this));
+        this.registerEvent(plugin.app.workspace.on("editor-change", (editor, info) => {
+            if (info.file?.path !== path) return;
+            const updated = scenePairs(editor.getValue()).find((candidate) => candidate.id === this.pairId);
+            if (updated) this.refreshPair(updated);
+        }));
+    }
+
+    refreshPair(pair: ScenePair): void {
+        this.refreshVariants([pair.lua, pair.js].map(({source, language}) => ({
+            source, language, name: language === "js" ? "scene.js" : "scene.lua", path: this.sourcePath,
+        })));
+    }
+}
+
 /** A `viscript` (Lua) or `viscript-js` code block. */
 export function renderCodeBlock(plugin: ViscriptPlugin, language: SceneLanguage, source: string, el: HTMLElement,
     context: MarkdownPostProcessorContext): void {
     const section = context.getSectionInfo(el);
-    const fence = section ? section.text.split("\n")[section.lineStart] ?? "" : "";
-    const block = new SceneBlock(plugin, el, {label: "viscript scene", ...fenceOptions(fence)});
+    const pair = section ? scenePairAtLine(section.text, section.lineStart) : null;
+    if (pair && language === "js" && section?.lineStart === pair.js.lineStart) {
+        // The Lua block owns the one player and its language selector; keep the Markdown source.
+        for (const owner of pairedBlocks.get(plugin) ?? []) {
+            if (owner.pairId === pair.id && owner.sourcePath === context.sourcePath) owner.refreshPair(pair);
+        }
+        el.hide();
+        return;
+    }
+    const paired = pair && language === "lua" && section?.lineStart === pair.lua.lineStart ? pair : null;
+    if (paired) el.dataset.viscriptPair = paired.id;
+    const fence = paired?.lua.fence ?? (section ? section.text.split("\n")[section.lineStart] ?? "" : "");
+    const options = {label: "viscript scene", ...fenceOptions(fence)};
+    const block = paired ? new PairedSceneBlock(plugin, el, options, paired, context.sourcePath)
+        : new SceneBlock(plugin, el, options);
     context.addChild(block);
-    block.show({source, language, name: language === "js" ? "scene.js" : "scene.lua", path: context.sourcePath});
+    const scene = {source: paired?.lua.source ?? source, language, name: language === "js" ? "scene.js" : "scene.lua",
+        path: context.sourcePath};
+    const variants: SceneSource[] | undefined = paired ? [scene, {
+        source: paired.js.source, language: "js", name: "scene.js", path: context.sourcePath,
+    }] : undefined;
+    block.show(scene, variants);
 }

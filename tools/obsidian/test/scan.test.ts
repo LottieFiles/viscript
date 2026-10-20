@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {imageMime, imageNames, looksLikeScene, scanSource} from "../src/scan.ts";
+import {audioMime, audioNames, imageMime, imageNames, looksLikeScene, scanSource} from "../src/scan.ts";
 
 test("Lua literals are read past comments, escapes decoded", () => {
     const {literals, code} = scanSource(String.raw`
@@ -47,6 +47,30 @@ s:text {text = "not an image.png\\nreally"}`, "lua");
     assert.deepEqual(imageNames(scanned), ["earth.png", "img/LOGO.SVG"]);
     assert.equal(imageMime("img/LOGO.SVG"), "svg");
     assert.equal(imageMime("earth.png"), "png");
+});
+
+test("sounds are WAV literals in Lua cues and retained runtime calls", () => {
+    const scanned = scanSource(String.raw`
+-- runtime:sound("comment.wav")
+vis.audio.cue(scene, {asset = "tone.wav"})
+runtime:sound("sounds/CLICK.WAV", {gain = 0.25})
+runtime:sound("tone.wav")
+runtime:sound("music.mp3")
+runtime:sound("music.flac")
+runtime:sound("music.ogg")
+scene:text {text = "not a sound.wav\nreally"}`, "lua");
+    assert.deepEqual(audioNames(scanned), ["tone.wav", "sounds/CLICK.WAV"]);
+    assert.equal(audioMime("sounds/CLICK.WAV"), "audio/wav");
+    assert.equal(audioMime("music.mp3"), "");
+});
+
+test("JavaScript cue audio names decode escaped paths and skip comments", () => {
+    const scanned = scanSource(String.raw`
+// scene.sound({asset: "comment.wav"});
+scene.sound({asset: "sounds/\u0074one.wav"});
+scene.sound({asset: 'sounds/tone.wav'});
+` + "scene.sound({asset: `click.wav`});", "js");
+    assert.deepEqual(audioNames(scanned), ["sounds/tone.wav", "click.wav"]);
 });
 
 test("a scene calls into vis outside comments", () => {

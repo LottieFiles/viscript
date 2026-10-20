@@ -64,6 +64,11 @@ export class ViscriptSettingTab extends PluginSettingTab {
                 control: {type: "dropdown", key: "controls", options: {hover: "Show on hover", always: "Always show", never: "Hide"}},
             },
             {
+                name: "Show source",
+                desc: "Show the script below players in notes. Each player's code button can also show or hide it. When editing a code block, its existing editor shows the source instead.",
+                control: {type: "toggle", key: "showSource"},
+            },
+            {
                 name: "Frame rate",
                 desc: "The most frames a second a scene draws. Lower rates save battery.",
                 control: {type: "dropdown", key: "maxFps", options: {"0": "Up to 60, or 30 on phones", "30": "30", "24": "24", "15": "15"}},
@@ -199,7 +204,7 @@ export class ViscriptSettingTab extends PluginSettingTab {
         setting.setDesc("Text and code as scenes draw them with these fonts.");
         setting.setClass("viscript-preview-setting");
         const box = setting.settingEl.createDiv({cls: "viscript-preview"});
-        const block = new SceneBlock(this.#plugin, box, {controls: false, autoplay: false, label: "Font preview"});
+        const block = new SceneBlock(this.#plugin, box, {controls: false, autoplay: false, label: "Font preview", sourceDisplay: false});
         block.load();
         block.show({source: PREVIEW, language: "lua", name: "preview.lua", path: ""});
         return () => block.unload();

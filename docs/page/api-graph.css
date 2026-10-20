@@ -1,0 +1,92 @@
+.api-graph {
+  min-width: 0;
+  margin: 0 0 28px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  overflow: hidden;
+  background: var(--panel);
+  font-family: var(--sans);
+}
+.api-graph-header { display: flex; align-items: center; gap: 6px; min-height: 40px; padding: 7px 9px; }
+.api-graph-title { color: var(--dim); font-size: 11px; font-weight: 550; letter-spacing: .02em; white-space: nowrap; }
+.api-graph-count { margin-left: auto; color: var(--mute); font: 10px var(--mono); white-space: nowrap; }
+.api-graph button {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--mute);
+  font: 17px/1 var(--sans);
+  cursor: pointer;
+}
+.api-graph button:hover { background: var(--raise); color: var(--fg); }
+.api-graph button:focus-visible, .api-graph-close:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.api-graph-stage { position: relative; width: 100%; height: 205px; }
+.api-graph-stage > svg { display: block; width: 100%; height: 100%; overflow: hidden; touch-action: none; cursor: grab; }
+.api-graph.is-dragging .api-graph-stage > svg, .api-graph.is-dragging .api-graph-node { cursor: grabbing; }
+.api-graph-edge { stroke: var(--line2); stroke-width: .8px; vector-effect: non-scaling-stroke; }
+.api-graph-edge-link { stroke: var(--mute); opacity: .38; }
+.api-graph-node { cursor: pointer; outline: none; text-decoration: none; }
+.api-graph-hit { fill: transparent; }
+.api-graph-dot { fill: var(--mute); stroke: var(--panel); stroke-width: 2; }
+.api-graph-node.is-category .api-graph-dot { fill: var(--dim); }
+.api-graph-node.is-current .api-graph-dot { fill: var(--accent); stroke: var(--panel); stroke-width: 2.5; }
+.api-graph-node text {
+  fill: var(--dim);
+  font: 10px var(--sans);
+  pointer-events: none;
+  opacity: 0;
+  paint-order: stroke;
+  stroke: var(--panel);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+.api-graph-node.is-category text, .api-graph-node.is-current text, .api-graph-node.has-label text,
+.api-graph-node.is-highlighted text, .api-graph-node:focus-visible text { opacity: 1; }
+.api-graph-node.is-current text { fill: var(--accent); }
+.api-graph:not(.api-graph-global) .api-graph-node.is-category:not(.is-current):not(.is-highlighted):not(.has-label):not(:focus-visible) text { opacity: 0; }
+.api-graph-node.is-highlighted .api-graph-dot, .api-graph-node:focus-visible .api-graph-dot { fill: var(--accent); stroke: var(--accent-soft); stroke-width: 7px; }
+.api-graph-node.is-dim { opacity: .2; }
+.api-graph-edge.is-dim { opacity: .1; }
+.api-graph-edge.is-highlighted { stroke: var(--accent); opacity: .7; }
+.api-graph-controls { position: absolute; right: 8px; bottom: 8px; display: flex; padding: 2px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); }
+.api-graph-controls button + button { border-left: 1px solid var(--line); border-radius: 0; }
+.api-graph-hint { position: absolute; left: 14px; bottom: 13px; color: var(--mute); font-size: 10px; pointer-events: none; }
+.api-graph-global { margin: 24px 0 32px; }
+.api-graph-global .api-graph-header { padding: 9px 14px; }
+.api-graph-global .api-graph-title { font-size: 12px; color: var(--fg); }
+.api-graph-global .api-graph-stage { height: 370px; }
+.api-graph-global .api-graph-node text { font-size: 11px; }
+.api-graph-modal {
+  position: fixed;
+  max-width: min(1040px, calc(100vw - 32px));
+  width: 1040px;
+  max-height: calc(100dvh - 32px);
+  padding: 0;
+  border: 1px solid var(--line2);
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--fg);
+  box-shadow: 0 28px 100px #0006;
+}
+.api-graph-modal::backdrop { background: #0009; backdrop-filter: blur(4px); }
+.api-graph-modal .api-graph { margin: 0; border: 0; border-radius: 0; }
+.api-graph-modal .api-graph-header { min-height: 52px; padding-right: 55px; border-bottom: 1px solid var(--line); }
+.api-graph-modal .api-graph-stage { height: min(650px, calc(100dvh - 100px)); }
+.api-graph-close { position: absolute; z-index: 1; right: 12px; top: 11px; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--dim); font: 23px var(--sans); cursor: pointer; }
+.api-graph-close:hover { background: var(--raise); color: var(--fg); }
+@media (max-width: 1180px) {
+  .api-graph-global .api-graph-stage { height: 330px; }
+}
+@media (max-width: 480px) {
+  .api-graph-global .api-graph-stage { height: 310px; }
+  .api-graph-global .api-graph-node text { font-size: 9px; }
+  .api-graph-hint { max-width: 140px; font-size: 9px; }
+  .api-graph-modal { max-width: calc(100vw - 16px); max-height: calc(100dvh - 16px); border-radius: 9px; }
+  .api-graph-modal .api-graph-stage { height: calc(100dvh - 80px); }
+}

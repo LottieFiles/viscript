@@ -1,0 +1,5 @@
+node_modules/
+quartz
+.quartz-cache/
+public/
+.obsidian/

@@ -4,6 +4,7 @@
 import {cpSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync} from "node:fs";
 import {dirname, join, relative, resolve} from "node:path";
 import {fileURLToPath} from "node:url";
+import {buildApi} from "./build-api.mjs";
 
 const page = resolve(dirname(fileURLToPath(import.meta.url)), "../docs/page");
 const {compile} = await import(resolve(page, "node_modules/@mdx-js/mdx/index.js"));
@@ -52,8 +53,10 @@ const scan = (dir) => readdirSync(dir, {withFileTypes: true}).forEach((e) =>
 scan(content);
 rmSync(out, {recursive: true, force: true});
 
+buildApi(join(out, "api"));
+const api = JSON.parse(readFileSync(join(out, "api/manifest.json"), "utf8"));
 const docs = [];
-for (const file of files.sort()) {
+for (const file of files.sort((a, b) => a.localeCompare(b, "en", {numeric: true}))) {
     const id = relative(content, file).replace(/\.mdx$/, "");
     const [meta, body] = frontmatter(readFileSync(file, "utf8"));
     const target = join(out, id + ".js");
@@ -63,7 +66,7 @@ for (const file of files.sort()) {
     writeFileSync(target, code);
     if (id.startsWith("docs/")) docs.push({id: id.slice(5).replace(/^[\d.]+-/, ""), file: id, ...meta});
 }
-writeFileSync(join(out, "manifest.js"), `export const DOCS = ${JSON.stringify(docs, null, 1)};\n`);
+writeFileSync(join(out, "manifest.js"), `export const DOCS = ${JSON.stringify(docs, null, 1)};\nexport const API = ${JSON.stringify(api, null, 1)};\n`);
 console.log(`compiled ${files.length} mdx files`);
 
 // The runtime the page ships, which the repository keeps only in the skill's bundle, and Pretendard

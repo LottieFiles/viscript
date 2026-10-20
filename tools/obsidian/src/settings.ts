@@ -9,6 +9,8 @@ export interface ViscriptSettings extends FontSettings {
     readonly autoplay: boolean;
     readonly end: EndBehavior;
     readonly controls: ControlsMode;
+    /** Show the read-only script below players in notes. */
+    readonly showSource: boolean;
     /** Frames per second at most; 0 for the default, 60 or 30 on phones. */
     readonly maxFps: number;
     readonly quality: Quality;
@@ -24,6 +26,7 @@ export const DEFAULT_SETTINGS: ViscriptSettings = {
     autoplay: true,
     end: "auto",
     controls: "hover",
+    showSource: false,
     maxFps: 0,
     quality: "auto",
     worker: true,

@@ -119,6 +119,73 @@
     display: none;
 }
 
+/* Source controls remain available even when playback controls are hidden. */
+
+.viscript-source-tools {
+    display: flex;
+    align-items: center;
+    gap: var(--size-4-1);
+    padding: var(--size-4-1) var(--size-4-2);
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+}
+
+.viscript-source-languages {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: var(--size-4-1);
+    min-width: 0;
+}
+
+.viscript-source-language {
+    padding: var(--size-2-1) var(--size-4-2);
+    height: auto;
+    box-shadow: none;
+    border-radius: var(--radius-s);
+    background: transparent;
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+}
+
+.viscript-source-language[aria-pressed="true"] {
+    background: var(--background-modifier-hover);
+    color: var(--text-normal);
+}
+
+.viscript-source-panel {
+    overflow: hidden;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-m);
+    background: var(--code-background);
+}
+
+.viscript-source-panel[hidden],
+.viscript-source-copy[hidden] {
+    display: none;
+}
+
+.viscript-source-panel pre {
+    max-height: 24rem;
+    margin: 0;
+    padding: var(--size-4-3);
+    overflow: auto;
+    color: var(--code-normal);
+    background: transparent;
+    font-family: var(--font-monospace);
+    font-size: var(--code-size);
+    line-height: 1.55;
+    white-space: pre;
+    user-select: text;
+}
+
+.viscript-source-panel code {
+    padding: 0;
+    background: transparent;
+    font: inherit;
+    white-space: inherit;
+}
+
 /* Source that is not a scene, and errors. */
 
 .viscript-notice {

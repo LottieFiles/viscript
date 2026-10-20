@@ -78,6 +78,20 @@ async function makeVault() {
     await mkdir(join(vault, "Fonts"), {recursive: true});
     await cp(join(repo, "src/examples/assets/PretendardStd-Regular.ttf"), join(vault, "Fonts/PretendardStd-Regular.ttf"));
     await cp(join(docs, "assets/earth.png"), join(vault, "earth.png"));
+    // A deterministic, decoded sound for the audio cue examples.
+    const rate = 8000, samples = rate, tone = Buffer.alloc(44 + samples * 2);
+    tone.write("RIFF"); tone.writeUInt32LE(36 + samples * 2, 4); tone.write("WAVEfmt ", 8);
+    tone.writeUInt32LE(16, 16); tone.writeUInt16LE(1, 20); tone.writeUInt16LE(1, 22);
+    tone.writeUInt32LE(rate, 24); tone.writeUInt32LE(rate * 2, 28); tone.writeUInt16LE(2, 32); tone.writeUInt16LE(16, 34);
+    tone.write("data", 36); tone.writeUInt32LE(samples * 2, 40);
+    for (let i = 0; i < samples; i++) {
+        // Keep the loop seam quiet so quality checks measure the gain envelope, not an abrupt
+        // source boundary after resampling the 8 kHz fixture to the device's sample rate.
+        const edge = Math.min(1, i / (rate * 0.01), (samples - 1 - i) / (rate * 0.01));
+        tone.writeInt16LE(Math.round(Math.sin(2 * Math.PI * 440 * i / rate) * 8000 * edge), 44 + i * 2);
+    }
+    await mkdir(join(vault, "assets"), {recursive: true});
+    await writeFile(join(vault, "assets/tone.wav"), tone);
     const dir = join(vault, ".obsidian/plugins/viscript");
     await mkdir(dir, {recursive: true});
     for (const name of ["main.js", "manifest.json", "styles.css"]) await cp(join(plugin, name), join(dir, name));
@@ -146,7 +160,15 @@ after(async () => {
 const READING = ".markdown-reading-view .viscript-scene";
 const LIVE = ".markdown-source-view .viscript-scene";
 const VIEW = ".workspace-leaf.mod-active .viscript-view";
+const ACTIVE_READING = `.workspace-leaf.mod-active ${READING}`;
+const ACTIVE_LIVE = `.workspace-leaf.mod-active ${LIVE}`;
 const SHOWN = ["playing", "paused", "stopped"];
+
+async function openNote(path, mode = "preview") {
+    await app.evaluate(async ([path, mode]) => {
+        await window.app.workspace.getLeaf(false).openFile(window.app.vault.getFileByPath(path), {state: {mode}});
+    }, [path, mode]);
+}
 
 // The scenes `selector` finds: their state, and the error or notice each shows.
 function scenes(selector, page = app) {
@@ -278,6 +300,399 @@ test("fonts by name: the theme's from the plugin, one the scene names from the f
     });
 });
 
+test("an API example has one player with Lua and JavaScript, while unrelated examples keep their players", options, async () => {
+    await openNote("Paired.md");
+    await app.waitForSelector(ACTIVE_READING);
+    await showEach(ACTIVE_READING);
+    assert.equal(await app.locator(ACTIVE_READING).count(), 1);
+    assert.equal(await app.locator(`${ACTIVE_READING} .viscript-source-language`).count(), 2);
+    assert.deepEqual((await scenes(ACTIVE_READING)).filter((scene) => scene.error), []);
+
+    await openNote("Unpaired.md");
+    await app.waitForSelector(ACTIVE_READING);
+    await showEach(ACTIVE_READING);
+    assert.equal(await app.locator(ACTIVE_READING).count(), 3, "unmarked and separately explained scenes stay separate");
+    assert.deepEqual((await scenes(ACTIVE_READING)).filter((scene) => scene.error), []);
+});
+
+test("audio cues produce decoded WebAudio samples in Lua and JavaScript, and pausing silences them", options, async (t) => {
+    const cdp = await app.context().newCDPSession(app);
+    await cdp.send("Emulation.setFocusEmulationEnabled", {enabled: true});
+    t.after(async () => {
+        await openNote("Scenes.md").catch(() => undefined);
+        await app.evaluate(() => {
+            for (const probe of window.e2eAudioProbes ?? []) probe.node.removeEventListener("audioprocess", probe.listen);
+            delete window.e2eAudioProbes;
+            delete window.e2eAudioBlock;
+            delete window.e2eAudioCanvas;
+        }).catch(() => undefined);
+        await cdp.send("Emulation.setFocusEmulationEnabled", {enabled: false}).catch(() => undefined);
+        await cdp.detach().catch(() => undefined);
+    });
+    await openNote("Audio.md");
+    await app.waitForSelector(ACTIVE_READING);
+    await showEach(ACTIVE_READING);
+    assert.equal(await app.locator(ACTIVE_READING).count(), 1);
+    assert.deepEqual((await scenes(ACTIVE_READING)).filter((scene) => scene.error), []);
+    const assets = await app.evaluate((selector) => {
+        const source = document.querySelector(`${selector} .viscript-source-panel code`).textContent;
+        return window.app.plugins.plugins.viscript.resources({source, language: "lua", path: "Audio.md", name: "audio.lua"}).assets;
+    }, ACTIVE_READING);
+    assert.equal(assets.length, 1, "a basename resolves the vault's audio attachment");
+    assert.match(assets[0].id, /^assets\/tone\.wav@/);
+    assert.equal(assets[0].name, "tone.wav");
+    assert.equal(assets[0].mime, "audio/wav");
+    const scene = app.locator(ACTIVE_READING), play = scene.locator(".viscript-play");
+    const playerAction = (action) => app.evaluate(([selector, action]) => {
+        const canvas = document.querySelector(`${selector} canvas`);
+        const player = [...window.app.plugins.plugins.viscript.blocks].find((block) => block.player?.canvas === canvas)?.player;
+        if (action === "pause") { player.pause(); player.seek(0); }
+        return {state: player.state, duration: player.duration};
+    }, [ACTIVE_READING, action]);
+    // The real miniaudio callback fills these buffers from decoded WAV bytes. Observing it after
+    // its callback, rather than replacing the audio API, catches a missing asset or silent mixer.
+    const observe = () => app.evaluate(() => {
+        const probes = window.e2eAudioProbes ??= [];
+        for (const device of window.miniaudio?.devices ?? []) {
+            if (!device?.scriptNode || probes.some((probe) => probe.node === device.scriptNode)) continue;
+            const probe = {device, node: device.scriptNode, frames: 0, nonzero: 0, peak: 0};
+            probe.listen = (event) => {
+                probe.frames++;
+                for (let channel = 0; channel < event.outputBuffer.numberOfChannels; channel++) {
+                    const samples = event.outputBuffer.getChannelData(channel);
+                    for (const sample of samples) {
+                        const level = Math.abs(sample);
+                        if (level > 0.00001) probe.nonzero++;
+                        if (level > probe.peak) probe.peak = level;
+                    }
+                }
+            };
+            probe.node.addEventListener("audioprocess", probe.listen);
+            probes.push(probe);
+        }
+        return probes.map((probe) => ({state: probe.device.webaudio?.state, frames: probe.frames, nonzero: probe.nonzero, peak: probe.peak}));
+    });
+    const reset = () => app.evaluate(() => {
+        for (const probe of window.e2eAudioProbes ?? []) probe.frames = probe.nonzero = probe.peak = 0;
+    });
+    for (const language of ["lua", "js"]) {
+        if (language === "js") {
+            await scene.locator('.viscript-source-language[data-language="js"]').click();
+            await until(async () => (await playerAction("inspect")).duration === 5 &&
+                (await scenes(ACTIVE_READING)).every((scene) => SHOWN.includes(scene.state) && !scene.error), "the JavaScript audio scene");
+        }
+        await playerAction("pause");
+        await until(async () => (await playerAction("inspect")).state === "paused", "the audio scene paused");
+        await reset();
+        await play.click();
+        const emitted = await until(async () => (await observe()).some((probe) => probe.state === "running" && probe.nonzero > 0),
+            `${language} audio to emit nonzero decoded PCM`, 6000).catch(async (error) => {
+                const evidence = await app.evaluate((selector) => {
+                    const source = document.querySelector(`${selector} .viscript-source-panel code`)?.textContent ?? "";
+                    const plugin = window.app.plugins.plugins.viscript;
+                    return {resources: plugin.resources({source, language: "lua", path: "Audio.md", name: "audio.lua"}),
+                        audioDevices: (window.miniaudio?.devices ?? []).map((device) => device && {state: device.state, context: device.webaudio?.state}),
+                        scene: document.querySelector(selector)?.dataset.state};
+                }, ACTIVE_READING);
+                assert.fail(`${error.message}\n${JSON.stringify(evidence)}\n${JSON.stringify(await observe())}`);
+            });
+        assert.ok(emitted);
+        await play.click();
+        await until(async () => (await playerAction("inspect")).state === "paused", "the cue paused with the scene");
+        await delay(350); // Let the last queued device buffer finish.
+        await reset();
+        await delay(300);
+        assert.ok((await observe()).every((probe) => probe.nonzero === 0), "paused scenes output no audio samples");
+        await play.click();
+        await until(async () => (await observe()).some((probe) => probe.state === "running" && probe.nonzero > 0),
+            `${language} audio to resume with playback`, 6000);
+        await play.click();
+    }
+    // Editing a source can add or remove sound without changing the block. A transferred canvas
+    // belongs to the worker; an inline canvas keeps its main-thread 2D context.
+    const js = (await readFile(join(vault, "Audio.md"), "utf8")).match(/```viscript-js loop\n([^]*?)\n```/)[1];
+    await app.evaluate((selector) => {
+        const canvas = document.querySelector(`${selector} canvas`);
+        window.e2eAudioBlock = [...window.app.plugins.plugins.viscript.blocks].find((block) => block.player?.canvas === canvas);
+        window.e2eAudioCanvas = canvas;
+    }, ACTIVE_READING);
+    const replaceSource = (source) => app.evaluate((source) => {
+        window.e2eAudioBlock.show({source, language: "js", name: "audio.js", path: "Audio.md"});
+    }, source);
+    const surface = () => app.evaluate(() => {
+        const player = window.e2eAudioBlock.player, canvas = player?.canvas;
+        let inline = false;
+        try { inline = Boolean(canvas?.getContext("2d")); } catch {}
+        return {changed: Boolean(canvas && canvas !== window.e2eAudioCanvas), state: player?.state, inline};
+    });
+    await replaceSource(js.replace(/^scene\.sound\([^\n]+\);\n/m, ""));
+    await until(async () => {
+        const seen = await surface();
+        return seen.changed && SHOWN.includes(seen.state) && !seen.inline;
+    }, "an edited silent scene to return to the worker");
+    await app.evaluate(() => { window.e2eAudioCanvas = window.e2eAudioBlock.player.canvas; });
+    await replaceSource(js);
+    await until(async () => {
+        const seen = await surface();
+        return seen.changed && SHOWN.includes(seen.state) && seen.inline;
+    }, "an edited sound scene to return to inline rendering");
+    await playerAction("pause");
+    await observe();
+    await reset();
+    await play.click();
+    await until(async () => (await observe()).some((probe) => probe.state === "running" && probe.nonzero > 0),
+        "the edited source to play its sound again", 6000);
+    await play.click();
+    await openNote("Runtime Audio.md");
+    await showEach(ACTIVE_READING);
+    const runtime = app.locator(`${ACTIVE_READING} canvas`);
+    await runtime.click();
+    await observe();
+    await reset();
+    await runtime.press("Space");
+    await until(async () => (await observe()).some((probe) => probe.state === "running" && probe.nonzero > 0),
+        "a retained runtime sound to emit nonzero decoded PCM after Space", 6000);
+    assert.equal(await hostMode(), "worker", "audio scenes leave the ordinary render worker enabled");
+    await shot("audio");
+});
+
+test("cue gain fades stay bounded and continuous through repeated Lua and JavaScript playback", options, async (t) => {
+    const cdp = await app.context().newCDPSession(app);
+    await cdp.send("Emulation.setFocusEmulationEnabled", {enabled: true});
+    const clear = () => app.evaluate(() => {
+        for (const probe of window.e2eGainProbes ?? []) probe.node.removeEventListener("audioprocess", probe.listen);
+        delete window.e2eGainProbes;
+    });
+    t.after(async () => {
+        await clear().catch(() => undefined);
+        await app.evaluate(() => {
+            for (const block of window.app.plugins.plugins.viscript.blocks) block.player?.pause();
+        }).catch(() => undefined);
+        await openNote("Scenes.md").catch(() => undefined);
+        await cdp.send("Emulation.setFocusEmulationEnabled", {enabled: false}).catch(() => undefined);
+        await cdp.detach().catch(() => undefined);
+    });
+    await app.evaluate(() => {
+        for (const block of window.app.plugins.plugins.viscript.blocks) block.player?.pause();
+    });
+    await openNote("Gain.md");
+    await app.waitForSelector(ACTIVE_READING);
+    await showEach(ACTIVE_READING);
+    const scene = app.locator(ACTIVE_READING);
+    assert.equal(await scene.count(), 1);
+    assert.deepEqual((await scenes(ACTIVE_READING)).filter((scene) => scene.error), []);
+
+    for (const language of ["lua", "js"]) {
+        if (language === "js") {
+            await scene.locator('.viscript-source-language[data-language="js"]').click();
+            await until(async () => (await scenes(ACTIVE_READING)).every((scene) => SHOWN.includes(scene.state) && !scene.error),
+                "the JavaScript gain scene");
+        }
+        await app.evaluate((selector) => {
+            const plugin = window.app.plugins.plugins.viscript;
+            const canvas = document.querySelector(`${selector} canvas`);
+            const player = [...plugin.blocks].find((block) => block.player?.canvas === canvas).player;
+            player.pause();
+            player.seek(0);
+        }, ACTIVE_READING);
+        await delay(200);
+        await clear();
+        // Listen after miniaudio's actual mixer, without substituting a browser audio API. A
+        // 0.244-full-scale sine at gain 0..1 must stay bounded, including after a loop restarts it.
+        await app.evaluate((selector) => {
+            const plugin = window.app.plugins.plugins.viscript;
+            const canvas = document.querySelector(`${selector} canvas`);
+            const player = [...plugin.blocks].find((block) => block.player?.canvas === canvas).player;
+            window.e2eGainProbes = [];
+            for (const device of window.miniaudio?.devices ?? []) {
+                if (!device?.scriptNode) continue;
+                const probe = {node: device.scriptNode, buffers: 0, nonzero: 0, peak: 0, maxStep: 0, middleStep: 0,
+                    loops: 0, lastTime: 0, lastSamples: [], maxStepAt: null};
+                probe.listen = (event) => {
+                    probe.buffers++;
+                    const time = player.time;
+                    if (time < probe.lastTime - 0.5) probe.loops++;
+                    probe.lastTime = time;
+                    for (let channel = 0; channel < event.outputBuffer.numberOfChannels; channel++) {
+                        const samples = event.outputBuffer.getChannelData(channel);
+                        let previous = probe.lastSamples[channel] ?? 0;
+                        for (let i = 0; i < samples.length; i++) {
+                            const sample = samples[i];
+                            const level = Math.abs(sample);
+                            if (level > 0.00001) probe.nonzero++;
+                            probe.peak = Math.max(probe.peak, level);
+                            const step = Math.abs(sample - previous);
+                            if (step > probe.maxStep) {
+                                probe.maxStep = step;
+                                probe.maxStepAt = {buffer: probe.buffers, channel, offset: i, time, previous, sample};
+                            }
+                            previous = sample;
+                        }
+                        probe.lastSamples[channel] = previous;
+                        // No transport operation occurs inside a callback. Its middle must be as
+                        // continuous as the decoded sine, even when a fade spans mixer chunks.
+                        const middle = Math.floor(samples.length / 2);
+                        for (let i = Math.max(1, middle - 4); i < Math.min(samples.length, middle + 5); i++) {
+                            probe.middleStep = Math.max(probe.middleStep, Math.abs(samples[i] - samples[i - 1]));
+                        }
+                    }
+                };
+                probe.node.addEventListener("audioprocess", probe.listen);
+                window.e2eGainProbes.push(probe);
+            }
+        }, ACTIVE_READING);
+        await scene.locator(".viscript-play").click();
+        await delay(3600);
+        const heard = await app.evaluate(() => (window.e2eGainProbes ?? []).map(({buffers, nonzero, peak, maxStep, middleStep, loops, maxStepAt}) =>
+            ({buffers, nonzero, peak, maxStep, middleStep, loops, maxStepAt})));
+        if (process.env.E2E_DIR) await writeFile(join(root, `gain-${language}.json`), JSON.stringify(heard));
+        assert.ok(heard.some((probe) => probe.nonzero > 10_000 && probe.loops >= 2),
+            `${language} must emit decoded samples across two scene restarts: ${JSON.stringify(heard)}`);
+        assert.ok(heard.every((probe) => probe.peak <= 0.28),
+            `${language} gain must not amplify the 0.244-full-scale asset: ${JSON.stringify(heard)}`);
+        assert.ok(heard.every((probe) => probe.middleStep <= 0.04),
+            `${language} gain fades must not click inside audio buffers: ${JSON.stringify(heard)}`);
+        assert.ok(heard.every((probe) => probe.maxStep <= 0.04),
+            `${language} cue looping must preserve sample continuity: ${JSON.stringify(heard)}`);
+        await scene.locator(".viscript-play").click();
+        await clear();
+    }
+    await shot("gain");
+});
+
+test("source settings and each player's toggle keep its canvas and time, and language tabs show the exact source", options, async (t) => {
+    const note = await readFile(join(vault, "Paired.md"), "utf8");
+    const lua = note.match(/```viscript loop\n([^]*?)\n```/)[1];
+    const js = note.match(/```viscript-js loop\n([^]*?)\n```/)[1];
+    t.after(async () => {
+        await app.evaluate(async () => {
+            delete window.e2eSourcePlayer;
+            await window.app.plugins.plugins.viscript.update({showSource: false});
+        }).catch(() => undefined);
+        await openNote("Scenes.md");
+    });
+    await openNote("Paired.md");
+    await app.waitForSelector(ACTIVE_READING);
+    await showEach(ACTIVE_READING);
+    const scene = app.locator(ACTIVE_READING);
+    const panel = scene.locator(".viscript-source-panel");
+    const toggle = scene.locator(".viscript-source-toggle");
+    assert.equal(await scene.locator(".viscript-source-tools").count(), 1);
+    assert.equal(await panel.isVisible(), false, "a new vault keeps source hidden until asked for");
+
+    await app.evaluate(() => window.app.plugins.plugins.viscript.update({showSource: true}));
+    await panel.waitFor({state: "visible"});
+    assert.equal((await panel.locator("code").textContent()).trimEnd(), lua);
+    await until(async () => await panel.locator("code.language-lua .token").count(), "highlighted Lua");
+    await app.evaluate((selector) => {
+        const canvas = document.querySelector(`${selector} canvas`);
+        const player = [...window.app.plugins.plugins.viscript.blocks].find((block) => block.player?.canvas === canvas).player;
+        canvas.dataset.e2eSource = "kept";
+        window.e2eSourcePlayer = player;
+        player.pause();
+        player.seek(1.25);
+    }, ACTIVE_READING);
+    const kept = () => app.evaluate((selector) => {
+        const canvas = document.querySelector(`${selector} canvas`);
+        const player = [...window.app.plugins.plugins.viscript.blocks].find((block) => block.player?.canvas === canvas)?.player;
+        return player === window.e2eSourcePlayer && canvas?.dataset.e2eSource === "kept"
+            && player.state === "paused" && Math.abs(player.time - 1.25) < 0.05;
+    }, ACTIVE_READING);
+    await until(kept, "the scene paused at the chosen time");
+    await toggle.click();
+    assert.equal(await toggle.getAttribute("aria-expanded"), "false");
+    assert.equal(await panel.isVisible(), false);
+    assert.ok(await kept(), "hiding source kept the canvas, player and time");
+    await toggle.click();
+    assert.equal(await toggle.getAttribute("aria-expanded"), "true");
+    assert.ok(await kept(), "showing source kept the canvas, player and time");
+
+    await app.evaluate(() => window.app.plugins.plugins.viscript.update({showSource: false}));
+    assert.equal(await panel.isVisible(), false);
+    assert.ok(await kept(), "the default setting only changes presentation");
+    await toggle.click();
+    assert.equal(await panel.isVisible(), true);
+    assert.equal(await app.evaluate(() => window.app.plugins.plugins.viscript.settings.showSource), false,
+        "a player's toggle does not change the vault setting");
+    await app.evaluate(() => window.app.plugins.plugins.viscript.update({showSource: true}));
+    assert.equal(await panel.isVisible(), true);
+    assert.ok(await kept());
+
+    const javascript = scene.locator('.viscript-source-language[data-language="js"]');
+    await javascript.click();
+    assert.equal(await javascript.getAttribute("aria-pressed"), "true");
+    assert.equal((await panel.locator("code").textContent()).trimEnd(), js);
+    await until(async () => await panel.locator("code.language-javascript .token").count(), "highlighted JavaScript");
+    await until(() => app.evaluate((selector) => {
+        const canvas = document.querySelector(`${selector} canvas`);
+        return [...window.app.plugins.plugins.viscript.blocks].find((block) => block.player?.canvas === canvas)?.player?.duration === 6;
+    }, ACTIVE_READING), "the JavaScript scene to load");
+    assert.equal(await app.locator(ACTIVE_READING).count(), 1);
+
+    // Automated runs leave the operating system clipboard alone.
+    assert.equal(await scene.getByRole("button", {name: "Copy source", exact: true}).isVisible(), true);
+    assert.equal(await scene.getByRole("button", {name: "Copy source", exact: true}).isEnabled(), true);
+    await shot("source-panel");
+});
+
+test("editing either language keeps one paired player above the original source without a second source panel", options, async (t) => {
+    const original = await readFile(join(vault, "Paired.md"), "utf8");
+    const cdp = await app.context().newCDPSession(app);
+    await cdp.send("Emulation.setFocusEmulationEnabled", {enabled: true});
+    const editing = ".workspace-leaf.mod-active .viscript-editing";
+    const select = (text, offset = 0, length = 0) => app.evaluate(([text, offset, length]) => {
+        const editor = window.app.workspace.activeEditor.editor;
+        const at = editor.getValue().indexOf(text) + offset;
+        editor.focus();
+        editor.setSelection(editor.offsetToPos(at), editor.offsetToPos(at + length));
+    }, [text, offset, length]);
+    const version = (selector, duration) => app.evaluate(([selector, duration, shown]) => {
+        const canvas = [...document.querySelectorAll(selector)].find((scene) => scene.isShown())?.querySelector("canvas");
+        const player = [...window.app.plugins.plugins.viscript.blocks].find((block) => block.player?.canvas === canvas)?.player;
+        return player && shown.includes(player.state) && player.duration === duration;
+    }, [selector, duration, SHOWN]);
+    const setMode = (source) => app.evaluate(async (source) => {
+        const leaf = window.app.workspace.getMostRecentLeaf();
+        await leaf.setViewState({type: "markdown", state: {file: "Paired.md", mode: "source", source}});
+        window.app.workspace.setActiveLeaf(leaf, {focus: true});
+    }, source);
+    t.after(async () => {
+        await app.evaluate((source) => window.app.vault.modify(window.app.vault.getFileByPath("Paired.md"), source), original)
+            .catch(() => undefined);
+        await app.evaluate(() => window.app.plugins.plugins.viscript.update({showSource: false})).catch(() => undefined);
+        await openNote("Scenes.md");
+        await cdp.send("Emulation.setFocusEmulationEnabled", {enabled: false}).catch(() => undefined);
+        await cdp.detach().catch(() => undefined);
+    });
+    await openNote("Paired.md");
+    await app.evaluate(() => window.app.plugins.plugins.viscript.update({showSource: true}));
+    await setMode(false);
+    for (const [source, duration] of [["local scene = vis.scene", 4], ["const scene = vis.scene", 6]]) {
+        await select(source);
+        await until(async () => await app.locator(`${editing}:visible`).count() === 1, "the edited example's scene");
+        await app.locator(`${editing}:visible`).scrollIntoViewIfNeeded();
+        await until(async () => await app.locator(`${ACTIVE_LIVE}:visible`).count() === 1, "one player for the edited Lua/JavaScript pair");
+        await until(() => version(editing, duration), `the ${duration}-second version to play`);
+        assert.equal(await app.locator(`${editing} .viscript-source-tools, ${editing} .viscript-source-panel`).count(), 0);
+        assert.ok(await app.locator(".workspace-leaf.mod-active .cm-line", {hasText: source}).count(), "the original Markdown source stays visible");
+        assert.deepEqual((await scenes(ACTIVE_LIVE)).filter((scene) => scene.error), []);
+    }
+    await select("scene.wait(6)", "scene.wait(".length, 1);
+    await app.keyboard.type("7");
+    await until(() => version(editing, 7), "the edited JavaScript version to play for seven seconds");
+    await until(async () => (await readFile(join(vault, "Paired.md"), "utf8")).includes("scene.wait(7)"), "the paired edit to be saved");
+    await select("# Paired example");
+    await until(async () => await app.locator(`${editing}:visible`).count() === 0 && await app.locator(`${ACTIVE_LIVE}:visible`).count() === 1,
+        "the single native preview after editing");
+    await app.locator(`${ACTIVE_LIVE}:visible .viscript-source-panel`).waitFor({state: "visible"});
+    await app.locator(`${ACTIVE_LIVE}:visible .viscript-source-language[data-language="js"]`).click();
+    await until(async () => (await app.locator(`${ACTIVE_LIVE}:visible .viscript-source-panel code`).textContent()).includes("scene.wait(7)"),
+        "the JavaScript tab to show the edited source");
+    await until(() => version(ACTIVE_LIVE, 7), "the native player to use the edited JavaScript version");
+    await setMode(true);
+    assert.equal(await app.locator(ACTIVE_LIVE).count(), 0, "source mode has only the original code");
+});
+
 test("Live Preview draws the same scenes", options, async () => {
     await app.evaluate(async () => {
         const leaf = window.app.workspace.getMostRecentLeaf();
@@ -390,6 +805,9 @@ test("a scene file opens in its own tab, where typing saves the file and redraws
     const drawn = () => app.waitForFunction(([view, shown]) => shown.includes(document.querySelector(`${view} .viscript-scene`)?.dataset.state)
         && !document.querySelector(`${view} .viscript-error`).isShown(), [VIEW, SHOWN], {timeout: 20_000});
     await drawn();
+    await app.evaluate(() => window.app.plugins.plugins.viscript.update({showSource: true}));
+    assert.equal(await app.locator(`${VIEW} .viscript-source-tools, ${VIEW} .viscript-source-panel`).count(), 0,
+        "the scene tab already has its own editor");
     // Select the label's text in the source and type over it.
     await app.locator(`${VIEW} .cm-line`, {hasText: "text = \"orbit.lua\""}).first().click();
     await app.evaluate((view) => {
@@ -444,8 +862,20 @@ test("the settings show the plugin's tab with a font preview", options, async ()
     assert.deepEqual((await scenes(".viscript-preview .viscript-scene", settings)).filter((scene) => scene.error), []);
     const names = await settings.evaluate(() => [...document.querySelectorAll(".setting-item")]
         .filter((item) => item.offsetParent !== null).map((item) => item.querySelector(".setting-item-name")?.textContent));
-    assert.ok(["Text font", "Code font", "Font folder", "Download fonts"].every((name) => names.includes(name)), names.join(", "));
+    assert.ok(["Text font", "Code font", "Font folder", "Download fonts", "Show source"].every((name) => names.includes(name)), names.join(", "));
     assert.ok(!names.includes("Text font name"), "the font's name is asked for only with another font chosen");
+    assert.equal(await settings.locator(".viscript-preview .viscript-source-tools, .viscript-preview .viscript-source-panel").count(), 0,
+        "the font preview does not repeat its sample source");
+    const sourceToggle = settings.locator(".setting-item").filter({has: settings.locator(".setting-item-name", {hasText: /^Show source$/})})
+        .locator(".checkbox-container");
+    const initialSource = await app.evaluate(() => window.app.plugins.plugins.viscript.settings.showSource);
+    for (const enabled of [!initialSource, initialSource]) {
+        await sourceToggle.click();
+        await until(async () => await app.evaluate(() => window.app.plugins.plugins.viscript.settings.showSource) === enabled,
+            `the source setting to be ${enabled}`);
+        await until(async () => JSON.parse(await readFile(join(vault, ".obsidian/plugins/viscript/data.json"), "utf8")).showSource === enabled,
+            "the source setting to be saved");
+    }
     await shot("settings", settings);
     await app.evaluate(() => window.app.setting.close());
 });

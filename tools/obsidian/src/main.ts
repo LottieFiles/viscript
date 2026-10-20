@@ -12,7 +12,7 @@ import {bundledFont, compilerCode, runtimeWasm, serverCode} from "./embedded.ts"
 import {fontCount, FontService} from "./font-service.ts";
 import {editingScenes} from "./live-preview.ts";
 import {CODE_BLOCK, SCENE, untitledName} from "./new-scene.ts";
-import {imageMime, imageNames, scanSource, type ScannedSource} from "./scan.ts";
+import {audioMime, audioNames, imageMime, imageNames, scanSource, type ScannedSource} from "./scan.ts";
 import type {SceneBlock, SceneSource} from "./scene.ts";
 import {DEFAULT_SETTINGS, readSettings, type ViscriptSettings} from "./settings.ts";
 import {ViscriptSettingTab} from "./settings-tab.ts";
@@ -24,7 +24,8 @@ const CODE_BLOCKS = [["viscript", "lua"], ["viscript-lua", "lua"], ["viscript-js
 const FONT_SETTINGS: readonly (keyof ViscriptSettings)[] = [
     "textFont", "textFontName", "codeFont", "codeFontName", "downloadFonts", "fontFolder",
 ];
-const PLAYBACK_SETTINGS: readonly (keyof ViscriptSettings)[] = ["autoplay", "end", "controls", "maxFps", "quality"];
+const PLAYBACK_SETTINGS: readonly (keyof ViscriptSettings)[] = ["autoplay", "end", "controls", "maxFps", "quality", "showSource"];
+type RenderMode = "auto" | "inline";
 
 export default class ViscriptPlugin extends Plugin {
     override settings: ViscriptSettings = DEFAULT_SETTINGS;
@@ -33,8 +34,8 @@ export default class ViscriptPlugin extends Plugin {
     /** Embedded scene files, which follow their file. */
     readonly embeds = new Set<FileEmbed>();
     fonts!: FontService;
-    #host: Promise<RenderHost> | null = null;
-    #renderHost: RenderHost | null = null;
+    readonly #hosts = new Map<RenderMode, Promise<RenderHost>>();
+    readonly #renderHosts = new Map<RenderMode, RenderHost>();
 
     override async onload(): Promise<void> {
         this.settings = readSettings(await this.loadData());
@@ -118,42 +119,43 @@ export default class ViscriptPlugin extends Plugin {
 
     override onunload(): void {
         for (const block of [...this.blocks]) block.unload();
-        this.#renderHost?.dispose();
-        this.#renderHost = null;
-        this.#host = null;
+        for (const host of this.#renderHosts.values()) host.dispose();
+        this.#renderHosts.clear();
+        this.#hosts.clear();
     }
 
-    /** The render host every scene shares, started by the first scene shown. */
-    host(): Promise<RenderHost> {
-        if (!this.#host) {
-            const host = Promise.all([serverCode(), compilerCode()]).then(([code, compiler]) => {
-                const renderHost = createRenderHost({
-                    server: {code},
-                    wasm: runtimeWasm,
-                    // Fonts by the names scenes set text in, found as fonts.ts says.
-                    fonts: this.fonts,
-                    assets: {bytes: (id) => this.#imageBytes(id)},
-                    mode: this.settings.worker ? "auto" : "inline",
-                    // Notes may come from anyone, and Obsidian gives the page and its workers Node:
-                    // JavaScript scenes run in the sandbox, and only the Lua they build is drawn.
-                    compiler: createSandboxCompiler({code: compiler}),
-                });
-                if (this.#host !== host) {
-                    renderHost.dispose();
-                    throw new Error("The plugin stopped");
-                }
-                this.#renderHost = renderHost;
-                return renderHost;
+    /** Scenes share a worker; sound needs a shared host on the main thread. */
+    host(audio = false): Promise<RenderHost> {
+        const mode: RenderMode = audio || !this.settings.worker ? "inline" : "auto";
+        const existing = this.#hosts.get(mode);
+        if (existing) return existing;
+        const host = Promise.all([serverCode(), compilerCode()]).then(([code, compiler]) => {
+            const renderHost = createRenderHost({
+                server: {code},
+                wasm: runtimeWasm,
+                // Fonts by the names scenes set text in, found as fonts.ts says.
+                fonts: this.fonts,
+                assets: {bytes: (id) => this.#assetBytes(id)},
+                mode,
+                // Notes may come from anyone, and Obsidian gives the page and its workers Node:
+                // JavaScript scenes run in the sandbox, and only the Lua they build is drawn.
+                compiler: createSandboxCompiler({code: compiler}),
             });
-            this.#host = host;
-            host.catch(() => { if (this.#host === host) this.#host = null; });
-        }
-        return this.#host;
+            if (this.#hosts.get(mode) !== host) {
+                renderHost.dispose();
+                throw new Error("The plugin stopped");
+            }
+            this.#renderHosts.set(mode, renderHost);
+            return renderHost;
+        });
+        this.#hosts.set(mode, host);
+        host.catch(() => { if (this.#hosts.get(mode) === host) this.#hosts.delete(mode); });
+        return host;
     }
 
-    /** The images a scene loads, found in the vault as links from its note or file would be. */
+    /** Scene images and sounds, found in the vault as links from its note or file would be. */
     resources(scene: SceneSource): SceneResources {
-        return {assets: this.#images(scanSource(scene.source, scene.language), scene.path)};
+        return {assets: this.#assets(scanSource(scene.source, scene.language), scene.path)};
     }
 
     /** Changes and saves settings, and applies them to the scenes on screen. */
@@ -164,11 +166,11 @@ export default class ViscriptPlugin extends Plugin {
         const changed = (key: keyof ViscriptSettings) => previous[key] !== this.settings[key];
         if (changed("worker")) {
             // The players move to a new host before the old one stops.
-            const old = this.#renderHost;
-            this.#renderHost = null;
-            this.#host = null;
+            const old = [...this.#renderHosts.values()];
+            this.#renderHosts.clear();
+            this.#hosts.clear();
             for (const block of this.blocks) block.rebuild();
-            old?.dispose();
+            for (const host of old) host.dispose();
         }
         if (changed("fontFolder")) this.fonts.invalidate();
         if (FONT_SETTINGS.some(changed)) this.#refreshFonts();
@@ -184,7 +186,7 @@ export default class ViscriptPlugin extends Plugin {
     // A name keeps the font it was first given in the render worker, so the worker asks again and
     // every scene loads again.
     #refreshFonts(): void {
-        this.#renderHost?.refreshFonts();
+        for (const host of this.#renderHosts.values()) host.refreshFonts();
         for (const block of this.blocks) block.reload();
     }
 
@@ -217,19 +219,21 @@ export default class ViscriptPlugin extends Plugin {
         if (this.fonts.changed(path)) this.#fontsChanged();
     }
 
-    // Images a scene loads by name, found as a link from its note or file would be.
-    #images(scanned: ScannedSource, path: string): AssetRef[] {
-        return imageNames(scanned).flatMap((name) => {
+    // Assets a scene loads by name, found as a link from its note or file would be.
+    #assets(scanned: ScannedSource, path: string): AssetRef[] {
+        const assets = [...imageNames(scanned).map((name) => ({name, mime: imageMime(name)})),
+            ...audioNames(scanned).map((name) => ({name, mime: audioMime(name)}))];
+        return assets.flatMap(({name, mime}) => {
             const file = this.app.metadataCache.getFirstLinkpathDest(name, path);
-            // The time in the id makes an edited image new to the render worker, which keeps bytes.
-            return file ? [{id: `${file.path}@${file.stat.mtime}`, name, mime: imageMime(name)}] : [];
+            // The time in the id makes an edited asset new to the render host, which keeps bytes.
+            return file ? [{id: `${file.path}@${file.stat.mtime}`, name, mime}] : [];
         });
     }
 
-    async #imageBytes(id: string): Promise<ArrayBuffer> {
+    async #assetBytes(id: string): Promise<ArrayBuffer> {
         const path = id.slice(0, id.lastIndexOf("@"));
         const file = this.app.vault.getFileByPath(path);
-        if (!file) throw new Error(`The image ${path} is not in the vault`);
+        if (!file) throw new Error(`The asset ${path} is not in the vault`);
         return this.app.vault.readBinary(file);
     }
 

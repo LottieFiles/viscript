@@ -1,0 +1,64 @@
+.viscript-showcase {
+  margin: 20px 0 28px;
+  min-width: 0;
+  border: 1px solid var(--line, #30343b);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--bg, #111318);
+}
+.viscript-showcase .viscript-showcase-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 20px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line, #30343b);
+}
+.viscript-showcase .viscript-showcase-caption {
+  color: var(--dim, #9096a2);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+.viscript-showcase .viscript-showcase-choice {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  color: var(--dim, #9096a2);
+  font-size: 12px;
+}
+.viscript-showcase .viscript-showcase-choice select {
+  min-width: 0;
+  max-width: min(100%, 360px);
+  padding: 7px 28px 7px 9px;
+  border: 1px solid var(--line2, #414856);
+  border-radius: 4px;
+  background: var(--raise, #1b1e25);
+  color: var(--fg, #e6e8ee);
+  font: inherit;
+}
+.viscript-showcase .viscript-showcase-stage {
+  min-width: 0;
+}
+.viscript-showcase .viscript-showcase-stage:empty {
+  aspect-ratio: 16 / 9;
+  background: var(--stage, #101216);
+}
+.viscript-showcase .viscript-showcase-stage.player {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+}
+.viscript-showcase .host-example {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+}
+@media (max-width: 560px) {
+  .viscript-showcase .viscript-showcase-header { padding: 11px 12px; }
+  .viscript-showcase .viscript-showcase-choice { width: 100%; }
+  .viscript-showcase .viscript-showcase-choice select { flex: 1; width: 0; max-width: none; }
+}

@@ -8,6 +8,7 @@ import {ASSETS, assetsFor, FONTS, FULL_PRETENDARD, needsFullPretendard} from "..
 import {HERO} from "../docs/page/scenes/hero.js";
 import {SKILLS} from "../docs/page/scenes/skills.js";
 import {COLLECTIONS} from "../docs/page/scenes/collections.js";
+import {loadApiExamples} from "./lib/api-markdown.mjs";
 
 const page = new URL("../docs/page/", import.meta.url);
 const bundle = new URL("runtime/", page);
@@ -54,6 +55,7 @@ const scenes = [];
 const add = (name, code, js, clips = []) => { if (code) scenes.push({name, code, js, clips}); };
 add("home/hero", HERO);
 add("home/skills", SKILLS);
+for (const example of loadApiExamples()) add(`api/${example.id}`, example.code, example.js);
 for (const c of COLLECTIONS) for (const e of c.episodes) {
     add(`examples/${c.id}/${e.id}`, e.src ? readFileSync(e.src, "utf8") : e.code, e.js, e.clips);
 }

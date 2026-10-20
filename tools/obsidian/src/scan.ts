@@ -1,5 +1,5 @@
-// What a scene's source says about the images it loads, and whether it is a scene at all. Scenes
-// name images in string literals, so the literals are read out of the code, past comments; nothing
+// What a scene's source says about the assets it loads, and whether it is a scene at all. Scenes
+// name assets in string literals, so the literals are read out of the code, past comments; nothing
 // is run.
 import type {SceneLanguage} from "../../player/src/protocol.ts";
 
@@ -239,6 +239,19 @@ export function imageNames(scanned: ScannedSource): string[] {
 /** The runtime's type name for an image file, from its extension. */
 export function imageMime(name: string): string {
     return IMAGE.exec(name)?.[1]?.toLowerCase() ?? "";
+}
+
+// The browser runtime's miniaudio build decodes WAV; MP3 and FLAC are disabled.
+const AUDIO = /\.wav$/i;
+
+/** Sounds a scene loads by name, in authored cues or retained runtime calls. */
+export function audioNames(scanned: ScannedSource): string[] {
+    return [...new Set(scanned.literals.filter((literal) => AUDIO.test(literal) && !/[\n"<>|]/.test(literal)))];
+}
+
+/** The audio asset MIME recognized by the render host. */
+export function audioMime(name: string): string {
+    return AUDIO.test(name) ? "audio/wav" : "";
 }
 
 /** Whether the source looks like a viscript scene at all: it calls into `vis`. */

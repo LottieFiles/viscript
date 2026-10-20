@@ -90,7 +90,7 @@ export class SceneView extends TextFileView {
         this.contentEl.addClass("viscript-view");
         const stage = this.contentEl.createDiv({cls: "viscript-view-stage"});
         this.#sourceEl = this.contentEl.createDiv({cls: "viscript-view-source"});
-        this.#block = this.addChild(new SceneBlock(this.#plugin, stage, {layout: "pane", controls: true}));
+        this.#block = this.addChild(new SceneBlock(this.#plugin, stage, {layout: "pane", controls: true, sourceDisplay: false}));
         this.#editor = createEditor(this.#sourceEl, "lua", (text) => {
             this.data = text;
             this.requestSave();

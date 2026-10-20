@@ -12,6 +12,7 @@ import type {NodeProp, Tree} from "@lezer/common";
 import {debounce, editorInfoField, editorLivePreviewField, type Debouncer} from "obsidian";
 import type {SceneLanguage} from "../../player/src/protocol.ts";
 import type ViscriptPlugin from "./main.ts";
+import {scenePairAtLine} from "./code-pairs.ts";
 import {fenceOptions} from "./options.ts";
 import {SceneBlock, type BlockOptions, type SceneSource} from "./scene.ts";
 
@@ -94,10 +95,28 @@ export function editingScenes(plugin: ViscriptPlugin, languages: ReadonlyMap<str
         if (!state.field(focused) || !state.field(editorLivePreviewField, false)) return Decoration.none;
         const ranges = state.selection.ranges;
         const path = state.field(editorInfoField, false)?.file?.path ?? "";
-        return Decoration.set(blocksOf(state, classProp, languages)
-            .filter((block) => ranges.some((range) => range.from <= block.to && range.to >= block.from))
-            .map((block) => Decoration.widget({widget: new SceneWidget(plugin, block, path), block: true, side: -1})
-                .range(block.line)));
+        const blocks = blocksOf(state, classProp, languages);
+        const selected = blocks.filter((block) => ranges.some((range) => range.from <= block.to && range.to >= block.from));
+        const source = state.doc.toString(), handled = new Set<number>();
+        const decorations = [];
+        for (const block of selected) {
+            const pair = scenePairAtLine(source, state.doc.lineAt(block.from).number - 1);
+            let editing = block;
+            if (pair) {
+                if (handled.has(pair.lua.lineStart)) continue;
+                handled.add(pair.lua.lineStart);
+                const members = blocks.filter((candidate) => {
+                    const line = state.doc.lineAt(candidate.from).number - 1;
+                    return line === pair.lua.lineStart || line === pair.js.lineStart;
+                });
+                const touched = members.filter((candidate) => selected.includes(candidate));
+                editing = touched.find((candidate) => state.selection.main.head >= candidate.from
+                    && state.selection.main.head <= candidate.to) ?? touched[0] ?? block;
+            }
+            decorations.push(Decoration.widget({widget: new SceneWidget(plugin, editing, path, pair?.id), block: true, side: -1})
+                .range(editing.line));
+        }
+        return Decoration.set(decorations, true);
     };
     const scenes = StateField.define<DecorationSet>({
         create: decorate,
@@ -114,26 +133,58 @@ interface Shown {
     readonly scene: SceneBlock;
     readonly follow: Debouncer<[SceneSource], void>;
     fence: string;
+    pairId: string | undefined;
+    restorePair: () => void;
 }
 
 /** The scene in each widget's element, which stays as the source changes under it. */
 const shown = new WeakMap<HTMLElement, Shown>();
 
+// Editing either language replaces the shared reading preview with the editing preview.
+// Keep Obsidian's document decorations intact so its cursor and source editing stay native.
+function suppressPair(view: EditorView, pairId: string | undefined): () => void {
+    if (!pairId) return () => {};
+    const hidden = new Map<HTMLElement, boolean>();
+    const hide = () => {
+        let changed = false;
+        for (const el of view.dom.querySelectorAll<HTMLElement>("[data-viscript-pair]")) {
+            if (el.dataset.viscriptPair !== pairId) continue;
+            if (!hidden.has(el)) {
+                hidden.set(el, el.hidden);
+                changed = true;
+            }
+            el.hidden = true;
+        }
+        if (changed) view.requestMeasure();
+    };
+    const observer = new MutationObserver(hide);
+    observer.observe(view.dom, {childList: true, subtree: true});
+    hide();
+    return () => {
+        observer.disconnect();
+        for (const [el, wasHidden] of hidden) el.hidden = wasHidden;
+        hidden.clear();
+    };
+}
+
 class SceneWidget extends WidgetType {
     readonly #plugin: ViscriptPlugin;
     readonly #block: CodeBlock;
     readonly #path: string;
+    readonly #pairId: string | undefined;
 
-    constructor(plugin: ViscriptPlugin, block: CodeBlock, path: string) {
+    constructor(plugin: ViscriptPlugin, block: CodeBlock, path: string, pairId?: string) {
         super();
         this.#plugin = plugin;
         this.#block = block;
         this.#path = path;
+        this.#pairId = pairId;
     }
 
     override eq(other: SceneWidget): boolean {
         return other.#block.source === this.#block.source && other.#block.fence === this.#block.fence
-            && other.#block.language === this.#block.language && other.#path === this.#path;
+            && other.#block.language === this.#block.language && other.#path === this.#path
+            && other.#pairId === this.#pairId;
     }
 
     toDOM(view: EditorView): HTMLElement {
@@ -143,13 +194,19 @@ class SceneWidget extends WidgetType {
         scene.load();
         scene.show(this.#scene());
         // The scene follows the source once typing pauses, as in the scene tab.
-        shown.set(el, {scene, follow: debounce((source: SceneSource) => scene.show(source), 300, true), fence: this.#block.fence});
+        shown.set(el, {scene, follow: debounce((source: SceneSource) => scene.show(source), 300, true),
+            fence: this.#block.fence, pairId: this.#pairId, restorePair: suppressPair(view, this.#pairId)});
         return el;
     }
 
-    override updateDOM(el: HTMLElement): boolean {
+    override updateDOM(el: HTMLElement, view: EditorView): boolean {
         const entry = shown.get(el);
         if (!entry) return false;
+        if (entry.pairId !== this.#pairId) {
+            entry.restorePair();
+            entry.pairId = this.#pairId;
+            entry.restorePair = suppressPair(view, this.#pairId);
+        }
         if (entry.fence !== this.#block.fence) {
             entry.fence = this.#block.fence;
             entry.scene.setOptions(this.#options());
@@ -161,6 +218,7 @@ class SceneWidget extends WidgetType {
     override destroy(el: HTMLElement): void {
         const entry = shown.get(el);
         shown.delete(el);
+        entry?.restorePair();
         entry?.follow.cancel();
         entry?.scene.unload();
     }
@@ -168,7 +226,8 @@ class SceneWidget extends WidgetType {
     // Focus on the scene would end the editing, so it keeps none, and an interactive scene takes
     // its input once the block is left.
     #options(): BlockOptions {
-        return {label: "viscript scene", ...fenceOptions(this.#block.fence), interactive: false, keepFocus: true};
+        return {label: "viscript scene", ...fenceOptions(this.#block.fence), interactive: false, keepFocus: true,
+            sourceDisplay: false};
     }
 
     #scene(): SceneSource {
