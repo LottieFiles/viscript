@@ -8,7 +8,7 @@
 - Primary topology: atlas, trace, compare, anatomy, or spine
 - Editorial direction: scientific plate, magazine insert, technical flyer, or another justified cut
 - User-specified theme, style, or color direction; write `none` when absent:
-- Theme decision: use built-in `pro_white` when the previous field is `none`; list every root and child Scene that receives it before object creation:
+- Theme decision: name no theme, so that Scenes are `adaptive`, when the previous field is `none`; otherwise list every root and child Scene that receives the chosen theme before object creation:
 - Explicit object-style overrides and the exact semantic or measured legibility reason for each; prefer `none`:
 - Established brand/example references inspected:
 
@@ -156,7 +156,7 @@ Hard layout rules:
 - Exact-final and seam review:
 - Looping export artifact:
 - Subject-only copy review: no loop, layout, theme, tooling, or audit meta text visible:
-- Default-visual review: absent a user style request, all Scenes use built-in `pro_white`, object styles remain Theme-resolved by default, and diagrams use one neutral ink family:
+- Default-visual review: absent a user style request, all Scenes name no theme and so are `adaptive`, object styles remain Theme-resolved by default, and diagrams use one neutral ink family:
 - Accent review: every extra hue names a necessary subject state or documented semantic exception; hierarchy otherwise uses restrained adjacent stroke weights:
 - Code/pseudocode review: readable at delivery size, complete mappings, unobscured glyphs, correct behavior, preserved flow across fragments:
 - Mechanism-evidence review: every title verb is enacted by its figure and every transient accent names a subject state:

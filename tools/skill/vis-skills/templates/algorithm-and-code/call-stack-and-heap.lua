@@ -1,6 +1,6 @@
 -- Question: which state belongs to each call frame, and which object survives a return?
 -- Variant: main -> buildUser(" Ada ") -> normalize(" Ada ") -> "Ada".
-local scene = vis.scene {width = 960, height = 540, fps = 30, loop = false, theme = "adaptive", camera = {mode = "fixed", view = "2d", target = {0, 0}, height = 540}}
+local scene = vis.scene {width = 960, height = 540, fps = 30, loop = false, camera = {mode = "fixed", view = "2d", target = {0, 0}, height = 540}}
 local LAYER = {route = 8, body = 20, text = 40}
 local TRACE = {
     {kind = "call", frame = "main", detail = "result = buildUser(...)"},

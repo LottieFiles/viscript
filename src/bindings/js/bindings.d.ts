@@ -101,6 +101,7 @@ export interface SemanticTheme {
     focus?: Color;
 }
 export interface ThemeOptions {
+    /** The theme the others extend; `"adaptive"` when omitted. */
     preset?: ThemePreset;
     background?: Color;
     text?: {
@@ -128,6 +129,7 @@ export interface SceneConfig {
     camera?: Camera;
     antialiasing?: boolean;
     loop?: boolean;
+    /** `"adaptive"` when omitted: the host app's colors and font, or Pro White without one. */
     theme?: ThemePreset | ThemeOptions;
 }
 

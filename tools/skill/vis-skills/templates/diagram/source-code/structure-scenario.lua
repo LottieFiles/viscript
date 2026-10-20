@@ -12,7 +12,6 @@ local SPEC = {
 
 local scene = vis.scene {
     width = 1280, height = 720, fps = 30, loop = false,
-    theme = "adaptive",
     camera = {mode = "fixed", view = "2d", target = {0, 0}, height = 720},
 }
 

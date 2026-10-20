@@ -13,16 +13,16 @@ Colour names such as `"accent"` resolve through it, so changing `theme` restyles
 
 | Token | Appearance |
 |---|---|
-| `"pro_white"` | Light background; the default. |
+| `"adaptive"` | The colours of the app that shows the scene, light or dark; `pro_white` where there is none. The default. |
+| `"pro_white"` | Light background. |
 | `"pro_black"` | Dark background. |
-| `"adaptive"` | The colours of the app that shows the scene, light or dark; `pro_white` where there is none. |
 
 The presets set `h1`, `h2`, `h3` and `text` in Pretendard and `code` in JetBrains Mono.
 
 ## Adaptive theme
 
-`"adaptive"` takes its colours, and the font of `h1`, `h2`, `h3` and `text`, from the app that shows the scene.<br />
-When the app switches between light and dark, the scene is drawn again in the new colours. Write it with semantic colours, and it fits wherever it is shown.
+`"adaptive"` takes its colours, and the font of `h1`, `h2`, `h3` and `text`, from the app that shows the scene, and a scene that names no theme takes it.<br />
+When the app switches between light and dark, the scene is drawn again in the new colours. Write it with semantic colours, and it fits wherever it is shown; name `"pro_white"` or `"pro_black"` for a fixed look.
 
 | Where | Colours | Headings and text | Follows |
 |---|---|---|---|
@@ -35,7 +35,7 @@ Switch this page between light and dark, and the scene below follows.
 
 ```lua live
 local scene = vis.scene {
-    width = 960, height = 540, theme = "adaptive",
+    width = 960, height = 540,
     camera = {mode = "fixed", view = "2d", height = 6},
 }
 
@@ -53,7 +53,7 @@ return scene
 
 ```js live
 const scene = vis.scene({
-    width: 960, height: 540, theme: "adaptive",
+    width: 960, height: 540,
     camera: {mode: "fixed", view: "2d", height: 6},
 });
 
@@ -93,7 +93,7 @@ Shapes with no colour take the next colour of the theme's `objects` cycle. Text 
 
 ## Custom theme
 
-Pass a table instead of a name. Fields you leave out come from `preset` (`pro_white` by default); `objects` replaces the colour cycle.
+Pass a table instead of a name. Fields you leave out come from `preset` (`adaptive` by default); `objects` replaces the colour cycle.
 
 ```lua live
 local scene = vis.scene {

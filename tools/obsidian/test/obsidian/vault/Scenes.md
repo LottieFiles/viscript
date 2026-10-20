@@ -4,7 +4,7 @@ A code block with Korean, which the bundled fonts have and the code font lacks:
 
 ```viscript loop
 local scene = vis.scene {
-    width = 640, height = 360, theme = "adaptive",
+    width = 640, height = 360,
     camera = {view = "2d", target = {0, 0}, height = 7},
 }
 local ball = scene:circle {center = {-3, 0}, radius = 0.5, fill = "accent"}
@@ -23,7 +23,7 @@ An embedded scene file:
 A JavaScript scene:
 
 ```viscript-js center 520
-const scene = vis.scene({width: 640, height: 240, theme: "adaptive", camera: {view: "2d", target: [0, 0], height: 4}});
+const scene = vis.scene({width: 640, height: 240, camera: {view: "2d", target: [0, 0], height: 4}});
 const dot = scene.circle({center: [-2, 0], radius: 0.4, fill: "accent"});
 scene.text({text: "JavaScript", point: [0, 1.3], size: 18});
 scene.growFromCenter(dot, 0.5).shift(dot, [4, 0], 1).wait(0.3);

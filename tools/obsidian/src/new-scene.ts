@@ -1,9 +1,9 @@
 // What a new scene starts from: the scene a new code block or scene file holds, and the name a new
 // scene file takes.
 
-// The adaptive theme takes its colors from the host, here the Obsidian theme.
+// A scene that names no theme is adaptive, and takes its colors from the Obsidian theme.
 export const SCENE = `local scene = vis.scene {
-    width = 640, height = 360, theme = "adaptive",
+    width = 640, height = 360,
     camera = {view = "2d", target = {0, 0}, height = 7},
 }
 local ball = scene:circle {center = {-3, 0}, radius = 0.5, fill = "accent"}

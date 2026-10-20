@@ -38,7 +38,12 @@ for (const [name, path] of Object.entries(sources)) {
 
 const git = (...args) => execFileSync("git", ["-C", root, ...args], {encoding: "utf8"}).trim();
 const commit = git("rev-parse", "--short=12", "HEAD");
-const dirty = git("status", "--porcelain").length > 0;
+// Only what the build reads, and what is copied beside it, makes it differ from the commit.
+const inputs = [
+    "src", "subprojects", "meson.build", "meson_options.txt", "scripts/cross", "scripts/wasm-bundle.sh",
+    "scripts/sync-wasm.mjs", "LICENSE", "licenses",
+];
+const dirty = git("status", "--porcelain", "--", ...inputs).length > 0;
 
 for (const bundle of bundles) {
     // write the bytes rather than copyFileSync: on APFS a copy clones the linker's file and keeps its

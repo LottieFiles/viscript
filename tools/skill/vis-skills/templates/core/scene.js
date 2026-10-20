@@ -5,7 +5,6 @@ const definition = vis.scene({
     height: 540,
     fps: 30,
     loop: false,
-    theme: "pro_white",
     camera: {mode: "fixed", view: "2d", target: [0, 0], height: 7},
 });
 

@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "project": "viscript",
   "projectVersion": "0.1.0",
-  "sourceCommit": "193f9141b72e",
+  "sourceCommit": "5052eb702609",
   "sourceDirty": false,
   "buildDate": "2026-10-20",
   "toolchain": {
@@ -36,8 +36,8 @@
     },
     {
       "path": "vis-wasm.wasm",
-      "bytes": 1183645,
-      "sha256": "a31c3b91e8cfb435f935c5634760ec9423b6630785c41bebfa689c8f569ae9e8"
+      "bytes": 1183989,
+      "sha256": "2a4b9822c44fedb941584491f29814b919dbca6f9bfa2398ba9344a46a3945d8"
     },
     {
       "path": "client.js",
@@ -46,8 +46,8 @@
     },
     {
       "path": "client.d.ts",
-      "bytes": 14008,
-      "sha256": "fa5ea34cfed601db3547eccd2a5737d7c10730c1fe83c4fec3b2e29544bc2fbc"
+      "bytes": 14021,
+      "sha256": "f72ab245ad7066b5228986401fdfe43efa4dfcab30f97e0c62dfa570e5752172"
     },
     {
       "path": "bindings.js",
@@ -56,8 +56,8 @@
     },
     {
       "path": "bindings.d.ts",
-      "bytes": 70938,
-      "sha256": "5bcb0bb2b4f905c7b05f8d3af242a48952e7253efadac8734eb79df06c7d129f"
+      "bytes": 71101,
+      "sha256": "126d296dc0f9ccea3de9e65727f6856bec4b8b1d5a5d22b7c8075ab0356da605"
     },
     {
       "path": "Pretendard.ttf",

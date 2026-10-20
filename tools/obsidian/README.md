@@ -30,7 +30,7 @@ JavaScript; **Insert a scene code block** in the command palette starts one.
 ````markdown
 ```viscript loop
 local scene = vis.scene {
-    width = 640, height = 360, theme = "adaptive",
+    width = 640, height = 360,
     camera = {view = "2d", target = {0, 0}, height = 7},
 }
 local ball = scene:circle {center = {-3, 0}, radius = 0.5, fill = "accent"}
@@ -70,10 +70,10 @@ follows what you type once you pause, with any error under it. A click on it pla
 and the timeline seeks without leaving the code; an `interactive` scene takes input once the cursor
 leaves the block.
 
-Scenes with `theme = "adaptive"` take their colors from the Obsidian theme and follow it
-between light and dark, and set their text in the text font below. A click plays or pauses a scene; the play bar appears on hover, and on
-touch screens it stays under the scene. Scenes load when they scroll into view and let go of
-their memory when they leave it.
+Scenes that name no theme, or name `adaptive`, take their colors from the Obsidian theme and
+follow it between light and dark, and set their text in the text font below. A click plays or
+pauses a scene; the play bar appears on hover, and on touch screens it stays under the scene.
+Scenes load when they scroll into view and let go of their memory when they leave it.
 
 Commands: **Insert a scene code block**, **Toggle autoplay**, **Reload all scenes** and
 **Look for fonts again**.

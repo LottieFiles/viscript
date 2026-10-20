@@ -26,7 +26,6 @@ Requires VS Code 1.96 or newer.
 ```lua
 local scene = vis.scene {
     width = 960, height = 540, fps = 30, loop = false,
-    theme = "adaptive",
     camera = {view = "2d", height = 7},
 }
 local circle = scene:circle {radius = 1, fill = "accent", id = "circle"}
@@ -107,7 +106,7 @@ In interactive-camera scenes, a drag pans in 2D or orbits in 3D, Shift-drag pans
 
 Scenes that use UI or Input take the canvas's pointer events, and its keys once it has focus (click it first), while their timeline plays. A retained runtime steps while the scene plays and holds while it is paused. Held input is released when the canvas loses focus. Sound starts after the first click or key press in the viewer.
 
-Relative `asset` and `texture` paths resolve beside the Lua file. The bundled runtime loads SVG and PNG images and WAV audio; JPG, WebP, MP3 and FLAC need a native build. The viewer has Pretendard, Source Serif 4, and JetBrainsMono, and registers each for the scenes that set text in it. `adaptive` takes the editor palette, and the viewer sets its headings and body text in Source Serif 4, with Korean in Pretendard; explicit scene themes and fonts remain authored choices.
+Relative `asset` and `texture` paths resolve beside the Lua file. The bundled runtime loads SVG and PNG images and WAV audio; JPG, WebP, MP3 and FLAC need a native build. The viewer has Pretendard, Source Serif 4, and JetBrainsMono, and registers each for the scenes that set text in it. `adaptive`, the theme of a scene that names no other, takes the editor palette, and the viewer sets its headings and body text in Source Serif 4, with Korean in Pretendard; explicit scene themes and fonts remain authored choices.
 
 ## Completion and export
 

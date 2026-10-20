@@ -9657,15 +9657,21 @@ static ThemePreset _themePreset(lua_State* lua, int index)
     return _enum(lua, index, "theme preset", PRESETS);
 }
 
-static Theme _themePresetValue(lua_State* lua, int index)
+// The adaptive Theme, which a scene takes unless it names another: the host's, or Pro White
+// without one. The load reports it used, so the host loads the scene again when its theme changes.
+static Theme _adaptiveTheme(lua_State* lua)
 {
-    auto preset = _themePreset(lua, index);
-    if (preset != ThemePreset::Adaptive) return Theme::preset(preset);
     void* memoryData = nullptr;
     lua_getallocf(lua, &memoryData);
     auto memory = static_cast<LuaMemory*>(memoryData);
     memory->adaptiveThemeUsed = true;
-    return memory->hasAdaptiveTheme ? memory->adaptiveTheme : Theme::preset(preset);
+    return memory->hasAdaptiveTheme ? memory->adaptiveTheme : Theme::preset(ThemePreset::Adaptive);
+}
+
+static Theme _themePresetValue(lua_State* lua, int index)
+{
+    auto preset = _themePreset(lua, index);
+    return preset == ThemePreset::Adaptive ? _adaptiveTheme(lua) : Theme::preset(preset);
 }
 
 static void _themeText(lua_State* lua, int index, const char* name, TextTheme& text)
@@ -9717,9 +9723,8 @@ static Theme _theme(lua_State* lua, int index)
              {"preset", "background", "text", "objects", "object_width", "roundness", "gradient",
               "end_gradient_stop", "axis", "colors"}, false);
 
-    auto theme = Theme::preset(ThemePreset::ProWhite);
     lua_getfield(lua, index, "preset");
-    if (!lua_isnil(lua, -1)) theme = _themePresetValue(lua, -1);
+    auto theme = lua_isnil(lua, -1) ? _adaptiveTheme(lua) : _themePresetValue(lua, -1);
     lua_pop(lua, 1);
     _fieldColor(lua, index, "background", theme.background);
     theme.gradient = _fieldBool(lua, index, "gradient", theme.gradient);
@@ -9821,12 +9826,13 @@ static int _sceneGen(lua_State* lua)
     config.loop = _fieldBool(lua, 1, "loop", config.loop);
     if (config.height > LUA_PIXEL_LIMIT / config.width) return luaL_error(lua, "scene pixel limit exceeded");
     auto backgroundAuthored = _fieldColor(lua, 1, "background", config.background);
-    auto hasTheme = _has(lua, 1, "theme");
     Theme theme;
-    if (hasTheme) {
+    if (_has(lua, 1, "theme")) {
         lua_getfield(lua, 1, "theme");
         theme = _theme(lua, -1);
         lua_pop(lua, 1);
+    } else {
+        theme = _adaptiveTheme(lua);
     }
 
     if (_has(lua, 1, "camera")) {
@@ -9879,10 +9885,8 @@ static int _sceneGen(lua_State* lua)
     lua_setmetatable(lua, -2);
     box->scene = Scene::gen(config);
     if (!box->scene) return luaL_error(lua, "could not create scene: invalid configuration or out of memory");
-    if (hasTheme) {
-        _check(lua, box->scene, box->scene->theme(theme), "could not apply scene theme");
-        if (backgroundAuthored) box->scene->config().background = config.background;
-    }
+    _check(lua, box->scene, box->scene->theme(theme), "could not apply scene theme");
+    if (backgroundAuthored) box->scene->config().background = config.background;
     box->nativeUsed = LUA_SCENE_CHARGE;
     box->memory = memory;
     box->resolver = memory->resolver;

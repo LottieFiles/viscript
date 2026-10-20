@@ -7,7 +7,6 @@ end
 local WIDTH, HEIGHT = 960, 540
 local scene = vis.scene {
     width = WIDTH, height = HEIGHT, fps = 60, loop = true,
-    theme = "adaptive",
     camera = {mode = "fixed", view = "2d", target = {0, 0}, height = HEIGHT},
 }
 

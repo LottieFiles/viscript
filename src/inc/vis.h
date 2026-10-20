@@ -2439,8 +2439,9 @@ struct Lua
     // a runtime module retains it until scene destruction and seals authoring.
     // One load shares scene/object/clip/point budgets and separate 64 MiB Lua/native budgets.
     // Text-only source needs a returned owning root scene; bytecode is rejected.
-    // A scene of the adaptive theme takes adaptiveTheme, the colors and fonts of the host app,
-    // or Pro White without one; adaptiveThemeUsed reports whether the source used that theme.
+    // A scene of the adaptive theme, which a scene takes unless it names another, takes
+    // adaptiveTheme, the colors and fonts of the host app, or Pro White without one;
+    // adaptiveThemeUsed reports whether the source used that theme.
     static Result load(const char* source, uint32_t size, const char* name, Scene** scene,
                        char* error, uint32_t errorSize, AssetResolver resolver = nullptr,
                        void* resolverData = nullptr, const Theme* adaptiveTheme = nullptr,

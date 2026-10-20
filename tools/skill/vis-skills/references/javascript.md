@@ -7,7 +7,6 @@ import {createVis, vis} from "./client.js";
 
 const definition = vis.scene({
     width: 960, height: 540, fps: 30, loop: false,
-    theme: "pro_white",
     camera: {view: "2d", target: [0, 0], height: 7},
 });
 const figure = definition.group({id: "figure"});
@@ -23,7 +22,7 @@ runtime.load(definition, "vector-scene.js");
 runtime.draw(document.querySelector("canvas"), runtime.duration);
 ```
 
-Scene size is in pixels and object positions are world coordinates. Vectors use arrays, ranges use `[min, max, step]`, and matrices are row-major absolute local-to-parent transforms. Follow [scene-contract.md](scene-contract.md) for camera mapping. Use `"adaptive"` for a host app, such as VS Code or Obsidian; the standalone default is `"pro_white"`.
+Scene size is in pixels and object positions are world coordinates. Vectors use arrays, ranges use `[min, max, step]`, and matrices are row-major absolute local-to-parent transforms. Follow [scene-contract.md](scene-contract.md) for camera mapping. A Scene that names no theme is `"adaptive"`, the colors and font of the host app, such as VS Code or Obsidian, or Pro White without one; `"pro_white"` and `"pro_black"` are fixed.
 
 ## Objects and layout
 

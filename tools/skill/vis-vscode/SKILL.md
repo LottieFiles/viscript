@@ -18,7 +18,7 @@ The extension plays ordinary viscript Lua scenes in a sandboxed Webview beside t
 ## Workflow
 
 1. Read the code before writing the Scene. Fix the revision, one representative scenario, and its ordered evidence ranges. Without genuine product source there is no manifest: deliver plain Lua Preview scenes.
-2. Write each Scene with vis-skills. The host adds only `theme = "adaptive"` (unless the user picks a style) and one fixed logical Canvas that the Viewer fits to the player. The Canvas must explain itself, because exports carry nothing else: a plate states its question and answer, and a motion Scene ends on an answer caption. Never draw editor chrome, file paths, line numbers, or episode navigation on the Canvas.
+2. Write each Scene with vis-skills. The host adds only one fixed logical Canvas that the Viewer fits to the player, and leaves the theme out, so the Scene is `adaptive` (unless the user picks a style). The Canvas must explain itself, because exports carry nothing else: a plate states its question and answer, and a motion Scene ends on an answer caption. Never draw editor chrome, file paths, line numbers, or episode navigation on the Canvas.
 3. Save the Scene at `.vscode/vis/<series>/animations/<scene>.lua` and add one manifest entry whose `links` follow the scenario's execution order.
 4. Run the vis-skills review, then the host review and the VS Code checks in [extension.md](references/extension.md#verify-before-delivery).
 

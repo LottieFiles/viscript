@@ -486,11 +486,11 @@
       "loop": {"type": "boolean", "description": "Whether playback loops."},
       "background": {"type": "Color", "description": "Canvas background color."},
       "antialiasing": {"type": "boolean", "description": "Enable renderer antialiasing."},
-      "theme": {"type": "string|ThemeConfig", "description": "Built-in theme name (pro_white, pro_black, or adaptive, which takes the host app's colors and font) or custom theme."},
+      "theme": {"type": "string|ThemeConfig", "description": "Built-in theme name (adaptive, the default, which takes the host app's colors and font and is pro_white without one; pro_white; or pro_black) or custom theme."},
       "camera": {"type": "CameraConfig", "description": "Camera view and interaction settings."}
     },
     "ThemeConfig": {
-      "preset": {"type": "string", "description": "Built-in Theme base preset."},
+      "preset": {"type": "string", "description": "Built-in Theme base preset; adaptive when omitted."},
       "background": {"type": "Color", "description": "Canvas background color."},
       "text": {"type": "table", "description": "H1, H2, H3, text, and code typography overrides; a font may be a comma list, as a text's may."},
       "objects": {"type": "Color[]", "description": "Automatic 1..10 color cycle shared in order by lhs, rhs, every later args member, and other peer categories."},

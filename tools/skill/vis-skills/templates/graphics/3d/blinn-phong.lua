@@ -4,7 +4,6 @@
 -- shown at the selected surface sample.
 local page = vis.scene {
     width = 960, height = 540, fps = 30, loop = false,
-    theme = "adaptive",
     camera = {mode = "fixed", view = "2d", target = {0, 0}, height = 6},
 }
 
@@ -140,7 +139,7 @@ end
 assert(math.abs(stateA.nDotL - stateB.nDotL) > 0.15, "light motion must visibly change the selected sample")
 
 local spatial = vis.scene {
-    width = 620, height = 410, fps = 30, loop = false, theme = "adaptive",
+    width = 620, height = 410, fps = 30, loop = false,
     camera = {
         mode = "fixed", view = "3d", eye = viewPosition, target = {0, 0.05, 0}, up = {0, 1, 0},
         projection = "perspective", fov = 0.62, near = 0.1, far = 30,
@@ -220,7 +219,7 @@ spatial:wait(2.15)
 local spatialEnd = spatial:duration()
 
 local ledger = vis.scene {
-    width = 336, height = 405, fps = 30, loop = false, theme = "adaptive",
+    width = 336, height = 405, fps = 30, loop = false,
     camera = {mode = "fixed", view = "2d", target = {0, 0}, height = 7.4},
 }
 local formula = ledger:text {

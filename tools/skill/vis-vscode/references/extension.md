@@ -17,7 +17,7 @@ From `tools/vscode/`, run `npm install` and `npm run compile`, press `F5`, and o
 These are the only delivery differences from vis-skills:
 
 - **Canvas.** One fixed logical Canvas. The Viewer fits it to the player uniformly, without cropping or stretching, and resizing never reruns Lua. Exports keep the Canvas's own size.
-- **Theme.** `theme = "adaptive"` follows the workbench theme and rebuilds when the theme changes. Fixed and custom themes stay Scene-owned.
+- **Theme.** A Scene that names no theme, or names `adaptive`, follows the workbench theme and rebuilds when the theme changes. `pro_white`, `pro_black` and custom themes built on them stay Scene-owned.
 - **Fonts.** Pretendard, monospaced JetBrains Mono NL (`JetBrainsMono`, used by code), and Source Serif 4 (used by the `adaptive` heading and body roles). The Viewer gives those roles the list `Source Serif 4, Pretendard`, so Korean letters, which Source Serif 4 lacks, come from Pretendard, as in the Viewer's CSS. The CLI has no host, so it sets `adaptive` in Pretendard with Pro White colors; the host review below measures what the Viewer shows.
 - **Assets.** `asset = "..."` and `texture = "..."` load relative to the Lua file.
 - **Runtime.** The bundled CPU WASM runtime includes Diagram authoring, UI, Input, the retained Lua Runtime, States, and Audio.

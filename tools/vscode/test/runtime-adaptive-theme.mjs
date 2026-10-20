@@ -51,9 +51,17 @@ runtime.load("return vis.scene {width = 8, height = 8, theme = 'pro_white'}", "f
 assert.equal(runtime.adaptiveTheme, false);
 assert.deepEqual([...runtime.render(0).slice(0, 4)], [255, 255, 255, 255]);
 
-runtime.load("return vis.scene {width = 8, height = 8}", "implicit-pro-white.lua");
-assert.equal(runtime.adaptiveTheme, false);
-assert.deepEqual([...runtime.render(0).slice(0, 4)], [255, 255, 255, 255]);
+// A scene that names no theme takes the host's, and so does a theme table without a preset; a
+// background the scene sets stays.
+runtime.load("return vis.scene {width = 8, height = 8}", "implicit-adaptive.lua");
+assert.equal(runtime.adaptiveTheme, true);
+assert.deepEqual([...runtime.render(0).slice(0, 4)], [16, 24, 32, 255]);
+runtime.load("return vis.scene {width = 8, height = 8, theme = {colors = {accent = '#ff0000'}}}", "adaptive-without-preset.lua");
+assert.equal(runtime.adaptiveTheme, true);
+assert.deepEqual([...runtime.render(0).slice(0, 4)], [16, 24, 32, 255]);
+runtime.load("return vis.scene {width = 8, height = 8, background = '#203040'}", "implicit-adaptive-background.lua");
+assert.equal(runtime.adaptiveTheme, true);
+assert.deepEqual([...runtime.render(0).slice(0, 4)], [32, 48, 64, 255]);
 
 runtime.load("return vis.scene {width = 8, height = 8, theme = 'pro_black'}", "pro-black.lua");
 assert.equal(runtime.adaptiveTheme, false);
@@ -177,6 +185,10 @@ runtime.destroy();
 // The host names the font of headings and body text; without one they are in Pretendard, as in
 // the presets. A runtime with no fonts names the fonts the scene sets text in.
 const bare = await createVis({wasmBinary});
+// Before a host gives its theme, a scene that names none is Pro White.
+bare.load("return vis.scene {width = 8, height = 8}", "no-host.lua");
+assert.equal(bare.adaptiveTheme, true);
+assert.deepEqual([...bare.render(0).slice(0, 4)], [255, 255, 255, 255]);
 const HEADINGS = "local s = vis.scene {width = 64, height = 64, theme = 'adaptive'}; s:text {text = 'Title', role = 'h1'}; return s";
 bare.hostTheme({dark: false});
 bare.load(HEADINGS, "host-font.lua");

@@ -252,9 +252,9 @@ See [`tools/vscode/README.md`](tools/vscode/README.md) for the manifest format a
 The plugin in [`tools/obsidian/`](tools/obsidian) plays scenes in notes. It draws
 ```` ```viscript ```` (Lua) and ```` ```viscript-js ```` code blocks, embedded `.lua` files such
 as `![[orbit.lua|480|loop]]`, and `.lua` files opened in a tab of their own with the source
-below. Scenes with the `adaptive` theme follow the Obsidian theme. The plugin ships the
-themes' fonts, so scenes look the same on every device; other fonts come from a vault folder or
-Fontsource.
+below. Scenes that name no other theme are `adaptive` and follow the Obsidian theme. The plugin
+ships the themes' fonts, so scenes look the same on every device; other fonts come from a vault
+folder or Fontsource.
 
 ```sh
 cd tools/obsidian

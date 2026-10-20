@@ -3,7 +3,7 @@
 -- The visible "concept camera" owns V/P; the presentation camera only lets the
 -- viewer inspect the object, frustum, image plane, and projection ray together.
 local page = vis.scene {
-    width = 960, height = 540, fps = 30, loop = false, theme = "adaptive",
+    width = 960, height = 540, fps = 30, loop = false,
     camera = {mode = "fixed", view = "2d", target = {0, 0}, height = 6},
 }
 
@@ -153,7 +153,7 @@ for index, vertex in ipairs(objectVertices) do
 end
 
 local spatial = vis.scene {
-    width = 620, height = 410, fps = 30, loop = false, theme = "adaptive",
+    width = 620, height = 410, fps = 30, loop = false,
     camera = {
         mode = "fixed", view = "3d", eye = {7.20, 4.60, 0.00}, target = {1.90, 1.05, 2.45},
         up = {0, 1, 0}, projection = "perspective", fov = 0.74, near = 0.1, far = 40,
@@ -249,7 +249,7 @@ spatial:wait(2.10)
 local spatialEnd = spatial:duration()
 
 local ledger = vis.scene {
-    width = 336, height = 405, fps = 30, loop = false, theme = "adaptive",
+    width = 336, height = 405, fps = 30, loop = false,
     camera = {mode = "fixed", view = "2d", target = {0, 0}, height = 7.4},
 }
 -- Stage labels stay ink; only the final ndc stage carries the result hue.

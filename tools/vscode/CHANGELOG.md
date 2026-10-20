@@ -8,6 +8,7 @@
 - Hold a paused scene's retained runtime until playback resumes.
 - Export PNG frames at the display's pixel ratio.
 - Fit the canvas to the player always; the FIT/RAW sizes, wheel zoom, middle-drag pan, and the frame-rate readout are gone.
+- Follow the editor theme in scenes that name no theme, which are now `adaptive`.
 
 ## 0.7.79
 

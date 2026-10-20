@@ -541,6 +541,44 @@ return scene
                              "needs named fonts, finite positive text sizes and object width, a "
                              "roundness from 0 to 0.5 and 1 to 10 object colors"));
 
+    // Leaving out the theme, or a theme table's preset, means adaptive; a fixed preset does not.
+    auto host = Theme::preset(ThemePreset::ProBlack);
+    host.background = Color::hex("#101820");
+    host.objects[0] = Color::hex("#62b0ff");
+    host.objectCount = 1u;
+    struct DefaultCase
+    {
+        const char* source;
+        bool adaptive;
+        const char* background;
+        const char* stroke;
+    };
+    const DefaultCase defaults[] = {
+        {"local s = vis.scene {}; s:line {from = {-1, 0}, to = {1, 0}, id = 'line'}; return s",
+         true, "#101820", "#62b0ff"},
+        {"local s = vis.scene {background = '#203040'}; s:line {from = {-1, 0}, to = {1, 0}, id = 'line'}; return s",
+         true, "#203040", "#62b0ff"},
+        {"local s = vis.scene {theme = {colors = {accent = '#ff0000'}}}; s:line {from = {-1, 0}, to = {1, 0}, stroke = 'accent', id = 'line'}; return s",
+         true, "#101820", "#ff0000"},
+        {"local s = vis.scene {theme = 'pro_white'}; s:line {from = {-1, 0}, to = {1, 0}, id = 'line'}; return s",
+         false, "#ffffff", "#b45f06"},
+    };
+    for (auto& example : defaults) {
+        adaptiveUsed = !example.adaptive;
+        scene = nullptr;
+        status = Lua::load(example.source, static_cast<uint32_t>(std::strlen(example.source)),
+                           "theme-default.lua", &scene, error, sizeof(error), nullptr, nullptr, &host,
+                           &adaptiveUsed);
+        CHECK(status == Result::Success);
+        CHECK(adaptiveUsed == example.adaptive);
+        auto line = scene ? scene->object("line") : nullptr;
+        CHECK(line != nullptr);
+        if (scene) CHECK(pixel(scene->config().background) == pixel(Color::hex(example.background)));
+        if (line) CHECK(pixel(line->style.stroke) == pixel(Color::hex(example.stroke)));
+        if (!scene || !line) std::fprintf(stderr, "  in: %s\n  error: %s\n", example.source, error);
+        delete scene;
+    }
+
     static constexpr auto namedSource = R"lua(
 local named = vis.scene {theme = "pro_black"}
 named:point {point = {0, 0}, id = "named-point"}
@@ -559,6 +597,7 @@ return named
     _scriptError("return vis.scene {theme = 'adaptive_vscode'}",
                  "theme preset must be 'pro_white', 'pro_black' or 'adaptive'");
 
+    // Without a host, the adaptive theme a scene takes when it names none is Pro White.
     static constexpr auto implicitSource = "return vis.scene {}";
     scene = _loaded(implicitSource, "theme-implicit.lua");
     if (scene) {

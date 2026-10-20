@@ -414,7 +414,7 @@ test("an error shows under the scene, and goes once the file is fixed", options,
     await app.waitForFunction((view) => !document.querySelector(`${view} .viscript-error`).isShown(), VIEW, {timeout: 10_000});
 });
 
-test("scenes with the adaptive theme take Obsidian's colors, light and dark", options, async () => {
+test("scenes that name no theme take Obsidian's colors, light and dark", options, async () => {
     const canvas = app.locator(`${VIEW} canvas`);
     const near = (a, b) => a.every((value, at) => Math.abs(value - b[at]) <= 3);
     for (const theme of ["moonstone", "obsidian"]) {

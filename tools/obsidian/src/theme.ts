@@ -1,6 +1,6 @@
-// Colors for scenes that follow the host's theme (theme = "adaptive"), from the Obsidian theme's
-// CSS variables, so a scene matches the note it is in, light or dark, in any theme. Their text
-// takes the text font, as the plugin names no font of its own for the theme.
+// Colors for scenes that follow the host's theme, as scenes that name no other do, from the
+// Obsidian theme's CSS variables, so a scene matches the note it is in, light or dark, in any
+// theme. Their text takes the text font, as the plugin names no font of its own for the theme.
 import type {HostThemePalette} from "vis-wasm-bundle";
 import {readPalette, type PaletteVariables} from "../../player/src/theme.ts";
 

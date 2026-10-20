@@ -126,8 +126,9 @@ export interface LayoutReport {
 }
 
 /**
- * The host app's theme, for scenes with `theme = "adaptive"`. A color left undefined or empty takes
- * the runtime's light or dark one, by `dark`, which are close to VS Code's default themes.
+ * The host app's theme, for adaptive scenes, which name no other theme. A color left undefined or
+ * empty takes the runtime's light or dark one, by `dark`, which are close to VS Code's default
+ * themes.
  */
 export interface HostThemePalette {
     readonly dark: boolean;

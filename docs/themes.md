@@ -8,9 +8,9 @@ their own Theme and palette position.
 
 | Lua / JavaScript token | C++ preset | Appearance |
 |---|---|---|
-| `pro_white` | `ProWhite` | Light background; default preset |
+| `adaptive` | `Adaptive` | Colors and font supplied by the host app; Pro White without one. A Lua or JavaScript Scene that names no theme takes it |
+| `pro_white` | `ProWhite` | Light background; a C++ Scene's own default |
 | `pro_black` | `ProBlack` | Dark background |
-| `adaptive` | `Adaptive` | Colors and font supplied by the host app; Pro White without one |
 
 The presets use Pretendard for `h1`, `h2`, `h3`, and `text`, and JetBrainsMono for
 `code`. Register the font files before loading scenes that measure text:
@@ -23,7 +23,9 @@ build/viscript render scene.lua -o frame.png   --font src/examples/assets/Preten
 
 `adaptive` takes its colors, and the font of `h1`, `h2`, `h3`, and `text`, from the
 app that shows the scene, and the app loads the scene again when its own theme
-changes, light or dark:
+changes, light or dark. A Scene takes it unless it names another theme, so a scene
+fits the app it is shown in without a `theme` line; name `pro_white` or `pro_black`
+for a fixed look, such as a scene whose literal colors suit one background:
 
 | Host | Colors | Headings and body text | Follows |
 |---|---|---|---|
@@ -72,8 +74,9 @@ color. Space resolves its omitted axes, grid, and label colors from the Theme.
 
 ## Custom Theme
 
-Set the Theme while creating the Scene. Partial settings extend `pro_white`, or the
-chosen `preset`; `objects` replaces the color cycle.
+Set the Theme while creating the Scene. Partial settings extend the chosen `preset`,
+`adaptive` when it is left out; name `pro_white` or `pro_black` when the settings fix
+the background. `objects` replaces the color cycle.
 
 ```lua
 local scene = vis.scene {
