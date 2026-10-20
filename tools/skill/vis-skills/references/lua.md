@@ -10,21 +10,13 @@ scene:wait(0.5)
 return scene
 ```
 
-Scene dimensions are pixels, 960×540 when left out; positions are world coordinates. Follow [scene-contract.md](scene-contract.md) for the mapping. Vectors use `{x, y}` or `{x, y, z}` and numeric indices. Ranges use `{min, max, step}`. Colors use theme roles or hex `#rgb`, `#rgba`, `#rrggbb`, or `#rrggbbaa`.
+Scene dimensions are pixels, 960×540 when left out; positions are world coordinates ([scene-contract.md](scene-contract.md)). Vectors are `{x, y}` or `{x, y, z}` arrays, ranges `{min, max, step}`, and colors theme roles or hex `#rgb`, `#rgba`, `#rrggbb`, or `#rrggbbaa`. Camera options are `target` and world-unit `height`, plus `eye`, `up`, `projection`, `fov`, `near`, and `far` in 3D.
 
-A Scene that names no theme is `"adaptive"`: it takes the colors and font of the host app, such as VS Code or Obsidian, and is Pro White without one. `"pro_white"` and `"pro_black"` are fixed. Camera options include `target`, world-unit `height`, and for 3D, `eye`, `up`, `projection`, `fov`, `near`, and `far`.
-
-Matrices are row-major and transform column vectors. Translation occupies entries 4, 8, and 12:
-
-```lua
-local matrix = {1,0,0,tx, 0,1,0,ty, 0,0,1,tz, 0,0,0,1}
-```
-
-Use this absolute local-to-parent transform for Group/Space `matrix`, `tween`'s `transform`, and `scene:transform`.
+[lua-more.md](lua-more.md) holds transform matrices, tables and matrices, pictures, masks and other paint, boolean shapes, contours, vector fields, stream lines, surfaces, `warp`, inset views, springs, Cell/Voxel sampling, child Scenes, scene transitions, and the optional modules.
 
 ## Objects
 
-Scene and Object handles share child factories. The receiver becomes the parent.
+Scene and Object handles share child factories; the receiver becomes the parent.
 
 | Factory | Main options |
 |---|---|
@@ -42,68 +34,43 @@ Scene and Object handles share child factories. The receiver becomes the parent.
 | `path` | move/line/quadratic/cubic/close `commands` |
 | `curve` | `from`, `control1`, `control2`, `to`, `samples` |
 | `plot` | `points`, or `fn` and `x_range`; `y_range`, `discontinuities`, `endpoint_radius` |
-| `area` | `fn`, `x_range`, `base` |
-| `riemann` | `fn` or `values`, `x_range`, `sample`, `negative` |
-| `contour` | `fn` or `values`, `levels`, `x_range`, `y_range`, `colors`, `labels` |
-| `vector_field` | `fn` or `values`, ranges, `length` or `scale`, `anchor`, `colors` |
-| `stream_lines` | `fn`, ranges or `seeds`, `time`, `dt`, `direction`, `colors` |
-| `surface` | row-major `points`, `size`, `mode`, `colors`, `mesh`, `shading`, `light` |
-| `union`, `intersection`, `difference`, `exclusion` | `of`, a list of closed shape handles |
+| `area`, `riemann` | `fn` (riemann also `values`), `x_range`; area `base`; riemann `sample`, `negative` |
 | `text`, `number` | text or numeric `value`, point, font, size, align, role, orientation |
 | `spans` | strings and styled text/TeX parts, `split`, `wrap`, `leading` |
 | `code` | `text`, `language`, `colors`, `leading` or `pitch` |
 | `tex` | TeX string or parts, `display`, text styling |
-| `matrix` | `rows`, `brackets`, `gap`, `justify`, `decimals` |
-| `table` | `rows`, `header`, `padding`, `justify`, `stripes`, `rules` |
-| `picture` | registered/file `asset`, or RGBA `pixels` and `size`; center, width, filter |
-| `cell` | `size`, `color`, patches, `mode`, fractional `padding` |
 | `connector` | endpoint handles `from`, `to`, `padding`, `tail`, `tip` |
 
-Style options include `id`, `stroke`, `fill`, `width`, `opacity`, `progress`, `layer`, `gradient`, `dash`, `dash_offset`, `isolate`, `mask`, `blend`, `blur`, and `shadow`. Groups pass their stroke, fill, and width to descendant shapes. `isolate = true` composites a family as one picture. A mask selects another object's alpha or luma, with inverse modes available.
+Style options include `id`, `stroke`, `fill`, `width`, `opacity`, `progress`, `layer`, `dash`, and `dash_offset`. Groups pass their stroke, fill, and width to descendant shapes.
 
-A connector follows sampled endpoint outlines and uses bounds when no closed outline crosses its center ray. `padding` adds world distance beyond each outline. `trim_distance` trims a line, arrow, or vector: one number trims both ends; `{start, finish}` sets separate distances. Arrow and route markers stay solid when their shafts are dashed.
+A connector follows its endpoints' outlines, or their bounds when no closed outline crosses its center ray, and `padding` adds world distance beyond each. `trim_distance` trims a line, arrow, or vector: one number trims both ends, `{start, finish}` each separately. Markers stay solid on dashed shafts.
 
-`object:label{...}` creates a child Text. Set its point, align, and layer explicitly. `scene:bounds(handle_or_list)` returns `left`, `right`, `bottom`, `top`, `width`, `height`, `center`, `min`, and `max` in world units. A Text counts with its layout box only when it was created with `measure = true`; otherwise only its anchor point counts, and one such Text has zero width. Use `rectangle{around = handles}` for a frame, or `brace{around = handles, label = "term"}` for an annotation; brace returns both the path and label.
+`object:label{...}` creates a child Text; set its point, align, and layer explicitly. `scene:bounds(handle_or_list)` returns `left`, `right`, `bottom`, `top`, `width`, `height`, `center`, `min`, and `max` in world units. A Text counts with its layout box only when created with `measure = true`; otherwise only its anchor point counts. Frame handles with `rectangle{around = handles}`; `brace{around = handles, label = "term"}` returns the path and the label.
 
-Arcs use radians counterclockwise from +x; a negative sweep runs clockwise. `sector = true` closes through the center. Angles mark two rays from a vertex; `other = true` chooses the outer angle, and `right` selects `"auto"`, `"never"`, or `"always"`. A text or TeX label follows the bisector.
+Arcs use radians counterclockwise from +x; a negative sweep runs clockwise, and `sector = true` closes through the center. An `angle` marks two rays from a vertex: `other = true` takes the outer angle, `right` is `"auto"`, `"never"`, or `"always"`, and its label follows the bisector.
 
-## Axes and fields
+## Axes and plots
 
-`space` separates grid `width` from pixel `axis_width`. `ticks = true` uses each range's step; a table selects per-axis steps. Axis labels accept strings or handles:
+`space` separates grid `width` from pixel `axis_width`. `ticks = true` uses each range's step; a table sets per-axis steps. `space:labels` takes strings or handles and returns the label handles in order; `side` and pixel `gap` place them.
 
 ```lua
-local axes = scene:space {
-    x = {-5, 5, 1}, y = {-3, 3, 1},
-    stroke = "#00000000", ticks = {x = math.pi / 2, y = 1},
-}
+local axes = scene:space {x = {-5, 5, 1}, y = {-3, 3, 1}, stroke = "#00000000", ticks = {x = math.pi / 2, y = 1}}
 axes:labels {x = {{-math.pi, "-pi"}, {math.pi, "pi"}}}
 local graph = axes:plot {fn = math.tan, x_range = {-5, 5, 0.01}, y_range = {-3, 3}}
 scene:create(graph, 2, "linear")
 ```
 
-`space:labels` returns label handles in authored order. `side` and pixel `gap` place world labels. `placement = "screen"` places billboard endpoint text outward from the projected origin at each camera sample; see [surface-recipe.md](surface-recipe.md).
-
-Plots use `y_range` to clip branches and `discontinuities` to separate known jumps. A non-finite sample breaks the line. `endpoint_radius` adds a solid marker at the active draw endpoint. A plot state may supply new `fn` or `points`; retained ranges and cuts apply to later states. Matching function grids blend vertically, while other geometry states interpolate matching pieces.
-
-`area` fills between a graph and a numeric/function `base`. `riemann` returns rectangles from left to right, with left, right, or midpoint sampling. Refine bars with `match_transform(..., {shapes = true})`.
-
-`contour` returns one Plot per level. Each child can be bound to a scalar field and animated through tracker samples. `labels = true` adds level-value text; a table sets `format`, local text `size`, `spacing`, `padding`, and `upright`. Grid values run row by row from the bottom left, x varying fastest.
-
-`vector_field` returns arrows in grid order, colored by magnitude. `length` caps their visual length smoothly; `scale` uses physical vector lengths. `stream_lines` integrates the field from grid or explicit seeds with `dt`, `time`, and forward/backward/both tracing.
-
-Surfaces use `"solid"`, `"mesh"`, or `"solid_mesh"`. Colors can be a colormap name, `{map, range, axis}`, a point callback, or one color per point. The available maps are viridis, plasma, inferno, magma, and cividis. `mesh = {11, 11}` draws a coarse mesh over a finer surface. Lighting follows the camera by default; `light = {direction = {-1, 1, 1}, ambient = 0.5}` fixes it in world space. In 3D, surfaces occlude strokes in their own layer; separate layers control foreground annotations.
+`y_range` clips branches, `discontinuities` separates known jumps, and a non-finite sample breaks the line. `endpoint_radius` adds a marker at the active draw endpoint. A plot state may supply new `fn` or `points`; matching function grids blend vertically. `area` fills between a graph and a numeric or function `base`; `riemann` returns rectangles left to right with left, right, or midpoint sampling, refined with `match_transform(..., {shapes = true})`.
 
 ## Text and code
 
-Text `size` is in points: the em spans `4/3 * size` screen pixels for billboard text or world units for plane text. Theme roles select font, size, and color. A font can be a comma list, such as `font = "Source Serif 4, Pretendard"`: each character takes the first loaded font that has it, and the first loaded font sets the line height. Characters no listed font has are drawn from the bundled Noto Sans Math symbols or the default font when either has them.
+Text `size` is in points ([coordinates](scene-contract.md#coordinates-and-identity)); theme roles select font, size, and color. A font can be a comma list (`font = "Source Serif 4, Pretendard"`): each character takes the first loaded font that has it.
 
-`local w, h = text:measure()` returns width and height in world units, in the registered font. `measure = true` stores that box at creation, so `scene:bounds`, `around`, and arranging see the Text's extent rather than its anchor point. To place a Text that appears later, create it with `opacity = 0`, measure and place it before the timeline calls, and reveal it in its beat. `baseline = true` pins the first baseline at `point`, with `align.x` selecting horizontal alignment. `reserve = "-0.00"` fixes a box from a sample string and the initial text. `tabular = true` gives digits, minus, and spaces equal advance cells.
+`local w, h = text:measure()` returns world width and height in the registered font, and `measure = true` stores that box at creation so `bounds`, `around`, and arranging see it. Create a Text that appears later with `opacity = 0`, measure and place it before the timeline, and reveal it in its beat. `baseline = true` pins the first baseline at `point`; `reserve = "-0.00"` fixes a box from a sample string; `tabular = true` gives digits equal widths.
 
-`number` animates `value`; `decimals`, `separator`, `sign`, `prefix`, and `suffix` format it. `matrix` and `table` return row groups with entry texts. Access parts with `row(r)`, `entry(r, c)`, and `column(c)`; indices start at 1. Matrix children also include its brackets; table children include stripes and rules. A matrix string entry is inline TeX when the tex module is built in (`"\\cos\\theta"`, `"x^2"`; use `"\\text{word}"` for words), and plain text otherwise; numbers stay countable texts, and `""` stays blank. Table strings are always text.
+`number` animates `value`, formatted by `decimals`, `separator`, `sign`, `prefix`, and `suffix`. `spans` returns measured texts and formulas on shared baselines: `split = "words"` or `"letters"` makes separate handles, `wrap` sets a world width, and unnamed parts get `<row-id>/<n>` IDs.
 
-`spans` returns measured texts and formulas on shared baselines. Strings retain their spaces; `split = "words"` or `"letters"` creates separate handles. Parts set local styling and `rise`, and `wrap` sets a width in world units. `leading` sets baseline spacing. Texts/formulas with no explicit ID use `<row-id>/<n>`.
-
-`code` returns line groups containing token handles. Languages include plain, Lua, Python, JavaScript, TypeScript, C, and C++. Tokens use semantic theme colors and the code role's monospaced font; `plain` keeps every token in `foreground`, so `scene:set {target = token, fill = "danger"}` on the `search` result marks only the decisive tokens. IDs use `<block-id>/<line>/<token>`.
+`code` returns line groups of token handles (IDs `<block-id>/<line>/<token>`) in the code role's monospaced font, for plain, Lua, Python, JavaScript, TypeScript, C, and C++; `plain` keeps every token in `foreground`.
 
 ```lua
 local listing = scene:code {text = "local total = 0\nreturn total", language = "lua", id = "listing"}
@@ -112,9 +79,9 @@ scene:highlight(listing, selected)
 local next_listing = scene:edit(listing, {replace = "total", with = "sum", match = "all"})
 ```
 
-`search` returns covered tokens and raises an error when nothing matches. `match` selects first, last, all, or an occurrence number; `lines` selects a line or range. `edit` applies replace/insert/remove/append/prepend operations in order and returns the new block. It keeps the original styling and parent, then animates the diff. `highlight` selects line indices or handles; call it without a selection to restore the whole block.
+`search` raises an error when nothing matches; `match` is first, last, all, or an occurrence number, and `lines` a line or range. `edit` applies replace/insert/remove/append/prepend in order and animates the diff into a new block with the same style and parent. `highlight` without a selection restores the whole block.
 
-With the TeX module, `tex` returns a typeset Group of glyphs and filled geometry:
+With the TeX module, `tex` returns a typeset Group. `part(tex, occurrence)` selects a part or glyph; split a formula into parts to keep terms together for `match_transform`, which pairs formulas by TeX.
 
 ```lua
 local equation = scene:tex {tex = {"a^2", "+", "b^2", "=", {"c^2", id = "hyp"}}, id = "eq"}
@@ -122,26 +89,21 @@ scene:indicate(equation:part("c^2"))
 local caption = scene:spans {"The area is ", {tex = "\\pi r^2"}, "."}
 ```
 
-`part(tex, occurrence)` selects a formula part or glyph by TeX. Split into parts to keep terms together during matching. `display = false` uses inline styles; `{tex = ...}` spans parts share the text baseline. `match_transform` pairs formulas by TeX and can override pairs with handles.
-
 ## Layout and timeline
 
-Use `move_to`, `next_to`, `align_to`, `arrange`, and `arrange_grid` for initial placement. Coordinates are relative to the direct parent. Measure text before arranging it. For an animated insertion, use the Scene's timeline `arrange` with sibling handles.
+Place with `move_to`, `next_to`, `align_to`, `arrange`, and `arrange_grid`, relative to the direct parent and after measuring text; the timeline's `arrange` animates an insertion among siblings.
 
-Most timeline calls take duration and curve, then advance the cursor. `wait` holds, `seek` moves the authoring cursor, `mark` names a time, and `at` authors at a time while restoring the previous cursor. `parallel` starts branches at the same cursor.
+Timeline calls advance the cursor. `wait` holds, `seek` moves the cursor, `mark` names a time, `at` authors at a time and restores the cursor, and `parallel` starts branches together. `scene:duration()` is the later of the cursor (`scene:time()`) and the latest time any call reached, so after an `at` call `wait(total - scene:duration())` stops short; pad to a total with `scene:seek(total)`.
 
-A Scene keeps two times: the cursor, where the next call starts (`scene:time()`), and the extent, the latest time any call reached. `scene:duration()` reports the larger of the two, or a mounted child Scene's duration when that is longer. `wait(d)` adds `d` to the cursor and `at` puts the cursor back, so after an `at` call `wait(total - scene:duration())` stops short of `total`. Pad to a total with `scene:seek(total)`.
-
-Animation calls share a timing table with `duration` and `curve`. Calls that stagger targets also accept `lag`. Reuse the same table across calls:
+Animation calls take a timing table with `duration`, `curve`, and, when they stagger targets, `lag`:
 
 ```lua
 local timing = {duration = 0.6, curve = "ease_in_out"}
 scene:shift(ball, {2, 0}, timing)
-scene:rotate(ball, math.pi / 2, timing)
-scene:create({ball, label}, {duration = 0.6, curve = "smooth", lag = 0.15})
+scene:create({ball, label}, {duration = 0.6, lag = 0.15})
 ```
 
-Positional duration and curve calls remain supported.
+Move, draw, and replace calls also take a positional duration and curve: `scene:shift(ball, {2, 0}, 1, "smooth")`. Effects and the camera take only the table: `fade_in` and `fade_out` (one handle each), `indicate`, `wiggle`, `circumscribe`, `flash`, `ripple`, `passing_flash`, and `focus`, as in `scene:fade_in(label, {duration = 0.4})`. To fade several handles at once, `tween` a list of `{target = handle, opacity = 1}` descriptors.
 
 | Purpose | Calls |
 |---|---|
@@ -152,58 +114,31 @@ Positional duration and curve calls remain supported.
 | Replace | `morph`, `fade_transform`, `match_transform`, `transition` |
 | State | `tween`, `set`, `save`, `restore`, `clone`, `warp`, `remove` |
 
-`tween` accepts one descriptor or a list. Each names `target` and properties such as shift, transform, position, opacity, colors, points, text, value, and layer. `shift` moves by a vector and `transform` sets the local matrix; `position` moves the center of the target's bounds to a point in its parent's space, from wherever earlier clips left it, and fails on an object without bounds. A descriptor takes only one of the three. `lag` offsets successive targets. `set` applies a state immediately; `save` and `restore` keep a stack of states per target.
+`tween` takes one descriptor or a list naming each target once, with properties such as shift, transform, position, opacity, colors, points, text, value, and layer. A descriptor moves with only one of `shift` (by a vector), `transform` (the local matrix), or `position` (the bounds' center to a point in the parent's space, failing on an object without bounds); `arc` bends the move by a central angle. Geometry uses the factory's names (`points`, `from`, `to`, `size`, `radius`); `center` animates arcs only. `set` applies the same descriptors at once, `scene:set({target = label, opacity = 0})`: a starting state before the timeline, a change at the cursor after it. `save` and `restore` keep a stack per target.
 
 ```lua
 scene:tween({target = ball, shift = {2, 0}, fill = "success"}, 1, "smooth")
 scene:tween({target = ball, position = {0, 1}, arc = math.pi / 2}, 1)
-scene:save(ball)
-scene:indicate(ball)
-scene:restore(ball, 0.5)
 scene:parallel(
     function() scene:shift(ball, {-1, 0}, 1) end,
     function() scene:fade(ball, 0.5, 1) end
 )
 ```
 
-Playing `text` fades out the whole old string, then fades in the whole replacement. `retype = true` erases to the shared prefix before typing the new suffix; use it when typing from an empty string too. `sweep = true` opts into a character sweep that mixes both strings. Both flags require `text` and cannot both be true. Numeric `value` still interpolates continuously.
+Tweening `text` fades the whole old string out and the new one in (`retype` and `sweep` are in lua-more.md); a numeric `value` interpolates. A curve is a preset (`"linear"`, `"smooth"`, `"ease_in"`, `"ease_out"`, `"ease_in_out"`, `"gentle"`, `"snappy"`, `"back"`), a tuned preset such as `{preset = "back", strength = 0.6}`, or `{bezier = {x1, y1, x2, y2}}`.
 
-```lua
-scene:tween({target = caption, text = "Ready to play"}, 1)
-scene:tween({target = caption, text = "Ready to export", retype = true}, 1)
-scene:tween({target = caption, text = "EXPORTED", sweep = true}, 1)
-```
+`morph` resamples outlines from source to target and pairs pieces automatically (`pairs` overrides; `{copy = true}` keeps the source); `clone` snapshots a family. `fade_transform` cross-fades into a target created at the current cursor with no clips, and drops the source. `match_transform` carries matching text, TeX, and optionally shapes into such a target, from a source at rest unless `copy = true`. `transition` fades handles out and others in without removing them; create the incoming ones at `opacity = 0`.
 
-Geometry descriptors use the factory's names, such as `points`, `from`, `to`, `control1`, `control2`, `size`, and `radius`. `center` animates arcs only; move other shapes with `shift`, `position`, or `transform`. `arc` bends movement by a central angle. Layer changes use the higher layer during the transition.
+## Cameras
 
-A curve can be a preset (`"linear"`, `"smooth"`, `"gentle"`, `"ease_in_out"`, and others), a cubic Bézier table, or a preset table with strength and reverse settings. A table such as `{preset = "back", strength = 0.6}` tunes a preset; `{bezier = {x1, y1, x2, y2}, strength = 1}` defines a custom curve.
-
-`morph` resamples outlines to turn the source into the target. Multi-piece paths pair automatically; explicit one-based contour `pairs` override selected matches. `{copy = true}` preserves the source. `clone` snapshots an object's current family, with an optional parent, ID, style, and world shift.
-
-`fade_transform` cross-fades source into a target attached at the current cursor without clips; the source leaves the timeline on completion. `transition` fades outgoing handles out and incoming handles in without removing them; create every incoming handle with `opacity = 0`. `match_transform` carries matching text, TeX, and optional shapes into a target attached at the current cursor without clips. The source must be at rest unless `copy = true` snapshots it. Options include `pairs`, `strings`, `diff`, `shapes`, `fade`, `lag`, `arc`, `path`, and `copy`.
-
-`warp` maps authored points in each target's parent space. It subdivides straight segments using `step` before bending them. Geometry stays warped after the animation, so later bounds, cloning, and motion paths use its new outline.
-
-```lua
-scene:warp(ball, function(x, y) return x + 0.2 * y * y, y end, 1, "smooth", {step = 0.05})
-```
-
-## Cameras and views
-
-`look` changes camera fields and can aim at handles while retaining the eye offset. `focus` frames handles in a 2D view with fractional padding; use `look` to frame a 3D view. `focus()` returns to the opening camera from either view. `orbit` rotates a 3D camera around its target.
+`look` changes camera fields and can aim at handles, keeping the eye offset. `focus` frames handles in a 2D view with fractional padding (`look` frames a 3D one), `focus()` returns to the opening camera, and `orbit` turns a 3D camera around its target.
 
 ```lua
 scene:focus(ball, {padding = 0.3, duration = 1})
-scene:look({target = ball}, 0.5)
 scene:focus()
-local lens = scene:view({x = 0.6, y = 0.05, width = 0.35, height = 0.35},
-    {camera = {target = ball, height = 1}, follow = ball, layer = 1})
-lens:focus(ball)
 ```
 
-A view renders the same objects through another camera. Its `look`, `focus`, `orbit`, and `fade` calls use the timeline. `follow` tracks an object in 2D; `optical`, `background`, `layer`, `hide`, and `opacity` style the inset.
-
-## Trackers and sampling
+## Trackers
 
 Trackers express continuous relationships. Bind each dependent to a callback, then animate the tracker:
 
@@ -213,46 +148,8 @@ scene:bind(ball, x, function(v) return {shift = {v, v * v / 2}} end)
 scene:track(x, 2, 3, "linear")
 ```
 
-A callback receives tracker values in order and returns a property state. `shift` is relative to the bound pose; `transform` is absolute; a bound state cannot use `position`. `track` bakes frame samples into retained clips. Overlapping tracks of different trackers merge on a bound object. Keep callbacks pure. For discrete counters and reveals, use the same `at` event and sample index for every dependent state.
+A callback receives tracker values in order and returns a property state: `shift` relative to the bound pose or an absolute `transform`, never `position` or `text`. A live readout is a `number` whose `value` the callback returns: `scene:number {value = 1.6, decimals = 2, prefix = "x = "}`. `track` bakes frame samples into clips, and overlapping tracks of different trackers merge on a bound object. Keep callbacks pure, and give a discrete counter or reveal one `at` event and sample index across all its dependents.
 
-`vis.spring_response(seconds, options)` samples a physical spring's displacement from equilibrium. Options are mass, stiffness, damping, displacement, and initial velocity. Use a seconds tracker and a linear track so physical time stays uniform:
+## Sandbox
 
-```lua
-local elapsed = scene:tracker(0)
-local omega = 2 * math.pi
-scene:bind(ball, elapsed, function(time)
-    return {shift = {vis.spring_response(time,
-        {mass = 1, stiffness = omega * omega, damping = 0.3 * omega, displacement = 2}), 0}}
-end)
-scene:wait(0.5)
-scene:track(elapsed, 7.5, 7.5, "linear")
-```
-
-`space:cell(fn, config)` and `space:voxel(fn, config)` sample colors over space ranges and time during authoring. Use duration, fps, mode, and fractional padding to control the field.
-
-```lua
-local plane = scene:space {x = {-2, 2, 0.1}, y = {-2, 2, 0.1}}
-plane:cell(function(x, y, time)
-    return x*x + y*y < (1 + time)^2 and "accent" or "#00000000"
-end, {duration = 1, fps = 24, mode = "padd", padding = 0.06})
-```
-
-## Scene composition and modules
-
-`scene:viewport(child, bounds)` mounts a child Scene. Bounds use normalized `{x, y, width, height}` from the frame's top left. `scene:scene_transition(stages, options)` plays a sequence, with each incoming stage starting at local time zero. Finish authoring children and stages before mounting: successful attachment seals and transfers them, so they cannot be edited or reused in another mount.
-
-Transition styles are match, fade, slide, zoom_in, and zoom_out. `hold` sets fully shown time; `live = false` shows completed stages. `from` chooses a slide side, `area` chooses a zoom region, `area_margin` adds object padding, and `match` carries equal-ID objects. `styles` sets each transition separately:
-
-```lua
-scene:scene_transition({overview, detail, summary}, {
-    duration = 0.8,
-    styles = {{style = "zoom_in", area = "chart", area_margin = 0},
-              {style = "slide", from = "bottom", match = true}},
-})
-```
-
-Use [vis-interactive](../../vis-interactive/SKILL.md) for UI, Input, action maps, retained runtime, audio, and simulation loops. Authored sound cues use `vis.audio.cue(scene, options)` when Audio is enabled.
-
-`vis.states(scene)` provides named object states, atomic transitions, and interaction-clock retargeting. `vis.diagram(scene)` provides semantic nodes, edges, groups, and audit metadata; see [diagram/native-authoring.md](diagram/native-authoring.md). Enable the corresponding modules in the build.
-
-Scripts run without `pairs`, `next`, `print`, `pcall`, `load`, `require`, metatables, `os`, `io`, `debug`, and the string pattern functions (`find`, `match`, `gmatch`, `gsub`). Iterate with `ipairs` or `vis.keys`, compare strings with `string.sub` and `string.byte`, and stop with `error(...)` to see a value. Use `math.randomseed(seed)` for repeatable authored randomness. `vis.keys(table)` gives ordered keys; `vis.merge(defaults, options)` combines component options with later values winning. Register fonts and memory-backed assets before loading a scene that measures or uses them. Review every authored timeline with [review.md](review.md).
+Scripts run without `pairs`, `next`, `print`, `pcall`, `load`, `require`, metatables, `os`, `io`, `debug`, and the string pattern functions (`find`, `match`, `gmatch`, `gsub`). Iterate with `ipairs` or `vis.keys(table)` (ordered keys), compare strings with `string.sub` and `string.byte`, and stop with `error(...)` to see a value. `math.randomseed(seed)` repeats authored randomness; `vis.merge(defaults, options)` combines options, later values winning. Register fonts and assets before loading a scene that measures or uses them.

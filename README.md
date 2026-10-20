@@ -293,8 +293,14 @@ done
 
 `vis-skills` carries the same prebuilt WASM runtime and fonts in
 `tools/skill/vis-skills/assets/wasm/`, so an agent can mount and render scenes in the
-browser or Node without building anything; the `viscript` CLI review commands need a
-native build. Then ask, for example:
+browser or Node without building anything. Its review rounds call `viscript audit` and
+`viscript render`, so put a native build on `PATH` too:
+
+```sh
+ln -s "$PWD/build/viscript" ~/.local/bin/viscript   # or any directory on PATH
+```
+
+Then ask, for example:
 
 ```text
 Use vis-skills to animate binary search on a sorted array of 16 numbers.

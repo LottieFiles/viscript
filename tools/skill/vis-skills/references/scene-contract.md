@@ -6,15 +6,15 @@ Rules for every viscript scene. Profiles may narrow a default; they never weaken
 
 - Write the data or deterministic trace first (values, steps, events). Derive every displayed coordinate, label, counter, and result from it; format only at display time.
 - Two views of one state read the same record and change in the same beat.
-- Keep supplied values and special cases. Mark illustrative values as such; make them non-degenerate and inside the claimed regime.
+- Keep supplied values and special cases. Make illustrative values non-degenerate and inside the claimed regime, and say that they are illustrative in the delivery or the prose, not on the canvas.
 - Before final choreography, change one input to an asymmetric value: every dependent must update without editing another literal.
 
 ## Defaults
 
 Leave out every option that equals its default; write a default only beside variants that set the same option otherwise, such as one centered label among left-aligned ones.
 
-- A Scene is 960×540 at 30 fps, has `loop = false`, takes the `adaptive` theme, and looks at the origin through a fixed 2D camera 6 units tall: `camera = {height = 8}` names only what differs. A host can override replay behavior; Obsidian uses its player settings or embed options.
-- A `3d` camera looks at the origin in perspective with +y up, and a 2D one is orthographic. `look` keeps every field it does not name, so it names only what moves: `scene:look({eye = {-6, 4.5, 8}}, 2)`. A `look` that turns a 2D camera to `3d` therefore stays orthographic unless it names `projection = "perspective"`.
+- A Scene is 960×540 at 30 fps, has `loop = false`, takes the `adaptive` theme, and looks at the origin through a fixed 2D camera 6 units tall: `camera = {height = 8}` names only what differs.
+- A `3d` camera is perspective with +y up, and a 2D one orthographic. `look` changes only the fields it names (`scene:look({eye = {-6, 4.5, 8}}, 2)`), so a 2D camera turned `3d` stays orthographic unless it names `projection = "perspective"`.
 - A shape has no fill until given one, so an outline needs only `stroke`. A filled shape without `stroke` still gets an outline in a Theme color, so a fill-only shape sets `width = 0`. A circle sits on the origin with radius 1, and a rectangle on the origin.
 - Text sits on the origin, centered (`align = {0.5, 0.5}`), in the `text` role.
 
@@ -29,7 +29,7 @@ Leave out every option that equals its default; write a default only beside vari
 
 ## Theme, text, color
 
-- Leave `theme` out unless the user picks a style: a Scene without one is `adaptive`, the host app's colors and font in VS Code or Obsidian and Pro White elsewhere. A chosen theme goes in the config of the root and of every child Scene, before visible objects; a child Scene does not inherit it. Paint with Theme roles, which read on light and dark hosts alike; a Scene whose literal colors suit one background names `pro_white` or `pro_black`.
+- Leave `theme` out unless the user picks a style: `adaptive` takes the host app's colors and font (Pro White elsewhere), and Theme roles read on light and dark hosts alike. A chosen theme goes in the config of the root and of every child Scene before visible objects; a Scene whose literal colors suit one background names `pro_white` or `pro_black`.
 - Register the selected fonts through the host. Verify meaning-bearing glyphs (`∇`, `±`, `θ`, Korean) in the raster; otherwise spell them plainly.
 - Text roles: `h1`, `h2`, `h3`, `text`, `code`. `point` is the anchor and alignment defaults to centered; set `align={0,0.5}` for left-anchored titles and margin labels.
 - Theme colors: `background`, `foreground`, `muted`, `accent`, `secondary`, `success`, `warning`, `danger`, `info`, `surface`, `border`, `result`, `focus` (no `object1`). Omitting paint cycles peer colors.
@@ -40,42 +40,41 @@ Leave out every option that equals its default; write a default only beside vari
 
 The default look is a printed technical figure: ink structure, square corners, and color only where the reader must look. A user's style request or a profile's stated exception overrides it.
 
-- **Square corners.** Leave `corner` at 0 for boxes, cells, slots, panels, and nodes; `vis.diagram` follows the Theme's `roundness`, which is 0 in the pro presets. Round only a shape whose roundness means something (a token, a physical object) or when the user asks.
+- **Square corners.** Leave `corner` at 0 for boxes, cells, slots, panels, and nodes (`vis.diagram` follows the Theme's `roundness`, 0 in the pro presets); round only a shape whose roundness means something (a token, a physical object) or when the user asks.
 - **Ink structure.** Frames, axes, slots, nodes, and routes use `foreground`, `muted`, or `border` with no fill, or a `background` fill that masks routes behind a node. No card fills, `surface` panels, shadows, gradients, or glows unless they mark a real region. Give every structural object explicit paint: omitted paint cycles the Theme's object colors.
-- **Color budget.** One hue carries the subject or the finding (`danger` for a failure, `result` for an answer, `accent` for the active path); `focus` may appear for one beat. Add a second hue only for a second named state the reader must compare. Color by category only when color is the data or identities must be told apart, and then keep one small palette.
-- **Weights.** 1 px for grids, rules, slots, and idle routes; 1.25–1.5 px for outlines and the subject; 2 px for a moving head, cursor, or result curve. Arrow `tip` near 7. A dash marks something implied, missing, constructed, or repeating, never ordinary structure.
+- **Color budget.** One hue carries the subject or the finding (`danger` for a failure, `result` for an answer, `accent` for the active path); `focus` may appear for one beat. Add a second hue only for a second named state the reader must compare. A hue means one state: what is active now and what is finished never share it. Color by category only when color is the data or identities must be told apart, and then keep one small palette.
+- **Weights.** 1 px for grids, rules, slots, and idle routes; 1.25–1.5 px for outlines and the subject; 2 px for a moving head, cursor, active selection, or result curve. Arrow `tip` near 7. A dash marks something implied, missing, constructed, or repeating, never ordinary structure.
 - **Type.** Hierarchy comes from role, size, and `muted`, not hue. Keep labels at 11–16 pt; a title uses `h3`, or `h2` on a poster-sized plate. Values, identifiers, and indices use the `code` role in ink (`fill = "foreground"` or `muted`): the role's own color is a hue, not ink.
 - **Code fragments.** Use `code {language = "plain"}` in ink and recolor only the decisive tokens (`search`) in the finding's hue; syntax colors compete with the evidence.
-- **Context.** Dim context by swapping it to `muted`/`border` or to opacity near 0.4; keep it when it explains an invariant.
+- **Context.** Dim context by swapping it to `muted`/`border` or to opacity near 0.4; keep it when it explains an invariant, and fade it out where new text would land on it.
 
 ## Visible text
 
-- Every string teaches: a name, a real value, a code fragment, a formula, or a short caption that states what the reader is looking at ("never written again", "2 of 5 drawn"). No production metadata (loop, theme, size, tool, review status) and no paragraphs.
+- Every string teaches: a name, a real value, a code fragment, a formula, or a short caption that states what the reader is looking at ("never written again", "2 of 5 drawn"). No production metadata (loop, theme, size, tool, review status, "illustrative") and no paragraphs. A counter or readout appears at the beat that first uses it.
 - Put words beside their evidence: a label next to its mark, a caption beside the figure it explains, the finding in its hue and the reason in `muted`.
+- At most one caption is on screen, and it belongs to its beat: it changes or leaves with the beat, never stays as a rule bar or legend. Caption each kind of step the first time it happens, each change of phase (a new pass, the stopping test), and the result; plain repeats run without one. A label that gives a step's reason (a comparison, a condition) leaves as the step's action completes, so no frame shows a claim the picture no longer matches; step labels in one place replace each other (`fade_transform`, or fade out before the next fades in).
+- A formula appears once the picture has shown what it names, its terms in the colors of the shapes they describe.
 - A motion explainer has no title unless requested; it labels values and ends on a short answer caption beside the result, so a paused or exported final frame explains itself.
 - A plate ([cheatsheet](profiles/cheatsheet.md), [pipeline plate](profiles/pipeline-plate.md)) is read as a figure: a title that states the question, one answer line, and a caption per section.
 - Beside prose (a note, a README, a docs page), the prose carries the sentences. The Scene keeps names, values, and code, drops the answer caption when the paragraph states the answer, and repeats no sentence of the prose, usage hints included.
 
 ## Layout and draw order
 
-- Build the settled layout before timeline calls. Measure text with `text:measure()` in the font its role names (a Text that appears later starts at `opacity = 0`, so it can be measured and placed first), reserve regions for the subject, its labels and captions, and a title when the format has one, and size boxes from contents plus insets. Recompose or split before shrinking text.
+- Build the settled layout before timeline calls. Measure text with `text:measure()` in the font its role names, reserve regions for the subject, its labels and captions, and a title when the format has one, and size boxes from contents plus insets. Recompose or split before shrinking text.
 - Size the canvas for where it is shown. A host scales the Scene to its column (about 700 px in an Obsidian note), and the labels shrink with it: author near the display width, and split a figure whose labels would show below 11 pt there.
-- Render the skeleton at delivery size before animating; reject empty, off-camera, mirrored, or wrong-scale frames.
 - Use explicit `layer` bands: background < regions < routes/guides < subjects < labels < transient focus. Creation order is not draw order.
-- `Object::bounds()` is approximate; final containment and gaps come from `viscript layout`/`audit` and the raster.
+- `scene:bounds` is approximate; final containment and gaps come from `viscript audit` and the raster.
 
 ## Motion
 
 - Leave one coherent opening group unanimated so `t=0` already shows the subject or question; never show labels before their owners. Reveal later facts in their own beat.
-- One beat = one claim and one dominant change. Animate the semantic thing (value, owner, route, trace step, result); decorative dots, sweeps, and pulses are not evidence. Camera moves frame the evidence (overview, zoom, emphasis); a plate keeps its camera still because the reader compares everything at once.
-- Continue identities: transform the existing object into its next state rather than removing it and drawing a replacement.
-- Keep finished structure as quieter context; hold conclusions. Linear for uniform rate, ease-out for construction, ease-in-out for reversible change.
-- `loop=false` unless recurrence is requested or a format profile loops (a plate, a readme-demo clip); a loop must return every object, label, and color to its `t=0` state.
-- Use `morph` for retained outlines and `match_transform` for text or formulas. Use `scene:clone(source, options)` or JS `definition.clone(source, options)` to snapshot a family at the cursor. Read API comments for ownership and geometry contracts.
-- Timelines are deterministic at any sample time. For dependents of a changing value use `scene:tracker`/`bind`/`track`, or `tracker`/`bind`/`track` on a JS builder (baked at construction). Cell/Voxel `time` callbacks run at construction.
+- One beat = one claim and one dominant change of the semantic thing (value, owner, route, trace step, result); decorative dots, sweeps, and pulses are not evidence.
+- Continue identities: transform the existing object into its next state rather than removing it and drawing a replacement. Use `morph` for retained outlines and `match_transform` for text or formulas; `scene:clone(source, options)` (JS `definition.clone(source, options)`) snapshots a family at the cursor.
+- Keep finished structure as quieter context; hold conclusions. An effect starts on the mark where its cause ends, and a beat's highlight, caption, and readouts change on the same mark.
+- Curves: `ease_out` for entrances, `ease_in` for exits, the default `smooth` for moves and reversible change, `linear` for a uniform rate; never `bounce` or `elastic`.
+- `loop=false` unless recurrence is requested or a format profile loops (a plate, a readme-demo clip); a loop returns every object, label, and color to its `t=0` state.
+- Timelines are deterministic at any sample time: dependents of a changing value use `tracker`/`bind`/`track` (baked at construction on a JS builder), and Cell/Voxel `time` callbacks run at construction.
 
-## Verify and deliver
+## Verify
 
-Use [review.md](review.md) for each review round: one `viscript audit` over every frame, `viscript layout` at each meaningful animation's start/end, `t=0`, and the exact final time from `viscript inspect`, plus the interior peaks or closest-contact times that expose a transient effect, and a small image set. Missing glyphs, unexpected null bounds for a visible object, overflow, unintended overlap, and clipping fail even when commands succeed. Use the same selected times for JS/TS runtime reports. For composed or Diagram scenes preserve the relevant audit policies from `viscript audit --help`.
-
-Look at the selected original-size frames: name the focal evidence and the tightest clearance in each, fix, and re-render using the same filenames. Use existing normal-speed host playback when needed; do not create an extra video for review. Keep probes, review renders, and reports in a scratch directory outside the user's project or vault ([review.md](review.md)), never beside the scene, and retain concise findings instead of full per-frame reports. Deliver source, requested export, reviewed times, and checks run.
+Review in [rounds](../SKILL.md#review-in-rounds), keeping their files outside the project or vault ([review.md](review.md)). Deliver the source, the requested export, the times on the contact sheet, and the checks run.

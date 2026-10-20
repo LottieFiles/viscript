@@ -204,7 +204,7 @@ runtime.destroy();
 
 Destroy the runtime at teardown. Failed reload preserves the last valid scene.
 
-`layoutReport` uses root pixels across nested Scenes. Resolve objects by `scenePath + id`; visual records refer back to object indices, and paths refer to their owning visuals. Inspect visible, unoccluded paint at boundary times and run CLI `audit` on `compileScene(definition)` output. Follow [review.md](review.md) for frame and image selection.
+`layoutReport` uses root pixels across nested Scenes. Resolve objects by `scenePath + id`; visual records refer back to object indices, and paths refer to their owning visuals. Inspect visible, unoccluded paint at boundary times and run CLI `audit` on `compileScene(definition)` output. Follow the [review round](../SKILL.md#review-in-rounds) for frame and image selection.
 
 ## Scene composition and modules
 
