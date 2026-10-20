@@ -1,4 +1,4 @@
-// The JSON a layout report is written as (see visLayoutJson.h).
+// The JSON a layout report is written as and the path it gives a scene (see visLayoutJson.h).
 #include "visLayoutJson.h"
 
 namespace vis
@@ -24,6 +24,15 @@ const char* layoutVisualKind(LayoutVisualKind kind) noexcept
         case LayoutVisualKind::FadeIn: return "fade-in";
     }
     return "unknown";
+}
+
+char* layoutScenePath(const char* parent, LayoutSceneKind kind, uint32_t index) noexcept
+{
+    auto name = layoutSceneKind(kind);
+    auto size = std::snprintf(nullptr, 0, "%s/%s:%u", parent, name, index);
+    auto path = size < 0 ? nullptr : new (std::nothrow) char[static_cast<size_t>(size) + 1u];
+    if (path) std::snprintf(path, static_cast<size_t>(size) + 1u, "%s/%s:%u", parent, name, index);
+    return path;
 }
 
 static const char* _bool(bool value)

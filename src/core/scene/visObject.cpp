@@ -246,7 +246,7 @@ Gradient mix(const Gradient& from, const Gradient& to, float progress) noexcept
         auto& a = from.stops[i];
         auto& b = to.stops[i];
         output.stops[i].offset = _mix(a.offset, b.offset, bounded);
-        output.stops[i].color = _lerp(a.color, b.color, bounded);
+        output.stops[i].color = _mix(a.color, b.color, bounded);
     }
     auto point = [bounded](const Vec3& a, const Vec3& b) {
         return Vec3{_mix(a.x, b.x, bounded), _mix(a.y, b.y, bounded), _mix(a.z, b.z, bounded)};
@@ -1414,7 +1414,7 @@ Color colormapColor(Colormap map, float share) noexcept
     auto u = t - static_cast<float>(index);
     auto& from = stops[index];
     auto& to = stops[index + 1u];
-    return {_lerp(from[0], to[0], u), _lerp(from[1], to[1], u), _lerp(from[2], to[2], u)};
+    return {_mix(from[0], to[0], u), _mix(from[1], to[1], u), _mix(from[2], to[2], u)};
 }
 
 float colormapShare(const SurfaceColormap& colormap, const Vec3& point) noexcept

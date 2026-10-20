@@ -2,7 +2,6 @@
 // intersections, layout reports and pixel samples from what it drew.
 #include <cmath>
 #include <cstddef>
-#include <cstdio>
 #include <cstring>
 #include <limits>
 #include <memory>
@@ -444,6 +443,10 @@ struct LayoutEntry
     uint8_t descendantsOpacity;
     LayoutVisualKind visualKind;
     LayoutVisualKind descendantsKind;
+    // The opacity the renderer mounts the scene's views and scenes with inside it: the fade of a
+    // match for the two scenes it blends, else 255. descendantsOpacity takes it in, but a view or
+    // a stage of a styled transition takes its own share of it, rounded once, as the renderer does.
+    uint8_t fade = 255u;
     // False for the incoming scene of a match, whose visuals the outgoing one measures.
     bool direct = true;
     // The walk's: the scene's record, its depth and its place.
@@ -565,17 +568,6 @@ static void _layoutUnion(BBox& output, const BBox& bounds)
     output = {left, top, right - left, bottom - top};
 }
 
-static uint8_t _layoutOpacity(uint8_t first, uint8_t second)
-{
-    return static_cast<uint8_t>((static_cast<uint32_t>(first) * second + 127u) / 255u);
-}
-
-// The alpha of a share in [0, 1].
-static uint8_t _layoutAlpha(float share)
-{
-    return static_cast<uint8_t>(share * 255.0f + 0.5f);
-}
-
 static bool _layoutContains(const BBox& outer, const BBox& inner)
 {
     return outer.width > 0.0f && outer.height > 0.0f
@@ -606,16 +598,6 @@ static bool _layoutVisual(const DrawCommand& first, const DrawCommand& second)
     return first.object == second.object && first.counterpart == second.counterpart
         && first.visualKind == second.visualKind
         && first.visualOpacity == second.visualOpacity;
-}
-
-// The path of a scene record: the path of its parent, then its kind and index there.
-static char* _scenePath(const char* parent, LayoutSceneKind kind, uint32_t index)
-{
-    auto name = layoutSceneKind(kind);
-    auto size = std::snprintf(nullptr, 0, "%s/%s:%u", parent, name, index);
-    auto path = size < 0 ? nullptr : new (std::nothrow) char[static_cast<size_t>(size) + 1u];
-    if (path) std::snprintf(path, static_cast<size_t>(size) + 1u, "%s/%s:%u", parent, name, index);
-    return path;
 }
 
 Result Renderer::layout(const Scene* scene, float time, LayoutReport& output,
@@ -667,7 +649,7 @@ Result Renderer::layout(const Scene* scene, float time, LayoutReport& output,
                 visual.layer = command.layer;
                 visual.kind = command.visualKind == LayoutVisualKind::Stable
                             ? stableKind : command.visualKind;
-                auto opacity = _layoutOpacity(groupOpacity, command.visualOpacity);
+                auto opacity = _opacity(groupOpacity, command.visualOpacity);
                 visual.opacity = static_cast<float>(opacity) / 255.0f;
                 BBox bounds;
                 auto result = opacity ? _paintBounds(list, same, presence, &matrix, bounds)
@@ -736,7 +718,7 @@ Result Renderer::layout(const Scene* scene, float time, LayoutReport& output,
                 return Result::OutOfMemory;
             }
             // An opaque scene hides what it covers of those before it.
-            if (_layoutOpacity(entry.opacity, entry.background) == 255u) {
+            if (_opacity(entry.opacity, entry.background) == 255u) {
                 _layoutOcclude(report->visuals, 0u, report->visualCnt, place.clip, INT32_MAX,
                                entry.index);
             }
@@ -783,11 +765,12 @@ Result Renderer::layout(const Scene* scene, float time, LayoutReport& output,
                 ViewFrame frame;
                 auto result = scene->pImpl->frame(i, entry.time, frame);
                 if (result != Result::Success) return result;
-                auto opacity = _layoutOpacity(entry.descendantsOpacity, _layoutAlpha(frame.opacity));
+                auto opacity = _opacity(entry.opacity, _alpha(frame.opacity, entry.fade));
                 if (!frame.shown || !opacity) continue;
                 LayoutScene view;
                 view.scene = scene;
-                view.path = _scenePath(report->scenes[entry.index].path, LayoutSceneKind::View, i);
+                view.path = layoutScenePath(report->scenes[entry.index].path,
+                                            LayoutSceneKind::View, i);
                 if (!view.path) return Result::OutOfMemory;
                 view.bounds = {
                     physical.x + physical.scaleX * spaceX * frame.rect[0],
@@ -808,7 +791,7 @@ Result Renderer::layout(const Scene* scene, float time, LayoutReport& output,
                     delete[] view.path;
                     return Result::OutOfMemory;
                 }
-                if (_layoutOpacity(opacity, frame.background.a) == 255u) {
+                if (_opacity(opacity, frame.background.a) == 255u) {
                     _layoutOcclude(report->visuals, directBegin, directEnd, view.clipBounds,
                                    frame.layer, viewIndex);
                 }
@@ -863,7 +846,7 @@ Result Renderer::layout(const Scene* scene, float time, LayoutReport& output,
             auto tolerance = std::fmax(std::fabs(relativeX), std::fabs(relativeY)) * 1.0e-3f;
             place.stretched = std::fabs(relativeX - relativeY) > tolerance;
             child.depth = parent.depth + 1u;
-            auto path = _scenePath(report->scenes[parent.index].path, child.kind, index);
+            auto path = layoutScenePath(report->scenes[parent.index].path, child.kind, index);
             return enter(child, path, parent.index);
         }
 
@@ -915,7 +898,7 @@ Result Renderer::layout(const Scene* scene, float time, LayoutReport& output,
                     LayoutEntry child(sequence.stages[i + part].scene,
                                       sequence.time(i + part, entry.time),
                                       LayoutSceneKind::Transition,
-                                      _layoutOpacity(entry.descendantsOpacity, _layoutAlpha(share)),
+                                      _opacity(entry.opacity, _alpha(share, entry.fade)),
                                       kind);
                     if (transition.match) {
                         child.list = &parts[part];
@@ -964,16 +947,16 @@ Result Renderer::layout(const Scene* scene, float time, LayoutReport& output,
                                  entry.descendantsOpacity, entry.descendantsKind);
             outgoing.list = &blended;
             outgoing.space = &fromConfig;
-            outgoing.background = _lerp(fromConfig.background.a, toConfig.background.a, bounded);
-            outgoing.descendantsOpacity = _layoutOpacity(entry.descendantsOpacity,
-                                                         _layoutAlpha(1.0f - bounded));
+            outgoing.background = _mix(fromConfig.background.a, toConfig.background.a, bounded);
+            outgoing.fade = _alpha(1.0f - bounded);
+            outgoing.descendantsOpacity = _opacity(entry.descendantsOpacity, outgoing.fade);
             outgoing.descendantsKind = LayoutVisualKind::FadeOut;
             LayoutEntry incoming(to, toTime, LayoutSceneKind::Transition,
                                  entry.descendantsOpacity, entry.descendantsKind);
             incoming.space = &fromConfig;
             incoming.background = 0u;
-            incoming.descendantsOpacity = _layoutOpacity(entry.descendantsOpacity,
-                                                         _layoutAlpha(bounded));
+            incoming.fade = _alpha(bounded);
+            incoming.descendantsOpacity = _opacity(entry.descendantsOpacity, incoming.fade);
             incoming.descendantsKind = LayoutVisualKind::FadeIn;
             incoming.direct = false;
             // Both scenes enter before the stages of their own sequences.

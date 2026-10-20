@@ -127,7 +127,7 @@ static Result _copy(DisplayList& list, const DrawCommand& command, const Vec2& f
     list.object = command.object;
     list.counterpart = counterpart;
     list.visualKind = kind;
-    list.visualOpacity = static_cast<uint8_t>(_clamp(opacity) * 255.0f + 0.5f);
+    list.visualOpacity = _alpha(_clamp(opacity));
     auto style = _scale(command.style, from, to, opacity);
     auto layer = command.layer;
     auto depth = command.depth;
@@ -160,8 +160,8 @@ static Result _copy(DisplayList& list, const DrawCommand& command, const Vec2& f
             Vec2 corners[3];
             for (auto i = 0u; i < 3u; i++)
                 corners[i] = _scale(command.points[i], from, to);
-            return list.picture(corners, command.picture, command.filter, static_cast<uint8_t>(static_cast<float>(command.opacity)
-                              * _clamp(opacity) + 0.5f), layer, depth);
+            return list.picture(corners, command.picture, command.filter,
+                                _alpha(_clamp(opacity), command.opacity), layer, depth);
         }
     }
     return Result::NonSupport;

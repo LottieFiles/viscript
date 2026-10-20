@@ -2748,7 +2748,7 @@ Result Scene::Impl::build(float time, DisplayList& list, bool sort, const ViewFr
                 Vec2 corners[3];
                 auto depth = 0.0f;
                 auto visible = _project(local, 3u, state.model, config, corners, nullptr, depth);
-                auto opacity = static_cast<uint8_t>(_clamp(state.opacity * progress) * 255.0f + 0.5f);
+                auto opacity = _alpha(_clamp(state.opacity * progress));
                 if (visible && opacity) {
                     PictureSource source;
                     source.encoded = image->encoded();

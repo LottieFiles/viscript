@@ -1442,9 +1442,9 @@ static VisualState _lerp(const VisualState& from, const VisualState& to, float p
     auto bounded = _clamp(progress);
     VisualState state;
     state.model = _lerp(from.model, to.model, progress);
-    state.stroke = _lerp(from.stroke, to.stroke, bounded);
-    state.fill = _lerp(from.fill, to.fill, bounded);
-    state.gradientEnd = _lerp(from.gradientEnd, to.gradientEnd, bounded);
+    state.stroke = _mix(from.stroke, to.stroke, bounded);
+    state.fill = _mix(from.fill, to.fill, bounded);
+    state.gradientEnd = _mix(from.gradientEnd, to.gradientEnd, bounded);
     state.width = _mix(from.width, to.width, bounded);
     state.radius = _mix(from.radius, to.radius, bounded);
     state.dashOffset = _mix(from.dashOffset, to.dashOffset, bounded);
@@ -1468,7 +1468,7 @@ static VisualState _lerp(const VisualState& from, const VisualState& to, float p
     state.corner = extent(from.corner, to.corner);
     state.trimDistance = {extent(from.trimDistance.x, to.trimDistance.x), extent(from.trimDistance.y, to.trimDistance.y)};
     state.blur = _mix(from.blur, to.blur, bounded);
-    state.shadow.color = _lerp(from.shadow.color, to.shadow.color, bounded);
+    state.shadow.color = _mix(from.shadow.color, to.shadow.color, bounded);
     state.shadow.offset = {_mix(from.shadow.offset.x, to.shadow.offset.x, bounded),
                            _mix(from.shadow.offset.y, to.shadow.offset.y, bounded)};
     state.shadow.blur = _mix(from.shadow.blur, to.shadow.blur, bounded);

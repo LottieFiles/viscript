@@ -694,6 +694,39 @@ void transitionLayoutVisuals(Renderer* renderer)
     }
     delete fadeRoot;
 
+    // The renderer draws a view of a scene in a match as opaque as the view times the fade of the
+    // scene, rounded once, and the report lists the view only when that is not 0: a view at 0.002
+    // shows on its own, but not a quarter into the match, where the scene fades to 191.
+    auto viewRoot = Scene::gen(config);
+    auto viewFrom = Scene::gen(config);
+    auto viewTo = Scene::gen(config);
+    CHECK(viewRoot && viewFrom && viewTo);
+    if (viewRoot && viewFrom && viewTo) {
+        SceneView view;
+        view.viewport = {0.5f, 0.5f, 0.5f, 0.5f};
+        view.camera = config.camera;
+        view.opacity = 0.002f;
+        CHECK(viewFrom->view(view) == Result::Success);
+        Scene* stages[] = {viewFrom, viewTo};
+        CHECK(viewRoot->transition(stages, 2u, {}, 1.0f, 0.0f,
+                                   AnimCurve::preset(AnimCurvePreset::Linear)) == Result::Success);
+        auto views = [&](float time) {
+            LayoutReport report;
+            CHECK(renderer->layout(viewRoot, time, report) == Result::Success);
+            auto count = 0u;
+            for (auto i = 0u; i < report.sceneCount(); i++) {
+                if (report.sceneAt(i)->kind == LayoutSceneKind::View) count++;
+            }
+            return count;
+        };
+        CHECK(views(0.0f) == 1u);
+        CHECK(views(0.25f) == 0u);
+    } else {
+        delete viewFrom;
+        delete viewTo;
+    }
+    delete viewRoot;
+
     Config rootConfig;
     rootConfig.width = 400;
     rootConfig.height = 200;

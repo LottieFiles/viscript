@@ -4,7 +4,6 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
-#include <limits>
 #include <new>
 
 #include "vis.h"
@@ -661,22 +660,6 @@ static const Object* _find(const Scene* scene, Slice id, uint32_t* matches = nul
     return found;
 }
 
-static char* _childPath(const char* parent, const char* kind, uint32_t index)
-{
-    auto parentSize = std::strlen(parent);
-    char suffix[48];
-    auto suffixSize = std::snprintf(suffix, sizeof(suffix), "/%s:%u", kind, index);
-    if (suffixSize < 0 || static_cast<size_t>(suffixSize) >= sizeof(suffix) ||
-        parentSize > std::numeric_limits<size_t>::max() - static_cast<size_t>(suffixSize) - 1u) {
-        return nullptr;
-    }
-    auto path = new (std::nothrow) char[parentSize + static_cast<size_t>(suffixSize) + 1u];
-    if (!path) return nullptr;
-    std::memcpy(path, parent, parentSize);
-    std::memcpy(path + parentSize, suffix, static_cast<size_t>(suffixSize) + 1u);
-    return path;
-}
-
 // Remembers the path the layout report gives scene, calls visit with the scene and that path, and
 // walks the viewports and then the transitions it plays the same way. Stops at the first failure.
 template<typename Visit>
@@ -689,7 +672,8 @@ static Result _walk(const Scene* scene, const char* authoredPath, ScenePathList&
     auto viewports = scene->viewportCount();
     for (auto i = 0u; status == Result::Success && i < viewports + scene->transitionCount(); i++) {
         auto viewport = i < viewports;
-        auto childPath = _childPath(path, viewport ? "viewport" : "transition", viewport ? i : i - viewports);
+        auto kind = viewport ? LayoutSceneKind::Viewport : LayoutSceneKind::Transition;
+        auto childPath = layoutScenePath(path, kind, viewport ? i : i - viewports);
         if (!childPath) return Result::OutOfMemory;
         status = _walk(viewport ? scene->sceneAt(i) : scene->transitionAt(i - viewports), childPath, paths, visit);
         delete[] childPath;
@@ -1190,7 +1174,7 @@ static bool _inventory(const Scene* scene, const char* path, Options& options, I
     // A view draws this scene's own objects again, so it adds a scene path to the report and
     // nothing to take stock of; an opaque view names that path when it hides a text.
     for (auto i = 0u; i < scene->viewCount(); i++) {
-        auto childPath = _childPath(path, "view", i);
+        auto childPath = layoutScenePath(path, LayoutSceneKind::View, i);
         if (!childPath) return false;
         const char* viewPath = nullptr;
         auto result = paths.remember(scene, childPath, viewPath);

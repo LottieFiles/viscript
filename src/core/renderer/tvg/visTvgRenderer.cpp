@@ -68,9 +68,8 @@ static uint32_t _stops(const DrawCommand& command, Color paint,
                                                           : Gradient::StopLimit;
     for (auto i = 0u; i < count; i++) {
         auto& stop = gradient.stops[i];
-        auto alpha = (static_cast<uint32_t>(stop.color.a) * paint.a + 127u) / 255u;
         stops[i] = {stop.offset, stop.color.r, stop.color.g, stop.color.b,
-                    static_cast<uint8_t>(alpha)};
+                    _opacity(stop.color.a, paint.a)};
     }
     return count;
 }
@@ -1580,7 +1579,7 @@ static Result _composites(RetainedNode* node, const DisplayList& list)
         composite->used = true;
         composite->pushed = false;
         composite->content.desiredCnt = 0;
-        auto opacity = static_cast<uint8_t>(layer.opacity * 255.0f + 0.5f);
+        auto opacity = _alpha(layer.opacity);
         if (!composite->placed || composite->opacity != opacity) {
             if (!_success(composite->content.scene->opacity(opacity))) return Result::Unknown;
             composite->opacity = opacity;
@@ -2102,7 +2101,7 @@ struct RendererBuilder
             ViewFrame frame;
             auto result = impl->frame(i, time, frame);
             if (result != Result::Success) return result;
-            auto shown = static_cast<uint8_t>(frame.opacity * static_cast<float>(opacity) + 0.5f);
+            auto shown = _alpha(frame.opacity, opacity);
             if (!frame.shown || !shown) continue;
             DisplayList list;
             result = impl->build(time, list, true, &frame);
@@ -2197,8 +2196,8 @@ struct RendererBuilder
         _begin(node);
         result = _local(node, config, blended);
         if (result != Result::Success) return result;
-        auto fromOpacity = static_cast<uint8_t>((1.0f - bounded) * 255.0f + 0.5f);
-        auto toOpacity = static_cast<uint8_t>(bounded * 255.0f + 0.5f);
+        auto fromOpacity = _alpha(1.0f - bounded);
+        auto toOpacity = _alpha(bounded);
         result = viewsAbove(node, from, fromTime, config, fromOpacity, commands);
         if (result == Result::Success) result = viewsAbove(node, to, toTime, config, toOpacity, commands);
         if (result == Result::Success) result = viewports(node, from, fromTime, config, fromOpacity, commands);
@@ -2287,7 +2286,7 @@ struct RendererBuilder
                         ? RendererBuilder::stage(mount->child, scene, parts[part], spaces[part], time, commands)
                         : RendererBuilder::scene(mount->child, scene, time, commands);
             if (result != Result::Success) return result;
-            auto shown = static_cast<uint8_t>(share * static_cast<float>(opacity) + 0.5f);
+            auto shown = _alpha(share, opacity);
             return _place(node, mount, transition.match ? spaces[part] : scene->pImpl->cfg,
                           config, viewport, shown, &sequence.viewport);
         };

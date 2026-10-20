@@ -1,6 +1,6 @@
 // The mix of two numbers or colors that the scene and the renderer share, so a value they both
-// interpolate rounds the same way in each, the clamp of the share they mix by, a color's opacity,
-// and the single precision mix of the scene's colors.
+// interpolate rounds the same way in each, the clamp of the share they mix by, a share of an
+// alpha, and an alpha or a color scaled by an opacity.
 #ifndef _VIS_MIX_H_
 #define _VIS_MIX_H_
 
@@ -36,6 +36,25 @@ static inline Color _opacity(Color color, float opacity)
     return color;
 }
 
+// share, which the caller keeps in [0, 1], as an alpha in [0, 255], rounded.
+static inline uint8_t _alpha(float share)
+{
+    return static_cast<uint8_t>(share * 255.0f + 0.5f);
+}
+
+// alpha scaled by share, which the caller keeps in [0, 1], rounded; _alpha(share) is the same
+// for an alpha of 255.
+static inline uint8_t _alpha(float share, uint8_t alpha)
+{
+    return static_cast<uint8_t>(share * static_cast<float>(alpha) + 0.5f);
+}
+
+// alpha scaled by opacity, both in [0, 255], rounded.
+static inline uint8_t _opacity(uint8_t alpha, uint8_t opacity)
+{
+    return static_cast<uint8_t>((static_cast<uint32_t>(alpha) * opacity + 127u) / 255u);
+}
+
 // The mix of two channels by a progress that _clamp() bounds, rounded.
 static inline uint8_t _mix(uint8_t from, uint8_t to, float progress)
 {
@@ -50,25 +69,6 @@ static inline Color _mix(const Color& from, const Color& to, float progress)
         _mix(from.g, to.g, progress),
         _mix(from.b, to.b, progress),
         _mix(from.a, to.a, progress)};
-}
-
-// The mix of two channels by a progress in [0, 1], rounded, in single precision as the scene mixes
-// colors. Where the multiply and the add round apart, as in WebAssembly, it can differ from _mix()
-// by one.
-static inline uint8_t _lerp(uint8_t from, uint8_t to, float progress)
-{
-    auto value = static_cast<float>(from)
-               + (static_cast<float>(to) - static_cast<float>(from)) * progress;
-    return static_cast<uint8_t>(value + 0.5f);
-}
-
-static inline Color _lerp(const Color& from, const Color& to, float progress)
-{
-    return {
-        _lerp(from.r, to.r, progress),
-        _lerp(from.g, to.g, progress),
-        _lerp(from.b, to.b, progress),
-        _lerp(from.a, to.a, progress)};
 }
 
 }  // namespace vis
