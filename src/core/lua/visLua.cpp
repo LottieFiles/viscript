@@ -6726,8 +6726,8 @@ static AnimationTarget _animationTarget(lua_State* lua, LuaScene* box, int index
 {
     luaL_checktype(lua, index, LUA_TTABLE);
     index = lua_absindex(lua, index);
-    // A descriptor takes the state keys and the five of its own.
-    if (_unknownKey(lua, index, {"target", "arc", "text", "retype", "layer"})) {
+    // A descriptor takes the state keys and the six of its own.
+    if (_unknownKey(lua, index, {"target", "position", "arc", "text", "retype", "layer"})) {
         if (lua_type(lua, -2) != LUA_TSTRING) luaL_error(lua, "option names must be strings");
         luaL_error(lua, "unknown option '%s'", lua_tostring(lua, -1));
     }
@@ -6739,7 +6739,10 @@ static AnimationTarget _animationTarget(lua_State* lua, LuaScene* box, int index
     auto changed = false;
     auto shift = _has(lua, index, "shift");
     auto transform = _has(lua, index, "transform");
+    auto position = _has(lua, index, "position");
     if (shift && transform) luaL_error(lua, "animation descriptor cannot contain both shift and transform");
+    if (shift && position) luaL_error(lua, "animation descriptor cannot contain both shift and position");
+    if (transform && position) luaL_error(lua, "animation descriptor cannot contain both transform and position");
     if (shift) {
         lua_getfield(lua, index, "shift");
         target.shift(_world(lua, -1, "shift"));
@@ -6754,8 +6757,12 @@ static AnimationTarget _animationTarget(lua_State* lua, LuaScene* box, int index
         target.transform(matrix);
         changed = true;
     }
+    if (position) {
+        target.position(_fieldWorld(lua, index, "position"));
+        changed = true;
+    }
     if (_has(lua, index, "arc")) {
-        if (!shift && !transform) luaL_error(lua, "arc requires shift or transform");
+        if (!shift && !transform && !position) luaL_error(lua, "arc requires shift, transform or position");
         target.arc(_fieldArc(lua, index));
     }
     for (auto& property : NUMBER_PROPERTIES) {

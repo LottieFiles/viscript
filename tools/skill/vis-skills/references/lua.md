@@ -156,10 +156,11 @@ Positional duration and curve calls remain supported.
 | Replace | `morph`, `fade_transform`, `match_transform`, `transition` |
 | State | `play`, `set`, `save`, `restore`, `clone`, `warp`, `remove` |
 
-`play` accepts one descriptor or a list. Each names `target` and properties such as shift, transform, opacity, colors, points, text, value, and layer. `lag` offsets successive targets. `set` applies a state immediately; `save` and `restore` keep a stack of states per target.
+`play` accepts one descriptor or a list. Each names `target` and properties such as shift, transform, position, opacity, colors, points, text, value, and layer. `shift` moves by a vector and `transform` sets the local matrix; `position` moves the center of the target's bounds to a point in its parent's space, from wherever earlier clips left it, and fails on an object without bounds. A descriptor takes only one of the three. `lag` offsets successive targets. `set` applies a state immediately; `save` and `restore` keep a stack of states per target.
 
 ```lua
 scene:play({target = ball, shift = {2, 0}, fill = "success"}, 1, "smooth")
+scene:play({target = ball, position = {0, 1}, arc = math.pi / 2}, 1)
 scene:save(ball)
 scene:indicate(ball)
 scene:restore(ball, 0.5)
@@ -169,7 +170,7 @@ scene:parallel(
 )
 ```
 
-Text changes interpolate characters. `retype = true` erases to the shared prefix before typing the new suffix. Geometry descriptors use the factory's names, such as `points`, `from`, `to`, `control1`, `control2`, `size`, and `radius`. `center` animates arcs only; move other shapes with `shift` or `transform`. `arc` bends movement by a central angle. Layer changes use the higher layer during the transition.
+Text changes interpolate characters. `retype = true` erases to the shared prefix before typing the new suffix. Geometry descriptors use the factory's names, such as `points`, `from`, `to`, `control1`, `control2`, `size`, and `radius`. `center` animates arcs only; move other shapes with `shift`, `position`, or `transform`. `arc` bends movement by a central angle. Layer changes use the higher layer during the transition.
 
 A curve can be a preset (`"linear"`, `"smooth"`, `"gentle"`, `"ease_in_out"`, and others), a cubic Bézier table, or a preset table with strength and reverse settings. A table such as `{preset = "back", strength = 0.6}` tunes a preset; `{bezier = {x1, y1, x2, y2}, strength = 1}` defines a custom curve.
 
@@ -208,7 +209,7 @@ scene:bind(ball, x, function(v) return {shift = {v, v * v / 2}} end)
 scene:track(x, 2, 3, "linear")
 ```
 
-A callback receives tracker values in order and returns a property state. `shift` is relative to the bound pose; `transform` is absolute. `track` bakes frame samples into retained clips. Overlapping tracks of different trackers merge on a bound object. Keep callbacks pure. For discrete counters and reveals, use the same `at` event and sample index for every dependent state.
+A callback receives tracker values in order and returns a property state. `shift` is relative to the bound pose; `transform` is absolute; a bound state cannot use `position`. `track` bakes frame samples into retained clips. Overlapping tracks of different trackers merge on a bound object. Keep callbacks pure. For discrete counters and reveals, use the same `at` event and sample index for every dependent state.
 
 `vis.spring_response(seconds, options)` samples a physical spring's displacement from equilibrium. Options are mass, stiffness, damping, displacement, and initial velocity. Use a seconds tracker and a linear track so physical time stays uniform:
 

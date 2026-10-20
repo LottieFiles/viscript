@@ -136,6 +136,7 @@ void _cameraCenters();
 void _cameraHome();
 void _views(Renderer* renderer);
 void _motion(Renderer* renderer);
+void _positioning(Renderer* renderer);
 void _layering(Renderer* renderer);
 void _pieceMorphs(Renderer* renderer);
 void _surfaceMorph(Renderer* renderer);

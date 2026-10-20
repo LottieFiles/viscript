@@ -313,6 +313,8 @@ void along.get();
 definition.bind(arrow, along, (v) => ({transform: matrix, arc: v}));
 // @ts-expect-error a bound state cannot shift and transform at once.
 definition.bind(arrow, along, (v) => ({shift: [v, 0], transform: matrix}));
+// @ts-expect-error a bound state cannot move to a position.
+definition.bind(point, along, (v) => ({position: [v, 0], radius: 0.1}));
 // @ts-expect-error track needs its duration.
 definition.track(along, 2);
 const bent = definition.curve({from: [-2, 0], control1: [-1, 1], control2: [1, 1], to: [2, 0]});
@@ -606,6 +608,8 @@ definition.view({x: 0, y: 0, width: 0.5, height: 0.5}, {zoom: 4});
 inset.wait(1);
 definition.play({target: rectangle, shift: [1, 0], arc: Math.PI / 2}, 1);
 definition.play({target: sibling, transform: matrix, arc: -Math.PI / 4}, 1);
+definition.play({target: rectangle, position: [1, 0], arc: Math.PI / 2, opacity: 0.5}, 1);
+definition.set({target: sibling, position: {x: 0, y: 1, z: 0}});
 definition.play([
     {target: rectangle, size: [2, 1], corner: 0.2, width: 4},
     {target: point, radius: 8, progress: 0.5},
@@ -674,6 +678,10 @@ world.voxel(() => 42);
 definition.play({target: rectangle});
 // @ts-expect-error shift and transform are mutually exclusive for one target.
 definition.play({target: rectangle, shift: [1, 0], transform: matrix});
+// @ts-expect-error position replaces a shift.
+definition.play({target: rectangle, shift: [1, 0], position: [0, 0]});
+// @ts-expect-error position replaces a transform.
+definition.set({target: rectangle, transform: matrix, position: [0, 0]});
 // @ts-expect-error play targets must be object handles.
 definition.play({target: definition, opacity: 0.5});
 // @ts-expect-error Unknown animation properties are rejected.

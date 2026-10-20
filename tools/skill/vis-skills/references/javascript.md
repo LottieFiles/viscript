@@ -122,10 +122,11 @@ Positional duration and curve calls remain supported.
 | Replacement | `morph`, `fadeTransform`, `matchTransform`, `transition` |
 | State | `play`, `set`, `save`, `restore`, `clone`, `warp`, `remove` |
 
-`play` accepts property descriptors with a target; `set` applies them immediately. `shift` is relative and `transform` is absolute. `arc` bends movement, `lag` offsets successive targets, and `retype` erases text to its shared prefix before typing the new suffix. `save`/`restore` keep target state stacks.
+`play` accepts property descriptors with a target; `set` applies them immediately. `shift` is relative and `transform` is absolute; `position` moves the center of the target's bounds to a point in its parent's space, from wherever earlier clips left it. A descriptor takes only one of the three, and a bound state cannot use `position`. `arc` bends movement, `lag` offsets successive targets, and `retype` erases text to its shared prefix before typing the new suffix. `save`/`restore` keep target state stacks.
 
 ```js
 definition.play({target: vector, shift: [1, 0], stroke: "success"}, 1, "smooth");
+definition.play({target: vector, position: [0, 1], arc: Math.PI / 2}, 1);
 definition.parallel(
     (scene) => scene.shift(vector, [-1, 0], 1),
     (scene) => scene.fade(vector, 0.5, 1),

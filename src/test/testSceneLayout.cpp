@@ -1211,3 +1211,93 @@ void animationTargets(Renderer* renderer)
     delete foreign;
     delete scene;
 }
+
+void positionTargets(Renderer* renderer)
+{
+    constexpr auto PI = 3.14159265358979f;
+    Config config;
+    config.width = 200;
+    config.height = 200;
+    config.camera.orthoHeight = 10.0f;
+    config.background = Color::hex("#000000");
+    config.antialiasing = false;
+    auto scene = Scene::gen(config);
+    auto mover = Rectangle::gen({-3.0f, 2.0f, 0.0f}, {1.0f, 1.0f});
+    auto arced = Rectangle::gen({2.0f, -2.0f, 0.0f}, {1.0f, 1.0f});
+    auto inner = Rectangle::gen({}, {0.5f, 0.5f});
+    auto group = Group::gen();
+    auto empty = Group::gen();
+    Object* objects[] = {mover, arced, inner, group, empty};
+    auto created = scene != nullptr;
+    for (auto object : objects) created = created && object;
+    CHECK(created);
+    if (!created) {
+        for (auto object : objects) delete object;
+        delete scene;
+        return;
+    }
+    for (auto shape : {mover, arced, inner}) {
+        shape->style.stroke.a = 0;
+        shape->fill(Color::hex("#ffffff"));
+    }
+    CHECK(group->add(inner) == Result::Success);
+    group->model = Mat4::translate({2.0f, 3.0f, 0.0f}) * Mat4::scale({2.0f, 2.0f, 1.0f});
+    for (auto object : {static_cast<Object*>(mover), static_cast<Object*>(arced), static_cast<Object*>(group),
+                        static_cast<Object*>(empty)}) {
+        CHECK(scene->add(object) == Result::Success);
+    }
+
+    // Before the timeline starts, a position places the center of the object's bounds at once.
+    CHECK(scene->update(AnimationTarget::from(mover).position({-1.0f, 2.0f, 0.0f})) == Result::Success);
+    CHECK(_placed(renderer, scene, mover, 0.0f, -1.0f, 2.0f, 1.0f));
+
+    // A play moves from there, halfway at half time on a linear curve and beside a fade; an arc
+    // of a half turn passes over the chord's midpoint at the top.
+    auto linear = AnimCurve::preset(AnimCurvePreset::Linear);
+    AnimationTarget moves[] = {AnimationTarget::from(mover).position({3.0f, 2.0f, 0.0f}).opacity(0.5f),
+                               AnimationTarget::from(arced).position({-2.0f, -2.0f, 0.0f}).arc(PI)};
+    CHECK(scene->play(moves, 2u, 2.0f, linear, 0.0f) == Result::Success);
+    CHECK(_placed(renderer, scene, mover, 1.0f, 1.0f, 2.0f, 1.0f));
+    CHECK(_placed(renderer, scene, mover, 2.0f, 3.0f, 2.0f, 1.0f));
+    CHECK(near(mover->opacity, 0.5f));
+    CHECK(_placed(renderer, scene, arced, 1.0f, 0.0f, 0.0f));
+    CHECK(_placed(renderer, scene, arced, 2.0f, -2.0f, -2.0f, 1.0f));
+
+    // One played while another move runs starts from where that move ends, adds to it, and the
+    // object still ends on the point.
+    CHECK(scene->seek(1.0f) == Result::Success);
+    CHECK(scene->play(AnimationTarget::from(mover).position({3.0f, -1.0f, 0.0f}), 2.0f, linear) == Result::Success);
+    CHECK(_placed(renderer, scene, mover, 2.0f, 3.0f, 0.5f, 1.0f));
+    CHECK(_placed(renderer, scene, mover, 3.0f, 3.0f, -1.0f, 1.0f));
+
+    // In a moved and scaled group, the point is in the group's space; a group moves by the
+    // center of its bounds, and after the timeline starts a position still applies at once.
+    CHECK(scene->play(AnimationTarget::from(inner).position({-1.0f, 0.5f, 0.0f}), 1.0f, linear) == Result::Success);
+    CHECK(_placed(renderer, scene, inner, 3.0f, 2.0f, 3.0f, 1.0f));
+    CHECK(_placed(renderer, scene, inner, 4.0f, 0.0f, 4.0f, 1.0f));
+    CHECK(scene->update(AnimationTarget::from(group).position({-3.0f, -3.5f, 0.0f})) == Result::Success);
+    CHECK(_placed(renderer, scene, inner, 4.0f, -3.0f, -3.5f, 1.0f));
+
+    // Without bounds there is nowhere to move from; a position replaces a shift or a transform,
+    // and a list that fails moves nothing.
+    CHECK(scene->play(AnimationTarget::from(empty).position({0.0f, 0.0f, 0.0f}), 1.0f)
+          == Result::InsufficientCondition);
+    CHECK(_says(scene, "no bounds yet to move to a position"));
+    CHECK(scene->update(AnimationTarget::from(empty).position({0.0f, 0.0f, 0.0f})) == Result::InsufficientCondition);
+    CHECK(_says(scene, "no bounds yet to move to a position"));
+    CHECK(scene->play(AnimationTarget::from(mover).shift({1.0f, 0.0f, 0.0f}).position({0.0f, 0.0f, 0.0f}), 1.0f)
+          == Result::InvalidArguments);
+    CHECK(_says(scene, "position cannot be used with shift or transform"));
+    CHECK(scene->update(AnimationTarget::from(mover).transform(Mat4::identity()).position({0.0f, 0.0f, 0.0f}))
+          == Result::InvalidArguments);
+    CHECK(_says(scene, "position cannot be used with shift or transform"));
+    auto nan = std::numeric_limits<float>::quiet_NaN();
+    CHECK(scene->play(AnimationTarget::from(mover).position({nan, 0.0f, 0.0f}), 1.0f) == Result::InvalidArguments);
+    CHECK(_says(scene, "finite point"));
+    AnimationTarget failing[] = {AnimationTarget::from(mover).position({0.0f, 0.0f, 0.0f}),
+                                 AnimationTarget::from(empty).position({1.0f, 0.0f, 0.0f})};
+    CHECK(scene->play(failing, 2u, 1.0f, linear, 0.0f) == Result::InsufficientCondition);
+    CHECK(near(scene->duration(), 4.0f));
+    CHECK(_placed(renderer, scene, mover, 4.0f, 3.0f, -1.0f, 1.0f));
+    delete scene;
+}

@@ -55,7 +55,7 @@ for k, s in ipairs(trace) do
     local w = cx(s.hi) - cx(s.lo) + CW + 0.08
     local dims = {}
     for i = plo, phi do if i < s.lo or i > s.hi then dims[#dims + 1] = {target = cells[i], opacity = 0.25}; dims[#dims + 1] = {target = nums[i], opacity = 0.25} end end
-    dims[#dims + 1] = {target = range, size = {w, 1.04}, shift = {(cx(s.lo) + cx(s.hi)) / 2 - (cx(plo) + cx(phi)) / 2, 0}}
+    dims[#dims + 1] = {target = range, size = {w, 1.04}, position = {(cx(s.lo) + cx(s.hi)) / 2, Y}}
     dims[#dims + 1] = {target = mid, shift = {cx(s.mid) - cx(trace[k - 1].mid), 0}}
     scene:play(dims, 0.6, "ease_in_out")
   end

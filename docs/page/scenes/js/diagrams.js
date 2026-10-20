@@ -241,7 +241,6 @@ code.forEach((ln, i) => {
 });
 const cursor = scene.rectangle({id: "code:cursor", center: [-3.25, code[0].y], size: [3.85, 0.38], corner: 0.04,
                                 fill: C.bar, stroke: C.none, layer: L.region + 1, opacity: 0});
-let curY = code[0].y;
 // regions
 function region(id, label, x, y, w, h) {
     scene.rectangle({id, center: [x, y], size: [w, h], corner: 0.06, fill: C.none,
@@ -275,8 +274,7 @@ function out(s, from) {
     go(o, -4.75 + (outN - 1) * 0.6, -1.95, 0.55);
 }
 function line(i) {
-    scene.play({target: cursor, shift: [0, code[i].y - curY], opacity: 1}, 0.25, "smooth");
-    curY = code[i].y;
+    scene.play({target: cursor, position: [-3.25, code[i].y], opacity: 1}, 0.25, "smooth");
 }
 function cb(id, label, color, x, y) {
     const o = token(id, label, x, y, {size: [1.1, 0.36], text: 13, stroke: color});

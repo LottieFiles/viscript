@@ -1652,6 +1652,7 @@ assert.throws(() => trail.bind(walker, gain, () => ({ opacity: 1 })), /An object
 assert.throws(() => trail.bind(spare, pace, () => 1), /A bound function must return a state object/);
 assert.throws(() => trail.bind(spare, pace, () => ({ spin: 1 })), /A bound state cannot set 'spin'/);
 assert.throws(() => trail.bind(spare, pace, () => ({ shift: [1, 0], arc: 1 })), /A bound state cannot set 'arc'/);
+assert.throws(() => trail.bind(spare, pace, () => ({ position: [1, 0] })), /A bound state cannot set 'position'/);
 assert.throws(
     () => trail.bind(spare, pace, () => ({ shift: [1, 0], transform: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1] })),
     /A bound state cannot contain both shift and transform/,
@@ -1810,6 +1811,26 @@ const rideScript = [
     "s:bind(dot, x, function(v) return {shift = {v, 0}} end)",
     's:parallel(function() s:track(x, 4, 2, "linear") end,',
     '    function() s:wait(0.5) s:scale(dot, 2, {duration = 1, curve = "linear"}) end)',
+    "return s",
+].join("\n");
+// A position moves the center of a target's bounds to a point of its parent's space, a group's by
+// its children, at once in a set and along an arc in a play.
+const placing = vis.scene({ width: 200, height: 200, camera: { mode: "fixed", view: "2d", height: 10 } });
+const placedBox = placing.rectangle({ center: [-3, 2], size: [1, 1], fill: "#ffffff", stroke: "#00000000", id: "box" });
+const placedCard = placing.group({ id: "card" });
+placedCard.rectangle({ size: [1, 0.5], fill: "#ffffff", stroke: "#00000000" });
+placing.set([{ target: placedBox, position: [-1, 2] }, { target: placedCard, position: { x: 0, y: 3 } }]);
+placing.play({ target: placedBox, position: [3, 2], arc: Math.PI / 2, opacity: 0.5 }, 2, "linear");
+placing.at(1, (scene) => scene.set({ target: placedCard, position: [-3, -3] }));
+assert.match(compileScene(placing), /position=\{3,2\}/);
+const placingScript = [
+    'local s = vis.scene {width = 200, height = 200, camera = {mode = "fixed", view = "2d", height = 10}}',
+    'local box = s:rectangle {center = {-3, 2}, size = {1, 1}, fill = "#ffffff", stroke = "#00000000", id = "box"}',
+    'local card = s:group {id = "card"}',
+    'card:rectangle {size = {1, 0.5}, fill = "#ffffff", stroke = "#00000000"}',
+    "s:set {{target = box, position = {-1, 2}}, {target = card, position = {x = 0, y = 3}}}",
+    's:play({target = box, position = {3, 2}, arc = math.pi / 2, opacity = 0.5}, 2, "linear")',
+    "s:at(1, function() s:set {target = card, position = {-3, -3}} end)",
     "return s",
 ].join("\n");
 const heardCurves = [
@@ -2289,7 +2310,16 @@ assert.throws(() => motion.rotate(wheel, 1, { spin: true }), /Unknown Rotate opt
 assert.throws(() => motion.scale(wheel, "big"), /factor/);
 assert.throws(() => motion.moveAlong(moon, orbit, { from: 2 }), /fraction/);
 assert.throws(() => motion.moveAlong(moon, orbit, { orient: 1 }), /boolean/);
-assert.throws(() => motion.play({ target: moon, opacity: 0.5, arc: 1 }), /arc requires/);
+assert.throws(() => motion.play({ target: moon, opacity: 0.5, arc: 1 }), /arc requires shift, transform or position/);
+assert.throws(
+    () => motion.play({ target: moon, shift: [1, 0], position: [0, 0] }),
+    /cannot combine shift and position/,
+);
+assert.throws(
+    () => motion.set({ target: moon, transform: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1], position: [0, 0] }),
+    /cannot combine transform and position/,
+);
+assert.throws(() => motion.set({ target: moon, position: [0, 0], arc: 1 }), /cannot use arc/);
 
 const connected = vis.scene({ width: 200, height: 200, camera: { height: 10 } });
 const connectedNode = connected.group({});
@@ -3946,6 +3976,7 @@ try {
         ["twin", twin, twinScript, [0, 0.3, 1, 1.4, 1.9, 2.4, 2.8, 3.1, 3.5, 3.9, 4.4, 4.5, 4.65, 5.1, 5.65, 5.9, 6.15]],
         ["shaped", shaped, shapedScript, [0, 0.25, 0.5, 0.75, 1, 1.25, 1.5]],
         ["ride", ride, rideScript, [0, 0.5, 0.75, 1, 1.25, 1.5, 2]],
+        ["position", placing, placingScript, [0, 0.5, 1, 1.5, 2, 0.5]],
         ["center", centering, centerScript, [0, 1, 1.5, 2, 2.5, 3, 3.5, 4]],
         ["home", homing, homeScript, [0, 0.5, 1, 1.25, 1.5, 1.75, 2, 2.25, 2.5]],
         ["lens", magnified, lensScript, [0, 0.25, 0.5, 1, 1.5, 1.75, 2, 2.5, 3, 3.25, 3.5, 3.75]],
@@ -3974,6 +4005,20 @@ try {
                     assert.ok(Math.abs(displacement - springReference(Math.max(0, time - 0.5))) < 0.002);
                 }
             }
+        }
+        if (name === "position") {
+            const center = (time, id) => {
+                const { bounds } = layoutAt(fromJs.path, time).scene.objects.find((object) => object.id === id);
+                return [bounds.x + bounds.width / 2, bounds.y + bounds.height / 2];
+            };
+            const expected = [[0, "box", 80, 60], [2, "box", 160, 60], [0, "card", 100, 40], [1, "card", 40, 160]];
+            for (const [time, id, x, y] of expected) {
+                const [centerX, centerY] = center(time, id);
+                const near = Math.abs(centerX - x) < 1 && Math.abs(centerY - y) < 1;
+                assert.ok(near, `${id} at ${time}: ${centerX}, ${centerY}`);
+            }
+            // The arc bends the move off the chord.
+            assert.ok(Math.abs(center(1, "box")[1] - 60) > 10);
         }
         if (name === "labelled-contours") {
             const label = fromJs.scene.objects.find((object) => object.id === "labels/1/label/1");

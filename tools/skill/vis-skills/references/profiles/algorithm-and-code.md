@@ -18,7 +18,7 @@ For traversals and searches, distinguish discovered/enqueued, currently processe
 
 Preserve graph directionality. For a directed input, derive each visible route from the canonical edge and shorten its endpoints from node geometry so the arrowhead remains visible outside the target body; a center-to-center shaft hidden by nodes is not directional evidence.
 
-For mutation, distinguish preview, commit, and settled invariant. Ghost destinations are temporary evidence, not live values or pointers. Track `slot_of[identity]`; derive each target or shift from the actual source and destination slot coordinates, then update the record after commit. A swap moves both value owners to exchanged slots or replaces the state atomically; never move one value into an occupied slot and imply completion. At every settled commit, verify the rendered slot-to-value map equals the trace with exactly one live value per occupied slot. Never cover a wrong transition with a reconstructed final-state overlay. Show sequential writes in actual order.
+For mutation, distinguish preview, commit, and settled invariant. Ghost destinations are temporary evidence, not live values or pointers. Track `slot_of[identity]`; move each owner with `position` to its destination slot's coordinates rather than a shift derived by hand, then update the record after commit. A swap moves both value owners to exchanged slots or replaces the state atomically; never move one value into an occupied slot and imply completion. At every settled commit, verify the rendered slot-to-value map equals the trace with exactly one live value per occupied slot. Never cover a wrong transition with a reconstructed final-state overlay. Show sequential writes in actual order.
 
 Use the state ledger in code rather than hand-authored distances:
 
@@ -26,8 +26,8 @@ Use the state ledger in code rather than hand-authored distances:
 local function swap_ids(a, b)
   local sa, sb = slot_of[a], slot_of[b]
   scene:play({
-    {target=owners[a], shift={slot_x[sb]-slot_x[sa], 0, 0}},
-    {target=owners[b], shift={slot_x[sa]-slot_x[sb], 0, 0}},
+    {target=owners[a], position={slot_x[sb], slot_y}},
+    {target=owners[b], position={slot_x[sa], slot_y}},
   }, swap_time, "ease_in_out", 0)
   slot_of[a], slot_of[b] = sb, sa
 end

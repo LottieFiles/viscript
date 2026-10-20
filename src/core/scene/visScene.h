@@ -932,6 +932,10 @@ struct Scene::Impl
     // Why target cannot give its object the values it names, or nullptr. Checks the values
     // against the object, not against the timeline.
     static const char* unanimatable(const AnimationTarget& target) noexcept;
+    // Turns the move of target to a position into the model that moves the center of its
+    // object's bounds there, measured where the clips authored so far leave the object. Fails
+    // when the object has no bounds.
+    Result place(AnimationTarget& target) noexcept;
     // The state of target's object once it takes the values target names, starting from state;
     // a text change takes text, the copy of its string that keep() gave, and a geometry change
     // geometry, the copy of its points that reshape() gave, when there are.

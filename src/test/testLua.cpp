@@ -524,6 +524,7 @@ int main()
         _themes(renderer);
         _cellVoxelBindings(renderer);
         _motion(renderer);
+        _positioning(renderer);
         _diagnostics();
         _crossFades();
         _textSizes();

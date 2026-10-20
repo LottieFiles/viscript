@@ -1795,6 +1795,10 @@ struct AnimationTarget
     static AnimationTarget from(Object* target) noexcept;
     AnimationTarget& shift(const Vec3& by) noexcept;
     AnimationTarget& transform(const Mat4& model) noexcept;
+    // Moves the target so that the center of its bounds lands on point, in its parent's space, as
+    // Object::moveTo() places it. play() and update() measure the bounds where the clips authored
+    // so far leave the target and fail without bounds. It excludes shift() and transform().
+    AnimationTarget& position(const Vec3& point) noexcept;
     AnimationTarget& opacity(float value) noexcept;
     AnimationTarget& stroke(Color color) noexcept;
     AnimationTarget& fill(Color color) noexcept;
@@ -1859,6 +1863,7 @@ struct AnimationTarget
 private:
     Object* target = nullptr;
     Mat4 targetModel = Mat4::identity();
+    Vec3 targetPosition;
     Color targetStroke;
     Color targetFill;
     float targetOpacity = 1.0f;

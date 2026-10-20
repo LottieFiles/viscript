@@ -269,6 +269,7 @@ void groupAndRectangleRendering(Renderer* renderer);
 void connectorOutlines(Renderer* renderer);
 void connectorAnimation(Renderer* renderer);
 void animationTargets(Renderer* renderer);
+void positionTargets(Renderer* renderer);
 void surfaceColors(Renderer* renderer);
 void surfaceMeshLines(Renderer* renderer);
 void surfaceMorph(Renderer* renderer);

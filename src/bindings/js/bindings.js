@@ -29,6 +29,7 @@ const FACTORIES = ["group", "space", ...OBJECTS, ...REGIONS];
 const PLAY_PROPERTIES = [
     "shift",
     "transform",
+    "position",
     "arc",
     "opacity",
     "stroke",
@@ -93,8 +94,10 @@ const PIVOT_ANCHORS = new Set([
     "bottom_right",
 ]);
 // The properties a bound state may set besides shift (an offset, see _boundDescriptor): those of
-// play but arc, text, retype and layer. And the per-track segment budget.
-const TRACKER_KEYS = PLAY_PROPERTIES.filter((key) => !["shift", "arc", "text", "retype", "layer"].includes(key));
+// play but position, arc, text, retype and layer. And the per-track segment budget.
+const TRACKER_KEYS = PLAY_PROPERTIES.filter(
+    (key) => !["shift", "position", "arc", "text", "retype", "layer"].includes(key),
+);
 const TRACKER_CLIP_LIMIT = 65536;
 // Treat sub-tolerance intervals as one instant when checking track overlap.
 const TRACKER_EPSILON = 1e-4;
@@ -3690,18 +3693,22 @@ export class SceneBuilder {
             if (Object.hasOwn(descriptor, "shift") && Object.hasOwn(descriptor, "transform")) {
                 throw new TypeError("Animation descriptors cannot combine shift and transform");
             }
+            for (const key of ["shift", "transform"]) {
+                if (Object.hasOwn(descriptor, key) && Object.hasOwn(descriptor, "position")) {
+                    throw new TypeError(`Animation descriptors cannot combine ${key} and position`);
+                }
+            }
             if (
                 Object.hasOwn(descriptor, "arc") &&
-                !Object.hasOwn(descriptor, "shift") &&
-                !Object.hasOwn(descriptor, "transform")
+                !["shift", "transform", "position"].some((key) => Object.hasOwn(descriptor, key))
             ) {
-                throw new TypeError("Animation descriptor arc requires shift or transform");
+                throw new TypeError("Animation descriptor arc requires shift, transform or position");
             }
             if (verb === "set" && Object.hasOwn(descriptor, "arc")) {
                 throw new TypeError("Set applies values at once, so its descriptors cannot use arc");
             }
             if (
-                (Object.hasOwn(descriptor, "shift") || Object.hasOwn(descriptor, "transform")) &&
+                ["shift", "transform", "position"].some((key) => Object.hasOwn(descriptor, key)) &&
                 HANDLE_TYPES.get(descriptor.target) === "connector"
             ) {
                 throw new TypeError("Connector geometry follows its endpoints and cannot be shifted or transformed");

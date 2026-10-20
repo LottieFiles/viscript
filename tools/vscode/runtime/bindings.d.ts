@@ -1005,6 +1005,9 @@ export type RippleOptions = RippleEffectOptions & TimingOptions;
 interface AnimationProperties {
     shift: WorldVector;
     transform: Mat4;
+    /** The point, in the parent's space, that the center of the target's bounds moves to from
+     * where the earlier clips leave it; a 2D point has z 0. Not with shift or transform. */
+    position: WorldVector;
     opacity: number;
     stroke: Color;
     fill: Color;
@@ -1084,15 +1087,18 @@ type AtLeastOne<T> = {
 type TextChoice = {retype?: never} | {text: string; retype?: boolean};
 
 export type AnimationSpec = {target: ObjectHandle} & AtLeastOne<AnimationProperties> & TextChoice & (
-    {shift?: WorldVector; transform?: never; arc?: never} |
-    {shift?: never; transform?: Mat4; arc?: never} |
-    {shift: WorldVector; transform?: never; arc: number} |
-    {shift?: never; transform: Mat4; arc: number}
+    {shift?: WorldVector; transform?: never; position?: never; arc?: never} |
+    {shift?: never; transform?: Mat4; position?: never; arc?: never} |
+    {shift?: never; transform?: never; position?: WorldVector; arc?: never} |
+    {shift: WorldVector; transform?: never; position?: never; arc: number} |
+    {shift?: never; transform: Mat4; position?: never; arc: number} |
+    {shift?: never; transform?: never; position: WorldVector; arc: number}
 );
 
 export type SetSpec = {target: ObjectHandle} & AtLeastOne<AnimationProperties> & TextChoice & (
-    {shift?: WorldVector; transform?: never; arc?: never} |
-    {shift?: never; transform?: Mat4; arc?: never}
+    {shift?: WorldVector; transform?: never; position?: never; arc?: never} |
+    {shift?: never; transform?: Mat4; position?: never; arc?: never} |
+    {shift?: never; transform?: never; position?: WorldVector; arc?: never}
 );
 
 declare const tracker: unique symbol;
@@ -1103,13 +1109,13 @@ export interface Tracker {
     get(): number;
 }
 /**
- * What a bound object shows for its trackers' values: any play property except arc, text and
- * layer, the points of a shape and a plot's fn among them. The shift is the offset from where
- * the object was when it was bound; a transform is absolute.
+ * What a bound object shows for its trackers' values: any play property except position, arc,
+ * text and layer, the points of a shape and a plot's fn among them. The shift is the offset from
+ * where the object was when it was bound; a transform is absolute.
  */
-export type BoundState = Partial<Omit<AnimationProperties, "shift" | "transform" | "text" | "layer">> & (
-    {shift?: readonly [number, number] | readonly [number, number, number]; transform?: never; arc?: never} |
-    {shift?: never; transform?: Mat4; arc?: never}
+export type BoundState = Partial<Omit<AnimationProperties, "shift" | "transform" | "position" | "text" | "layer">> & (
+    {shift?: readonly [number, number] | readonly [number, number, number]; transform?: never; position?: never; arc?: never} |
+    {shift?: never; transform?: Mat4; position?: never; arc?: never}
 );
 
 export type TimingOptions = {

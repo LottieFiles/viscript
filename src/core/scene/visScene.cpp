@@ -1648,6 +1648,10 @@ static constexpr auto TARGET_FIXED =
     "a connector follows its endpoints, and a moving group must contain an endpoint of each "
     "connector inside it";
 static constexpr auto TARGET_MATRIX = "the matrix must be finite and affine, with a last row of 0, 0, 0, 1";
+static constexpr auto POSITION_EXCLUSIVE = "position cannot be used with shift or transform";
+static constexpr auto POSITION_POINT = "the position must be a finite point";
+static constexpr auto POSITION_BOUNDS =
+    "the object has no bounds yet to move to a position; give it geometry or children first";
 static constexpr auto VALUE_NONE = "the animation changes no property";
 static constexpr auto VALUE_OPACITY = "the opacity must be between 0 and 1";
 static constexpr auto VALUE_PROGRESS = "the draw progress must be between 0 and 1";
@@ -3107,7 +3111,9 @@ static constexpr uint32_t TARGET_GEOMETRY = 1u << 18u;
 static constexpr uint32_t TARGET_TRIM_DISTANCE = 1u << 19u;
 static constexpr uint32_t TARGET_ARC_START = 1u << 20u;
 static constexpr uint32_t TARGET_ARC_ANGLE = 1u << 21u;
-static constexpr uint32_t TARGET_ALL = (1u << 22u) - 1u;
+// A move to a point, which play() and update() turn into the model it reaches (see place()).
+static constexpr uint32_t TARGET_POSITION = 1u << 22u;
+static constexpr uint32_t TARGET_ALL = (1u << 23u) - 1u;
 // The properties that make an object a layer that carries effects.
 static constexpr uint32_t TARGET_EFFECTS = TARGET_BLUR | TARGET_SHADOW;
 // The properties a group passes to the shapes that take them from it.
@@ -3259,6 +3265,13 @@ AnimationTarget& AnimationTarget::transform(const Mat4& model) noexcept
 {
     targetModel = model;
     properties |= TARGET_MODEL;
+    return *this;
+}
+
+AnimationTarget& AnimationTarget::position(const Vec3& point) noexcept
+{
+    targetPosition = point;
+    properties |= TARGET_POSITION;
     return *this;
 }
 
@@ -6537,9 +6550,11 @@ const char* Scene::Impl::unanimatable(const AnimationTarget& target) noexcept
         return "start needs an arc and finite radians";
     if ((properties & TARGET_ARC_ANGLE) && (object->type() != Type::Arc || !std::isfinite(target.targetAngle) || std::fabs(target.targetAngle) > 6.28318530718f))
         return "angle needs an arc and a sweep between -2 pi and 2 pi";
-    if (properties & TARGET_MODEL) {
+    if (properties & (TARGET_MODEL | TARGET_POSITION)) {
+        if ((properties & TARGET_MODEL) && (properties & TARGET_POSITION)) return POSITION_EXCLUSIVE;
         if (!_transformable(object)) return TARGET_FIXED;
-        if (!_affine(target.targetModel)) return TARGET_MATRIX;
+        if ((properties & TARGET_MODEL) && !_affine(target.targetModel)) return TARGET_MATRIX;
+        if ((properties & TARGET_POSITION) && !_finite(target.targetPosition)) return POSITION_POINT;
         if (!_arc(target.targetArc)) return MOTION_ARC;
     }
     if ((properties & TARGET_OPACITY)
@@ -6620,6 +6635,17 @@ const char* Scene::Impl::unanimatable(const AnimationTarget& target) noexcept
         }
     }
     return nullptr;
+}
+
+Result Scene::Impl::place(AnimationTarget& target) noexcept
+{
+    auto object = target.target;
+    Bounds box;
+    if (!object->bounds(box)) return fail(Result::InsufficientCondition, POSITION_BOUNDS);
+    target.targetModel = Mat4::translate(target.targetPosition - box.center()) * object->model;
+    if (!_affine(target.targetModel)) return fail(Result::InvalidArguments, MOTION_RANGE);
+    target.properties = (target.properties & ~TARGET_POSITION) | TARGET_MODEL;
+    return Result::Success;
 }
 
 VisualState Scene::Impl::targeted(const AnimationTarget& target, const VisualState& state,
@@ -7434,6 +7460,27 @@ Result Scene::play(const AnimationTarget* targets, uint32_t count, float duratio
     if (!_timeline(impl.cursor, duration, lag, count, nextCursor)) {
         return impl.fail(Result::InvalidArguments, TIMELINE_RANGE);
     }
+    // Moves to a position play as the models they reach, all measured before any target moves.
+    auto positions = 0u;
+    for (auto i = 0u; i < count; i++) {
+        if (targets[i].properties & TARGET_POSITION) positions++;
+    }
+    if (positions) {
+        auto placed = new (std::nothrow) AnimationTarget[count];
+        if (!placed) return impl.fail(Result::OutOfMemory, SCENE_MEMORY);
+        auto result = Result::Success;
+        for (auto i = 0u; i < count && result == Result::Success; i++) {
+            auto& target = targets[i];
+            placed[i] = target;
+            if (!(target.properties & TARGET_POSITION)) continue;
+            auto reason = _unplayable(target.target ? impl.entry(target.target) : nullptr, target.target);
+            if (!reason) reason = Impl::unanimatable(target);
+            result = reason ? impl.fail(Result::InvalidArguments, reason) : impl.place(placed[i]);
+        }
+        if (result == Result::Success) result = play(placed, count, duration, curve, lag);
+        delete[] placed;
+        return result;
+    }
     for (auto i = 0u; i < count; i++) {
         auto& target = targets[i];
         auto entry = target.target ? impl.entry(target.target) : nullptr;
@@ -7615,6 +7662,12 @@ Result Scene::update(const AnimationTarget& target) noexcept
     if (entry->dead >= 0.0f) return impl.fail(Result::InvalidArguments, TARGET_REMOVED);
     if (impl.owner) return impl.fail(Result::InsufficientCondition, SCENE_MOUNTED);
     if (auto reason = Impl::unanimatable(target)) return impl.fail(Result::InvalidArguments, reason);
+    // A move to a position sets the model it reaches (see Impl::place()).
+    if (target.properties & TARGET_POSITION) {
+        auto placed = target;
+        auto result = impl.place(placed);
+        return result == Result::Success ? update(placed) : result;
+    }
     if (_warpSized(object, target.properties)) return impl.fail(Result::InvalidArguments, WARP_SIZE);
     if ((target.properties & TARGET_GEOMETRY) && warped(object)) {
         return impl.fail(Result::InvalidArguments, WARP_GEOMETRY);

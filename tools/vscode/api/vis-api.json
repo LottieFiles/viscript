@@ -385,8 +385,9 @@
     },
     "Animation": {
       "target": {"type": "Object", "required": true, "description": "Distinct live target owned by this Scene."},
-      "shift": {"type": "Vec2|Vec3", "description": "Parent-space shift; mutually exclusive with transform."},
-      "transform": {"type": "Mat4", "description": "Absolute local-to-parent transform; mutually exclusive with shift."},
+      "shift": {"type": "Vec2|Vec3", "description": "Parent-space shift; mutually exclusive with transform and position."},
+      "transform": {"type": "Mat4", "description": "Absolute local-to-parent transform; mutually exclusive with shift and position."},
+      "position": {"type": "Vec2|Vec3", "description": "Parent-space point the center of the target's bounds moves to, from where earlier clips leave it; a Vec2 has z 0. Mutually exclusive with shift and transform, and not allowed in a bound state."},
       "opacity": {"type": "number", "description": "Target opacity from 0 to 1."},
       "stroke": {"type": "Color|ThemeColor", "description": "Target stroke color."},
       "fill": {"type": "Color|ThemeColor", "description": "Target fill color."},

@@ -2179,6 +2179,7 @@ int main()
         connectorAnimation(renderer);
         connectorOutlines(renderer);
         animationTargets(renderer);
+        positionTargets(renderer);
         timelineTracks(renderer);
         clipLists(renderer);
         sampleWork();

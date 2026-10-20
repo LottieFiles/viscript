@@ -44,10 +44,9 @@ local function token(id, s, x, y, o)
     local t = T(g, id .. ":label", s, 0, 0, o.text or 15, o.color or C.text, nil, layer + 2)
     return {g = g, b = b, t = t, x = x, y = y, v = s}
 end
--- descriptor that carries a token to (x, y); call it when the move is scheduled
+-- descriptor that carries a token to (x, y), which it records
 local function toward(o, x, y, arc)
-    local d = {target = o.g, shift = {x - o.x, y - o.y}, arc = arc}
     o.x, o.y = x, y
-    return d
+    return {target = o.g, position = {x, y}, arc = arc}
 end
 `;

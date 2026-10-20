@@ -1,0 +1,184 @@
+---
+title: Tokens & Captions
+group: More
+---
+
+# Tokens & Captions
+
+Place objects at exact points, carry labeled tokens along edges, and keep one caption on screen.
+
+## Move to a point
+
+<p><code>shift</code> moves a target by a vector from where it is, and <code>transform</code> replaces its whole local matrix.
+<code>position</code> names the point instead: the center of the target's bounds lands on it, in the target's parent's space,
+starting from wherever earlier clips left it.</p>
+<p><code>scene:set</code> places the target at once; <code>play</code> moves it there, straight or bent by an <code>arc</code>.
+A descriptor takes only one of <code>shift</code>, <code>transform</code> and <code>position</code>, and an object with
+no bounds yet, such as an empty group, cannot move to a position.</p>
+
+```lua live
+local scene = vis.scene {
+    width = 960, height = 540, theme = "pro_black",
+    camera = {mode = "fixed", view = "2d", height = 6},
+}
+
+local stops = {{-4, -1}, {0, -1}, {4, -1}}
+for _, point in ipairs(stops) do
+    scene:circle {center = point, radius = 0.06, fill = "foreground", layer = 1}
+end
+
+-- drawn elsewhere: position moves the center of its bounds, wherever it was authored
+local card = scene:rectangle {center = {2, 2}, size = {1.4, 0.9}, corner = 0.12, fill = "accent"}
+scene:set {target = card, position = stops[1]}
+scene:wait(0.4)
+
+scene:play({target = card, position = stops[2]}, 1)
+scene:play({target = card, position = stops[3], arc = -math.pi / 2}, 1)
+
+return scene
+```
+
+```js live
+const scene = vis.scene({
+    width: 960, height: 540, theme: "pro_black",
+    camera: {mode: "fixed", view: "2d", height: 6},
+});
+
+const stops = [[-4, -1], [0, -1], [4, -1]];
+for (const point of stops) {
+    scene.circle({center: point, radius: 0.06, fill: "foreground", layer: 1});
+}
+
+// drawn elsewhere: position moves the center of its bounds, wherever it was authored
+const card = scene.rectangle({center: [2, 2], size: [1.4, 0.9], corner: 0.12, fill: "accent"});
+scene.set({target: card, position: stops[0]});
+scene.wait(0.4);
+
+scene.play({target: card, position: stops[1]}, 1);
+scene.play({target: card, position: stops[2], arc: -Math.PI / 2}, 1);
+
+return scene;
+```
+
+## A token along an edge
+
+<p>A token is one group, a box and its label, so it moves as a unit. <code>scene:set</code> puts it where the edge leaves
+the first node, <code>move_along</code> carries its center along the edge, and a <code>to</code> below 1 stops it short of
+the arrow tip. A last <code>position</code> parks it beside the node it reached.</p>
+
+```lua live
+local scene = vis.scene {
+    width = 960, height = 540, theme = "pro_black",
+    camera = {mode = "fixed", view = "2d", height = 6},
+}
+
+local d = vis.diagram(scene, {id = "request", layout = "manual", node_size = {1.8, 0.9}, corner = 0.08})
+local client = d:node {id = "client", label = "Client", position = {-4, 0}}
+local server = d:node {id = "server", label = "Server", position = {0, 0}}
+local db = d:node {id = "db", label = "Database", position = {4, 0}}
+local ask = d:connect {id = "ask", from = client, to = server, route = "straight"}
+d:connect {id = "read", from = server, to = db, route = "straight"}
+local built = d:build()
+
+local token = scene:group {}
+token:rectangle {size = {0.7, 0.36}, corner = 0.05, fill = "background", stroke = "accent", width = 1.5}
+token:text {text = "GET", size = 15}
+scene:set {target = token, position = {-3.1, 0}}
+scene:fade_in(token, {duration = 0.3})
+
+scene:move_along(token, built:edge(ask), {to = 0.7, duration = 1})
+scene:play({target = token, position = {0, 0.85}, arc = -1.2}, 0.6)
+scene:indicate(built:node_body(server), {duration = 0.5})
+
+return scene
+```
+
+```js live
+const scene = vis.scene({
+    width: 960, height: 540, theme: "pro_black",
+    camera: {mode: "fixed", view: "2d", height: 6},
+});
+
+// vis.diagram is Lua-only; this draws the same three nodes and two edges from primitives
+const [w, h] = [1.8, 0.9];
+const ask = scene.arrow({from: [-4 + w / 2, 0], to: [-w / 2, 0], stroke: "muted", layer: -20});
+scene.arrow({from: [w / 2, 0], to: [4 - w / 2, 0], stroke: "muted", layer: -20});
+const node = (label, x) => {
+    const group = scene.group({});
+    const body = group.rectangle({center: [x, 0], size: [w, h], corner: 0.08, fill: "background", stroke: "foreground"});
+    group.text({text: label, point: [x, 0], role: "text", color: "foreground", layer: 10});
+    return body;
+};
+node("Client", -4);
+const server = node("Server", 0);
+node("Database", 4);
+
+const token = scene.group({});
+token.rectangle({size: [0.7, 0.36], corner: 0.05, fill: "background", stroke: "accent", width: 1.5});
+token.text({text: "GET", size: 15});
+scene.set({target: token, position: [-3.1, 0]});
+scene.fadeIn(token, {duration: 0.3});
+
+scene.moveAlong(token, ask, {to: 0.7, duration: 1});
+scene.play({target: token, position: [0, 0.85], arc: -1.2}, 0.6);
+scene.indicate(server, {duration: 0.5});
+
+return scene;
+```
+
+## One caption at a time
+
+<p>Captions need no API of their own: keep the one on screen in a local, create the next where it stands, and
+<code>fade_transform</code> the old one into it.</p>
+
+```lua live
+local scene = vis.scene {
+    width = 960, height = 540, theme = "pro_black",
+    camera = {mode = "fixed", view = "2d", height = 6},
+}
+
+local dot = scene:circle {radius = 0.25, fill = "accent"}
+scene:set {target = dot, position = {-4, 0.5}}
+
+local caption = scene:text {text = "1. Start on the left", point = {0, -1.8}, align = {0.5, 0.5}, size = 30}
+local function say(text)
+    local line = scene:text {text = text, point = {0, -1.8}, align = {0.5, 0.5}, size = 30}
+    scene:fade_transform(caption, line, 0.4)
+    caption = line
+end
+
+scene:wait(0.6)
+say("2. Move to the middle")
+scene:play({target = dot, position = {0, 0.5}}, 0.8)
+say("3. Hop to the right")
+scene:play({target = dot, position = {4, 0.5}, arc = -math.pi / 2}, 0.8)
+scene:wait(0.6)
+
+return scene
+```
+
+```js live
+const scene = vis.scene({
+    width: 960, height: 540, theme: "pro_black",
+    camera: {mode: "fixed", view: "2d", height: 6},
+});
+
+const dot = scene.circle({radius: 0.25, fill: "accent"});
+scene.set({target: dot, position: [-4, 0.5]});
+
+let caption = scene.text({text: "1. Start on the left", point: [0, -1.8], align: [0.5, 0.5], size: 30});
+const say = (text) => {
+    const line = scene.text({text, point: [0, -1.8], align: [0.5, 0.5], size: 30});
+    scene.fadeTransform(caption, line, 0.4);
+    caption = line;
+};
+
+scene.wait(0.6);
+say("2. Move to the middle");
+scene.play({target: dot, position: [0, 0.5]}, 0.8);
+say("3. Hop to the right");
+scene.play({target: dot, position: [4, 0.5], arc: -Math.PI / 2}, 0.8);
+scene.wait(0.6);
+
+return scene;
+```

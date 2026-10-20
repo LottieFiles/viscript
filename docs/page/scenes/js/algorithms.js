@@ -176,11 +176,9 @@ function pop() {
 const th = scene.rectangle({id: "pivot-line", center: [(x0 + x1) / 2, base], size: [x1 - x0, 0.03],
                             fill: C.alt, stroke: C.none, layer: L.label - 1});
 scene.set({target: th, opacity: 0});
-let thx = (x0 + x1) / 2, thy = base;
 function threshold(lo, hi, v) {
     const cx = x0 + (lo - 1 + hi) / 2 * w, y = base + v / maxv * hmax;
-    scene.play({target: th, shift: [cx - thx, y - thy], size: [(hi - lo + 1) * w, 0.03], opacity: 0.9}, 0.3, "smooth");
-    thx = cx; thy = y;
+    scene.play({target: th, position: [cx, y], size: [(hi - lo + 1) * w, 0.03], opacity: 0.9}, 0.3, "smooth");
 }
 // scan pointers: i = end of the < pivot zone, j = scanner
 const pi = T(scene, "ptr:i", "i", X(1), base - 0.6, 14, C.accent);
@@ -306,17 +304,15 @@ T(scene, "target", "target  " + target, x0, 1.75, 16, C.warn, [0, 0.5]);
 const winW = (lo, hi) => (hi - lo + 1) * w;
 const win = scene.rectangle({id: "window", center: [(X(1) + X(n)) / 2, y], size: [winW(1, n) + 0.08, 0.8],
                              corner: 0.06, fill: C.none, stroke: C.accent, width: 2, layer: L.edge});
-let winX = (X(1) + X(n)) / 2, wlo = 1, whi = n;
+let wlo = 1, whi = n;
 const plo = T(scene, "ptr:lo", "lo", X(1), y - 0.95, 13, C.accent);
 const phi = T(scene, "ptr:hi", "hi", X(n), y - 0.95, 13, C.accent);
 const pmid = T(scene, "ptr:mid", "mid", X(1), y + 0.65, 13, C.warn);
 scene.set({target: pmid, opacity: 0});
-let mpos = 1;
 scene.wait(0.5);
 for (const e of TRACE) {
-    together(() => scene.play({target: pmid, shift: [(e.mid - mpos) * w, 0], opacity: 1}, 0.35, "smooth"),
+    together(() => scene.play({target: pmid, position: [X(e.mid), y + 0.65], opacity: 1}, 0.35, "smooth"),
              () => scene.play({target: box[e.mid], stroke: C.warn}, 0.25));
-    mpos = e.mid;
     const v = arr[e.mid];
     const rel = e.verdict === "hit" ? "=" : e.verdict === "right" ? "<" : ">";
     if (e.verdict === "hit") {
@@ -338,13 +334,13 @@ for (const e of TRACE) {
     }
     const ncx = (X(nlo) + X(nhi)) / 2;
     scene.parallel(
-        () => scene.play({target: win, shift: [ncx - winX, 0], size: [winW(nlo, nhi) + 0.08, 0.8]}, 0.45, "smooth"),
+        () => scene.play({target: win, position: [ncx, y], size: [winW(nlo, nhi) + 0.08, 0.8]}, 0.45, "smooth"),
         () => { if (nlo !== wlo) scene.shift(plo, [(nlo - wlo) * w, 0], 0.45, "smooth"); },
         () => { if (nhi !== whi) scene.shift(phi, [(nhi - whi) * w, 0], 0.45, "smooth"); },
         () => scene.stroke(box[e.mid], C.line, 0.2),
         ...dim.map((k) => () => scene.fade(cells[k], 0.25, 0.3)),
     );
-    winX = ncx; wlo = nlo; whi = nhi;
+    wlo = nlo; whi = nhi;
 }
 scene.wait(2.4);
 return scene;`;

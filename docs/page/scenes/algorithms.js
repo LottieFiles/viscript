@@ -182,11 +182,9 @@ end
 local th = scene:rectangle {id = "pivot-line", center = {(x0 + x1) / 2, base}, size = {x1 - x0, 0.03},
                             fill = C.alt, stroke = C.none, layer = L.label - 1}
 scene:set({target = th, opacity = 0})
-local thx, thy = (x0 + x1) / 2, base
 local function threshold(lo, hi, v)
     local cx, y = x0 + (lo - 1 + hi) / 2 * w, base + v / maxv * hmax
-    scene:play({target = th, shift = {cx - thx, y - thy}, size = {(hi - lo + 1) * w, 0.03}, opacity = 0.9}, 0.3, "smooth")
-    thx, thy = cx, y
+    scene:play({target = th, position = {cx, y}, size = {(hi - lo + 1) * w, 0.03}, opacity = 0.9}, 0.3, "smooth")
 end
 -- scan pointers: i = end of the < pivot zone, j = scanner
 local pi = T(scene, "ptr:i", "i", X(1), base - 0.6, 14, C.accent)
@@ -316,17 +314,15 @@ T(scene, "target", "target  " .. target, x0, 1.75, 16, C.warn, {0, 0.5})
 local winW = function(lo, hi) return (hi - lo + 1) * w end
 local win = scene:rectangle {id = "window", center = {(X(1) + X(#arr)) / 2, y}, size = {winW(1, #arr) + 0.08, 0.8},
                              corner = 0.06, fill = C.none, stroke = C.accent, width = 2, layer = L.edge}
-local winX, wlo, whi = (X(1) + X(#arr)) / 2, 1, #arr
+local wlo, whi = 1, #arr
 local plo = T(scene, "ptr:lo", "lo", X(1), y - 0.95, 13, C.accent)
 local phi = T(scene, "ptr:hi", "hi", X(#arr), y - 0.95, 13, C.accent)
 local pmid = T(scene, "ptr:mid", "mid", X(1), y + 0.65, 13, C.warn)
 scene:set({target = pmid, opacity = 0})
-local mpos = 1
 scene:wait(0.5)
 for _, e in ipairs(TRACE) do
-    together(function() scene:play({target = pmid, shift = {(e.mid - mpos) * w, 0}, opacity = 1}, 0.35, "smooth") end,
+    together(function() scene:play({target = pmid, position = {X(e.mid), y + 0.65}, opacity = 1}, 0.35, "smooth") end,
              function() scene:play({target = box[e.mid], stroke = C.warn}, 0.25) end)
-    mpos = e.mid
     local v = arr[e.mid]
     local rel = e.verdict == "hit" and "=" or (e.verdict == "right" and "<" or ">")
     if e.verdict == "hit" then
@@ -348,14 +344,14 @@ for _, e in ipairs(TRACE) do
     end
     local ncx = (X(nlo) + X(nhi)) / 2
     local fns = {
-        function() scene:play({target = win, shift = {ncx - winX, 0}, size = {winW(nlo, nhi) + 0.08, 0.8}}, 0.45, "smooth") end,
+        function() scene:play({target = win, position = {ncx, y}, size = {winW(nlo, nhi) + 0.08, 0.8}}, 0.45, "smooth") end,
         function() if nlo ~= wlo then scene:shift(plo, {(nlo - wlo) * w, 0}, 0.45, "smooth") end end,
         function() if nhi ~= whi then scene:shift(phi, {(nhi - whi) * w, 0}, 0.45, "smooth") end end,
         function() scene:stroke(box[e.mid], C.line, 0.2) end,
     }
     for _, k in ipairs(dim) do fns[#fns + 1] = function() scene:fade(cells[k], 0.25, 0.3) end end
     scene:parallel(table.unpack(fns))
-    winX, wlo, whi = ncx, nlo, nhi
+    wlo, whi = nlo, nhi
 end
 scene:wait(2.4)
 return scene`;

@@ -868,3 +868,65 @@ return s
                  "for i=1,200 do s:save(g) end; return s",
                  "scene native memory limit exceeded");
 }
+
+// A position moves the center of an object's bounds to a point of its parent's space, measured
+// where the earlier clips leave the object. A frame 10 units high on 200 pixels makes a unit 20
+// pixels.
+void _positioning(Renderer* renderer)
+{
+    static constexpr auto source = R"lua(
+local s = vis.scene {width = 200, height = 200, camera = {height = 10}}
+local solid = {fill = "#ffffff", stroke = "#00000000"}
+local box = s:rectangle {id = "box", center = {-3, 2, 1}, size = {1, 1}, fill = solid.fill, stroke = solid.stroke}
+local dot = s:rectangle {id = "dot", center = {2, -2}, size = {1, 1}, fill = solid.fill, stroke = solid.stroke}
+local card = s:group {id = "card"}
+card:rectangle {id = "face", size = {1, 0.5}, fill = solid.fill, stroke = solid.stroke}
+s:set {{target = box, position = {-1, 2}}, {target = card, position = {0, 3}}}
+s:play({{target = box, position = {3, 2}, opacity = 0.5}, {target = dot, position = {-2, -2}, arc = math.pi}},
+    2, "linear")
+s:at(1, function() s:play({target = box, position = {3, -1}}, 2, "linear") end)
+s:at(2.5, function() s:set {target = card, position = {-3, -3}} end)
+return s
+)lua";
+    auto scene = _loaded(source, "position.lua");
+    if (scene) {
+        auto at = [&](const char* id, float time, float x, float y) {
+            auto center = _centerAt(renderer, scene, id, time);
+            auto placed = std::fabs(center.x - (100.0f + 20.0f * x)) <= 1.0f
+                          && std::fabs(center.y - (100.0f - 20.0f * y)) <= 1.0f;
+            if (!placed) std::fprintf(stderr, "  %s at %.2f s: (%.1f, %.1f) px\n", id, time, center.x, center.y);
+            return placed;
+        };
+        CHECK(_near(scene->duration(), 3.0f));
+        // A set places at once, and a point of two numbers has z 0.
+        CHECK(at("box", 0.0f, -1.0f, 2.0f) && at("card", 0.0f, 0.0f, 3.0f));
+        Bounds bounds;
+        auto box = scene->object("box");
+        CHECK(box && box->bounds(bounds) && std::fabs(bounds.center().z) < 1.0e-4f);
+        // A play is halfway at half time, and an arc of a half turn passes over the top.
+        CHECK(at("box", 1.0f, 1.0f, 2.0f) && at("dot", 1.0f, 0.0f, 0.0f) && at("dot", 2.0f, -2.0f, -2.0f));
+        CHECK(box && _near(box->opacity, 0.5f));
+        // One begun while the first runs adds to it and still ends on its point.
+        CHECK(at("box", 2.0f, 3.0f, 0.5f) && at("box", 3.0f, 3.0f, -1.0f));
+        CHECK(at("card", 2.4f, 0.0f, 3.0f) && at("card", 2.5f, -3.0f, -3.0f));
+    }
+    delete scene;
+
+    static constexpr auto prefix = "local s=vis.scene{}; local r=s:rectangle{}; local g=s:group{}; ";
+    char script[320];
+    auto fails = [&](const char* body, const char* expected) {
+        std::snprintf(script, sizeof(script), "%s%s return s", prefix, body);
+        _scriptError(script, expected);
+    };
+    fails("s:play({target=r, shift={1, 0}, position={0, 0}})",
+          "animation descriptor cannot contain both shift and position");
+    fails("s:set({target=r, transform={1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1}, position={0, 0}})",
+          "animation descriptor cannot contain both transform and position");
+    fails("s:play({target=r, opacity=0.5, arc=1})", "arc requires shift, transform or position");
+    fails("s:play({target=r, position={1}})", "position must contain 2 or 3 numbers");
+    fails("s:play({target=g, position={0, 0}})",
+          "could not play animation: the object has no bounds yet to move to a position");
+    fails("s:set({target=g, position={0, 0}})", "could not set values: the object has no bounds yet");
+    fails("local x=s:tracker(0); s:bind(r, x, function(v) return {position={v, 0}} end)",
+          "a bound state cannot set 'position'");
+}

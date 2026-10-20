@@ -38,11 +38,9 @@ function token(id, s, x, y, o = {}) {
     const t = T(g, id + ":label", s, 0, 0, o.text ?? 15, o.color ?? C.text, null, layer + 2);
     return {g, b, t, x, y, v: s};
 }
-// descriptor that carries a token to (x, y); call it when the move is scheduled
+// descriptor that carries a token to (x, y), which it records
 function toward(o, x, y, arc) {
-    const d = {target: o.g, shift: [x - o.x, y - o.y]};
-    if (arc !== undefined) d.arc = arc;
     o.x = x; o.y = y;
-    return d;
+    return arc === undefined ? {target: o.g, position: [x, y]} : {target: o.g, position: [x, y], arc};
 }
 `;

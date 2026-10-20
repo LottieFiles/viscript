@@ -33,7 +33,7 @@ Most clips are two to four beats: a close-up on the cause, a widen to show the e
 - **Verbs.** `write` and `retype` for commands, `create` for wires and arrows (`progress` 0 → 1), `grow_from_center` with a `back` curve for an arriving subject, an `arc` shift for a hop, `scale` for a short squash, and a progress bar's `size` with a matching `shift` for work in progress. Stagger a wave of similar items by about 0.1 s.
 - **Crossing items.** When items swap places, give right-movers an `arc` hop and slide left-movers flat, so crossing items never sit at the same height. Keep the hop small enough to stay inside the panel.
 - **Labels that belong to slots.** Index or value labels under moving items stay at their slots and change text after each pass (fade out, `set` text, fade in). Labels that travel with their items collide mid-move.
-- **Loop.** Set `loop = true` and end on the exact frame at `t = 0`: fade out what appeared, reset shifted objects with `set`, and return the camera. Hold the result for about 1 s before the reset; the whole clip is usually 5–12 s.
+- **Loop.** Set `loop = true` and end on the exact frame at `t = 0`: fade out what appeared, reset moved objects with `set` and their starting `position`, and return the camera. Hold the result for about 1 s before the reset; the whole clip is usually 5–12 s.
 
 ## Layout
 
