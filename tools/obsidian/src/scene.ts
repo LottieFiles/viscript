@@ -24,6 +24,8 @@ export interface BlockOptions extends SceneOptions {
     readonly layout?: "inline" | "pane";
     /** Opens the scene's file; given, the bar has a button for it. */
     readonly open?: (event: MouseEvent) => void;
+    /** Presses on the scene leave the focus where it is, as above a code block being edited. */
+    readonly keepFocus?: boolean;
 }
 
 const PLACEHOLDER = [960, 540] as const;
@@ -50,6 +52,8 @@ export class SceneBlock extends MarkdownRenderChild {
     #generation = 0;
     #active = false;
     #resize: ResizeObserver | null = null;
+    /** The timeline follows a pointer held on it, rather than playback. */
+    #scrubbing = false;
 
     constructor(plugin: ViscriptPlugin, containerEl: HTMLElement, options: BlockOptions = {}) {
         super(containerEl);
@@ -79,6 +83,7 @@ export class SceneBlock extends MarkdownRenderChild {
         }
         this.#error = this.#root.createEl("pre", {cls: "viscript-error", attr: {role: "alert"}});
         this.#error.hide();
+        if (options.keepFocus) this.#keepFocus();
         this.#showState("loading");
         this.#layout();
     }
@@ -119,7 +124,7 @@ export class SceneBlock extends MarkdownRenderChild {
     /** Changes the options an embed's alias gives. */
     setOptions(options: BlockOptions): void {
         const previous = this.#options;
-        this.#options = {...options, layout: previous.layout, open: previous.open};
+        this.#options = {...options, layout: previous.layout, open: previous.open, keepFocus: previous.keepFocus};
         this.#layout();
         if (previous.interactive !== options.interactive) this.rebuild();
         else this.configure();
@@ -256,6 +261,29 @@ export class SceneBlock extends MarkdownRenderChild {
         void player?.load({source: scene.source, language: scene.language, name: scene.name});
     }
 
+    // A press that takes no focus: the canvas and buttons still get their clicks, but a range input
+    // moves only once focused, so the timeline follows the pointer itself.
+    #keepFocus(): void {
+        this.#root.addEventListener("mousedown", (event) => event.preventDefault());
+        const scrub = this.#scrub;
+        const seek = (event: PointerEvent) => {
+            const box = scrub.getBoundingClientRect();
+            const at = Math.min(1, Math.max(0, (event.clientX - box.left) / Math.max(1, box.width)));
+            scrub.value = String(at * Number(scrub.max));
+            scrub.dispatchEvent(new Event("input"));
+        };
+        scrub.addEventListener("pointerdown", (event) => {
+            if (event.button !== 0) return;
+            scrub.setPointerCapture(event.pointerId);
+            this.#scrubbing = true;
+            seek(event);
+        });
+        scrub.addEventListener("pointermove", (event) => {
+            if (this.#scrubbing && scrub.hasPointerCapture(event.pointerId)) seek(event);
+        });
+        scrub.addEventListener("lostpointercapture", () => { this.#scrubbing = false; });
+    }
+
     #showError(message: string): void {
         this.#error.setText(message);
         this.#error.show();
@@ -270,7 +298,7 @@ export class SceneBlock extends MarkdownRenderChild {
     }
 
     #showTime(time: number, duration: number): void {
-        if (this.#scrub.ownerDocument.activeElement !== this.#scrub) {
+        if (!this.#scrubbing && this.#scrub.ownerDocument.activeElement !== this.#scrub) {
             this.#scrub.max = String(duration || 1);
             this.#scrub.value = String(time);
         }

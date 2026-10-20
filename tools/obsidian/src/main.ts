@@ -1,12 +1,17 @@
 // viscript for Obsidian: scenes in notes (embedded .lua files and code blocks) and in their own
 // tabs, drawn by the viscript WASM runtime in a render worker through @viscript/player.
-import {debounce, MarkdownView, Notice, Plugin, TFile, type TAbstractFile, type WorkspaceLeaf} from "obsidian";
+import {
+    debounce, Keymap, MarkdownView, normalizePath, Notice, Plugin, TFile, TFolder, type PaneType, type TAbstractFile,
+    type WorkspaceLeaf,
+} from "obsidian";
 import {createRenderHost, type RenderHost} from "../../player/src/host/host.ts";
 import {createSandboxCompiler} from "../../player/src/host/sandbox.ts";
 import type {AssetRef, SceneResources} from "../../player/src/protocol.ts";
 import {embedRegistry, FileEmbed, renderCodeBlock} from "./embed.ts";
 import {bundledFont, compilerCode, runtimeWasm, serverCode} from "./embedded.ts";
 import {fontCount, FontService} from "./font-service.ts";
+import {editingScenes} from "./live-preview.ts";
+import {CODE_BLOCK, SCENE, untitledName} from "./new-scene.ts";
 import {imageMime, imageNames, scanSource, type ScannedSource} from "./scan.ts";
 import type {SceneBlock, SceneSource} from "./scene.ts";
 import {DEFAULT_SETTINGS, readSettings, type ViscriptSettings} from "./settings.ts";
@@ -20,20 +25,6 @@ const FONT_SETTINGS: readonly (keyof ViscriptSettings)[] = [
     "textFont", "textFontName", "codeFont", "codeFontName", "downloadFonts", "fontFolder",
 ];
 const PLAYBACK_SETTINGS: readonly (keyof ViscriptSettings)[] = ["autoplay", "end", "controls", "maxFps", "quality"];
-
-// The adaptive theme takes its colors from the host, here the Obsidian theme.
-const TEMPLATE = `\`\`\`viscript
-local scene = vis.scene {
-    width = 640, height = 360, theme = "adaptive",
-    camera = {view = "2d", target = {0, 0}, height = 7},
-}
-local ball = scene:circle {center = {-3, 0}, radius = 0.5, fill = "accent"}
-scene:grow_from_center(ball, 0.6)
-scene:shift(ball, {6, 0}, 1.5)
-scene:wait(0.5)
-return scene
-\`\`\`
-`;
 
 export default class ViscriptPlugin extends Plugin {
     override settings: ViscriptSettings = DEFAULT_SETTINGS;
@@ -51,12 +42,23 @@ export default class ViscriptPlugin extends Plugin {
         this.addSettingTab(new ViscriptSettingTab(this.app, this));
 
         this.registerView(VIEW_TYPE, (leaf) => new SceneView(leaf, this));
+        let opensFiles = false;
         if (this.settings.openFiles) {
             try {
                 this.registerExtensions([EXTENSION], VIEW_TYPE);
+                opensFiles = true;
             } catch (error) {
                 console.warn(`viscript: another plugin opens .${EXTENSION} files`, error);
             }
+        }
+        // A folder's menu in the file explorer offers a new scene file beside Obsidian's "New
+        // canvas", while scene files open in the scene tab, where the new one opens.
+        if (opensFiles) {
+            this.registerEvent(this.app.workspace.on("file-menu", (menu, file, source) => {
+                if (source !== "file-explorer-context-menu" || !(file instanceof TFolder)) return;
+                menu.addItem((item) => item.setSection("action-primary").setIcon("clapperboard").setTitle("New viscript")
+                    .onClick((event) => void this.#newScene(file, Keymap.isModEvent(event))));
+            }));
         }
         const registry = embedRegistry(this.app);
         if (registry) {
@@ -69,6 +71,7 @@ export default class ViscriptPlugin extends Plugin {
             this.registerMarkdownCodeBlockProcessor(name, (source, el, context) =>
                 renderCodeBlock(this, language, source, el, context));
         }
+        this.registerEditorExtension(editingScenes(this, new Map(CODE_BLOCKS)));
 
         this.registerEvent(this.app.workspace.on("css-change", () => {
             for (const block of this.blocks) block.retheme();
@@ -84,7 +87,7 @@ export default class ViscriptPlugin extends Plugin {
         this.addCommand({
             id: "insert-scene",
             name: "Insert a scene code block",
-            editorCallback: (editor) => editor.replaceSelection(TEMPLATE),
+            editorCallback: (editor) => editor.replaceSelection(CODE_BLOCK),
         });
         this.addCommand({
             id: "toggle-autoplay",
@@ -183,6 +186,18 @@ export default class ViscriptPlugin extends Plugin {
     #refreshFonts(): void {
         this.#renderHost?.refreshFonts();
         for (const block of this.blocks) block.reload();
+    }
+
+    // A new scene file in a folder takes a free name, as Obsidian's own new files do, and opens with
+    // its name ready to change.
+    async #newScene(folder: TFolder, pane: PaneType | boolean): Promise<void> {
+        try {
+            const name = untitledName(folder.children.map((child) => child.name), EXTENSION);
+            const file = await this.app.vault.create(normalizePath(`${folder.path}/${name}`), SCENE);
+            await this.app.workspace.getLeaf(pane).openFile(file, {eState: {rename: "all"}});
+        } catch (error) {
+            new Notice(`viscript: could not make a scene file: ${error instanceof Error ? error.message : error}`);
+        }
     }
 
     // A changed scene file reloads where it is embedded or open; a changed font reloads all.

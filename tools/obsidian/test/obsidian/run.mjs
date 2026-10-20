@@ -291,6 +291,98 @@ test("Live Preview draws the same scenes", options, async () => {
     await shot("live-preview");
 });
 
+test("a code block being edited in Live Preview keeps its scene above the source, which follows the typing", options, async (t) => {
+    // Obsidian shows a block's source only to an editor with focus, which a window behind others lacks.
+    const cdp = await app.context().newCDPSession(app);
+    await cdp.send("Emulation.setFocusEmulationEnabled", {enabled: true});
+    const EDITING = ".markdown-source-view .viscript-editing";
+    const setMode = (source) => app.evaluate(async (source) => {
+        const leaf = window.app.workspace.getLeavesOfType("markdown").find((leaf) => leaf.view.file?.path === "Scenes.md");
+        await leaf.setViewState({type: "markdown", state: {file: "Scenes.md", mode: "source", source}});
+        window.app.workspace.setActiveLeaf(leaf, {focus: true});
+    }, source);
+    // Puts the cursor at `offset` characters into the first `text` in the note, in an editor with focus.
+    const select = (text, offset = 0, length = 0) => app.evaluate(([text, offset, length]) => {
+        const editor = window.app.workspace.activeEditor.editor;
+        const at = editor.getValue().indexOf(text) + offset;
+        editor.focus();
+        editor.setSelection(editor.offsetToPos(at), editor.offsetToPos(at + length));
+    }, [text, offset, length]);
+    // The editing scene, and whether the first block's opening fence shows as source just below it.
+    const editing = () => app.evaluate((selector) => {
+        const el = document.querySelector(selector), scene = el?.querySelector(".viscript-scene");
+        const fence = [...document.querySelectorAll(".markdown-source-view .cm-line")].find((line) => line.textContent.includes("viscript loop"));
+        return {
+            count: document.querySelectorAll(selector).length,
+            state: scene?.dataset.state ?? null,
+            error: el?.querySelector(".viscript-error")?.isShown() ? el.querySelector(".viscript-error").textContent : null,
+            source: Boolean(fence),
+            above: Boolean(el && fence && el.nextElementSibling === fence),
+            kept: el?.dataset.kept === "yes",
+            focused: document.activeElement?.matches(".markdown-source-view .cm-content") ?? false,
+            time: el?.querySelector(".viscript-time")?.textContent ?? null,
+        };
+    }, EDITING);
+    const reaches = (check, what) => until(async () => check(await editing()), what, 10_000).catch(async (error) => {
+        assert.fail(`${error.message}\n${JSON.stringify(await editing())}`);
+    });
+    // The scene is above the line the editor scrolled to, and plays only once seen.
+    const reveal = () => app.locator(EDITING).scrollIntoViewIfNeeded();
+    t.after(async () => {
+        await setMode(false).catch(() => undefined);
+        await cdp.send("Emulation.setFocusEmulationEnabled", {enabled: false}).catch(() => undefined);
+        await cdp.detach().catch(() => undefined);
+    });
+
+    await setMode(false);
+    await select("local scene = vis.scene", 0);
+    await reaches((seen) => seen.count === 1 && seen.above && seen.focused, "the scene above the source");
+    await reveal();
+    await reaches((seen) => SHOWN.includes(seen.state) && !seen.error, "the scene to draw");
+    await app.evaluate((selector) => { document.querySelector(selector).dataset.kept = "yes"; }, EDITING);
+    await shot("editing");
+
+    // Typing changes the scene without making a new one.
+    await select("scene:wait(0.5)", "scene:".length, "wait".length);
+    await app.keyboard.type("wiat");
+    await reveal();
+    await reaches((seen) => /scene\.lua:\d+: .*wiat/.test(seen.error ?? "") && seen.kept && seen.focused, "the typed error");
+    await select("scene:wiat(0.5)", "scene:".length, "wiat".length);
+    await app.keyboard.type("wait");
+    await reveal();
+    await reaches((seen) => !seen.error && seen.kept && SHOWN.includes(seen.state), "the fixed scene");
+
+    // A click pauses the scene and a drag on the timeline seeks, and neither ends the editing.
+    const canvas = app.locator(`${EDITING} .viscript-canvas`);
+    await reaches((seen) => seen.state === "playing", "the scene to play");
+    await canvas.click();
+    await reaches((seen) => seen.state === "paused" && seen.focused && seen.source && seen.kept, "a click to pause the scene");
+    await canvas.hover();
+    const box = await app.locator(`${EDITING} .viscript-scrub`).boundingBox();
+    await app.mouse.move(box.x + box.width * 0.2, box.y + box.height / 2);
+    await app.mouse.down();
+    await app.mouse.move(box.x + box.width * 0.75, box.y + box.height / 2, {steps: 4});
+    await app.mouse.up();
+    await reaches((seen) => {
+        const [time, duration] = (seen.time ?? "").split(" / ").map(Number);
+        return Math.abs(time - duration * 0.75) < 0.25 && seen.focused && seen.source && seen.kept;
+    }, "a drag to seek");
+
+    // Leaving the block, or the editor, gives the block back to Obsidian's own scene.
+    await select("# Scenes", 0);
+    await reaches((seen) => seen.count === 0 && !seen.source, "the block to be drawn by Obsidian again");
+    await select("local scene = vis.scene", 0);
+    await reaches((seen) => seen.count === 1 && seen.above, "the scene above the source again");
+    await app.evaluate(() => document.activeElement.blur());
+    await reaches((seen) => seen.count === 0 && !seen.source, "the block to be drawn when the editor has no focus");
+
+    // Source mode shows no scenes.
+    await setMode(true);
+    await select("local scene = vis.scene", 0);
+    await delay(1000);
+    assert.equal((await editing()).count, 0);
+});
+
 test("a scene file opens in its own tab, where typing saves the file and redraws", options, async () => {
     await app.evaluate(async () => {
         await window.app.workspace.getLeaf("tab").openFile(window.app.vault.getFileByPath("orbit.lua"));
@@ -481,6 +573,53 @@ test("turning the plugin off removes every scene, and turning it on draws them a
         assert.fail(`${error.message}\nactive leaf: ${JSON.stringify(leaf)}\nscenes: ${JSON.stringify(await scenes(".viscript-scene"))}`);
     });
     await shot("enabled-again");
+});
+
+test("a folder's menu makes a scene file beside New canvas, which opens with its name to type", options, async () => {
+    await app.evaluate(async () => {
+        // Obsidian's own menus, which the page holds, rather than the system's on macOS.
+        window.app.vault.setConfig("nativeMenus", false);
+        await window.app.vault.createFolder("Drafts");
+        await window.app.workspace.revealLeaf(window.app.workspace.getLeavesOfType("file-explorer")[0]);
+    });
+    // Opens the folder's menu, and gives its items in order with "|" between sections.
+    const menu = async () => {
+        await app.locator(".nav-folder-title[data-path=\"Drafts\"]").click({button: "right"});
+        await app.locator(".menu").waitFor();
+        return app.evaluate(() => [...document.querySelectorAll(".menu .menu-item-title, .menu .menu-separator")]
+            .map((item) => item.classList.contains("menu-separator") ? "|" : item.textContent));
+    };
+    const newScene = async (name) => {
+        const items = await menu();
+        const section = items.join("\n").split("|").find((part) => part.includes("New canvas")) ?? "";
+        assert.deepEqual(items.filter((item) => item === "New viscript"), ["New viscript"], items.join(", "));
+        assert.ok(section.split("\n").includes("New viscript"), items.join(", "));
+        await shot("new-scene-menu");
+        await app.locator(".menu .menu-item", {hasText: "New viscript"}).click();
+        await until(() => existsSync(join(vault, "Drafts", name)), `Drafts/${name}`, 10_000);
+        await until(() => app.evaluate((path) => window.app.workspace.getActiveFile()?.path === path, `Drafts/${name}`),
+            `Drafts/${name} to open`, 10_000);
+        await app.waitForFunction(([view, shown]) => shown.includes(document.querySelector(`${view} .viscript-scene`)?.dataset.state)
+            && !document.querySelector(`${view} .viscript-error`).isShown(), [VIEW, SHOWN], {timeout: 20_000});
+    };
+
+    await newScene("Untitled.lua");
+    assert.match(await readFile(join(vault, "Drafts/Untitled.lua"), "utf8"), /^local scene = vis\.scene \{[^]*\nreturn scene\n$/);
+    // The tab's title holds the name, selected, so typing names the file.
+    const title = await app.evaluate(() => ({
+        focused: document.activeElement?.matches(".workspace-leaf.mod-active .view-header-title") ?? false,
+        selected: window.getSelection()?.toString(),
+    }));
+    assert.deepEqual(title, {focused: true, selected: "Untitled"});
+    await shot("new-scene");
+    await app.keyboard.type("Bounce");
+    await app.keyboard.press("Enter");
+    await until(() => existsSync(join(vault, "Drafts/Bounce.lua")) && !existsSync(join(vault, "Drafts/Untitled.lua")),
+        "the file to take its new name", 10_000);
+
+    // A name the folder holds is passed over.
+    await newScene("Untitled.lua");
+    await newScene("Untitled 1.lua");
 });
 
 test("the plugin logged no errors", options, (t) => {

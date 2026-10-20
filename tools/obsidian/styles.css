@@ -44,6 +44,12 @@
     box-shadow: 0 0 0 2px var(--background-modifier-border-focus);
 }
 
+/* A code block being edited in Live Preview, with its scene above the source. */
+
+.viscript-editing {
+    padding-block-end: var(--size-4-2);
+}
+
 /* The bar: play, the timeline and the time, over the scene's bottom edge or under it. */
 
 .viscript-bar {

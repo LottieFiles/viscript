@@ -46,6 +46,11 @@ its own tab with its source below. Edits there are saved to the file and redraw 
 every note that embeds the file follows. An error shows under the scene, with its
 line, until the source is fixed.
 
+**New viscript**, beside **New canvas** when you right-click a folder in the file explorer, makes
+`Untitled.lua` there from the scene above, numbered past the names the folder holds. It opens in
+the scene tab with its name selected, so typing names the file. It is there while
+**Open .lua files as scenes** is on.
+
 Words after the code block's language, or in the embed's alias, set options:
 `![[orbit.lua|480|loop|Two circles]]`, ```` ```viscript-js center 520 ````.
 
@@ -59,6 +64,11 @@ Words after the code block's language, or in the embed's alias, set options:
 | `interactive` | The scene takes pointer and key input, for scenes built to |
 
 Other words name the scene for screen readers, as an image's alt text does.
+
+In Live Preview, a code block you are editing keeps its scene above the source, and the scene
+follows what you type once you pause, with any error under it. A click on it plays or pauses it
+and the timeline seeks without leaving the code; an `interactive` scene takes input once the cursor
+leaves the block.
 
 Scenes with `theme = "adaptive"` take their colors from the Obsidian theme and follow it
 between light and dark, and set their text in the text font below. A click plays or pauses a scene; the play bar appears on hover, and on
@@ -143,18 +153,19 @@ runtime instance that scenes share.
 
 ```sh
 npm run check            # TypeScript
-npm test                 # option words, reading scene sources, which font each name gets
+npm test                 # option words, reading scene sources, which font each name gets, new file names
 npm run test:obsidian    # builds, then drives the Obsidian installed here
 ```
 
-`test:obsidian` starts the installed Obsidian with a profile folder and a vault made for the run.
-It never opens your vaults, and it stops before changing anything if Obsidian opens another one.
-It checks reading view, Live Preview, embeds, the scene tab with editing and errors, both themes,
-the settings, the fonts each name gets, downloading fonts from Fontsource with and without a font
-folder set, the worker and the main thread, what JavaScript scenes can reach, and turning the
-plugin off and on; the downloads are skipped when Fontsource cannot be reached. Set `OBSIDIAN` to the executable if it is not in the
-usual place, and `E2E_DIR` to keep the vault and screenshots. Without Obsidian installed, the run
-is skipped.
+`test:obsidian` starts the installed Obsidian with a profile folder and a vault made for the run. It
+never opens your vaults, and it stops before changing anything if Obsidian opens another one. It
+checks reading view, Live Preview with a code block being edited, embeds, the scene tab with editing
+and errors, both themes, **New viscript** in a folder's menu, the settings, the fonts each name
+gets, downloading fonts from Fontsource with and without a font folder set, the worker and the main
+thread, what JavaScript scenes can reach, and turning the plugin off and on; the downloads are
+skipped when Fontsource cannot be reached. Set `OBSIDIAN` to the executable if it is not in the
+usual place, and `E2E_DIR` to keep the vault and screenshots. Without Obsidian installed, the run is
+skipped.
 
 ## Limits
 
