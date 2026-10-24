@@ -95,6 +95,12 @@
     min-width: 0;
 }
 
+/* Themes may label range endpoints; the time display already includes the duration. */
+.viscript-bar input.viscript-scrub::before,
+.viscript-bar input.viscript-scrub::after {
+    content: none;
+}
+
 .viscript-time {
     flex: none;
     font-size: var(--font-ui-smaller);
