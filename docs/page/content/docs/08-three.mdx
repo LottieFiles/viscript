@@ -30,8 +30,8 @@ local e = {{1,2},{2,3},{3,4},{4,1},{5,6},{6,7},{7,8},{8,5},{1,5},{2,6},{3,7},{4,
 local edges = {}
 for i, p in ipairs(e) do edges[i] = space:line {from = c[p[1]], to = c[p[2]], color = "#6cb6ff", width = 3} end
 
-scene:create(edges, 0.4, "ease_out", 0.05)
-scene:look({eye = {-8, 4, 7}}, 2, "ease_in_out")
+scene:create(edges, {duration = 0.4, curve = "ease_out", lag = 0.05})
+scene:look({eye = {-8, 4, 7}}, {duration = 2, curve = "ease_in_out"})
 
 return scene
 ```
@@ -45,8 +45,8 @@ const c = [[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,1],[1,-1,1],[1,1,1],[-
 const e = [[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]];
 const edges = e.map(([p, q]) => space.line({from: c[p], to: c[q], color: "#6cb6ff", width: 3}));
 
-scene.create(edges, 0.4, "ease_out", 0.05);
-scene.look({eye: [-8, 4, 7]}, 2, "ease_in_out");
+scene.create(edges, {duration: 0.4, curve: "ease_out", lag: 0.05});
+scene.look({eye: [-8, 4, 7]}, {duration: 2, curve: "ease_in_out"});
 
 return scene;
 ```
@@ -79,8 +79,8 @@ end
 local s = scene:surface {points = pts, size = {n, n}, mode = "solid_mesh", shading = false,
                          fill = "#6cb6ff40", stroke = "#6cb6ffb0", width = 0.75}
 
-scene:create(s, 1.0)
-scene:look({eye = {-5.4, 4.8, 6.0}}, 1.5, "ease_in_out")
+scene:create(s, {duration = 1.0})
+scene:look({eye = {-5.4, 4.8, 6.0}}, {duration = 1.5, curve = "ease_in_out"})
 
 return scene
 ```
@@ -101,8 +101,8 @@ for (let row = 0; row < n; row++) {
 const s = scene.surface({points: pts, size: [n, n], mode: "solid_mesh", shading: false,
                          fill: "#6cb6ff40", stroke: "#6cb6ffb0", width: 0.75});
 
-scene.create(s, 1.0);
-scene.look({eye: [-5.4, 4.8, 6.0]}, 1.5, "ease_in_out");
+scene.create(s, {duration: 1.0});
+scene.look({eye: [-5.4, 4.8, 6.0]}, {duration: 1.5, curve: "ease_in_out"});
 
 return scene;
 ```

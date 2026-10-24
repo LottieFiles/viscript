@@ -113,9 +113,9 @@ local bar = scene:rectangle {size = {0.6, 0.3}, fill = "danger"}
 bar:move_to({3.5, 0})
 bar:align_to(box, {0, 1})              -- same top edge as box
 
-scene:grow_from_center(box, 0.4)
-for _, tag in ipairs(tags) do scene:grow_from_center(tag, 0.25) end
-scene:grow_from_edge(bar, "left", 0.4)
+scene:grow_from_center(box, {duration = 0.4})
+for _, tag in ipairs(tags) do scene:grow_from_center(tag, {duration = 0.25}) end
+scene:grow_from_edge(bar, "left", {duration = 0.4})
 scene:wait(0.5)
 
 return scene
@@ -131,9 +131,9 @@ const bar = scene.rectangle({size: [0.6, 0.3], fill: "danger"});
 bar.moveTo([3.5, 0]);
 bar.alignTo(box, [0, 1]);              // same top edge as box
 
-scene.growFromCenter(box, 0.4);
-for (const tag of tags) scene.growFromCenter(tag, 0.25);
-scene.growFromEdge(bar, "left", 0.4);
+scene.growFromCenter(box, {duration: 0.4});
+for (const tag of tags) scene.growFromCenter(tag, {duration: 0.25});
+scene.growFromEdge(bar, "left", {duration: 0.4});
 scene.wait(0.5);
 
 return scene;
@@ -141,7 +141,7 @@ return scene;
 
 ### Animated rearrange
 
-The timeline call `scene:arrange(items, duration)` moves siblings into a new row. Pass the list in its new order — here with a box inserted in the middle.
+The timeline call `scene:arrange(items, options?)` moves siblings into a new row. Pass the list in its new order — here with a box inserted in the middle.
 
 ```lua live
 local scene = vis.scene {}
@@ -155,7 +155,7 @@ scene:wait(0.4)
 -- insert a new box in the middle: re-arrange with it in the list
 local new = scene:rectangle {center = {0, -1.5}, size = {0.8, 0.8}, corner = 0.1, fill = "warning"}
 scene:fade_in(new, {duration = 0.3})
-scene:arrange({boxes[1], boxes[2], new, boxes[3], boxes[4]}, 0.8, "smooth", {gap = 0.4})
+scene:arrange({boxes[1], boxes[2], new, boxes[3], boxes[4]}, {duration = 0.8, curve = "smooth", gap = 0.4})
 scene:wait(0.6)
 
 return scene
@@ -171,7 +171,7 @@ scene.wait(0.4);
 // insert a new box in the middle: re-arrange with it in the list
 const added = scene.rectangle({center: [0, -1.5], size: [0.8, 0.8], corner: 0.1, fill: "warning"});
 scene.fadeIn(added, {duration: 0.3});
-scene.arrange([boxes[0], boxes[1], added, boxes[2], boxes[3]], 0.8, "smooth", {gap: 0.4});
+scene.arrange([boxes[0], boxes[1], added, boxes[2], boxes[3]], {duration: 0.8, curve: "smooth", gap: 0.4});
 scene.wait(0.6);
 
 return scene;
@@ -203,9 +203,9 @@ local dot = scene:circle {center = {1.35, 0}, radius = 0.7, fill = "warning"}
 local box = scene:rectangle {center = {4, 0}, size = {1.4, 1.4}, fill = "danger"}
 
 scene:wait(0.4)
-scene:uncreate(ring, 0.8)                                   -- erase the stroke
+scene:uncreate(ring, {duration = 0.8})                                   -- erase the stroke
 scene:fade_out(card, {shift = {0, -0.6}, duration = 0.6})   -- fade and drift
-scene:shrink_to_center(dot, 0.6)                            -- collapse
+scene:shrink_to_center(dot, {duration = 0.6})                            -- collapse
 scene:remove(box)                                           -- gone at once
 scene:wait(0.6)
 
@@ -221,9 +221,9 @@ const dot = scene.circle({center: [1.35, 0], radius: 0.7, fill: "warning"});
 const box = scene.rectangle({center: [4, 0], size: [1.4, 1.4], fill: "danger"});
 
 scene.wait(0.4);
-scene.uncreate(ring, 0.8);                                  // erase the stroke
+scene.uncreate(ring, {duration: 0.8});                                  // erase the stroke
 scene.fadeOut(card, {shift: [0, -0.6], duration: 0.6});     // fade and drift
-scene.shrinkToCenter(dot, 0.6);                             // collapse
+scene.shrinkToCenter(dot, {duration: 0.6});                             // collapse
 scene.remove(box);                                          // gone at once
 scene.wait(0.6);
 
@@ -241,7 +241,7 @@ local before = scene:circle {fill = "accent"}
 scene:wait(0.5)
 
 local after = scene:rectangle {size = {2.4, 1.4}, corner = 0.2, fill = "warning"}
-scene:fade_transform(before, after, 0.8)   -- after takes over from before
+scene:fade_transform(before, after, {duration = 0.8})   -- after takes over from before
 scene:wait(0.6)
 
 return scene
@@ -254,7 +254,7 @@ const before = scene.circle({fill: "accent"});
 scene.wait(0.5);
 
 const after = scene.rectangle({size: [2.4, 1.4], corner: 0.2, fill: "warning"});
-scene.fadeTransform(before, after, 0.8);   // after takes over from before
+scene.fadeTransform(before, after, {duration: 0.8});   // after takes over from before
 scene.wait(0.6);
 
 return scene;
@@ -276,10 +276,10 @@ local a = scene:circle {center = {-3, 1}, radius = 0.5, fill = "accent"}
 local b = scene:rectangle {center = {3, -1}, size = {1.2, 0.8}, fill = "warning"}
 local link = scene:connector {from = a, to = b, stroke = "#e6e8ee", width = 3, tip = 10, padding = 0.1}
 
-scene:create(link, 0.6)
+scene:create(link, {duration = 0.6})
 scene:parallel(                       -- the connector keeps both ends attached
-    function() scene:shift(a, {1, -2.4}, 1.2, "smooth") end,
-    function() scene:shift(b, {-1.5, 2.2}, 1.2, "smooth") end)
+    function() scene:shift(a, {1, -2.4}, {duration = 1.2, curve = "smooth"}) end,
+    function() scene:shift(b, {-1.5, 2.2}, {duration = 1.2, curve = "smooth"}) end)
 
 return scene
 ```
@@ -291,10 +291,10 @@ const a = scene.circle({center: [-3, 1], radius: 0.5, fill: "accent"});
 const b = scene.rectangle({center: [3, -1], size: [1.2, 0.8], fill: "warning"});
 const link = scene.connector(a, b, {stroke: "#e6e8ee", width: 3, tip: 10, padding: 0.1});
 
-scene.create(link, 0.6);
+scene.create(link, {duration: 0.6});
 scene.parallel(                       // the connector keeps both ends attached
-    () => scene.shift(a, [1, -2.4], 1.2, "smooth"),
-    () => scene.shift(b, [-1.5, 2.2], 1.2, "smooth"));
+    () => scene.shift(a, [1, -2.4], {duration: 1.2, curve: "smooth"}),
+    () => scene.shift(b, [-1.5, 2.2], {duration: 1.2, curve: "smooth"}));
 
 return scene;
 ```
@@ -308,9 +308,9 @@ local scene = vis.scene {}
 
 local v = scene:vector {origin = {0, 0}, value = {2, 1}, stroke = "danger", width = 4}
 
-scene:create(v, 0.5)
-scene:tween({target = v, value = {-1, 2}}, 1)
-scene:tween({target = v, value = {2.5, -1.5}}, 1)
+scene:create(v, {duration = 0.5})
+scene:tween({target = v, value = {-1, 2}}, {duration = 1})
+scene:tween({target = v, value = {2.5, -1.5}}, {duration = 1})
 
 return scene
 ```
@@ -320,9 +320,9 @@ const scene = vis.scene();
 
 const v = scene.vector({origin: [0, 0], value: [2, 1], stroke: "danger", width: 4});
 
-scene.create(v, 0.5);
-scene.tween({target: v, value: [-1, 2]}, 1);
-scene.tween({target: v, value: [2.5, -1.5]}, 1);
+scene.create(v, {duration: 0.5});
+scene.tween({target: v, value: [-1, 2]}, {duration: 1});
+scene.tween({target: v, value: [2.5, -1.5]}, {duration: 1});
 
 return scene;
 ```

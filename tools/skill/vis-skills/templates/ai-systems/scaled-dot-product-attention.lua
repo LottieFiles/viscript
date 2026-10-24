@@ -146,10 +146,10 @@ local conclusion = root:spans {
 
 scene:fade_in(header, {shift = {0, -6}, duration = 0.55, curve = "gentle"})
 scene:fade_in(nodes, {shift = {0, -6}, duration = 0.7, curve = "ease_out"})
-scene:create(pipeline_routes, 0.75, "ease_out", 0.05, "forward")
-scene:create(value_route, 0.45, "ease_out")
+scene:create(pipeline_routes, {duration = 0.75, curve = "ease_out", lag = 0.05, direction = "forward"})
+scene:create(value_route, {duration = 0.45, curve = "ease_out"})
 scene:fade_in(matrix, {shift = {0, -5}, duration = 0.65, curve = "gentle"})
-scene:create(axis, 0.35, "linear")
+scene:create(axis, {duration = 0.35, curve = "linear"})
 scene:fade_in(axis_label, {duration = 0.25, curve = "gentle"})
 scene:fade_in(result, {shift = {0, -5}, duration = 0.55, curve = "gentle"})
 scene:indicate(mask, {color = "focus", scale = 1.025, duration = 0.4, curve = "ease_in_out"})

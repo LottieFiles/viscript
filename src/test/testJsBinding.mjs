@@ -11,7 +11,11 @@ const bindingPath = process.argv[2];
 const cliPath = process.argv[3];
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
-const { compileScene, evaluateScene, vis, ViewHandle } = await import(pathToFileURL(bindingPath));
+const bindings = await import(pathToFileURL(bindingPath));
+const { compileScene, evaluateScene, vis, ViewHandle } = bindings;
+assert.equal(bindings.SceneBuilder, undefined, "SceneBuilder is a type; vis.scene creates scenes");
+assert.equal(vis.scene().compile, undefined, "compileScene is the public compiler entry point");
+assert.equal(typeof compileScene(vis.scene()), "string");
 const objectCount = (scene) =>
     scene.objects.length + scene.viewports.reduce((count, viewport) => count + objectCount(viewport.scene), 0);
 const boundsOverlap = (scene, firstId, secondId) => {
@@ -41,8 +45,8 @@ const axis = world.arrow({
     id: "double-arrow",
 });
 const point = world.point({ point: [2.2, 1.45], fill: "#ef5350", id: "target" });
-scene.transform(axis, [0.72, -0.69, 0, 0, 0.69, 0.72, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1], 1.6, "ease_in_out");
-scene.fade(point, 0.25, 0.5, "ease_out").wait(0.4);
+scene.transform(axis, [0.72, -0.69, 0, 0, 0.69, 0.72, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1], {duration: 1.6, curve: "ease_in_out"});
+scene.fade(point, 0.25, {duration: 0.5, curve: "ease_out"}).wait(0.4);
 
 const lua = compileScene(scene);
 assert.match(lua, /objects\[1\]:arrow/);
@@ -58,8 +62,8 @@ trimmed.arrow({ from: [-4, 2], to: [4, 2], trimDistance: 1, tail: 5, tip: 8 });
 trimmed.vector({ origin: [-4, -2], value: [8, 0], trimDistance: [2, 1] });
 const trimmedX = trimmed.tracker(0);
 trimmed.bind(trimmedLine, trimmedX, (t) => ({ to: [4, 6 * t], trimDistance: [1 + t, 2 - t] }));
-trimmed.track(trimmedX, 1, 1, "linear");
-trimmed.tween({ target: trimmedLine, trimDistance: 0.5 }, 1, "linear");
+trimmed.track(trimmedX, 1, {duration: 1, curve: "linear"});
+trimmed.tween({ target: trimmedLine, trimDistance: 0.5 }, {duration: 1, curve: "linear"});
 assert.match(compileScene(trimmed), /\["trim_distance"\]=\{1,2\}/);
 assert.match(compileScene(trimmed), /trim_distance=0.5/);
 assert.throws(() => trimmed.tween({target: trimmedLine, buff: 1}), /Unknown animation property: buff/);
@@ -75,8 +79,8 @@ s:arrow {from = {-4, 2}, to = {4, 2}, trim_distance = 1, tail = 5, tip = 8}
 s:vector {origin = {-4, -2}, value = {8, 0}, trim_distance = {2, 1}}
 local x = s:tracker(0)
 s:bind(l, x, function(t) return {to = {4, 6 * t}, trim_distance = {1 + t, 2 - t}} end)
-s:track(x, 1, 1, "linear")
-s:tween({target = l, trim_distance = 0.5}, 1, "linear")
+s:track(x, 1, {duration = 1, curve = "linear"})
+s:tween({target = l, trim_distance = 0.5}, {duration = 1, curve = "linear"})
 return s
 `;
 
@@ -194,13 +198,13 @@ box.moveTo([-1.25, 0]).nextTo(circle, [1, 0, 0], 0.4).alignTo(circle, [0, 1, 0])
 nodes.arrange([1, 0, 0], 0.3).arrangeGrid(2, 0.2, 0.4);
 const shift = [0.5, 0.25];
 const firstAnimation = { target: box, shift, opacity: 0.5, fill: "#f4a261" };
-freeform.tween(firstAnimation, 0.8, "ease_out", 0.1);
+freeform.tween(firstAnimation, {duration: 0.8, curve: "ease_out", lag: 0.1});
 const transform = [1, 0, 0, 0.5, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
 const parallelAnimations = [
     { target: circle, transform },
     { target: connector, stroke: "#e76f51", dash_offset: -12, tail: 10, tip: 16 },
 ];
-freeform.tween(parallelAnimations, 1.2, "ease_in_out", 0.2);
+freeform.tween(parallelAnimations, {duration: 1.2, curve: "ease_in_out", lag: 0.2});
 groupMatrix[0] = 99;
 boxCenter[0] = 99;
 connectorOptions.padding = 99;
@@ -246,11 +250,11 @@ assert.match(freeformLua, /objects\[1\]:arrange\(\{1,0,0\},0\.3\)/);
 assert.match(freeformLua, /objects\[1\]:arrange_grid\(2,0\.2,0\.4\)/);
 assert.match(
     freeformLua,
-    /scene:tween\(\{\{target=objects\[2\],shift=\{0\.5,0\.25\},opacity=0\.5,fill="#f4a261"\}\},0\.8,"ease_out",0\.1\)/,
+    /scene:tween\(\{\{target=objects\[2\],shift=\{0\.5,0\.25\},opacity=0\.5,fill="#f4a261"\}\},\{\["curve"\]="ease_out",\["duration"\]=0\.8,\["lag"\]=0\.1\}\)/,
 );
 assert.match(
     freeformLua,
-    /scene:tween\(\{\{target=objects\[4\],transform=\{1,0,0,0\.5,0,1,0,0,0,0,1,0,0,0,0,1\}\},\{target=objects\[7\],stroke="#e76f51",dash_offset=-12,tail=10,tip=16\}\},1\.2,"ease_in_out",0\.2\)/,
+    /scene:tween\(\{\{target=objects\[4\],transform=\{1,0,0,0\.5,0,1,0,0,0,0,1,0,0,0,0,1\}\},\{target=objects\[7\],stroke="#e76f51",dash_offset=-12,tail=10,tip=16\}\},\{\["curve"\]="ease_in_out",\["duration"\]=1\.2,\["lag"\]=0\.2\}\)/,
 );
 assert.doesNotMatch(freeformLua, /99/);
 for (const factory of [
@@ -286,8 +290,8 @@ assert.equal(angleTwin.find("angle-label"), nativeAngle.children()[0]);
 const angleTracker = angleTwin.tracker(0);
 angleTwin.bind(nativeArc, angleTracker, (v) => ({center: [-2 + v, 0], radius: 1 + v, start: 0.2 + v, angle: Math.PI - v}));
 angleTwin.bind(nativeAngle, angleTracker, (v) => ({vertex: [v, 0], from: [-1 + v, 0.2], to: [-1 + v, -0.2]}));
-angleTwin.track(angleTracker, 1, 1, "linear");
-angleTwin.tween({target: nativeAngle, radius: 0.75, vertex: [2, 0], from: [1, -0.2], to: [1, 0.2]}, 0.5, "linear");
+angleTwin.track(angleTracker, 1, {duration: 1, curve: "linear"});
+angleTwin.tween({target: nativeAngle, radius: 0.75, vertex: [2, 0], from: [1, -0.2], to: [1, 0.2]}, {duration: 0.5, curve: "linear"});
 const angleTwinScript = `
 local s = vis.scene {width = 200, height = 100, fps = 10, camera = {height = 10, view = "2d"}}
 local a = s:arc {center = {-2, 0}, radius = 1, start = 0.2, angle = math.pi, dash = {4, 2}}
@@ -296,8 +300,8 @@ local m = s:angle {vertex = {0, 0}, from = {-1, 0.2}, to = {-1, -0.2}, radius = 
 local t = s:tracker(0)
 s:bind(a, t, function(v) return {center = {-2 + v, 0}, radius = 1 + v, start = 0.2 + v, angle = math.pi - v} end)
 s:bind(m, t, function(v) return {vertex = {v, 0}, from = {-1 + v, 0.2}, to = {-1 + v, -0.2}} end)
-s:track(t, 1, 1, "linear")
-s:tween({target = m, radius = 0.75, vertex = {2, 0}, from = {1, -0.2}, to = {1, 0.2}}, 0.5, "linear")
+s:track(t, 1, {duration = 1, curve = "linear"})
+s:tween({target = m, radius = 0.75, vertex = {2, 0}, from = {1, -0.2}, to = {1, 0.2}}, {duration = 0.5, curve = "linear"})
 return s
 `;
 assert.match(compileScene(angleTwin), /:arc /);
@@ -368,16 +372,16 @@ const effectSource = effects.polygon({
 const effectAuxiliary = effects.rectangle({ id: "effect-auxiliary" });
 const fadeShift = [0, 0.5];
 const fadeOptions = { shift: fadeShift, scale: 0.9, duration: 0.6, curve: "ease_out" };
-effects.create(effectSource, 0.5, "linear", 0, "clockwise");
-effects.uncreate(effectSource, 0.4, "smooth", 0.1, "reverse");
-effects.fillReveal(effectSource, 0.3, "ease_out", 0.05);
-effects.drawBorderThenFill(effectSource, 0.6, "ease_in_out", 0, "counterclockwise");
-effects.write(effectSource, 0.7, "gentle", 0.05, "forward");
+effects.create(effectSource, {duration: 0.5, curve: "linear", lag: 0, direction: "clockwise"});
+effects.uncreate(effectSource, {duration: 0.4, curve: "smooth", lag: 0.1, direction: "reverse"});
+effects.fillReveal(effectSource, {duration: 0.3, curve: "ease_out", lag: 0.05});
+effects.drawBorderThenFill(effectSource, {duration: 0.6, curve: "ease_in_out", lag: 0, direction: "counterclockwise"});
+effects.write(effectSource, {duration: 0.7, curve: "gentle", lag: 0.05, direction: "forward"});
 effects.fadeIn(effectSource, fadeOptions);
 effects.fadeOut(effectSource);
-effects.growFromCenter(effectSource, 0.45, "ease_out");
-effects.growFromEdge(effectSource, "bottom", 0.4, "ease_out");
-effects.shrinkToCenter(effectSource, 0.35, "ease_in");
+effects.growFromCenter(effectSource, {duration: 0.45, curve: "ease_out"});
+effects.growFromEdge(effectSource, "bottom", {duration: 0.4, curve: "ease_out"});
+effects.shrinkToCenter(effectSource, {duration: 0.35, curve: "ease_in"});
 effects.indicate(effectSource, { color: "#4cc9f0", scale: 1.25, duration: 0.7, curve: "smooth" });
 effects.indicate(effectAuxiliary);
 const effectTarget = effects.polygon({
@@ -388,7 +392,7 @@ const effectTarget = effects.polygon({
         [0, 1.25],
     ],
 });
-effects.morph(effectSource, effectTarget, 0.8, "ease_in_out");
+effects.morph(effectSource, effectTarget, {duration: 0.8, curve: "ease_in_out"});
 const effectReplacement = effects.polygon({
     id: "effect-replacement",
     points: [
@@ -397,9 +401,9 @@ const effectReplacement = effects.polygon({
         [0.6, 1],
     ],
 });
-effects.morph(effectTarget, effectReplacement, 0.9, "ease_out");
+effects.morph(effectTarget, effectReplacement, {duration: 0.9, curve: "ease_out"});
 const effectLabel = effects.text({id: "effect-label", text: "result", point: [0, 0]});
-effects.fadeTransform(effectReplacement, effectLabel, 0.25, "gentle");
+effects.fadeTransform(effectReplacement, effectLabel, {duration: 0.25, curve: "gentle"});
 const batchMorph = vis.scene();
 const batchSourceA = batchMorph.plot({points: [[-1, 0], [0, 1], [1, 0]]});
 const batchSourceB = batchMorph.plot({points: [[-1, 1], [0, 0], [1, 1]]});
@@ -408,13 +412,11 @@ const batchTargetB = batchMorph.plot({points: [[-1, -1], [0, 0], [1, -1]]});
 batchMorph.morph(
     [batchSourceA, batchSourceB],
     [batchTargetA, batchTargetB],
-    0.8,
-    "ease_in_out",
-    0.1,
+    {duration: 0.8, curve: "ease_in_out", lag: 0.1},
 );
 assert.match(
     compileScene(batchMorph),
-    /scene:morph\(\{objects\[1\],objects\[2\]\},\{objects\[3\],objects\[4\]\},0\.8,"ease_in_out",0\.1\)/,
+    /scene:morph\(\{objects\[1\],objects\[2\]\},\{objects\[3\],objects\[4\]\},\{\["curve"\]="ease_in_out",\["duration"\]=0\.8,\["lag"\]=0\.1\}\)/,
 );
 const springOptions = { mass: 1, stiffness: (2 * Math.PI) ** 2, damping: 0.6 * Math.PI, displacement: 200 };
 const springReference = (time) => {
@@ -489,7 +491,7 @@ const physicalSpringScene = vis.scene({width: 960, height: 540, fps: 30,
 const springSeconds = physicalSpringScene.tracker(0);
 const springMass = physicalSpringScene.rectangle({id: "mass", size: [50, 50], fill: "#409cff", width: 0});
 physicalSpringScene.bind(springMass, springSeconds, (time) => ({shift: [vis.springResponse(time, springOptions), 0]}));
-physicalSpringScene.wait(0.5).track(springSeconds, 7.5, 7.5, "linear");
+physicalSpringScene.wait(0.5).track(springSeconds, 7.5, {duration: 7.5, curve: "linear"});
 physicalSpringScene.at(8, () => {});
 const physicalSpringScript = `
 local s = vis.scene {width=960, height=540, fps=30, camera={view="2d", height=540}}
@@ -501,7 +503,7 @@ s:bind(mass, seconds, function(time)
     damping=0.3*omega, displacement=200}), 0}}
 end)
 s:wait(0.5)
-s:track(seconds, 7.5, 7.5, "linear")
+s:track(seconds, 7.5, {duration = 7.5, curve = "linear"})
 s:seek(8)
 return s
 `;
@@ -509,17 +511,17 @@ return s
 const backCurve = vis.animCurve.preset("back", 1.4);
 const customCurve = vis.animCurve.cubicBezier(0.2, 0.9, 0.3, 1, 0.75);
 const reversedBackCurve = vis.animCurve.reverse(backCurve);
-effects.shift(effectAuxiliary, [1, 0], 0.8, backCurve);
-effects.shift(effectAuxiliary, [-1, 0], 0.8, reversedBackCurve);
+effects.shift(effectAuxiliary, [1, 0], {duration: 0.8, curve: backCurve});
+effects.shift(effectAuxiliary, [-1, 0], {duration: 0.8, curve: reversedBackCurve});
 effects.fadeIn(effectAuxiliary, { duration: 0.5, curve: customCurve });
 fadeShift[0] = 99;
 fadeOptions.scale = 99;
 const effectsLua = compileScene(effects);
-assert.match(effectsLua, /scene:create\(objects\[1\],0\.5,"linear",0,"clockwise"\)/);
-assert.match(effectsLua, /scene:uncreate\(objects\[1\],0\.4,"smooth",0\.1,"reverse"\)/);
-assert.match(effectsLua, /scene:fill_reveal\(objects\[1\],0\.3,"ease_out",0\.05\)/);
-assert.match(effectsLua, /scene:draw_border_then_fill\(objects\[1\],0\.6,"ease_in_out",0,"counterclockwise"\)/);
-assert.match(effectsLua, /scene:write\(objects\[1\],0\.7,"gentle",0\.05,"forward"\)/);
+assert.match(effectsLua, /scene:create\(objects\[1\],\{\["curve"\]="linear",\["direction"\]="clockwise",\["duration"\]=0\.5,\["lag"\]=0\}\)/);
+assert.match(effectsLua, /scene:uncreate\(objects\[1\],\{\["curve"\]="smooth",\["direction"\]="reverse",\["duration"\]=0\.4,\["lag"\]=0\.1\}\)/);
+assert.match(effectsLua, /scene:fill_reveal\(objects\[1\],\{\["curve"\]="ease_out",\["duration"\]=0\.3,\["lag"\]=0\.05\}\)/);
+assert.match(effectsLua, /scene:draw_border_then_fill\(objects\[1\],\{\["curve"\]="ease_in_out",\["direction"\]="counterclockwise",\["duration"\]=0\.6,\["lag"\]=0\}\)/);
+assert.match(effectsLua, /scene:write\(objects\[1\],\{\["curve"\]="gentle",\["direction"\]="forward",\["duration"\]=0\.7,\["lag"\]=0\.05\}\)/);
 assert.match(
     effectsLua,
     /scene:fade_in\(objects\[1\],\{\["curve"\]="ease_out",\["duration"\]=0\.6,\["scale"\]=0\.9,\["shift"\]=\{0,0\.5\}\}\)/,
@@ -528,9 +530,9 @@ assert.match(
     effectsLua,
     /scene:fade_out\(objects\[1\],\{\["curve"\]="smooth",\["duration"\]=1,\["scale"\]=1,\["shift"\]=\{0,0,0\}\}\)/,
 );
-assert.match(effectsLua, /scene:grow_from_center\(objects\[1\],0\.45,"ease_out"\)/);
-assert.match(effectsLua, /scene:grow_from_edge\(objects\[1\],"bottom",0\.4,"ease_out"\)/);
-assert.match(effectsLua, /scene:shrink_to_center\(objects\[1\],0\.35,"ease_in"\)/);
+assert.match(effectsLua, /scene:grow_from_center\(objects\[1\],\{\["curve"\]="ease_out",\["duration"\]=0\.45\}\)/);
+assert.match(effectsLua, /scene:grow_from_edge\(objects\[1\],"bottom",\{\["curve"\]="ease_out",\["duration"\]=0\.4\}\)/);
+assert.match(effectsLua, /scene:shrink_to_center\(objects\[1\],\{\["curve"\]="ease_in",\["duration"\]=0\.35\}\)/);
 assert.match(
     effectsLua,
     /scene:indicate\(objects\[1\],\{\["color"\]="#4cc9f0",\["curve"\]="smooth",\["duration"\]=0\.7,\["scale"\]=1\.25\}\)/,
@@ -539,11 +541,11 @@ assert.match(
     effectsLua,
     /scene:indicate\(objects\[2\],\{\["color"\]="focus",\["curve"\]="smooth",\["duration"\]=1,\["scale"\]=1\.2\}\)/,
 );
-assert.match(effectsLua, /scene:morph\(objects\[1\],objects\[3\],0\.8,"ease_in_out"\)/);
-assert.match(effectsLua, /scene:morph\(objects\[3\],objects\[4\],0\.9,"ease_out"\)/);
-assert.match(effectsLua, /scene:fade_transform\(objects\[4\],objects\[5\],0\.25,"gentle"\)/);
-assert.match(effectsLua, /scene:shift\(objects\[2\],\{1,0\},0\.8,\{\["preset"\]="back",\["strength"\]=1\.4\}\)/);
-assert.match(effectsLua, /scene:shift\(objects\[2\],\{-1,0\},0\.8,\{\["preset"\]="back",\["reverse"\]=true,\["strength"\]=1\.4\}\)/);
+assert.match(effectsLua, /scene:morph\(objects\[1\],objects\[3\],\{\["curve"\]="ease_in_out",\["duration"\]=0\.8,\["lag"\]=0\}\)/);
+assert.match(effectsLua, /scene:morph\(objects\[3\],objects\[4\],\{\["curve"\]="ease_out",\["duration"\]=0\.9,\["lag"\]=0\}\)/);
+assert.match(effectsLua, /scene:fade_transform\(objects\[4\],objects\[5\],\{\["curve"\]="gentle",\["duration"\]=0\.25\}\)/);
+assert.match(effectsLua, /scene:shift\(objects\[2\],\{1,0\},\{\["curve"\]=\{\["preset"\]="back",\["strength"\]=1\.4\},\["duration"\]=0\.8\}\)/);
+assert.match(effectsLua, /scene:shift\(objects\[2\],\{-1,0\},\{\["curve"\]=\{\["preset"\]="back",\["reverse"\]=true,\["strength"\]=1\.4\},\["duration"\]=0\.8\}\)/);
 assert.match(
     effectsLua,
     /scene:fade_in\(objects\[2\],\{\["curve"\]=\{\["bezier"\]=\{0\.2,0\.9,0\.3,1\},\["strength"\]=0\.75\},\["duration"\]=0\.5,\["scale"\]=1,\["shift"\]=\{0,0,0\}\}\)/,
@@ -559,10 +561,10 @@ const invalidEffectSource = invalidEffects.circle();
 const invalidEffectTarget = invalidEffects.rectangle();
 const invalidEffectForeign = vis.scene().circle();
 const invalidEffectsBefore = compileScene(invalidEffects);
-assert.throws(() => invalidEffects.create(invalidEffectSource, 1, "smooth", 0, "diagonal"), /Create direction/);
-assert.throws(() => invalidEffects.uncreate(invalidEffectSource, 1, "smooth", 0, "diagonal"), /Create direction/);
+assert.throws(() => invalidEffects.create(invalidEffectSource, {duration: 1, curve: "smooth", lag: 0, direction: "diagonal"}), /Create direction/);
+assert.throws(() => invalidEffects.uncreate(invalidEffectSource, {duration: 1, curve: "smooth", lag: 0, direction: "diagonal"}), /Create direction/);
 assert.throws(
-    () => invalidEffects.drawBorderThenFill(invalidEffectSource, 1, "smooth", 0, "diagonal"),
+    () => invalidEffects.drawBorderThenFill(invalidEffectSource, {duration: 1, curve: "smooth", lag: 0, direction: "diagonal"}),
     /Create direction/,
 );
 assert.throws(() => invalidEffects.fadeIn(invalidEffectSource, null), /plain object/);
@@ -638,8 +640,8 @@ assert.throws(() => invalidEffects.morph(invalidEffectForeign, invalidEffectTarg
 assert.throws(() => invalidEffects.fadeTransform(invalidEffectSource, invalidEffectSource), /distinct handles/);
 assert.throws(() => invalidEffects.fadeTransform(invalidEffectSource, invalidEffectForeign), /same scene/);
 // A duration the script cannot hold stops the call, not the compile after it.
-assert.throws(() => invalidEffects.fadeTransform(invalidEffectSource, invalidEffectTarget, Infinity),
-    /Scene numbers must be finite/);
+assert.throws(() => invalidEffects.fadeTransform(invalidEffectSource, invalidEffectTarget, {duration: Infinity}),
+    /Timing duration must be a finite positive number/);
 assert.equal(compileScene(invalidEffects), invalidEffectsBefore);
 
 // Named emphasis effects compile to their Lua calls with every option spelled out, and a wiggle
@@ -647,7 +649,7 @@ assert.equal(compileScene(invalidEffects), invalidEffectsBefore);
 const emphasis = vis.scene({ width: 160, height: 90 });
 const wiggled = emphasis.rectangle({ size: [1, 1], id: "wiggled" });
 emphasis.parallel(
-    (scene) => scene.shift(wiggled, [2, 0], 3, "linear"),
+    (scene) => scene.shift(wiggled, [2, 0], {duration: 3, curve: "linear"}),
     (scene) => scene.wait(0.5).wiggle(wiggled, { scale: 1.2, angle: 0.1, swings: 4, duration: 1, curve: "linear" }),
 );
 emphasis.wiggle(wiggled);
@@ -713,77 +715,110 @@ assert.match(
     /scene:ripple\(objects\[1\],\{\["color"\]="focus",\["curve"\]="snappy",\["duration"\]=1,\["padding"\]=0,\["size"\]=0\.6,\["width"\]=3\}\)/,
 );
 
-// Named timing compiles to the same timeline as positional calls and leaves shared options intact.
+// One options object carries timing and method-specific settings without changing caller data.
 const sharedTiming = Object.freeze({duration: 0.4, curve: "linear"});
 const sharedStagger = Object.freeze({...sharedTiming, lag: 0.25});
-const namedTimingCalls = [
-    (s, a, b, named) => s.create([a, b], ...(named ? [sharedStagger] : [0.4, "linear", 0.25])),
-    (s, a, b, named) => s.uncreate([a, b], ...(named ? [sharedStagger] : [0.4, "linear", 0.25])),
-    (s, a, b, named) => s.fillReveal([a, b], ...(named ? [sharedStagger] : [0.4, "linear", 0.25])),
-    (s, a, b, named) => s.drawBorderThenFill([a, b], ...(named ? [sharedStagger] : [0.4, "linear", 0.25])),
-    (s, a, b, named) => s.write([a, b], ...(named ? [sharedStagger] : [0.4, "linear", 0.25])),
-    (s, a, b, named) => s.growFromCenter(a, ...(named ? [sharedTiming] : [0.4, "linear"])),
-    (s, a, b, named) => s.growFromEdge(a, "left", ...(named ? [sharedTiming] : [0.4, "linear"])),
-    (s, a, b, named) => s.shrinkToCenter(a, ...(named ? [sharedTiming] : [0.4, "linear"])),
-    (s, a, b, named) => s.shift(a, [0, 1], ...(named ? [sharedTiming] : [0.4, "linear"])),
-    (s, a, b, named) => s.fade(a, 0.3, ...(named ? [sharedTiming] : [0.4, "linear"])),
-    (s, a, b, named) => s.stroke(a, "accent", ...(named ? [sharedTiming] : [0.4, "linear"])),
-    (s, a, b, named) => s.fill(a, "accent", ...(named ? [sharedTiming] : [0.4, "linear"])),
-    (s, a, b, named) => s.fadeTransform(a, b, ...(named ? [sharedTiming] : [0.4, "linear"])),
-    (s, a, b, named) => s.morph(a, b, ...(named ? [{...sharedStagger, copy: true}] : [0.4, "linear", {lag: 0.25, copy: true}])),
-    (s, a, b, named) => s.matchTransform(a, b, ...(named ? [{...sharedStagger, copy: true}] : [0.4, "linear", {lag: 0.25, copy: true}])),
-    (s, a, b, named) => s.arrange([a, b], ...(named ? [{...sharedTiming, gap: 0.5}] : [0.4, "linear", {gap: 0.5}])),
-    (s, a, b, named) => s.tween([{target: a, shift: [0, 1]}, {target: b, opacity: 0.3}],
-        ...(named ? [sharedStagger] : [0.4, "linear", 0.25])),
-    (s, a, b, named) => s.save(a).shift(a, [0, 1]).restore(a, ...(named ? [sharedStagger] : [0.4, "linear", 0.25])),
-    (s, a, b, named) => s.look({target: [1, 0], height: 4}, ...(named ? [sharedTiming] : [0.4, "linear"])),
-    (s, a, b, named) => {
+const timingAuthors = [
+    ["create", (s, a, b) => s.create([a, b], {...sharedStagger, direction: "reverse"}), 0.5],
+    ["uncreate", (s, a, b) => s.uncreate([a, b], sharedStagger), 0.5],
+    ["fill-reveal", (s, a, b) => s.fillReveal([a, b], sharedStagger), 0.5],
+    ["border-fill", (s, a, b) => s.drawBorderThenFill([a, b], sharedStagger), 0.5],
+    ["write", (s, a, b) => s.write([a, b], sharedStagger), 0.5],
+    ["grow", (s, a) => s.growFromCenter(a, sharedTiming), 0.4],
+    ["grow-edge", (s, a) => s.growFromEdge(a, "left", sharedTiming), 0.4],
+    ["shrink", (s, a) => s.shrinkToCenter(a, sharedTiming), 0.4],
+    ["shift", (s, a) => s.shift(a, [0, 1], sharedTiming), 0.4],
+    ["fade", (s, a) => s.fade(a, 0.3, sharedTiming), 0.4],
+    ["stroke", (s, a) => s.stroke(a, "accent", sharedTiming), 0.4],
+    ["fill", (s, a) => s.fill(a, "accent", sharedTiming), 0.4],
+    ["fade-transform", (s, a, b) => s.fadeTransform(a, b, sharedTiming), 0.4],
+    ["morph", (s, a, b) => s.morph(a, b, {...sharedStagger, copy: true}), 0.4],
+    ["match", (s, a, b) => s.matchTransform(a, b, {...sharedStagger, copy: true}), 0.4],
+    ["arrange", (s, a, b) => s.arrange([a, b], {...sharedTiming, gap: 0.5}), 0.4],
+    ["tween", (s, a, b) => s.tween([{target: a, shift: [0, 1]}, {target: b, opacity: 0.3}], sharedStagger), 0.5],
+    ["restore", (s, a) => s.save(a).shift(a, [0, 1]).restore(a, sharedStagger), 1.4],
+    ["look", (s) => s.look({target: [1, 0], height: 4}, sharedTiming), 0.4],
+    ["track", (s, a) => {
         const t = s.tracker(0);
         s.bind(a, t, (x) => ({shift: [x, 0]}));
-        s.track(t, 1, ...(named ? [sharedTiming] : [0.4, "linear"]));
-    },
-    (s, a, b, named) => {
+        s.track(t, 1, sharedTiming);
+    }, 0.4],
+    ["track-batch", (s, a) => {
         const t = s.tracker(0);
         s.bind(a, t, (x) => ({shift: [x, 0]}));
-        s.track([[t, 1]], ...(named ? [sharedTiming] : [0.4, "linear"]));
-    },
-    (s, a, b, named) => {
+        s.track([[t, 1]], sharedTiming);
+    }, 0.4],
+    ["view", (s) => {
         const v = s.view({x: 0.5, y: 0, width: 0.5, height: 0.5});
-        v.look({target: [1, 0]}, ...(named ? [sharedTiming] : [0.4, "linear"]));
-        v.fade(0.3, ...(named ? [sharedTiming] : [0.4, "linear"]));
-    },
-    (s, a, b, named) => {
+        v.look({target: [1, 0]}, sharedTiming);
+        v.fade(0.3, sharedTiming);
+    }, 0.8],
+    ["edit", (s) => {
         const block = s.code({text: "x = 1", id: "code"});
-        s.edit(block, {replace: "1", with: "2"}, ...(named
-            ? [{...sharedTiming, fade: 0.5}] : [0.4, "linear", {fade: 0.5}]));
-    },
-    (s, a, b, named) => s.sound({asset: "tone.wav", begin: 0, end: 1}).gain(0.3, 0,
-        ...(named ? [sharedTiming] : [0.4, "linear"])),
-    (s, a, b, named) => s.warp(a, (x, y) => [x + 0.2, y], ...(named
-        ? [{...sharedTiming, x_range: [-2, 2, 1], y_range: [-2, 2, 1]}]
-        : [0.4, "linear", {x_range: [-2, 2, 1], y_range: [-2, 2, 1]}])),
+        s.edit(block, {replace: "1", with: "2"}, {...sharedTiming, fade: 0.5});
+    }, 0.4],
+    ["gain", (s) => s.sound({asset: "tone.wav", begin: 0, end: 1}).gain(0.3, 0, sharedTiming), 0],
+    ["warp", (s, a) => s.warp(a, (x, y) => [x + 0.2, y], {
+        ...sharedTiming, x_range: [-2, 2, 1], y_range: [-2, 2, 1],
+    }), 0.4],
 ];
-for (const author of namedTimingCalls) {
-    const source = (named) => {
-        const s = vis.scene({width: 96, height: 64});
-        const a = s.rectangle({id: "a", center: [-1, 0], size: [1, 1]});
-        const b = s.rectangle({id: "b", center: [1, 0], size: [1, 1]});
-        author(s, a, b, named);
-        return compileScene(s);
-    };
-    assert.equal(source(true), source(false), author.toString());
-}
+const timingLuaCases = timingAuthors.map(([name, author, duration]) => {
+    const s = vis.scene({width: 96, height: 64});
+    const a = s.rectangle({id: "a", center: [-1, 0], size: [1, 1]});
+    const b = s.rectangle({id: "b", center: [1, 0], size: [1, 1]});
+    author(s, a, b);
+    const source = compileScene(s);
+    assert.match(source, /(?:\["duration"\]=|duration=)0\.4|scene:seek\(times\[1\]\+0\.4\)/, name);
+    return {name, source, duration};
+});
+assert.deepEqual(sharedTiming, {duration: 0.4, curve: "linear"});
+assert.deepEqual(sharedStagger, {duration: 0.4, curve: "linear", lag: 0.25});
+
+const unsetDirection = Object.freeze({duration: 0.4, direction: undefined});
+const unsetCopy = Object.freeze({duration: 0.4, copy: undefined});
+const unsetTiming = vis.scene();
+const unsetSource = unsetTiming.rectangle({});
+const unsetTarget = unsetTiming.circle({});
+unsetTiming.create(unsetSource, unsetDirection).morph(unsetSource, unsetTarget, unsetCopy);
+assert.equal(Object.hasOwn(unsetDirection, "direction"), true);
+assert.equal(Object.hasOwn(unsetCopy, "copy"), true);
+assert.equal(unsetDirection.direction, undefined);
+assert.equal(unsetCopy.copy, undefined);
+assert.doesNotMatch(compileScene(unsetTiming), /\["(?:direction|copy)"\]=/);
+
 const timingValidation = vis.scene();
 const timingTarget = timingValidation.rectangle({});
 const timingBefore = compileScene(timingValidation);
 for (const options of [{duration: 0}, {duration: -1}, {duration: Infinity}, {curve: "unknown"},
-    {easing: "smooth"}, {lag: 0.25}, {seconds: 1}]) {
+    {easing: "smooth"}, {lag: 0.25}, {seconds: 1}, null, [], 0.4]) {
     assert.throws(() => timingValidation.shift(timingTarget, [0, 1], options));
 }
 assert.throws(() => timingValidation.create(timingTarget, {lag: -0.1}), /Lag/);
-assert.throws(() => timingValidation.shift(timingTarget, [0, 1], sharedTiming, "linear"), /positional arguments/);
-assert.throws(() => timingValidation.look({target: [0, 0]}, sharedTiming, "linear"), /positional arguments/);
+const timingTracker = timingValidation.tracker(0);
+assert.throws(() => timingValidation.track(timingTracker, 1), /Track requires timing options/);
+for (const call of [
+    () => timingValidation.create(timingTarget, 0.4, "linear", 0.25),
+    () => timingValidation.shift(timingTarget, [0, 1], sharedTiming, "linear"),
+    () => timingValidation.look({target: [0, 0]}, 0.4, "linear"),
+    () => timingValidation.tween({target: timingTarget, opacity: 0.5}, 0.4, "linear"),
+    () => timingValidation.morph(timingTarget, timingTarget, 0.4, "linear", {copy: true}),
+    () => timingValidation.restore(timingTarget, 0.4),
+]) assert.throws(call, /options (?:object|must be a plain object)/);
 assert.equal(compileScene(timingValidation), timingBefore);
+
+const timingDefaults = vis.scene();
+const defaultTarget = timingDefaults.rectangle({});
+timingDefaults.shift(defaultTarget, [1, 0]).save(defaultTarget).restore(defaultTarget);
+const defaultsLua = compileScene(timingDefaults);
+assert.match(defaultsLua, /scene:shift\([^\n]+\["duration"\]=1/);
+assert.match(defaultsLua, /scene:restore\([^\n]+\["duration"\]=0/);
+
+const timingMotion = vis.scene({width: 200, height: 100, camera: {height: 4}});
+const timingFirst = timingMotion.rectangle({id: "first", center: [-1, 0], size: [1, 1]});
+const timingSecond = timingMotion.rectangle({id: "second", center: [1, 0], size: [1, 1]});
+timingMotion.tween([{target: timingFirst, shift: [2, 0]}, {target: timingSecond, shift: [2, 0]}],
+    Object.freeze({duration: 2, curve: "linear", lag: 0.5}));
+const timingMotionLua = compileScene(timingMotion);
 
 // warp calls fn at every sample of x_range and y_range, each running on until it reaches its
 // max, and hands Lua the images row by row from the bottom left, each number in the fewest
@@ -793,16 +828,14 @@ const warpedPlane = warping.space({ id: "plane", x: [-4, 4, 1], y: [-3, 3, 1] })
 const warpedDot = warping.point({ id: "dot", point: [1, 1] });
 const squared = (x, y) => [x * x - y * y, 2 * x * y];
 warping.warp([warpedPlane, warpedDot], squared, { x_range: [-4, 4, 0.5], y_range: [-3, 3, 0.5] });
-warping.warp(warpedDot, (x, y) => [x + 0.1, y / 2], 0.5, "linear", {
-    x_range: [-1, 1, 0.75],
+warping.warp(warpedDot, (x, y) => [x + 0.1, y / 2], {duration: 0.5, curve: "linear", x_range: [-1, 1, 0.75],
     y_range: [1, 2.5, 1],
-    step: 0.1,
-});
+    step: 0.1,});
 const warpRegion = { x_range: [0, 1, 1], y_range: [0, 1, 1] };
-assert.throws(() => warping.warp(warpedDot, squared), /Warp requires options with x_range and y_range/);
-assert.throws(() => warping.warp(warpedDot, squared, 1, "smooth"), /Warp requires options with x_range and y_range/);
-assert.throws(() => warping.warp(warpedDot, squared, warpRegion, "linear"),
-    /Warp takes \(target, fn, options\) or \(target, fn, duration, curve, options\)/);
+assert.throws(() => warping.warp(warpedDot, squared), /Warp requires x_range/);
+assert.throws(() => warping.warp(warpedDot, squared, {duration: 1, curve: "smooth"}), /Warp requires x_range/);
+assert.throws(() => warping.warp(warpedDot, squared, 1, "linear", warpRegion),
+    /Animation timing takes one options object/);
 assert.throws(() => warping.warp(warpedDot, [1, 2], warpRegion), /Warp fn must be a function of x and y that returns \[x, y\]/);
 assert.throws(() => warping.warp(vis.scene().point({ point: [0, 0] }), squared, warpRegion),
     /Animation targets must be handles from the same scene/);
@@ -827,13 +860,13 @@ const warpingLua = compileScene(warping);
 const warpCalls = warpingLua.split("\n").filter((line) => line.startsWith("scene:warp("));
 assert.equal(warpCalls.length, 2);
 assert.match(warpCalls[0], /^scene:warp\(\{objects\[1\],objects\[2\]\},\{\["values"\]=\{\{7,24\},\{3\.25,21\},/);
-assert.match(warpCalls[0], /\{7,24\}\},\["x_range"\]=\{-4,4,0\.5\},\["y_range"\]=\{-3,3,0\.5\}\},1,"smooth"\)$/);
+assert.match(warpCalls[0], /\{7,24\}\},\["x_range"\]=\{-4,4,0\.5\},\["y_range"\]=\{-3,3,0\.5\}\},\{\["curve"\]="smooth",\["duration"\]=1\}\)$/);
 assert.equal(warpCalls[0].match(/\{-?[\d.]+,-?[\d.]+\}/g).length, 17 * 13);
 assert.equal(
     warpCalls[1],
     'scene:warp(objects[2],{["values"]={{-0.9,0.5},{-0.15,0.5},{0.6,0.5},{1.35,0.5},{-0.9,1},{-0.15,1},{0.6,1},{1.35,1},'
-        + '{-0.9,1.5},{-0.15,1.5},{0.6,1.5},{1.35,1.5}},["x_range"]={-1,1.25,0.75},["y_range"]={1,3,1}},0.5,"linear",'
-        + '{["step"]=0.1})',
+        + '{-0.9,1.5},{-0.15,1.5},{0.6,1.5},{1.35,1.5}},["x_range"]={-1,1.25,0.75},["y_range"]={1,3,1}},'
+        + '{["curve"]="linear",["duration"]=0.5,["step"]=0.1})',
 );
 // The scene cannot know where the targets stand, so samples that miss one fail when it runs.
 const uncovered = vis.scene();
@@ -850,7 +883,7 @@ const endpointPlot = vis.scene({width: 320, height: 180, camera: {view: "2d", he
 const endpointGraph = endpointPlot.plot({id: "graph", fn: (x) => 2 * x,
     x_range: [-2, 2, 1], y_range: [-1, 1], endpoint_radius: 3, width: 0, progress: 0});
 endpointPlot.clone(endpointGraph, {id: "copy", shift: [0, 2]});
-endpointPlot.wait(1).tween({target: endpointGraph, fn: (x) => 2 * x + 1}, 1, "linear");
+endpointPlot.wait(1).tween({target: endpointGraph, fn: (x) => 2 * x + 1}, {duration: 1, curve: "linear"});
 endpointPlot.wait(1).set({target: endpointGraph, points: [[-1, 0], [1, 0]]});
 endpointPlot.wait(1).set({target: endpointGraph, points: []});
 endpointPlot.wait(1);
@@ -859,7 +892,7 @@ local s=vis.scene{width=320,height=180,camera={view="2d",height=6}}
 local graph=s:plot{id="graph",fn=function(x) return 2*x end,
     x_range={-2,2,1},y_range={-1,1},endpoint_radius=3,width=0,progress=0}
 s:clone(graph,{id="copy",shift={0,2}})
-s:wait(1); s:tween({target=graph,fn=function(x) return 2*x+1 end},1,"linear")
+s:wait(1); s:tween({target=graph,fn=function(x) return 2*x+1 end},{duration = 1, curve = "linear"})
 s:wait(1); s:set{target=graph,points={{-1,0},{1,0}}}
 s:wait(1); s:set{target=graph,points={}}
 s:wait(1)
@@ -885,16 +918,16 @@ progressPlot(endpointSpace, "spaced", 2.5, 0);
 const endpointReset = progressPlot(endpointProgress, "reset", -2.5, 1);
 const endpointFuture = endpointProgress.plot({id: "future", points: [[-1, 0], [1, 0]],
     endpoint_radius: 4, width: 0, progress: 0});
-endpointProgress.uncreate(endpointReset, 1, "linear");
+endpointProgress.uncreate(endpointReset, {duration: 1, curve: "linear"});
 endpointProgress.at(1, (s) => s.tween([{target: endpointDown, progress: 0},
-    {target: endpointUp, progress: 1}, {target: endpointStay, progress: 0}], 1, "linear"));
-endpointProgress.at(1, (s) => s.create([endpointGroup, endpointSpace], 1, "linear"));
-endpointProgress.at(1.5, (s) => s.tween({target: endpointReset, progress: 0}, 1, "linear"));
-endpointProgress.at(2, (s) => s.uncreate([endpointGroup, endpointSpace], 1, "linear"));
-endpointProgress.at(1, (s) => s.tween({target: endpointFuture, progress: 0}, 1, "linear"));
-endpointProgress.at(3, (s) => s.create(endpointFuture, 1, "linear"));
-endpointProgress.at(3.5, (s) => s.create(endpointReset, 1, "linear"));
-endpointProgress.at(4, (s) => s.create([endpointGroup, endpointSpace], 1, "linear"));
+    {target: endpointUp, progress: 1}, {target: endpointStay, progress: 0}], {duration: 1, curve: "linear"}));
+endpointProgress.at(1, (s) => s.create([endpointGroup, endpointSpace], {duration: 1, curve: "linear"}));
+endpointProgress.at(1.5, (s) => s.tween({target: endpointReset, progress: 0}, {duration: 1, curve: "linear"}));
+endpointProgress.at(2, (s) => s.uncreate([endpointGroup, endpointSpace], {duration: 1, curve: "linear"}));
+endpointProgress.at(1, (s) => s.tween({target: endpointFuture, progress: 0}, {duration: 1, curve: "linear"}));
+endpointProgress.at(3, (s) => s.create(endpointFuture, {duration: 1, curve: "linear"}));
+endpointProgress.at(3.5, (s) => s.create(endpointReset, {duration: 1, curve: "linear"}));
+endpointProgress.at(4, (s) => s.create([endpointGroup, endpointSpace], {duration: 1, curve: "linear"}));
 endpointProgress.wait(4);
 const endpointProgressScript = `
 local s=vis.scene{width=320,height=180,camera={view="2d",height=6}}
@@ -907,17 +940,17 @@ local space=s:space{x={-3,3,1},y={-3,3,1},stroke="#00000000",axis_x="#00000000",
 local spaced=space:plot{id="spaced",points={{-2,2.5},{2,2.5}},endpoint_radius=4,width=0,progress=0}
 local reset=s:plot{id="reset",points={{-2,-2.5},{2,-2.5}},endpoint_radius=4,width=0,progress=1}
 local future=s:plot{id="future",points={{-1,0},{1,0}},endpoint_radius=4,width=0,progress=0}
-s:uncreate(reset,1,"linear")
+s:uncreate(reset,{duration = 1, curve = "linear"})
 s:at(1,function()
-    s:tween({{target=down,progress=0},{target=up,progress=1},{target=stay,progress=0}},1,"linear")
+    s:tween({{target=down,progress=0},{target=up,progress=1},{target=stay,progress=0}},{duration = 1, curve = "linear"})
 end)
-s:at(1,function() s:create({group,space},1,"linear") end)
-s:at(1.5,function() s:tween({target=reset,progress=0},1,"linear") end)
-s:at(2,function() s:uncreate({group,space},1,"linear") end)
-s:at(1,function() s:tween({target=future,progress=0},1,"linear") end)
-s:at(3,function() s:create(future,1,"linear") end)
-s:at(3.5,function() s:create(reset,1,"linear") end)
-s:at(4,function() s:create({group,space},1,"linear") end)
+s:at(1,function() s:create({group,space},{duration = 1, curve = "linear"}) end)
+s:at(1.5,function() s:tween({target=reset,progress=0},{duration = 1, curve = "linear"}) end)
+s:at(2,function() s:uncreate({group,space},{duration = 1, curve = "linear"}) end)
+s:at(1,function() s:tween({target=future,progress=0},{duration = 1, curve = "linear"}) end)
+s:at(3,function() s:create(future,{duration = 1, curve = "linear"}) end)
+s:at(3.5,function() s:create(reset,{duration = 1, curve = "linear"}) end)
+s:at(4,function() s:create({group,space},{duration = 1, curve = "linear"}) end)
 s:seek(5)
 return s
 `;
@@ -991,8 +1024,8 @@ const recutWhole = recut.plot({ points: [[0, 0], [1, 1], [2, 0]] });
 recut.tween([
     { target: recutBroken, points: [[0, 1], [1, 2], [3, 2], [4, 1]] },
     { target: recutBanded, points: [[0, 1], [0.5, 2], [1.5, 2], [2, 1]] },
-], 1);
-recut.tween({ target: recutWhole, points: [[0, 0], [1, 1]] }, 1);
+], {duration: 1});
+recut.tween({ target: recutWhole, points: [[0, 0], [1, 1]] }, {duration: 1});
 const recutLua = compileScene(recut);
 // Graphs with poles, jumps and an edge of their domain, drawn on, which render as their Lua
 // twin's do; the steps are powers of two, so every sample is exact in single precision.
@@ -1009,7 +1042,7 @@ plotTwin.create([
         fn: (x) => (x < 0 ? Math.ceil(x) : Math.floor(x)), x_range: [-2, 2, 1 / 8], discontinuities: [-2, -1, 1, 2],
         color: "#0000ff",
     }),
-], 1, "linear");
+], {duration: 1, curve: "linear"});
 const plotTwinScript = [
     'local s = vis.scene {width = 320, height = 180, camera = {mode = "fixed", view = "2d", height = 6}}',
     "local w = s:space {x = {-3, 3, 1}, y = {-2, 2, 1}}",
@@ -1020,7 +1053,7 @@ const plotTwinScript = [
     '    w:plot {fn = math.sqrt, x_range = {-1, 3, 1 / 4}, color = "#00aa00"},',
     "    w:plot {fn = function(x) if x < 0 then return math.ceil(x) end return math.floor(x) end, x_range = {-2, 2, 1 / 8},",
     '        discontinuities = {-2, -1, 1, 2}, color = "#0000ff"},',
-    '}, 1, "linear")',
+    '}, {duration = 1, curve = "linear"})',
     "return s",
     "",
 ].join("\n");
@@ -1033,18 +1066,18 @@ const regraph = vis.scene();
 const functionPlay = vis.scene({ width: 320, height: 180, camera: { mode: "fixed", view: "2d", height: 6 } });
 const functionGraph = functionPlay.plot({ fn: () => 0, x_range: [-2, 2, 0.5], y_range: [-1, 1], width: 4 });
 const functionCalls = [];
-functionPlay.tween({ target: functionGraph, fn: (x) => { functionCalls.push(x); return 2 * x * x; } }, 1, "linear");
-functionPlay.tween({ target: functionGraph, fn: () => 2 }, 1, "linear");
-functionPlay.tween({ target: functionGraph, fn: () => 0 }, 1, "linear");
+functionPlay.tween({ target: functionGraph, fn: (x) => { functionCalls.push(x); return 2 * x * x; } }, {duration: 1, curve: "linear"});
+functionPlay.tween({ target: functionGraph, fn: () => 2 }, {duration: 1, curve: "linear"});
+functionPlay.tween({ target: functionGraph, fn: () => 0 }, {duration: 1, curve: "linear"});
 assert.deepEqual(functionCalls.filter((x) => [-2, -1.5, -1, -0.5, 0, 0.5, 1, 1.5, 2].includes(x)),
     [-2, -1.5, -1, -0.5, 0, 0.5, 1, 1.5, 2]);
 assert.match(compileScene(functionPlay), /samples=\{\{-2,8\},\{-1.5,4.5\},\{-1,2\},\{-0.5,0.5\},\{0,0\}/);
 const functionPlayScript = [
     'local s = vis.scene {width = 320, height = 180, camera = {mode = "fixed", view = "2d", height = 6}}',
     'local p = s:plot {fn = function() return 0 end, x_range = {-2, 2, 0.5}, y_range = {-1, 1}, width = 4}',
-    's:tween({target = p, fn = function(x) return 2 * x * x end}, 1, "linear")',
-    's:tween({target = p, fn = function() return 2 end}, 1, "linear")',
-    's:tween({target = p, fn = function() return 0 end}, 1, "linear")',
+    's:tween({target = p, fn = function(x) return 2 * x * x end}, {duration = 1, curve = "linear"})',
+    's:tween({target = p, fn = function() return 2 end}, {duration = 1, curve = "linear"})',
+    's:tween({target = p, fn = function() return 0 end}, {duration = 1, curve = "linear"})',
     'return s',
 ].join("\n");
 const animatedPoles = vis.scene({ width: 320, height: 180, fps: 10,
@@ -1055,7 +1088,7 @@ const shiftedPole = (phase) => (x) => { poleCalls++; return Math.tan(x - phase);
 const movingPole = animatedPoles.plot({ id: "graph", fn: shiftedPole(0), x_range: [-3, 3, 0.125],
     y_range: [-4, 4], width: 4 });
 animatedPoles.bind(movingPole, polePhase, (phase) => ({ fn: shiftedPole(phase) }));
-animatedPoles.track(polePhase, 0.5, 1, "linear");
+animatedPoles.track(polePhase, 0.5, {duration: 1, curve: "linear"});
 const animatedPolesLua = compileScene(animatedPoles);
 const bakedPoleCalls = poleCalls;
 assert.equal(compileScene(animatedPoles), animatedPolesLua);
@@ -1067,53 +1100,53 @@ local phase = s:tracker(0)
 local function shifted(p) return function(x) return math.tan(x-p) end end
 local graph = s:plot {id = "graph", fn = shifted(0), x_range = {-3,3,0.125}, y_range = {-4,4}, width = 4}
 s:bind(graph,phase,function(p) return {fn = shifted(p)} end)
-s:track(phase,0.5,1,"linear")
+s:track(phase,0.5,{duration = 1, curve = "linear"})
 return s`;
 const regraphPlot = regraph.plot({ fn: (x) => 1 / x, x_range: [-1, 1, 0.5], y_range: [-1.5, 1.5] });
-regraph.tween({ target: regraphPlot, fn: (x) => 1 / (x - 0.25) }, 1);
+regraph.tween({ target: regraphPlot, fn: (x) => 1 / (x - 0.25) }, {duration: 1});
 const regraphSteps = regraph.plot({ points: [[0, 0], [1, 1]] });
-regraph.tween({ target: regraphSteps, fn: Math.floor, x_range: [0, 2, 0.5], discontinuities: [1] }, 1);
-regraph.tween({ target: regraphSteps, fn: Math.ceil }, 1);
+regraph.tween({ target: regraphSteps, fn: Math.floor, x_range: [0, 2, 0.5], discontinuities: [1] }, {duration: 1});
+regraph.tween({ target: regraphSteps, fn: Math.ceil }, {duration: 1});
 regraph.set({ target: regraphSteps, points: [[0, 0], [1, 1], [2, NaN], [3, 0]] });
-regraph.tween({ target: regraphPlot, fn: () => 5, y_range: [-1, 1] }, 1);
+regraph.tween({ target: regraphPlot, fn: () => 5, y_range: [-1, 1] }, {duration: 1});
 assert.deepEqual(compileScene(regraph).split("\n").filter((line) => line.includes("tween(") || line.includes("set(")), [
     'scene:tween({{target=objects[1],fn={points={{-1,-0.8},{-0.5,-1.3333334},{-0.41666666,-1.5},{0/0,0/0},{0.9166667,1.5},'
-        + '{1,1.3333334}},samples={{-1,-0.8},{-0.5,-1.3333334},{0,-4},{0/0,0/0},{0.5,4},{1,1.3333334}}}}},1,"smooth",0)',
+        + '{1,1.3333334}},samples={{-1,-0.8},{-0.5,-1.3333334},{0,-4},{0/0,0/0},{0.5,4},{1,1.3333334}}}}},{["curve"]="smooth",["duration"]=1,["lag"]=0})',
     'scene:tween({{target=objects[2],fn={points={{0,0},{0.5,0},{0.9995,0},{0/0,0/0},{1.0005,1},{1.5,1},{2,2}},'
         + 'samples={{0,0},{0.5,0},{0.9995,0},{0/0,0/0},{1.0005,1},{1.5,1},{2,2}}},'
-        + 'x_range={0,2,0.5},discontinuities={1}}},1,"smooth",0)',
+        + 'x_range={0,2,0.5},discontinuities={1}}},{["curve"]="smooth",["duration"]=1,["lag"]=0})',
     'scene:tween({{target=objects[2],fn={points={{0,0},{0.5,1},{0.9995,1},{0/0,0/0},{1.0005,2},{1.5,2},{2,2}},'
-        + 'samples={{0,0},{0.5,1},{0.9995,1},{0/0,0/0},{1.0005,2},{1.5,2},{2,2}}}}},1,"smooth",0)',
+        + 'samples={{0,0},{0.5,1},{0.9995,1},{0/0,0/0},{1.0005,2},{1.5,2},{2,2}}}}},{["curve"]="smooth",["duration"]=1,["lag"]=0})',
     "scene:set({{target=objects[2],points={{0,0},{1,1},{0/0,0/0},{3,0}}}})",
-    'scene:tween({{target=objects[1],fn={points={},samples={{-1,5},{-0.5,5},{0,5},{0.5,5},{1,5}}},y_range={-1,1}}},1,"smooth",0)',
+    'scene:tween({{target=objects[1],fn={points={},samples={{-1,5},{-0.5,5},{0,5},{0.5,5},{1,5}}},y_range={-1,1}}},{["curve"]="smooth",["duration"]=1,["lag"]=0})',
 ]);
 const regraphFresh = regraph.plot({ points: [[0, 0], [1, 1]] });
 const regraphTriangle = regraph.polygon({ points: [[0, 0], [1, 0], [0, 1]] });
-assert.throws(() => regraph.tween({ target: regraphSteps, x_range: [0, 1, 0.5] }, 1), /Animation x_range needs fn/);
-assert.throws(() => regraph.tween({ target: regraphSteps, y_range: [0, 1] }, 1), /Animation y_range needs fn or points/);
-assert.throws(() => regraph.tween({ target: regraphSteps, discontinuities: [1] }, 1),
+assert.throws(() => regraph.tween({ target: regraphSteps, x_range: [0, 1, 0.5] }, {duration: 1}), /Animation x_range needs fn/);
+assert.throws(() => regraph.tween({ target: regraphSteps, y_range: [0, 1] }, {duration: 1}), /Animation y_range needs fn or points/);
+assert.throws(() => regraph.tween({ target: regraphSteps, discontinuities: [1] }, {duration: 1}),
     /Animation discontinuities needs fn or points/);
-assert.throws(() => regraph.tween({ target: regraphSteps, fn: Math.sin, points: [[0, 0], [1, 1]] }, 1),
+assert.throws(() => regraph.tween({ target: regraphSteps, fn: Math.sin, points: [[0, 0], [1, 1]] }, {duration: 1}),
     /Animation of a plot takes either points or fn, not both/);
-assert.throws(() => regraph.tween({ target: regraphSteps, fn: 3 }, 1), /Animation fn must be a function of x/);
-assert.throws(() => regraph.tween({ target: regraphSteps, fn: Math.sin, y_range: [1, 0] }, 1),
+assert.throws(() => regraph.tween({ target: regraphSteps, fn: 3 }, {duration: 1}), /Animation fn must be a function of x/);
+assert.throws(() => regraph.tween({ target: regraphSteps, fn: Math.sin, y_range: [1, 0] }, {duration: 1}),
     /Plot y_range must have lo below hi/);
-assert.throws(() => regraph.tween({ target: regraphFresh, fn: Math.sin }, 1), /Plot fn requires x_range/);
-assert.throws(() => regraph.tween({ target: regraphTriangle, fn: Math.sin }, 1), /Animation fn needs a plot/);
+assert.throws(() => regraph.tween({ target: regraphFresh, fn: Math.sin }, {duration: 1}), /Plot fn requires x_range/);
+assert.throws(() => regraph.tween({ target: regraphTriangle, fn: Math.sin }, {duration: 1}), /Animation fn needs a plot/);
 assert.throws(() => regraph.set({ target: regraphTriangle, x_range: [0, 1, 0.5] }), /Animation x_range needs a plot/);
 // A call that fails leaves the plots their cuts, as one that fails in Lua ends the script.
 assert.throws(() => regraph.tween([
     { target: regraphFresh, fn: Math.sin, x_range: [0, 1, 0.5] },
     { target: regraphTriangle, fn: Math.sin },
-], 1), /Animation fn needs a plot/);
-assert.throws(() => regraph.tween({ target: regraphFresh, fn: Math.sin }, 1), /Plot fn requires x_range/);
+], {duration: 1}), /Animation fn needs a plot/);
+assert.throws(() => regraph.tween({ target: regraphFresh, fn: Math.sin }, {duration: 1}), /Plot fn requires x_range/);
 assert.throws(() => regraph.tween({
     target: regraphSteps,
     fn: (x) => {
         regraph.wait(1);
         return x;
     },
-}, 1), /Scene authoring is unavailable inside a sampling callback/);
+}, {duration: 1}), /Scene authoring is unavailable inside a sampling callback/);
 // A graph whose pole a tracker moves, bound and tracked, steps cut at discontinuities and to a band
 // and then to nothing, points of other counts, and a copy that takes fn alone, which render as
 // their Lua twin's do. The pole and the steps of x_range are powers of two, so every sample is
@@ -1126,14 +1159,14 @@ const replotGraph = replotAxes.plot({ fn: replotHyperbola(-2), x_range: [-3, 3, 
 replot.bind(replotGraph, replotPole, (p) => ({ fn: replotHyperbola(p) }));
 const replotSteps = replotAxes.plot({ points: [[-3, -1], [3, 1]], color: "#ff0000" });
 replot.set({ target: replotSteps, points: [[-3, -1], [0, 1], [3, -1]] });
-replot.track(replotPole, 2, 1, "linear");
+replot.track(replotPole, 2, {duration: 1, curve: "linear"});
 replot.tween({
     target: replotSteps, fn: Math.floor, x_range: [-2, 2, 1 / 8], y_range: [-1.5, 1.5], discontinuities: [1, -1, 0],
-}, 1);
-replot.tween({ target: replotSteps, fn: Math.ceil }, 1);
+}, {duration: 1});
+replot.tween({ target: replotSteps, fn: Math.ceil }, {duration: 1});
 const replotCopy = replot.clone(replotGraph);
-replot.tween([{ target: replotCopy, fn: replotHyperbola(0.5) }, { target: replotSteps, fn: () => 5 }], 1);
-replot.tween({ target: replotSteps, points: [[-3, 0], [-1, 1], [1, -1], [3, 0]] }, 1);
+replot.tween([{ target: replotCopy, fn: replotHyperbola(0.5) }, { target: replotSteps, fn: () => 5 }], {duration: 1});
+replot.tween({ target: replotSteps, points: [[-3, 0], [-1, 1], [1, -1], [3, 0]] }, {duration: 1});
 const replotScript = [
     'local s = vis.scene {width = 320, height = 180, fps = 10, camera = {mode = "fixed", view = "2d", height = 6}}',
     "local w = s:space {x = {-3, 3, 1}, y = {-2, 2, 1}}",
@@ -1143,12 +1176,12 @@ const replotScript = [
     "s:bind(graph, pole, function(p) return {fn = hyperbola(p)} end)",
     'local steps = w:plot {points = {{-3, -1}, {3, 1}}, color = "#ff0000"}',
     "s:set {target = steps, points = {{-3, -1}, {0, 1}, {3, -1}}}",
-    's:track(pole, 2, 1, "linear")',
-    "s:tween({target = steps, fn = math.floor, x_range = {-2, 2, 1 / 8}, y_range = {-1.5, 1.5}, discontinuities = {1, -1, 0}}, 1)",
-    "s:tween({target = steps, fn = math.ceil}, 1)",
+    's:track(pole, 2, {duration = 1, curve = "linear"})',
+    "s:tween({target = steps, fn = math.floor, x_range = {-2, 2, 1 / 8}, y_range = {-1.5, 1.5}, discontinuities = {1, -1, 0}}, {duration = 1})",
+    "s:tween({target = steps, fn = math.ceil}, {duration = 1})",
     "local copy = s:clone(graph)",
-    "s:tween({{target = copy, fn = hyperbola(0.5)}, {target = steps, fn = function() return 5 end}}, 1)",
-    "s:tween({target = steps, points = {{-3, 0}, {-1, 1}, {1, -1}, {3, 0}}}, 1)",
+    "s:tween({{target = copy, fn = hyperbola(0.5)}, {target = steps, fn = function() return 5 end}}, {duration = 1})",
+    "s:tween({target = steps, points = {{-3, 0}, {-1, 1}, {1, -1}, {3, 0}}}, {duration = 1})",
     "return s",
     "",
 ].join("\n");
@@ -1190,8 +1223,8 @@ const suppliedScreen = screenAxes.text({id: "screen-supplied", text: "y", size: 
 assert.equal(screenAxes.labels({placement: "screen", y: [[1, suppliedScreen]], gap: 10})[0], suppliedScreen);
 assert.throws(() => screenAxes.labels({placement: "other"}), /Space labels placement must be 'world' or 'screen'/);
 assert.throws(() => screenAxes.labels({placement: "screen", side: {x: "above"}}), /Screen labels do not take side/);
-screenLabels.look({height: 4}, 1, "linear");
-screenLabels.warp(screenAxes, (x, y) => [x + 3, y], 1, "linear", {x_range: [-2, 2, 1], y_range: [-1, 1, 1]});
+screenLabels.look({height: 4}, {duration: 1, curve: "linear"});
+screenLabels.warp(screenAxes, (x, y) => [x + 3, y], {duration: 1, curve: "linear", x_range: [-2, 2, 1], y_range: [-1, 1, 1]});
 const screenLabelLua = compileScene(screenLabels);
 assert.match(screenLabelLua, /\["placement"\]="screen"/);
 // Generated ids continue independently on each axis and preserve supplied handle ids.
@@ -1225,11 +1258,11 @@ const labeledAxes = labeled.space({ x: [-3, 3, 1], y: [-2, 2, 1], ticks: true })
 const labeledDot = labeled.circle({ center: [-2, 1], radius: 0.2, fill: "#ffffff", stroke: "#00000000" });
 labeled.bind(labeledDot, [labeledX, labeledZ], (x, z) => ({ shift: [x, 0], radius: 0.2 * z }));
 labeled.parallel(
-    (scene) => scene.track(labeledX, 4, 4, "linear"),
+    (scene) => scene.track(labeledX, 4, {duration: 4, curve: "linear"}),
     (scene) => {
         scene.wait(1);
         labeledAxes.labels({ x: [[1, "one"], [-1, "minus one"]] });
-        scene.track(labeledZ, 3, 1, "linear");
+        scene.track(labeledZ, 3, {duration: 1, curve: "linear"});
     },
 );
 const labeledScript = [
@@ -1239,10 +1272,10 @@ const labeledScript = [
     "local axes = s:space {x = {-3, 3, 1}, y = {-2, 2, 1}, ticks = true}",
     'local dot = s:circle {center = {-2, 1}, radius = 0.2, fill = "#ffffff", stroke = "#00000000"}',
     "s:bind(dot, {x, z}, function(a, b) return {shift = {a, 0}, radius = 0.2 * b} end)",
-    's:parallel(function() s:track(x, 4, 4, "linear") end, function()',
+    's:parallel(function() s:track(x, 4, {duration = 4, curve = "linear"}) end, function()',
     "    s:wait(1)",
     '    axes:labels {x = {{1, "one"}, {-1, "minus one"}}}',
-    '    s:track(z, 3, 1, "linear")',
+    '    s:track(z, 3, {duration = 1, curve = "linear"})',
     "end)",
     "return s",
 ].join("\n");
@@ -1253,7 +1286,7 @@ const panelConfig = { width: 160, height: 90, camera: { view: "2d", height: 6 } 
 const panel = vis.scene(panelConfig);
 const panelWorld = panel.space({ id: "panel" });
 const panelPoint = panelWorld.point({ point: [0, 0], id: "panel-point" });
-panel.create(panelPoint, 0.5);
+panel.create(panelPoint, {duration: 0.5});
 const insetConfig = { width: 80, height: 45 };
 const inset = vis.scene(insetConfig);
 const insetWorld = inset.space({ id: "inset" });
@@ -1357,10 +1390,10 @@ const liveConfig = { width: 120, height: 60, background: "#000000", camera: { he
 const liveRoot = vis.scene(liveConfig);
 const liveFirst = vis.scene(liveConfig);
 const liveDot = liveFirst.circle({ center: [-1, 0], radius: 0.2, fill: "#ffffff", stroke: "#00000000" });
-liveFirst.shift(liveDot, [4, 0], 4, "linear");
+liveFirst.shift(liveDot, [4, 0], {duration: 4, curve: "linear"});
 const liveSecond = vis.scene(liveConfig);
 const liveNext = liveSecond.circle({ center: [-1, 0], radius: 0.2, fill: "#ffffff", stroke: "#00000000" });
-liveSecond.shift(liveNext, [1, 0], 0.5, "linear");
+liveSecond.shift(liveNext, [1, 0], {duration: 0.5, curve: "linear"});
 liveRoot.sceneTransition([liveFirst, liveSecond], { hold: [2, 1], duration: 1, style: "slide", curve: "linear" });
 const liveLua = compileScene(liveRoot);
 assert.match(liveLua, /\["hold"\]=\{2,1\}/);
@@ -1530,7 +1563,7 @@ assert.match(maskedSource, /\["mask"\]=\{\["mode"\]="inverse_alpha",\["target"\]
 assert.match(maskedSource, /objects\[6\]:mask\(objects\[3\],"luma"\)/);
 maskedScene.circle({id: "shade", radius: 0.5, blend: "multiply"});
 const soft = maskedScene.rectangle({id: "soft", size: [2, 1], blur: 2, shadow: {offset: [0, -4], blur: 8}});
-maskedScene.tween({target: soft, blur: 0, shadow: {color: "#ff000080"}}, 1);
+maskedScene.tween({target: soft, blur: 0, shadow: {color: "#ff000080"}}, {duration: 1});
 const softSource = compileScene(maskedScene);
 assert.match(softSource, /\["blur"\]=2,\["id"\]="soft",\["shadow"\]=\{\["blur"\]=8,\["offset"\]=\{0,-4\}\}/);
 assert.match(softSource, /scene:tween\(\{\{target=objects\[8\],blur=0,shadow=\{\["color"\]="#ff000080"\}\}\}/);
@@ -1575,7 +1608,7 @@ const audioScene = vis.scene();
 const music = audioScene.sound({
     asset: "theme.ogg", bus: "music", begin: 0.25, end: 8, gain: 0.6, loop: true,
 });
-music.gain(0.2, 4, 0.5, "ease_out").gain(0.8, 5, 1, "smooth");
+music.gain(0.2, 4, {duration: 0.5, curve: "ease_out"}).gain(0.8, 5, {duration: 1, curve: "smooth"});
 audioScene.wait(8);
 const audioLua = compileScene(audioScene);
 // vis.audio exists only with the audio module, so a cue and its gains are guarded by it.
@@ -1583,8 +1616,8 @@ assert.deepEqual(audioLua.split("\n").slice(1, 5), [
     "local cues = {}",
     'if vis.audio then cues[1]=vis.audio.cue(scene,{["asset"]="theme.ogg",["begin"]=0.25,["bus"]="music",'
         + '["end"]=8,["gain"]=0.6,["loop"]=true}) end',
-    'if cues[1] then cues[1]:gain(0.2,4,0.5,"ease_out") end',
-    'if cues[1] then cues[1]:gain(0.8,5,1,"smooth") end',
+    'if cues[1] then cues[1]:gain(0.2,4,{["curve"]="ease_out",["duration"]=0.5}) end',
+    'if cues[1] then cues[1]:gain(0.8,5,{["curve"]="smooth",["duration"]=1}) end',
 ]);
 assert.throws(() => vis.scene().sound({asset: ""}), /asset/);
 assert.throws(() => vis.scene().sound({asset: "hit.wav", bus: "voice"}), /bus/);
@@ -1597,12 +1630,12 @@ const tracks = vis.scene({ width: 160, height: 90 });
 const runner = tracks.circle({ radius: 0.4, id: "runner" });
 const badge = tracks.rectangle({ size: [1, 1], id: "badge" });
 tracks.parallel(
-    (scene) => scene.shift(runner, [2, 0], 3, "linear"),
+    (scene) => scene.shift(runner, [2, 0], {duration: 3, curve: "linear"}),
     (scene) => scene.fadeIn(badge, { duration: 1 }).mark("badge"),
 );
-tracks.at("badge", (scene) => scene.fill(runner, "#ff0000", 0.5));
-tracks.at(4, (scene) => scene.fade(runner, 0.5, 1));
-tracks.parallel([(scene) => scene.shift(badge, [0, 1], 1)]);
+tracks.at("badge", (scene) => scene.fill(runner, "#ff0000", {duration: 0.5}));
+tracks.at(4, (scene) => scene.fade(runner, 0.5, {duration: 1}));
+tracks.parallel([(scene) => scene.shift(badge, [0, 1], {duration: 1})]);
 const tracksLua = compileScene(tracks);
 assert.match(tracksLua, /times\[1\]=scene:time\(\);times\[2\]=times\[1\]/);
 assert.match(tracksLua, /scene:mark\("badge"\)/);
@@ -1617,8 +1650,8 @@ assert.throws(() => vis.scene().mark(""), /Marker/);
 const lensed = vis.scene({ width: 160, height: 90 });
 lensed.rectangle({ size: [1, 1] });
 lensed.parallel(
-    (scene) => scene.look({ target: [2, 0] }, 2, "linear"),
-    (scene) => scene.wait(0.5).look({ view: "3d", eye: [2, -8, 6], projection: "perspective", fov: 0.6 }, 1),
+    (scene) => scene.look({ target: [2, 0] }, {duration: 2, curve: "linear"}),
+    (scene) => scene.wait(0.5).look({ view: "3d", eye: [2, -8, 6], projection: "perspective", fov: 0.6 }, {duration: 1}),
 );
 const lensedLua = compileScene(lensed);
 
@@ -1633,13 +1666,13 @@ const gain = trail.tracker(0.5);
 const walked = [];
 assert.equal(trail.bind(walker, pace, (v) => (walked.push(v), { shift: [v, 1], opacity: v / 4 })), walker);
 trail.bind(meter, [pace, gain], (v, k) => ({ value: v * k }));
-assert.equal(trail.track(pace, 3, 1, "linear"), trail);
+assert.equal(trail.track(pace, 3, {duration: 1, curve: "linear"}), trail);
 assert.deepEqual(walked, [1, 1.5, 2, 2.5, 3]);
 assert.equal(pace.get(), 3);
-trail.track([[gain, 2]], 0.5, "linear");
-trail.track(pace, 1, 0.5);
+trail.track([[gain, 2]], {duration: 0.5, curve: "linear"});
+trail.track(pace, 1, {duration: 0.5});
 assert.deepEqual(walked, [1, 1.5, 2, 2.5, 3, 2, 1]);
-trail.track(trail.tracker(0), 1, 0.25);
+trail.track(trail.tracker(0), 1, {duration: 0.25});
 const trailBefore = compileScene(trail);
 const otherTracker = vis.scene().tracker(0);
 assert.throws(() => trail.tracker(Number.NaN), /Tracker value must be a finite number/);
@@ -1658,15 +1691,15 @@ assert.throws(
     /A bound state cannot contain both shift and transform/,
 );
 assert.throws(() => trail.bind(spare, pace, () => ({ shift: 1 })), /A bound shift must be an array of numbers/);
-for (const duration of [undefined, 0, -1, Infinity, Number.NaN, "1"]) {
-    assert.throws(() => trail.track(pace, 2, duration), /Track duration must be a positive finite number/);
+for (const duration of [0, -1, Infinity, Number.NaN, "1"]) {
+    assert.throws(() => trail.track(pace, 2, {duration: duration}), /Track duration must be a finite positive number/);
 }
-assert.throws(() => trail.track(pace, Number.NaN, 1), /Track target must be a finite number/);
-assert.throws(() => trail.track([], 1), /Track requires a tracker or an array of \[tracker, value\]/);
-assert.throws(() => trail.track(1, 2, 1), /Track requires a tracker or an array of \[tracker, value\]/);
-assert.throws(() => trail.track([[pace, 2], [{}, 2]], 1), /Expected a tracker from scene\.tracker/);
-assert.throws(() => trail.track([[otherTracker, 2]], 1), /Tracker belongs to another scene/);
-assert.throws(() => trail.track(pace, 2, 1, "wobble"), /Unknown animation curve preset: wobble/);
+assert.throws(() => trail.track(pace, Number.NaN, {duration: 1}), /Track target must be a finite number/);
+assert.throws(() => trail.track([], {duration: 1}), /Track requires a tracker or an array of \[tracker, value\]/);
+assert.throws(() => trail.track(1, 2, {duration: 1}), /Track requires a tracker or an array of \[tracker, value\]/);
+assert.throws(() => trail.track([[pace, 2], [{}, 2]], {duration: 1}), /Expected a tracker from scene\.tracker/);
+assert.throws(() => trail.track([[otherTracker, 2]], {duration: 1}), /Tracker belongs to another scene/);
+assert.throws(() => trail.track(pace, 2, {duration: 1, curve: "wobble"}), /Unknown animation curve preset: wobble/);
 assert.equal(pace.get(), 1);
 assert.equal(compileScene(trail), trailBefore);
 trail.bind(spare, gain, (k) => ({ opacity: k / 2 }));
@@ -1675,10 +1708,10 @@ assert.match(trailLua, /scene:set\(\{\{target=objects\[1\],shift=\{1,1,0\},opaci
 assert.match(trailLua, /scene:set\(\{\{target=objects\[2\],value=0\.5\}\}\)/);
 assert.match(
     trailLua,
-    /scene:tween\(\{\{target=objects\[1\],shift=\{0\.5,0,0\},opacity=0\.375\},\{target=objects\[2\],value=0\.75\}\},times\[2\]-times\[1\],"linear",0\)/,
+    /scene:tween\(\{\{target=objects\[1\],shift=\{0\.5,0,0\},opacity=0\.375\},\{target=objects\[2\],value=0\.75\}\},\{duration=times\[2\]-times\[1\],curve="linear",lag=0\}\)/,
 );
-assert.match(trailLua, /scene:tween\(\{\{target=objects\[2\],value=3\.75\}\},times\[7\]-times\[6\],"linear",0\)/);
-assert.match(trailLua, /scene:tween\(\{\{target=objects\[1\],shift=\{-1,0,0\},opacity=0\.5\},\{target=objects\[2\],value=4\}\},times\[10\]-times\[9\],"linear",0\)/);
+assert.match(trailLua, /scene:tween\(\{\{target=objects\[2\],value=3\.75\}\},\{duration=times\[7\]-times\[6\],curve="linear",lag=0\}\)/);
+assert.match(trailLua, /scene:tween\(\{\{target=objects\[1\],shift=\{-1,0,0\},opacity=0\.5\},\{target=objects\[2\],value=4\}\},\{duration=times\[10\]-times\[9\],curve="linear",lag=0\}\)/);
 assert.match(trailLua, /scene:wait\(0\.25\)/);
 assert.match(trailLua, /scene:set\(\{\{target=objects\[3\],opacity=1\}\}\)/);
 assert.equal(trailLua.match(/scene:tween\(/g).length, 8);
@@ -1688,11 +1721,11 @@ const stepping = vis.scene({ fps: 25 });
 const tick = stepping.tracker(0);
 stepping.bind(stepping.circle({ radius: 0.2 }), tick, (v) => ({ opacity: v }));
 const segments = () => compileScene(stepping).match(/scene:tween\(/g).length;
-stepping.track(tick, 1, 0.28);
+stepping.track(tick, 1, {duration: 0.28});
 assert.equal(segments(), 7);
-stepping.track(tick, 0, 0.001);
+stepping.track(tick, 0, {duration: 0.001});
 assert.equal(segments(), 8);
-stepping.track(tick, 1, 20);
+stepping.track(tick, 1, {duration: 20});
 assert.equal(segments(), 508);
 assert.match(compileScene(stepping), /scene:seek\(times\[1\]\+0\.04\)/);
 
@@ -1706,7 +1739,7 @@ longTrack.bind(longNumber, longValue, (v) => {
     return { value: Math.floor(v * 600 + 0.5) };
 });
 longTrack.bind(longLine, longValue, (v) => ({ to: [1, v * v] }));
-longTrack.track(longValue, 1, 20, "linear");
+longTrack.track(longValue, 1, {duration: 20, curve: "linear"});
 assert.equal(longSamples, 601);
 const longTrackScript = `
 local s=vis.scene{width=160,height=90,fps=30}
@@ -1715,7 +1748,7 @@ local n=s:number{value=0,decimals=0,id="n"}
 local line=s:line{from={0,0},to={1,0},id="line"}
 s:bind(n,t,function(v) return {value=math.floor(v*600+0.5)} end)
 s:bind(line,t,function(v) return {to={1,v*v}} end)
-s:track(t,1,20,"linear")
+s:track(t,1,{duration = 20, curve = "linear"})
 return s
 `;
 const minuteTrack = vis.scene({ width: 160, height: 90, fps: 60 });
@@ -1725,17 +1758,17 @@ minuteTrack.bind(minuteTrack.number({ value: 0, decimals: 0, id: "n" }), minuteV
     minuteSamples++;
     return { value: Math.floor(v * 3600 + 0.5) };
 });
-minuteTrack.track(minuteValue, 1, 60, "linear");
+minuteTrack.track(minuteValue, 1, {duration: 60, curve: "linear"});
 assert.equal(minuteSamples, 3601);
 const minuteTrackScript = `
 local s=vis.scene{width=160,height=90,fps=60}
 local t=s:tracker(0)
 local n=s:number{value=0,decimals=0,id="n"}
 s:bind(n,t,function(v) return {value=math.floor(v*3600+0.5)} end)
-s:track(t,1,60,"linear")
+s:track(t,1,{duration = 60, curve = "linear"})
 return s
 `;
-assert.throws(() => longTrack.track(longValue, 0, 1e30), /65536-clip budget/);
+assert.throws(() => longTrack.track(longValue, 0, {duration: 1e30}), /65536-clip budget/);
 assert.equal(longValue.get(), 1);
 
 // Linear tracker callbacks keep double precision before a binding stores its retained state.
@@ -1746,7 +1779,7 @@ preciseTrack.bind(preciseTrack.number({ value: 0, id: "n" }), preciseCount, (val
     assert.equal(value, 2000 * (preciseStep++ / 240));
     return { value: Math.floor(value) };
 });
-preciseTrack.wait(1).track(preciseCount, 2000, 8, "linear").wait(1);
+preciseTrack.wait(1).track(preciseCount, 2000, {duration: 8, curve: "linear"}).wait(1);
 assert.equal(preciseStep, 241);
 for (const curve of [{ preset: "linear", reverse: true }, { preset: "smooth", strength: 0 },
     { bezier: [0.2, 0.3, 0.8, 0.9], strength: 0, reverse: true }]) {
@@ -1757,14 +1790,14 @@ for (const curve of [{ preset: "linear", reverse: true }, { preset: "smooth", st
         assert.equal(v, 2000 * (step++ / 240));
         return { opacity: 0.5 };
     });
-    scene.track(value, 2000, 8, curve);
+    scene.track(value, 2000, {duration: 8, curve: curve});
 }
 
 const timedTracks = [24, 30, 60].map((fps) => {
     const scene = vis.scene({ fps });
     const seconds = scene.tracker(0);
     scene.bind(scene.number({ value: 0 }), seconds, (value) => ({ value }));
-    scene.wait(0.5).track(seconds, 7.5, 7.5, "linear").mark("end");
+    scene.wait(0.5).track(seconds, 7.5, {duration: 7.5, curve: "linear"}).mark("end");
     return [fps, scene];
 });
 
@@ -1777,9 +1810,9 @@ const twinLine = twin.plot({ points: Array.from({ length: 21 }, (_, i) => [i / 1
 const twinX = twin.tracker(0);
 twin.bind(twinDot, twinX, (v) => ({ shift: [v, 0], opacity: 0.6 + v / 10 }));
 twin.bind(twinLine, twinX, (v) => ({ progress: 0.25 + v / 4 }));
-twin.track(twinX, 2, 1, "linear").track([[twinX, 1]], 0.5).track(twinX, 1.7, 0.7, "back");
-twin.track(twinX, 0.2, 0.9, "elastic").track(twinX, 1.3, 0.6, { bezier: [0.3, -0.4, 0.6, 1.6], strength: 0.8 });
-twin.track(twinX, 0.5, 0.45, { preset: "ease_in_out", reverse: true }).track(twin.tracker(0), 1, 0.25);
+twin.track(twinX, 2, {duration: 1, curve: "linear"}).track([[twinX, 1]], {duration: 0.5}).track(twinX, 1.7, {duration: 0.7, curve: "back"});
+twin.track(twinX, 0.2, {duration: 0.9, curve: "elastic"}).track(twinX, 1.3, {duration: 0.6, curve: { bezier: [0.3, -0.4, 0.6, 1.6], strength: 0.8 }});
+twin.track(twinX, 0.5, {duration: 0.45, curve: { preset: "ease_in_out", reverse: true }}).track(twin.tracker(0), 1, {duration: 0.25});
 twin.focus(twinDot, { padding: 0.5, duration: 0.25 }).focus([twinDot, twinLine]).focus(null, { duration: 0.5 });
 const twinScript = [
     "local s = vis.scene {width = 160, height = 90, fps = 10}",
@@ -1790,9 +1823,9 @@ const twinScript = [
     "local x = s:tracker(0)",
     "s:bind(dot, x, function(v) return {shift = {v, 0}, opacity = 0.6 + v / 10} end)",
     "s:bind(line, x, function(v) return {progress = 0.25 + v / 4} end)",
-    's:track(x, 2, 1, "linear") s:track({{x, 1}}, 0.5) s:track(x, 1.7, 0.7, "back")',
-    's:track(x, 0.2, 0.9, "elastic") s:track(x, 1.3, 0.6, {bezier = {0.3, -0.4, 0.6, 1.6}, strength = 0.8})',
-    's:track(x, 0.5, 0.45, {preset = "ease_in_out", reverse = true}) s:track(s:tracker(0), 1, 0.25)',
+    's:track(x, 2, {duration = 1, curve = "linear"}) s:track({{x, 1}}, {duration = 0.5}) s:track(x, 1.7, {duration = 0.7, curve = "back"})',
+    's:track(x, 0.2, {duration = 0.9, curve = "elastic"}) s:track(x, 1.3, {duration = 0.6, curve = {bezier = {0.3, -0.4, 0.6, 1.6}, strength = 0.8}})',
+    's:track(x, 0.5, {duration = 0.45, curve = {preset = "ease_in_out", reverse = true}}) s:track(s:tracker(0), 1, {duration = 0.25})',
     "s:focus(dot, {padding = 0.5, duration = 0.25}) s:focus({dot, line}) s:focus(nil, {duration = 0.5})",
     "return s",
 ].join("\n");
@@ -1801,7 +1834,7 @@ const rider = ride.rectangle({ center: [-2, 0], size: [1, 1], fill: "#ffffff", s
 const rideX = ride.tracker(0);
 ride.bind(rider, rideX, (v) => ({ shift: [v, 0] }));
 ride.parallel(
-    (scene) => scene.track(rideX, 4, 2, "linear"),
+    (scene) => scene.track(rideX, 4, {duration: 2, curve: "linear"}),
     (scene) => scene.wait(0.5).scale(rider, 2, { duration: 1, curve: "linear" }),
 );
 const rideScript = [
@@ -1809,7 +1842,7 @@ const rideScript = [
     'local dot = s:rectangle {center = {-2, 0}, size = {1, 1}, fill = "#ffffff", stroke = "#00000000", id = "dot"}',
     "local x = s:tracker(0)",
     "s:bind(dot, x, function(v) return {shift = {v, 0}} end)",
-    's:parallel(function() s:track(x, 4, 2, "linear") end,',
+    's:parallel(function() s:track(x, 4, {duration = 2, curve = "linear"}) end,',
     '    function() s:wait(0.5) s:scale(dot, 2, {duration = 1, curve = "linear"}) end)',
     "return s",
 ].join("\n");
@@ -1820,7 +1853,7 @@ const placedBox = placing.rectangle({ center: [-3, 2], size: [1, 1], fill: "#fff
 const placedCard = placing.group({ id: "card" });
 placedCard.rectangle({ size: [1, 0.5], fill: "#ffffff", stroke: "#00000000" });
 placing.set([{ target: placedBox, position: [-1, 2] }, { target: placedCard, position: { x: 0, y: 3 } }]);
-placing.tween({ target: placedBox, position: [3, 2], arc: Math.PI / 2, opacity: 0.5 }, 2, "linear");
+placing.tween({ target: placedBox, position: [3, 2], arc: Math.PI / 2, opacity: 0.5 }, {duration: 2, curve: "linear"});
 placing.at(1, (scene) => scene.set({ target: placedCard, position: [-3, -3] }));
 assert.match(compileScene(placing), /position=\{3,2\}/);
 const placingScript = [
@@ -1829,7 +1862,7 @@ const placingScript = [
     'local card = s:group {id = "card"}',
     'card:rectangle {size = {1, 0.5}, fill = "#ffffff", stroke = "#00000000"}',
     "s:set {{target = box, position = {-1, 2}}, {target = card, position = {x = 0, y = 3}}}",
-    's:tween({target = box, position = {3, 2}, arc = math.pi / 2, opacity = 0.5}, 2, "linear")',
+    's:tween({target = box, position = {3, 2}, arc = math.pi / 2, opacity = 0.5}, {duration = 2, curve = "linear"})',
     "s:at(1, function() s:set {target = card, position = {-3, -3}} end)",
     "return s",
 ].join("\n");
@@ -1846,7 +1879,7 @@ const listenerLevel = listener.tracker(-1.3);
 const heard = [];
 listener.bind(listener.circle({ radius: 0.1 }), listenerLevel, (v) => (heard.push(v), { opacity: 0.5 }));
 heardCurves.forEach(([curve, , duration], index) => {
-    listener.track(listenerLevel, index % 2 ? -1.3 : 2.9, duration, curve);
+    listener.track(listenerLevel, index % 2 ? -1.3 : 2.9, {duration: duration, curve: curve});
 });
 const listenerScript = [
     "local s = vis.scene {width = 64, height = 36, fps = 24}",
@@ -1854,7 +1887,7 @@ const listenerScript = [
     "local heard = {}",
     "s:bind(s:circle {radius = 0.1}, level, function(v) heard[#heard + 1] = v return {opacity = 0.5} end)",
     ...heardCurves.map(([, curve, duration], index) => {
-        return `s:track(level, ${index % 2 ? -1.3 : 2.9}, ${duration}, ${curve})`;
+        return `s:track(level, ${index % 2 ? -1.3 : 2.9}, {duration = ${duration}, curve = ${curve}})`;
     }),
     'for i, v in ipairs(heard) do s:point {point = {0, 0}, id = string.format("%d:%.17g", i, v)} end',
     "return s",
@@ -1872,9 +1905,9 @@ shaped.bind(bow, bend, (v) => ({ control2: [1, v] }));
 shaped.bind(beam, bend, (v) => ({ to: [3, -2 + v] }));
 shaped.bind(hand, bend, (v) => ({ value: [1 - v / 4, v / 2] }));
 shaped.bind(wave, bend, (v) => ({ points: [[-3, 2], [0, 2 + v / 2], [3, 2]], opacity: 1 - v / 4 }));
-shaped.track(bend, 2, 1, "smooth");
+shaped.track(bend, 2, {duration: 1, curve: "smooth"});
 const wedge = shaped.polygon({ points: [[0, 0], [1, 0], [0, 1]], fill: "#ffffff", id: "wedge" });
-shaped.tween({ target: wedge, points: [[0, 0], [2, 0], [0, 2]] }, 0.5).set({ target: beam, from: [-3, -1] });
+shaped.tween({ target: wedge, points: [[0, 0], [2, 0], [0, 2]] }, {duration: 0.5}).set({ target: beam, from: [-3, -1] });
 const shapedScript = [
     'local s = vis.scene {width = 160, height = 90, fps = 10, camera = {mode = "fixed", view = "2d", height = 6}}',
     'local bow = s:curve {from = {-3, 0}, control1 = {-1, 0}, control2 = {1, 0}, to = {3, 0}, width = 4, id = "bow"}',
@@ -1886,9 +1919,9 @@ const shapedScript = [
     "s:bind(beam, bend, function(v) return {to = {3, -2 + v}} end)",
     "s:bind(hand, bend, function(v) return {value = {1 - v / 4, v / 2}} end)",
     "s:bind(wave, bend, function(v) return {points = {{-3, 2}, {0, 2 + v / 2}, {3, 2}}, opacity = 1 - v / 4} end)",
-    's:track(bend, 2, 1, "smooth")',
+    's:track(bend, 2, {duration = 1, curve = "smooth"})',
     'local wedge = s:polygon {points = {{0, 0}, {1, 0}, {0, 1}}, fill = "#ffffff", id = "wedge"}',
-    's:tween({target = wedge, points = {{0, 0}, {2, 0}, {0, 2}}}, 0.5, "smooth")',
+    's:tween({target = wedge, points = {{0, 0}, {2, 0}, {0, 2}}}, {duration = 0.5, curve = "smooth"})',
     "s:set {target = beam, from = {-3, -1}}",
     "return s",
 ].join("\n");
@@ -1915,21 +1948,21 @@ const outline = misshaped.path({
 const reach = misshaped.tracker(0);
 const misshapedBefore = compileScene(misshaped);
 assert.throws(
-    () => misshaped.tween({ target: tri, points: [[0, 0], [1, 1]] }, 1),
+    () => misshaped.tween({ target: tri, points: [[0, 0], [1, 1]] }, {duration: 1}),
     /Animation points must have 3 points, as the polygon has, not 2; a shape keeps its point count/,
 );
 assert.throws(
-    () => misshaped.tween({ target: rod, points: [[0, 0], [1, 1]] }, 1),
+    () => misshaped.tween({ target: rod, points: [[0, 0], [1, 1]] }, {duration: 1}),
     /Animation points needs a polygon, plot, route or path of one contour/,
 );
 assert.throws(() => misshaped.set({ target: rod, origin: [0, 0] }), /Animation origin needs a vector/);
 assert.throws(() => misshaped.set({ target: pin, control1: [0, 0] }), /Animation control1 needs a curve/);
 assert.throws(
-    () => misshaped.tween({ target: ring, from: [0, 0] }, 1),
+    () => misshaped.tween({ target: ring, from: [0, 0] }, {duration: 1}),
     /Animation from needs a line, arrow, curve or angle; move other objects with shift/,
 );
 assert.throws(
-    () => misshaped.tween({ target: tri, points: { x: 0, y: 0 } }, 1),
+    () => misshaped.tween({ target: tri, points: { x: 0, y: 0 } }, {duration: 1}),
     /Animation points must be an array of points/,
 );
 assert.throws(
@@ -1939,7 +1972,7 @@ assert.throws(
 assert.throws(
     () => misshaped.tween(
         [{ target: outline, points: [[0, 0], [1, 0], [1, 1], [0, 1]] }, { target: pin, from: [0, 0] }],
-        1,
+        {duration: 1},
     ),
     /Animation from needs a line, arrow, curve or angle/,
 );
@@ -1948,7 +1981,7 @@ misshaped.bind(outline, reach, (v) => ({
     points: v < 0.5 ? [[0, 0], [1, 0], [1, 1 + v]] : [[0, 0], [1, 0], [1, 1], [0, 1]],
 }));
 assert.throws(
-    () => misshaped.track(reach, 1, 1),
+    () => misshaped.track(reach, 1, {duration: 1}),
     /Animation points must have 3 points, as the path has, not 4; a shape keeps its point count/,
 );
 
@@ -1960,25 +1993,25 @@ const copied = vis.scene({ width: 160, height: 90, fps: 10, camera: { mode: "fix
 const rib = copied.line({ from: [-2, -2], to: [2, -2], width: 2, id: "rib" });
 const lift = copied.tracker(0);
 copied.bind(rib, lift, (v) => ({ to: [2, -2 + v] }));
-copied.track(lift, 2, 1, "linear");
+copied.track(lift, 2, {duration: 1, curve: "linear"});
 copied.at(0.5, (scene) => scene.clone(rib, { id: "rib2" }));
-copied.warp(rib, (x, y) => [x, y + 1], 1, "linear", { x_range: [-3, 3, 1], y_range: [-3, 1, 1] });
+copied.warp(rib, (x, y) => [x, y + 1], {duration: 1, curve: "linear", x_range: [-3, 3, 1], y_range: [-3, 1, 1]});
 const fan = copied.group({ id: "fan" });
 const blade = fan.polygon({ points: [[0, 0], [1, 0], [0, 1]], id: "fan/blade" });
 const fanCopy = copied.clone(fan, { id: "fan2" });
 for (const target of [copied.clone(blade), copied.find("fan2/blade")]) {
     assert.throws(
-        () => copied.tween({ target, points: [[0, 0], [1, 1]] }, 1),
+        () => copied.tween({ target, points: [[0, 0], [1, 1]] }, {duration: 1}),
         /Animation points must have 3 points, as the polygon has, not 2/,
     );
 }
-copied.tween({ target: fanCopy.children()[0], points: [[0, 0], [2, 0], [0, 2]] }, 0.5);
+copied.tween({ target: fanCopy.children()[0], points: [[0, 0], [2, 0], [0, 2]] }, {duration: 0.5});
 const copiedLua = compileScene(copied);
 assert.match(copiedLua, /scene:warp\(objects\[1\],\{\["values"\]=/);
 const rewarped = vis.scene({ width: 160, height: 90 });
 const rewarpedBeam = rewarped.line({ from: [0, 0], to: [1, 0], id: "beam" });
-rewarped.warp(rewarpedBeam, (x, y) => [x, y + 1], 1, "linear", { x_range: [-1, 2, 1], y_range: [-1, 1, 1] });
-rewarped.tween({ target: rewarpedBeam, to: [1, 1] }, 1);
+rewarped.warp(rewarpedBeam, (x, y) => [x, y + 1], {duration: 1, curve: "linear", x_range: [-1, 2, 1], y_range: [-1, 1, 1]});
+rewarped.tween({ target: rewarpedBeam, to: [1, 1] }, {duration: 1});
 const rewarpedLua = compileScene(rewarped);
 // Tracks of different trackers that overlap on one binding merge there, as in Lua. The twin
 // overlaps two tracks in a parallel at frames that interleave, overlays a third with at after a
@@ -1997,13 +2030,13 @@ const mergeHeard = [];
 merging.bind(mergeDot, [mergeX, mergeZ], (x, z) => ({ shift: [x, 0], radius: 0.2 * z }));
 merging.bind(mergeBar, mergeX, (x) => ({ opacity: 1 - x / 8 }));
 merging.bind(mergeRing, [mergeX, mergeW], (x, w) => (mergeHeard.push(x, w), { width: 1 + x, opacity: 1 - w / 2 }));
-merging.tween({ target: mergeBar, size: [2, 0.4] }, 0.5, "linear");
+merging.tween({ target: mergeBar, size: [2, 0.4] }, {duration: 0.5, curve: "linear"});
 merging.parallel(
-    (scene) => scene.track(mergeX, 4, 4, "linear"),
-    (scene) => scene.wait(1.05).track(mergeZ, 3, 1, "smooth"),
+    (scene) => scene.track(mergeX, 4, {duration: 4, curve: "linear"}),
+    (scene) => scene.wait(1.05).track(mergeZ, 3, {duration: 1, curve: "smooth"}),
 );
-merging.at(2.33, (scene) => scene.track(mergeW, 1, 1.5, "ease_in"));
-merging.track(mergeX, 2, 1, "linear");
+merging.at(2.33, (scene) => scene.track(mergeW, 1, {duration: 1.5, curve: "ease_in"}));
+merging.track(mergeX, 2, {duration: 1, curve: "linear"});
 // The functions of the tracks that merge on the ring run once for each frame of the tracks
 // before them, and the ring waits for the save to sample at the frames of both of its tracks.
 assert.equal(mergeHeard.length, 2 * (1 + 40 + 10));
@@ -2025,10 +2058,10 @@ const mergeScript = [
     "    heard[#heard + 1] = b",
     "    return {width = 1 + a, opacity = 1 - b / 2}",
     "end)",
-    's:tween({target = bar, size = {2, 0.4}}, 0.5, "linear")',
-    's:parallel(function() s:track(x, 4, 4, "linear") end, function() s:wait(1.05) s:track(z, 3, 1, "smooth") end)',
-    's:at(2.33, function() s:track(w, 1, 1.5, "ease_in") end)',
-    's:track(x, 2, 1, "linear") s:save(dot)',
+    's:tween({target = bar, size = {2, 0.4}}, {duration = 0.5, curve = "linear"})',
+    's:parallel(function() s:track(x, 4, {duration = 4, curve = "linear"}) end, function() s:wait(1.05) s:track(z, 3, {duration = 1, curve = "smooth"}) end)',
+    's:at(2.33, function() s:track(w, 1, {duration = 1.5, curve = "ease_in"}) end)',
+    's:track(x, 2, {duration = 1, curve = "linear"}) s:save(dot)',
     "return s",
 ].join("\n");
 const mergeHeardScript = mergeScript.replace(
@@ -2045,7 +2078,7 @@ assert.match(mergeLua, /\ntimes\[4\]=scene:time\(\);scene:seek\(times\[4\]\+0\.1
 assert.equal(mergeLua.match(/^local /gm).length, 3);
 assert.match(mergeLua, /\ntimes\[83\]=scene:time\(\)\n/);
 assert.match(mergeLua, /\nscene:seek\(times\[4\]\);scene:tween\(\{\{target=objects\[1\],/);
-assert.match(mergeLua, /\nscene:seek\(times\[14\]\);scene:tween\(\{\{target=objects\[1\],[^\n]*\},times\[45\]-times\[14\],"linear",0\)\n/);
+assert.match(mergeLua, /\nscene:seek\(times\[14\]\);scene:tween\(\{\{target=objects\[1\],[^\n]*\},\{duration=times\[45\]-times\[14\],curve="linear",lag=0\}\)\n/);
 assert.match(mergeLua, /\nscene:seek\(times\[4\]\);scene:tween\(\{\{target=objects\[2\],opacity=/);
 assert.match(mergeLua, /\nscene:seek\(times\[83\]\)\nscene:save\(objects\[1\]\)\n/);
 assert.match(compileScene(twin), recordsFrames);
@@ -2057,16 +2090,16 @@ const clash = vis.scene();
 const clashX = clash.tracker(0);
 clash.bind(clash.circle({ radius: 1 }), clashX, (x) => ({ opacity: x }));
 assert.throws(
-    () => clash.parallel((scene) => scene.track(clashX, 1, 2), (scene) => scene.wait(1).track(clashX, 0, 2)),
+    () => clash.parallel((scene) => scene.track(clashX, 1, {duration: 2}), (scene) => scene.wait(1).track(clashX, 0, {duration: 2})),
     /This track and an earlier one move the same tracker at once; a tracker has one value at a time/,
 );
 const replayed = vis.scene();
 const replayedX = replayed.tracker(0);
 const replayedZ = replayed.tracker(0);
 replayed.bind(replayed.circle({ radius: 1 }), [replayedX, replayedZ], (x, z) => ({ opacity: x, radius: 1 + z }));
-replayed.track(replayedX, 1, 2).fade(replayed.circle({ radius: 0.5 }), 0.5, 1);
+replayed.track(replayedX, 1, {duration: 2}).fade(replayed.circle({ radius: 0.5 }), 0.5, {duration: 1});
 assert.throws(
-    () => replayed.at(1, (scene) => scene.track(replayedZ, 1, 1)),
+    () => replayed.at(1, (scene) => scene.track(replayedZ, 1, {duration: 1})),
     new RegExp(
         "This track overlaps a track whose segments have already played on the same object; author tracks " +
             "that overlap with only wait, at, parallel, mark, bind, tracker and factories between them",
@@ -2078,12 +2111,12 @@ const brokenX = broken.tracker(0);
 const brokenZ = broken.tracker(0);
 broken.bind(broken.circle({ radius: 1 }), [brokenX, brokenZ], (x, z) => (x + z > 1.5 ? 1 : { opacity: x }));
 const brokenBefore = compileScene(broken);
-assert.throws(() => broken.track([[brokenX, 2]], 1), /A bound function must return a state object/);
+assert.throws(() => broken.track([[brokenX, 2]], {duration: 1}), /A bound function must return a state object/);
 assert.equal(brokenX.get(), 0);
 assert.equal(compileScene(broken), brokenBefore);
-broken.parallel((scene) => scene.track(brokenX, 1, 2), (scene) => scene.wait(1).track(brokenZ, 1, 1));
+broken.parallel((scene) => scene.track(brokenX, 1, {duration: 2}), (scene) => scene.wait(1).track(brokenZ, 1, {duration: 1}));
 assert.throws(() => compileScene(broken), /A bound function must return a state object/);
-assert.throws(() => broken.fade(broken.circle({ radius: 0.5 }), 0.5, 1), /A bound function must return a state object/);
+assert.throws(() => broken.fade(broken.circle({ radius: 0.5 }), 0.5, {duration: 1}), /A bound function must return a state object/);
 // A bound function runs as a sampling callback at bind, at track and where waiting tracks play,
 // so it cannot author the scene; an animation it started where tracks play used to play them
 // again without end.
@@ -2099,9 +2132,9 @@ authoring.bind(authoringDot, [authoringX, authoringZ], (x, z) => {
     return { opacity: x * z };
 });
 author = () => authoring.circle();
-assert.throws(() => authoring.track(authoringX, 1, 1), unavailable);
+assert.throws(() => authoring.track(authoringX, 1, {duration: 1}), unavailable);
 author = () => {};
-authoring.parallel((scene) => scene.track(authoringX, 1, 1), (scene) => scene.track(authoringZ, 1, 1));
+authoring.parallel((scene) => scene.track(authoringX, 1, {duration: 1}), (scene) => scene.track(authoringZ, 1, {duration: 1}));
 author = () => authoring.fade(authoringDot, 0.5);
 assert.throws(() => compileScene(authoring), unavailable);
 
@@ -2115,13 +2148,13 @@ const laterZ = later.tracker(1);
 const laterDot = later.circle({ radius: 0.2, id: "dot" });
 later.fadeIn(laterDot);
 later.bind(laterDot, [laterX, laterZ], (x, z) => ({ shift: [x, 0], radius: 0.2 * z }));
-later.parallel((scene) => scene.track(laterX, 2, 2, "linear"), (scene) => scene.wait(0.55).track(laterZ, 2, 1));
+later.parallel((scene) => scene.track(laterX, 2, {duration: 2, curve: "linear"}), (scene) => scene.wait(0.55).track(laterZ, 2, {duration: 1}));
 const nested = vis.scene({ width: 160, height: 90, fps: 10 });
 const nestedX = nested.tracker(0);
 const nestedZ = nested.tracker(1);
 const nestedDot = nested.circle({ radius: 0.2, id: "inner" });
 nested.bind(nestedDot, [nestedX, nestedZ], (x, z) => ({ shift: [x, 0], radius: 0.2 * z }));
-nested.parallel((scene) => scene.track(nestedX, 2, 2), (scene) => scene.wait(0.5).track(nestedZ, 2, 1));
+nested.parallel((scene) => scene.track(nestedX, 2, {duration: 2}), (scene) => scene.wait(0.5).track(nestedZ, 2, {duration: 1}));
 later.viewport(nested, { x: 0, y: 0, width: 0.5, height: 0.5 });
 const laterLua = compileScene(later);
 assert.match(laterLua, /\ntimes\[3\]=scene:time\(\);scene:seek\(times\[3\]\+0\.1\);times\[4\]=scene:time\(\)\n/);
@@ -2137,12 +2170,12 @@ const laterScript = [
     'local dot = s:circle {radius = 0.2, id = "dot"}',
     "s:fade_in(dot)",
     "s:bind(dot, {x, z}, function(a, b) return {shift = {a, 0}, radius = 0.2 * b} end)",
-    's:parallel(function() s:track(x, 2, 2, "linear") end, function() s:wait(0.55) s:track(z, 2, 1) end)',
+    's:parallel(function() s:track(x, 2, {duration = 2, curve = "linear"}) end, function() s:wait(0.55) s:track(z, 2, {duration = 1}) end)',
     "local inner = vis.scene {width = 160, height = 90, fps = 10}",
     "local ix = inner:tracker(0)",
     "local iz = inner:tracker(1)",
     'inner:bind(inner:circle {radius = 0.2, id = "inner"}, {ix, iz}, function(a, b) return {shift = {a, 0}, radius = 0.2 * b} end)',
-    "inner:parallel(function() inner:track(ix, 2, 2) end, function() inner:wait(0.5) inner:track(iz, 2, 1) end)",
+    "inner:parallel(function() inner:track(ix, 2, {duration = 2}) end, function() inner:wait(0.5) inner:track(iz, 2, {duration = 1}) end)",
     "s:viewport(inner, {x = 0, y = 0, width = 0.5, height = 0.5})",
     "return s",
 ].join("\n");
@@ -2152,7 +2185,7 @@ const apartZ = apart.tracker(1);
 const apartDot = apart.circle({ radius: 0.2, id: "dot" });
 apart.fadeIn(apartDot);
 apart.bind(apartDot, [apartX, apartZ], (x, z) => ({ shift: [x, 0], radius: 0.2 * z }));
-apart.track(apartX, 2, 2).at(1.5, (scene) => scene.track(apartZ, 2, 1));
+apart.track(apartX, 2, {duration: 2}).at(1.5, (scene) => scene.track(apartZ, 2, {duration: 1}));
 const apartLua = compileScene(apart);
 assert.match(apartLua, recordsFrames);
 
@@ -2171,21 +2204,21 @@ const pendingBeam = pending.line({ from: [-2, 0.5], to: [2, 0.5], width: 4, id: 
 pending.bind(pendingBeam, pendingZ, (b) => ({ to: [2, 0.5 + b] }));
 const pendingLens = pending.view({ x: 0.5, y: 0.5, width: 0.5, height: 0.5 }, { camera: { height: 2 } });
 const pendingOverlap = (a, b) => pending.parallel(
-    (scene) => scene.track(pendingX, a, 2, "linear"),
-    (scene) => scene.wait(1).track(pendingZ, b, 2, "linear"),
+    (scene) => scene.track(pendingX, a, {duration: 2, curve: "linear"}),
+    (scene) => scene.wait(1).track(pendingZ, b, {duration: 2, curve: "linear"}),
 );
 pendingOverlap(2, 1);
 pending.at(1.5, (scene) => scene.clone(pendingBow, { id: "copy" }));
 pendingOverlap(3, 0);
-pendingLens.look({ target: pendingDot }, 0.5);
+pendingLens.look({ target: pendingDot }, {duration: 0.5});
 pendingOverlap(4, 1);
 pending.view({ x: 0, y: 0, width: 0.5, height: 0.5 }, { camera: { target: pendingDot, height: 2 } });
 pendingOverlap(4.5, 0);
-pending.warp(pendingBeam, (x, y) => [x, y + 1], 1, "linear", { x_range: [-3, 3, 1], y_range: [-1, 3, 1] });
+pending.warp(pendingBeam, (x, y) => [x, y + 1], {duration: 1, curve: "linear", x_range: [-3, 3, 1], y_range: [-1, 3, 1]});
 const pendingLua = compileScene(pending);
 for (const call of [
     /objects\[\d+\],objects\[\d+\] = scene:clone\(objects\[1\],\{\["id"\]="copy"\}\)/,
-    /view1:look\(\{\["target"\]=objects\[2\]\},0\.5,"smooth"\)/,
+    /view1:look\(\{\["target"\]=objects\[2\]\},\{\["curve"\]="smooth",\["duration"\]=0\.5\}\)/,
     /local view2=scene:view\(/,
     /scene:warp\(objects\[3\],/,
 ]) {
@@ -2203,16 +2236,16 @@ const pendingScript = [
     "s:bind(beam, z, function(b) return {to = {2, 0.5 + b}} end)",
     "local lens = s:view({x = 0.5, y = 0.5, width = 0.5, height = 0.5}, {camera = {height = 2}})",
     "local function overlap(a, b)",
-    '    s:parallel(function() s:track(x, a, 2, "linear") end, function() s:wait(1) s:track(z, b, 2, "linear") end)',
+    '    s:parallel(function() s:track(x, a, {duration = 2, curve = "linear"}) end, function() s:wait(1) s:track(z, b, {duration = 2, curve = "linear"}) end)',
     "end",
     "overlap(2, 1)",
     's:at(1.5, function() s:clone(bow, {id = "copy"}) end)',
     "overlap(3, 0)",
-    "lens:look({target = dot}, 0.5)",
+    "lens:look({target = dot}, {duration = 0.5})",
     "overlap(4, 1)",
     "s:view({x = 0, y = 0, width = 0.5, height = 0.5}, {camera = {target = dot, height = 2}})",
     "overlap(4.5, 0)",
-    's:warp(beam, function(px, py) return px, py + 1 end, 1, "linear")',
+    's:warp(beam, function(px, py) return px, py + 1 end, {duration = 1, curve = "linear"})',
     "return s",
 ].join("\n");
 // A formula, like the other factories, and the lookup of its parts leave the tracks waiting, so
@@ -2221,9 +2254,9 @@ const quiet = vis.scene({ fps: 10 });
 const quietX = quiet.tracker(0);
 const quietZ = quiet.tracker(0);
 quiet.bind(quiet.circle({ radius: 1 }), [quietX, quietZ], (x, z) => ({ opacity: x, radius: 1 + z }));
-quiet.track(quietX, 1, 2);
+quiet.track(quietX, 1, {duration: 2});
 quiet.tex({ tex: "x^2" }).part("x");
-quiet.at(1, (scene) => scene.track(quietZ, 1, 1));
+quiet.at(1, (scene) => scene.track(quietZ, 1, {duration: 1}));
 assert.match(compileScene(quiet), recordsFrames);
 
 // A transform that turns and a morph add their change to a running shift, and a morph that
@@ -2232,19 +2265,19 @@ const layers = vis.scene({ width: 160, height: 80, camera: { mode: "fixed", view
 const bar = layers.rectangle({ center: [-2, 0], size: [2, 0.5], fill: "#ffffff", stroke: "#00000000", id: "bar" });
 const blob = layers.circle({ center: [-2, -1], radius: 0.5, fill: "#ffffff", stroke: "#00000000", id: "blob" });
 layers.parallel(
-    (scene) => scene.shift(bar, [4, 0], 2, "linear"),
-    (scene) => scene.wait(0.5).transform(bar, [0, -1, 0, 2, 1, 0, 0, 2, 0, 0, 1, 0, 0, 0, 0, 1], 1, "linear"),
-    (scene) => scene.shift(blob, [4, 0], 2, "linear"),
+    (scene) => scene.shift(bar, [4, 0], {duration: 2, curve: "linear"}),
+    (scene) => scene.wait(0.5).transform(bar, [0, -1, 0, 2, 1, 0, 0, 2, 0, 0, 1, 0, 0, 0, 0, 1], {duration: 1, curve: "linear"}),
+    (scene) => scene.shift(blob, [4, 0], {duration: 2, curve: "linear"}),
     (scene) => {
         scene.wait(1);
         const square = scene.rectangle({ center: [2, 0], size: [1, 1], fill: "#ffffff", stroke: "#00000000" });
-        scene.morph(blob, square, 1, "linear");
+        scene.morph(blob, square, {duration: 1, curve: "linear"});
     },
 );
 const layersLua = compileScene(layers);
 const hasty = vis.scene({ width: 160, height: 80 });
 const hastyDot = hasty.circle({ radius: 0.5, id: "dot" });
-hasty.shift(hastyDot, [1, 0], 2).at(1, (scene) => scene.morph(hastyDot, scene.rectangle({ size: [1, 1] }), 0.5));
+hasty.shift(hastyDot, [1, 0], {duration: 2}).at(1, (scene) => scene.morph(hastyDot, scene.rectangle({ size: [1, 1] }), {duration: 0.5}));
 const hastyLua = compileScene(hasty);
 
 const shapes = vis.scene({ width: 160, height: 90 });
@@ -2264,7 +2297,7 @@ shapes.tween(
         { target: caption, size: 40 },
         { target: strip, gradient: { type: "linear", stops: ["#00ff00", "#ffff00"] } },
     ],
-    1,
+    {duration: 1},
 );
 const shapesLua = compileScene(shapes);
 assert.match(shapesLua, /\{target=objects\[1\],width=4,radius=1\.5\}/);
@@ -2327,11 +2360,11 @@ connectedNode.circle({ radius: 1 });
 connectedNode.text({ text: "node" });
 const connectedSink = connected.circle({ center: [3, 3], radius: 0.5 });
 const connectedEdge = connected.connector(connectedNode, connectedSink, { id: "edge", padding: 0.1 });
-connected.create(connectedEdge, 0.5, "linear");
+connected.create(connectedEdge, {duration: 0.5, curve: "linear"});
 connected.fadeIn(connectedNode, { duration: 0.5 });
 const connectedToken = connected.circle({ radius: 0.1, id: "token" });
 connected.parallel(
-    (s) => s.shift(connectedSink, [1, 0], 1, "linear"),
+    (s) => s.shift(connectedSink, [1, 0], {duration: 1, curve: "linear"}),
     (s) => s.moveAlong(connectedToken, connectedEdge, { from: 1, to: 0, duration: 1, curve: "linear" }),
 );
 assert.match(compileScene(connected), /scene:connector \{from=objects\[1\],to=objects\[4\]/);
@@ -2343,11 +2376,11 @@ node:circle {radius = 1}
 node:text {text = "node"}
 local sink = s:circle {center = {3, 3}, radius = 0.5}
 local edge = s:connector {from = node, to = sink, id = "edge", padding = 0.1}
-s:create(edge, 0.5, "linear")
+s:create(edge, {duration = 0.5, curve = "linear"})
 s:fade_in(node, {duration = 0.5})
 local token = s:circle {radius = 0.1, id = "token"}
 s:parallel(
-    function() s:shift(sink, {1, 0}, 1, "linear") end,
+    function() s:shift(sink, {1, 0}, {duration = 1, curve = "linear"}) end,
     function() s:move_along(token, edge, {from = 1, to = 0, duration = 1, curve = "linear"}) end)
 return s
 `;
@@ -2377,7 +2410,7 @@ assert.equal(card.row(2), rowB);
 assert.equal(card.entry(1, 2), rowA2);
 assert.deepEqual(card.column(1), [rowA1, rowB1]);
 assert.deepEqual(card.column(2), [rowA2]);
-tree.tween({ target: card.entry(2, 1), opacity: 0.5 }, 1);
+tree.tween({ target: card.entry(2, 1), opacity: 0.5 }, {duration: 1});
 assert.ok(compileScene(tree).includes(`{{target=${rowB1.name},opacity=0.5}}`));
 assert.throws(() => card.row(3), /Row 3 is past the last of the group's 2 rows/);
 assert.throws(() => card.row(0), /Row takes a whole number from 1/);
@@ -2435,30 +2468,30 @@ const centering = vis.scene({ width: 160, height: 90, camera: { mode: "fixed", v
 const hub = centering.rectangle({ center: [3, 1], size: [2, 1], fill: "#ffffff", stroke: "#00000000", id: "hub" });
 const spoke = centering.circle({ center: [-2, -1], radius: 0.5, fill: "#ff0000", id: "spoke" });
 centering.parallel(
-    (scene) => scene.look({ target: [-4, 0] }, 2, "linear"),
-    (scene) => scene.wait(1).look({ target: hub }, 2, "linear"),
+    (scene) => scene.look({ target: [-4, 0] }, {duration: 2, curve: "linear"}),
+    (scene) => scene.wait(1).look({ target: hub }, {duration: 2, curve: "linear"}),
 );
 centering.look({ target: [hub, spoke], height: 6 });
 const centeringLua = compileScene(centering);
-assert.match(centeringLua, /scene:look\(\{\["target"\]=objects\[1\]\},2,"linear"\)/);
-assert.match(centeringLua, /scene:look\(\{\["height"\]=6,\["target"\]=\{objects\[1\],objects\[2\]\}\},1,"smooth"\)/);
-assert.match(compileScene(vis.scene().look({ target: [1, 2] })), /scene:look\(\{\["target"\]=\{1,2\}\},1,"smooth"\)/);
+assert.match(centeringLua, /scene:look\(\{\["target"\]=objects\[1\]\},\{\["curve"\]="linear",\["duration"\]=2\}\)/);
+assert.match(centeringLua, /scene:look\(\{\["height"\]=6,\["target"\]=\{objects\[1\],objects\[2\]\}\},\{\["curve"\]="smooth",\["duration"\]=1\}\)/);
+assert.match(compileScene(vis.scene().look({ target: [1, 2] })), /scene:look\(\{\["target"\]=\{1,2\}\},\{\["curve"\]="smooth",\["duration"\]=1\}\)/);
 assert.throws(() => centering.look({ target: vis.scene().circle({ radius: 1 }) }), /handles from the same scene/);
 assert.throws(() => centering.look({ target: [hub, [1, 2]] }), /handles from the same scene/);
 const centerScript = [
     'local s = vis.scene {width = 160, height = 90, camera = {mode = "fixed", view = "2d", height = 4}}',
     's:rectangle {center = {3, 1}, size = {2, 1}, fill = "#ffffff", stroke = "#00000000", id = "hub"}',
     's:circle {center = {-2, -1}, radius = 0.5, fill = "#ff0000", id = "spoke"}',
-    's:parallel(function() s:look({target = {-4, 0}}, 2, "linear") end,',
-    '    function() s:wait(1) s:look({target = {3, 1}}, 2, "linear") end)',
-    's:look({target = {0.75, 0}, height = 6}, 1, "smooth")',
+    's:parallel(function() s:look({target = {-4, 0}}, {duration = 2, curve = "linear"}) end,',
+    '    function() s:wait(1) s:look({target = {3, 1}}, {duration = 2, curve = "linear"}) end)',
+    's:look({target = {0.75, 0}, height = 6}, {duration = 1, curve = "smooth"})',
     "return s",
 ].join("\n");
 const aiming = vis.scene({ camera: { mode: "fixed", view: "3d", eye: [0, 0, 10], projection: "perspective" } });
 const rim = aiming.line({ from: [1, 0, -2], to: [3, 2, 0] });
 aiming.parallel(
     (scene) => scene.orbit(2 * Math.PI, { duration: 4, curve: "linear" }),
-    (scene) => scene.wait(1).look({ target: rim }, 2, "linear"),
+    (scene) => scene.wait(1).look({ target: rim }, {duration: 2, curve: "linear"}),
 );
 const aimingLua = compileScene(aiming);
 
@@ -2479,7 +2512,7 @@ const homing = vis.scene({
 });
 homing.rectangle({ center: [1, 0], size: [2, 1], fill: "#ffffff", stroke: "#00000000" });
 homing.circle({ center: [3, 1], radius: 0.5, fill: "#ff0000" });
-homing.orbit(Math.PI / 2).look({ fov: 0.9 }, 0.5).focus(null, { duration: 1, curve: "linear" });
+homing.orbit(Math.PI / 2).look({ fov: 0.9 }, {duration: 0.5}).focus(null, { duration: 1, curve: "linear" });
 const homeScript = [
     "local s = vis.scene {width = 160, height = 90,",
     '    camera = {mode = "fixed", view = "3d", eye = {4, -6, 5}, target = {1, 0, 0}, up = {0, 0, 1},',
@@ -2487,8 +2520,8 @@ const homeScript = [
     's:rectangle {center = {1, 0}, size = {2, 1}, fill = "#ffffff", stroke = "#00000000"}',
     's:circle {center = {3, 1}, radius = 0.5, fill = "#ff0000"}',
     "s:orbit(math.pi / 2)",
-    's:look({fov = 0.9}, 0.5, "smooth")',
-    's:look({eye = {4, -6, 5}, target = {1, 0, 0}, up = {0, 0, 1}, fov = 0.6}, 1, "linear")',
+    's:look({fov = 0.9}, {duration = 0.5, curve = "smooth"})',
+    's:look({eye = {4, -6, 5}, target = {1, 0, 0}, up = {0, 0, 1}, fov = 0.6}, {duration = 1, curve = "linear"})',
     "return s",
 ].join("\n");
 const flattening = vis.scene({ width: 160, height: 90 });
@@ -2509,30 +2542,30 @@ const lens = magnified.view({ x: 0.5, y: 0, width: 0.5, height: 0.5 }, {
 });
 assert.ok(lens instanceof ViewHandle);
 assert.ok(Object.isFrozen(lens));
-assert.equal(lens.fade(1, 0.5), lens);
-assert.equal(lens.look({ height: 1.5 }, 1, "linear").focus(speck, { padding: 0.5, duration: 0.5 }).focus(), lens);
+assert.equal(lens.fade(1, {duration: 0.5}), lens);
+assert.equal(lens.look({ height: 1.5 }, {duration: 1, curve: "linear"}).focus(speck, { padding: 0.5, duration: 0.5 }).focus(), lens);
 let overview;
 magnified.at(0.25, (scene) => {
     overview = scene.view({ x: 0, y: 0.5, width: 0.25, height: 0.5 }, {
         camera: { target: [2, 0], height: 4 }, optical: false,
     });
 });
-overview.look({ target: [cover, speck] }, 0.5).fade(0.5, 0.25, "linear");
+overview.look({ target: [cover, speck] }, {duration: 0.5}).fade(0.5, {duration: 0.25, curve: "linear"});
 const magnifiedLua = compileScene(magnified);
 assert.match(magnifiedLua, new RegExp([
     'local view1=scene:view\\(\\{\\["height"\\]=0\\.5,\\["width"\\]=0\\.5,\\["x"\\]=0\\.5,\\["y"\\]=0\\},',
     '\\{\\["background"\\]="#05080d",\\["camera"\\]=\\{\\["height"\\]=3,\\["target"\\]=objects\\[1\\]\\},',
     '\\["follow"\\]=objects\\[1\\],\\["hide"\\]=\\{objects\\[2\\]\\},\\["layer"\\]=0,\\["opacity"\\]=0\\}\\)\n',
-    'view1:fade\\(1,0\\.5,"smooth"\\)\n',
-    'view1:look\\(\\{\\["height"\\]=1\\.5\\},1,"linear"\\)\n',
+    'view1:fade\\(1,\\{\\["curve"\\]="smooth",\\["duration"\\]=0\\.5\\}\\)\n',
+    'view1:look\\(\\{\\["height"\\]=1\\.5\\},\\{\\["curve"\\]="linear",\\["duration"\\]=1\\}\\)\n',
     'view1:focus\\(objects\\[1\\],\\{\\["duration"\\]=0\\.5,\\["padding"\\]=0\\.5\\}\\)\n',
     'view1:focus\\(nil,\\{\\}\\)\n',
     'times\\[1\\]=scene:time\\(\\);scene:seek\\(0\\.25\\)\n',
     'local view2=scene:view\\(\\{\\["height"\\]=0\\.5,\\["width"\\]=0\\.25,\\["x"\\]=0,\\["y"\\]=0\\.5\\},',
     '\\{\\["camera"\\]=\\{\\["height"\\]=4,\\["target"\\]=\\{2,0\\}\\},\\["optical"\\]=false\\}\\)\n',
     'scene:seek\\(times\\[1\\]\\)\n',
-    'view2:look\\(\\{\\["target"\\]=\\{objects\\[2\\],objects\\[1\\]\\}\\},0\\.5,"smooth"\\)\n',
-    'view2:fade\\(0\\.5,0\\.25,"linear"\\)\n',
+    'view2:look\\(\\{\\["target"\\]=\\{objects\\[2\\],objects\\[1\\]\\}\\},\\{\\["curve"\\]="smooth",\\["duration"\\]=0\\.5\\}\\)\n',
+    'view2:fade\\(0\\.5,\\{\\["curve"\\]="linear",\\["duration"\\]=0\\.25\\}\\)\n',
 ].join("")));
 const lensScript = [
     'local s = vis.scene {width = 160, height = 90, camera = {mode = "fixed", view = "2d", height = 9}}',
@@ -2541,14 +2574,14 @@ const lensScript = [
     '    fill = "#0000ff", stroke = "#00000000", layer = 1, id = "cover"}',
     "local lens = s:view({x = 0.5, y = 0, width = 0.5, height = 0.5}, {camera = {target = speck, height = 3},",
     '    follow = speck, hide = cover, layer = 0, background = "#05080d", opacity = 0})',
-    'lens:fade(1, 0.5) lens:look({height = 1.5}, 1, "linear")',
+    'lens:fade(1, {duration = 0.5}) lens:look({height = 1.5}, {duration = 1, curve = "linear"})',
     "lens:focus(speck, {padding = 0.5, duration = 0.5}) lens:focus()",
     "local overview",
     "s:at(0.25, function()",
     "    overview = s:view({x = 0, y = 0.5, width = 0.25, height = 0.5}, {camera = {target = {2, 0}, height = 4},",
     "        optical = false})",
     "end)",
-    'overview:look({target = {cover, speck}}, 0.5) overview:fade(0.5, 0.25, "linear")',
+    'overview:look({target = {cover, speck}}, {duration = 0.5}) overview:fade(0.5, {duration = 0.25, curve = "linear"})',
     "return s",
 ].join("\n");
 
@@ -2574,9 +2607,9 @@ assert.throws(() => magnified.view(viewRect, { follow: stranger }), /handles fro
 assert.throws(() => magnified.view(viewRect, { camera: { target: stranger } }), /handles from the same scene/);
 assert.throws(() => magnified.view(viewRect, { hide: Array(257).fill(speck) }), /A view hides at most 256 objects/);
 for (const duration of [0, -1, Number.NaN]) {
-    assert.throws(() => lens.fade(0.5, duration), /View fade duration must be a positive number/);
+    assert.throws(() => lens.fade(0.5, {duration}), /Timing duration must be a finite positive number/);
 }
-assert.throws(() => lens.fade(0.5, 1, "wobble"), /Unknown animation curve preset: wobble/);
+assert.throws(() => lens.fade(0.5, {duration: 1, curve: "wobble"}), /Unknown animation curve preset: wobble/);
 assert.throws(() => lens.orbit(0), /non-zero/);
 assert.throws(() => lens.focus([]), /Focus targets must be a handle or a non-empty array of handles/);
 assert.throws(() => lens.focus(speck, { easing: "linear" }), /Unknown Focus option: easing/);
@@ -2601,7 +2634,7 @@ assert.throws(() => sealed.view(viewRect), /sealed/);
 // The script checks the timing: the fades of a view follow one another. A 3D view orbits.
 const hurried = vis.scene();
 const hurriedView = hurried.view(viewRect, { opacity: 0 });
-hurried.parallel(() => hurriedView.fade(1, 1), () => hurriedView.fade(0.5, 1));
+hurried.parallel(() => hurriedView.fade(1, {duration: 1}), () => hurriedView.fade(0.5, {duration: 1}));
 const hurriedLua = compileScene(hurried);
 const turning = vis.scene({ camera: { mode: "fixed", view: "3d", eye: [0, 0, 10], projection: "perspective" } });
 turning.point({ point: [2, 0, 0] });
@@ -2621,7 +2654,7 @@ reserved.space({ x: [-100, 100, 50], y: [-70, 70, 50], width: 1, axis_width: 2, 
 const reservedNumber = reserved.number({ tabular: true, value: 1.5, decimals: 2, reserve: "-000.00", align: [1, 0.5], id: "n" });
 reserved.matrix({ tabular: true, rows: [[1, 2], [3, 4]], reserve: ["-000.00", "00"], justify: "right", id: "m" });
 reserved.text({ tabular: true, text: "x1", reserve: "long text", point: [0, -50] });
-reserved.tween({ target: reservedNumber, value: -3 }, 1, "linear");
+reserved.tween({ target: reservedNumber, value: -3 }, {duration: 1, curve: "linear"});
 assert.throws(() => reserved.number({ reserve: false }), /Text reserve must be a string/);
 assert.throws(() => reserved.number({ tabular: 1 }), /Text tabular must be a boolean/);
 assert.throws(() => reserved.matrix({ rows: [[1]], tabular: "yes" }), /Matrix tabular must be a boolean/);
@@ -2637,30 +2670,30 @@ assert.throws(() => reserved.matrix({ rows: [[1, 2]], reserve: ["0"] }), /Matrix
 const counting = vis.scene({ width: 320, height: 180 });
 const counted = counting.number({ value: 0, separator: ",", prefix: "n = ", id: "count" });
 counting.set({ target: counted, value: 5 });
-counting.tween({ target: counted, value: 1000 }, 2, "linear");
+counting.tween({ target: counted, value: 1000 }, {duration: 2, curve: "linear"});
 const countingLua = compileScene(counting);
 assert.match(countingLua, /objects\[1\] = scene:number \{\["id"\]="count",\["prefix"\]="n = ",\["separator"\]=",",\["value"\]=0\}/);
 assert.match(countingLua, /scene:set\(\{\{target=objects\[1\],value=5\}\}\)/);
-assert.match(countingLua, /scene:tween\(\{\{target=objects\[1\],value=1000\}\},2,"linear",0\)/);
+assert.match(countingLua, /scene:tween\(\{\{target=objects\[1\],value=1000\}\},\{\["curve"\]="linear",\["duration"\]=2,\["lag"\]=0\}\)/);
 
 // A text or label changes its string as tween and set animate text, beside a move.
 const retitled = vis.scene({ width: 320, height: 180 });
 const title = retitled.text({ text: "cat", id: "title" });
 const retitledCaption = retitled.rectangle({ size: [1, 1] }).label({ text: "Hello world", id: "caption" });
 retitled.set({ target: title, text: "draft" });
-retitled.tween([{ target: title, text: "horse", shift: [1, 0] }, { target: retitledCaption, text: "Hello there", retype: true }], 1, "linear");
+retitled.tween([{ target: title, text: "horse", shift: [1, 0] }, { target: retitledCaption, text: "Hello there", retype: true }], {duration: 1, curve: "linear"});
 const retitledLua = compileScene(retitled);
 assert.match(retitledLua, /scene:set\(\{\{target=objects\[1\],text="draft"\}\}\)/);
 assert.match(
     retitledLua,
-    /scene:tween\(\{\{target=objects\[1\],shift=\{1,0\},text="horse"\},\{target=objects\[3\],text="Hello there",retype=true\}\},1,"linear",0\)/,
+    /scene:tween\(\{\{target=objects\[1\],shift=\{1,0\},text="horse"\},\{target=objects\[3\],text="Hello there",retype=true\}\},\{\["curve"\]="linear",\["duration"\]=1,\["lag"\]=0\}\)/,
 );
 const textModes = vis.scene({ width: 320, height: 180 });
 const textMode = textModes.text({ text: "VISCRIPT", id: "sentence" });
-textModes.tween({ target: textMode, text: "Hello, API" }, 1, "linear");
-textModes.tween({ target: textMode, text: "Fade", retype: false, sweep: false }, 1, "linear");
-textModes.tween({ target: textMode, text: "Sweep", sweep: true, retype: false }, 1, "linear");
-textModes.tween({ target: textMode, text: "Retype", retype: true, sweep: false }, 1, "linear");
+textModes.tween({ target: textMode, text: "Hello, API" }, {duration: 1, curve: "linear"});
+textModes.tween({ target: textMode, text: "Fade", retype: false, sweep: false }, {duration: 1, curve: "linear"});
+textModes.tween({ target: textMode, text: "Sweep", sweep: true, retype: false }, {duration: 1, curve: "linear"});
+textModes.tween({ target: textMode, text: "Retype", retype: true, sweep: false }, {duration: 1, curve: "linear"});
 const textModesLua = compileScene(textModes);
 assert.match(textModesLua, /text="Hello, API"\}\}/);
 assert.match(textModesLua, /text="Fade",retype=false,sweep=false/);
@@ -2690,11 +2723,11 @@ const layered = vis.scene({ width: 320, height: 180 });
 const layeredBack = layered.rectangle({ size: [1, 1], id: "back" });
 const layeredFront = layered.circle({ radius: 0.5, layer: 1, id: "front" });
 layered.set({ target: layeredBack, layer: 2 });
-layered.tween({ target: layeredBack, layer: 0, shift: [1, 0] }, 1, "linear");
+layered.tween({ target: layeredBack, layer: 0, shift: [1, 0] }, {duration: 1, curve: "linear"});
 layered.set({ target: layeredFront, layer: -1 });
 const layeredLua = compileScene(layered);
 assert.match(layeredLua, /scene:set\(\{\{target=objects\[1\],layer=2\}\}\)/);
-assert.match(layeredLua, /scene:tween\(\{\{target=objects\[1\],shift=\{1,0\},layer=0\}\},1,"linear",0\)/);
+assert.match(layeredLua, /scene:tween\(\{\{target=objects\[1\],shift=\{1,0\},layer=0\}\},\{\["curve"\]="linear",\["duration"\]=1,\["lag"\]=0\}\)/);
 assert.match(layeredLua, /scene:set\(\{\{target=objects\[2\],layer=-1\}\}\)/);
 assert.throws(() => layered.tween({ target: layeredBack, layer: 1.5 }), /Animation layer must be an integer/);
 assert.throws(() => layered.set({ target: layeredBack, layer: 2 ** 31 }), /Animation layer must fit in 32 bits/);
@@ -2707,22 +2740,22 @@ const saving = vis.scene({ width: 160, height: 80, camera: { height: 4 } });
 const savingCard = saving.rectangle({ center: [-2, 0], size: [1, 1], id: "card" });
 const savingDot = saving.circle({ center: [2, 0], radius: 0.5, id: "dot" });
 saving.save([savingCard, savingDot]);
-saving.tween([{ target: savingCard, shift: [1, 1] }, { target: savingDot, layer: 3 }], 1);
-saving.restore(savingCard, 1, "linear");
+saving.tween([{ target: savingCard, shift: [1, 1] }, { target: savingDot, layer: 3 }], {duration: 1});
+saving.restore(savingCard, {duration: 1, curve: "linear"});
 saving.restore(savingDot);
 saving.save(savingCard);
-saving.restore(savingCard, 0.5);
+saving.restore(savingCard, {duration: 0.5});
 const savingLua = compileScene(saving);
 assert.match(savingLua, /scene:save\(\{objects\[1\],objects\[2\]\}\)/);
-assert.match(savingLua, /scene:restore\(objects\[1\],1,"linear",0\)/);
-assert.match(savingLua, /scene:restore\(objects\[2\],0,"smooth",0\)/);
-assert.match(savingLua, /scene:save\(objects\[1\]\)\nscene:restore\(objects\[1\],0\.5,"smooth",0\)/);
-assert.throws(() => saving.restore(savingCard, -1), /Restore duration must be zero or a positive number of seconds/);
-assert.throws(() => saving.restore(savingCard, 1, "linear", -0.5), /Restore lag must be zero or positive/);
+assert.match(savingLua, /scene:restore\(objects\[1\],\{\["curve"\]="linear",\["duration"\]=1,\["lag"\]=0\}\)/);
+assert.match(savingLua, /scene:restore\(objects\[2\],\{\["curve"\]="smooth",\["duration"\]=0,\["lag"\]=0\}\)/);
+assert.match(savingLua, /scene:save\(objects\[1\]\)\nscene:restore\(objects\[1\],\{\["curve"\]="smooth",\["duration"\]=0\.5,\["lag"\]=0\}\)/);
+assert.throws(() => saving.restore(savingCard, {duration: -1}), /Restore duration must be a finite non-negative number/);
+assert.throws(() => saving.restore(savingCard, {duration: 1, curve: "linear", lag: -0.5}), /Lag must be finite and non-negative/);
 assert.throws(() => saving.save([]), /Animation targets must be handles from the same scene/);
 assert.throws(() => saving.restore(layeredBack), /Animation targets must be handles from the same scene/);
 const unsaved = vis.scene({ width: 160, height: 80 });
-unsaved.restore(unsaved.circle({ radius: 0.5, id: "lonely" }), 1);
+unsaved.restore(unsaved.circle({ radius: 0.5, id: "lonely" }), {duration: 1});
 const unsavedLua = compileScene(unsaved);
 
 // Spans name every text they make, in the order the scene sets them.
@@ -2744,15 +2777,15 @@ assert.equal(spanned.find("brown"), sentence.children()[2]);
 assert.equal(spanned.find("sentence/1"), sentence.children()[0]);
 assert.equal(spanned.find("sentence/4"), sentence.children()[3]);
 assert.equal(spanned.find("sentence/3"), null);
-spanned.write(sentence.children(), 1, "smooth", 0.2);
-spanned.fill(spanned.find("brown"), "#ff0000", 0.5);
+spanned.write(sentence.children(), {duration: 1, curve: "smooth", lag: 0.2});
+spanned.fill(spanned.find("brown"), "#ff0000", {duration: 0.5});
 assert.throws(() => spanned.spans([]), /non-empty array/);
 assert.throws(() => spanned.spans("text"), /non-empty array/);
 assert.throws(() => spanned.spans([3]), /string or a plain object/);
 const spannedLua = compileScene(spanned);
 assert.match(spannedLua, /(objects\[\d+\]) = scene:spans \{"The quick ",\{\["color"\]="#a0522d",\["id"\]="brown",\["text"\]="brown"\}," fox",\["id"\]="sentence",\["point"\]=\{0,1,0\},\["split"\]="words"\}\n(objects\[\d+\]) = \1:children\(\)/);
-assert.match(spannedLua, /scene:write\(\{objects\[2\]\[1\],objects\[2\]\[2\],objects\[2\]\[3\],objects\[2\]\[4\]\},1,"smooth",0\.2\)/);
-assert.match(spannedLua, /scene:fill\(objects\[2\]\[3\],"#ff0000",0\.5,"smooth"\)/);
+assert.match(spannedLua, /scene:write\(\{objects\[2\]\[1\],objects\[2\]\[2\],objects\[2\]\[3\],objects\[2\]\[4\]\},\{\["curve"\]="smooth",\["duration"\]=1,\["lag"\]=0\.2\}\)/);
+assert.match(spannedLua, /scene:fill\(objects\[2\]\[3\],"#ff0000",\{\["curve"\]="smooth",\["duration"\]=0\.5\}\)/);
 assert.match(spannedLua, /scene:group \{\["id"\]="block",\["typeset"\]=true\}/);
 
 // A match pairs the pieces of two rows: texts that read the same travel, given pairs cross-fade.
@@ -2760,43 +2793,41 @@ const matching = vis.scene({ width: 320, height: 180 });
 const firstRow = matching.spans(["a²", " + ", "b²", " = ", "c²"], { id: "first" });
 matching.wait(0.5);
 const secondRow = matching.spans(["c²", " = ", "a²", " + ", "b²"], { id: "second" });
-matching.matchTransform(firstRow, secondRow, 1.5, "smooth", { arc: Math.PI / 2 });
+matching.matchTransform(firstRow, secondRow, {duration: 1.5, curve: "smooth", arc: Math.PI / 2});
 const rootRow = matching.spans(["c", " = ", "√(", "a²", " + ", "b²", ")"], { id: "root" });
-matching.matchTransform(secondRow, rootRow, 1, "linear", {
-    pairs: [[matching.find("second/1"), matching.find("root/1")]],
-    lag: 0.1,
-});
+matching.matchTransform(secondRow, rootRow, {duration: 1, curve: "linear", pairs: [[matching.find("second/1"), matching.find("root/1")]],
+    lag: 0.1,});
 assert.throws(() => matching.matchTransform(rootRow, rootRow), /distinct handles/);
-assert.throws(() => matching.matchTransform(firstRow, rootRow, 1, "smooth", { spin: 1 }), /Unknown MatchTransform option: spin/);
-assert.throws(() => matching.matchTransform(firstRow, rootRow, 1, "smooth", { arc: 7 }), /arc must be a finite angle/);
-assert.throws(() => matching.matchTransform(firstRow, rootRow, 1, "smooth", { lag: -1 }), /lag must be a finite number/);
-assert.throws(() => matching.matchTransform(firstRow, rootRow, 1, "smooth", { pairs: [[firstRow]] }), /pairs must be an array/);
-assert.throws(() => matching.matchTransform(firstRow, rootRow, 1, "smooth", { strings: "no" }), /strings must be a boolean/);
+assert.throws(() => matching.matchTransform(firstRow, rootRow, {duration: 1, curve: "smooth", spin: 1}), /Unknown MatchTransform option: spin/);
+assert.throws(() => matching.matchTransform(firstRow, rootRow, {duration: 1, curve: "smooth", arc: 7}), /arc must be a finite angle/);
+assert.throws(() => matching.matchTransform(firstRow, rootRow, {duration: 1, curve: "smooth", lag: -1}), /Lag must be finite and non-negative/);
+assert.throws(() => matching.matchTransform(firstRow, rootRow, {duration: 1, curve: "smooth", pairs: [[firstRow]]}), /pairs must be an array/);
+assert.throws(() => matching.matchTransform(firstRow, rootRow, {duration: 1, curve: "smooth", strings: "no"}), /strings must be a boolean/);
 const plain = vis.scene({ width: 320, height: 180 });
 const plainFrom = plain.spans(["x"]);
 const plainTo = plain.spans(["x"]);
-plain.matchTransform(plainFrom, plainTo, 1, "smooth", { strings: false });
-assert.match(compileScene(plain), /scene:match_transform\(objects\[1\],objects\[3\],1,"smooth",\{\["strings"\]=false\}\)/);
-assert.throws(() => matching.matchTransform(firstRow, rootRow, 1, "smooth", { diff: 1 }), /diff must be a boolean/);
+plain.matchTransform(plainFrom, plainTo, {duration: 1, curve: "smooth", strings: false});
+assert.match(compileScene(plain), /scene:match_transform\(objects\[1\],objects\[3\],\{\["duration"\]=1,\["curve"\]="smooth",\["lag"\]=0,\["strings"\]=false\}\)/);
+assert.throws(() => matching.matchTransform(firstRow, rootRow, {duration: 1, curve: "smooth", diff: 1}), /diff must be a boolean/);
 const edits = vis.scene({ width: 320, height: 180 });
 const before = edits.code({ text: "a b\nc", language: "lua" });
 const after = edits.code({ text: "c\nb a", language: "lua" });
-edits.matchTransform(before, after, 1, "smooth", { diff: true, fade: 0.4 });
-assert.match(compileScene(edits), /scene:match_transform\(objects\[1\],objects\[\d+\],1,"smooth",\{\["diff"\]=true,\["fade"\]=0\.4\}\)/);
-assert.throws(() => matching.matchTransform(firstRow, rootRow, 1, "smooth", { fade: 0 }), /fade must be a share of the duration/);
+edits.matchTransform(before, after, {duration: 1, curve: "smooth", diff: true, fade: 0.4});
+assert.match(compileScene(edits), /scene:match_transform\(objects\[1\],objects\[\d+\],\{\["duration"\]=1,\["curve"\]="smooth",\["lag"\]=0,\["diff"\]=true,\["fade"\]=0\.4\}\)/);
+assert.throws(() => matching.matchTransform(firstRow, rootRow, {duration: 1, curve: "smooth", fade: 0}), /fade must be a share of the duration/);
 const bars = vis.scene({ width: 320, height: 180 });
 const twoBars = bars.group();
 twoBars.rectangle({ center: [-1, 0], size: [2, 1] });
 const fourBars = bars.group();
 fourBars.rectangle({ center: [-1.5, 0], size: [0.8, 1] });
-bars.matchTransform(twoBars, fourBars, 1, "smooth", { shapes: true });
-assert.match(compileScene(bars), /scene:match_transform\(objects\[1\],objects\[3\],1,"smooth",\{\["shapes"\]=true\}\)/);
-assert.throws(() => bars.matchTransform(twoBars, fourBars, 1, "smooth", { shapes: "yes" }), /shapes must be a boolean/);
+bars.matchTransform(twoBars, fourBars, {duration: 1, curve: "smooth", shapes: true});
+assert.match(compileScene(bars), /scene:match_transform\(objects\[1\],objects\[3\],\{\["duration"\]=1,\["curve"\]="smooth",\["lag"\]=0,\["shapes"\]=true\}\)/);
+assert.throws(() => bars.matchTransform(twoBars, fourBars, {duration: 1, curve: "smooth", shapes: "yes"}), /shapes must be a boolean/);
 const matchingLua = compileScene(matching);
-assert.match(matchingLua, /scene:match_transform\(objects\[1\],objects\[3\],1\.5,"smooth",\{\["arc"\]=1\.5707963267948966\}\)/);
+assert.match(matchingLua, /scene:match_transform\(objects\[1\],objects\[3\],\{\["duration"\]=1\.5,\["curve"\]="smooth",\["arc"\]=1\.5707963267948966,\["lag"\]=0\}\)/);
 assert.match(
     matchingLua,
-    /scene:match_transform\(objects\[3\],objects\[5\],1,"linear",\{\["lag"\]=0\.1,\["pairs"\]=\{\{objects\[4\]\[1\],objects\[6\]\[1\]\}\}\}\)/,
+    /scene:match_transform\(objects\[3\],objects\[5\],\{\["duration"\]=1,\["curve"\]="linear",\["lag"\]=0\.1,\["pairs"\]=\{\{objects\[4\]\[1\],objects\[6\]\[1\]\}\}\}\)/,
 );
 
 // Code names its lines and tokens as the native factory splits them, blank lines too.
@@ -2815,8 +2846,8 @@ assert.equal(coded.find("listing/2/1").name, coded.find("listing/2").children()[
 assert.equal(coded.find("listing/4/7"), listing.children()[3].children()[6]);
 assert.equal(coded.find("listing/4/8"), null);
 assert.equal(nestedCode.children()[0].children().length, 3);
-coded.write(listing.children()[3].children(), 1, "smooth", 0.1);
-coded.fill(coded.find("listing/2/4"), "#ff0000", 0.5);
+coded.write(listing.children()[3].children(), {duration: 1, curve: "smooth", lag: 0.1});
+coded.fill(coded.find("listing/2/4"), "#ff0000", {duration: 0.5});
 coded.highlight(listing, 2, 4, { dim: 0.3, duration: 1 });
 coded.highlight(listing, coded.find("listing/2/2"));
 coded.highlight(listing, [coded.find("listing/4/1"), coded.find("listing/4/3")], { curve: "linear" });
@@ -2847,8 +2878,8 @@ assert.match(
     codedLua,
     /(objects\[\d+\]) = scene:code \{\["id"\]="listing",\["language"\]="lua",\["size"\]=16,\["text"\]="--\[\[ a\\n  b \]\] local x = 1\\n\\nprint\(x, 'y'\) -- z\\n"\}\n(objects\[\d+\]) = \1:children\(\)\n(objects\[\d+\]) = \{\} for i, line in ipairs\(\2\) do \3\[i\] = line:children\(\) end/,
 );
-assert.match(codedLua, /scene:write\(\{objects\[3\]\[4\]\[1\],objects\[3\]\[4\]\[2\],objects\[3\]\[4\]\[3\],objects\[3\]\[4\]\[4\],objects\[3\]\[4\]\[5\],objects\[3\]\[4\]\[6\],objects\[3\]\[4\]\[7\]\},1,"smooth",0\.1\)/);
-assert.match(codedLua, /scene:fill\(objects\[3\]\[2\]\[4\],"#ff0000",0\.5,"smooth"\)/);
+assert.match(codedLua, /scene:write\(\{objects\[3\]\[4\]\[1\],objects\[3\]\[4\]\[2\],objects\[3\]\[4\]\[3\],objects\[3\]\[4\]\[4\],objects\[3\]\[4\]\[5\],objects\[3\]\[4\]\[6\],objects\[3\]\[4\]\[7\]\},\{\["curve"\]="smooth",\["duration"\]=1,\["lag"\]=0\.1\}\)/);
+assert.match(codedLua, /scene:fill\(objects\[3\]\[2\]\[4\],"#ff0000",\{\["curve"\]="smooth",\["duration"\]=0\.5\}\)/);
 assert.match(codedLua, /objects\[5\] = objects\[4\]:code \{\["text"\]="a  =\\tb"\}/);
 assert.match(codedLua, /scene:highlight\(objects\[1\],2,4,\{\["dim"\]=0\.3,\["duration"\]=1\}\)/);
 assert.match(codedLua, /scene:highlight\(objects\[1\],objects\[3\]\[2\]\[2\]\)/);
@@ -2859,12 +2890,12 @@ assert.match(codedLua, /scene:highlight\(objects\[1\]\)\n/);
 const pinnedCode = vis.scene({ width: 320, height: 180, camera: {height: 180} });
 const pinnedBlock = pinnedCode.code({text: "iii WWW\n\nMM", point: [-120, 60], align: [0, 1],
     size: 18, baseline: true, pitch: 36, id: "pin"});
-pinnedCode.fade(pinnedBlock, 0.5, 1, "linear");
+pinnedCode.fade(pinnedBlock, 0.5, {duration: 1, curve: "linear"});
 const pinnedCodeScript = `
 local s = vis.scene {width = 320, height = 180, camera = {height = 180}}
 local b = s:code {text = "iii WWW\\n\\nMM", point = {-120, 60}, align = {0, 1},
     size = 18, baseline = true, pitch = 36, id = "pin"}
-s:fade(b, 0.5, 1, "linear")
+s:fade(b, 0.5, {duration = 1, curve = "linear"})
 return s
 `;
 assert.match(compileScene(pinnedCode), /\["baseline"\]=true/);
@@ -2919,11 +2950,11 @@ const third = sums.edit(second, [
     { replace: [1, 2], with: "local n, sum = 10, 0" },
     { prepend: "-- squares" },
     { insert: "  -- add", after: 3 },
-], 2, "linear", { fade: 0.5 });
+], {duration: 2, curve: "linear", fade: 0.5});
 assert.equal(sums.find("sum.3"), third);
 assert.deepEqual(third.children().map((line) => line.children().length), [1, 8, 7, 1, 7, 1, 2]);
 const last = sums.edit(third, [{ remove: [4, 4] }, { remove: " * i" }, { replace: "sum", with: "total", match: "last" }],
-    0.5, "smooth", { id: "final" });
+    {duration: 0.5, curve: "smooth", id: "final"});
 assert.equal(sums.find("final"), last);
 assert.deepEqual(last.children().map((line) => line.children().length), [1, 8, 7, 5, 1, 2]);
 assert.deepEqual(last.search("total"), found("final/6/2"));
@@ -2932,7 +2963,7 @@ const reworded = sums.edit(word, { replace: "café", with: "cafe", match: "all" 
 assert.equal(holder.children().at(-1), reworded);
 assert.equal(sums.find("word.2/2/3"), reworded.entry(2, 3));
 // Blank lines that end a text with no line feed of its own stay lines in the script.
-const spaced = sums.edit(reworded, { insert: "\n\n", after: "print(cafe)" }, 0.5);
+const spaced = sums.edit(reworded, { insert: "\n\n", after: "print(cafe)" }, {duration: 0.5});
 assert.equal(spaced.children().length, 3);
 assert.equal(sums.find("word.3/3"), spaced.row(3));
 const sumsLua = compileScene(sums);
@@ -2944,15 +2975,15 @@ assert.match(
 assert.match(sumsLua, /objects\[8\] = scene:rectangle \{\["around"\]=\{objects\[3\]\[2\]\[4\],objects\[3\]\[2\]\[5\],objects\[3\]\[2\]\[6\]\},\["id"\]="box",\["padding"\]=0\.1\}/);
 assert.match(
     sumsLua,
-    /objects\[9\] = scene:edit\(objects\[1\],\{\{\["replace"\]=\{1,5\},\["with"\]="local n = 10\\nlocal total = 0\\nfor i = 1, n do\\n  total = total \+ i\\nend\\nreturn total\\n"\}\},1,"smooth",\{\["id"\]="sum\.2"\}\)\nobjects\[10\] = objects\[9\]:children\(\)/,
+    /objects\[9\] = scene:edit\(objects\[1\],\{\{\["replace"\]=\{1,5\},\["with"\]="local n = 10\\nlocal total = 0\\nfor i = 1, n do\\n  total = total \+ i\\nend\\nreturn total\\n"\}\},\{\["duration"\]=1,\["curve"\]="smooth",\["id"\]="sum\.2",\["lag"\]=0\}\)\nobjects\[10\] = objects\[9\]:children\(\)/,
 );
 assert.match(
     sumsLua,
-    /objects\[12\] = scene:edit\(objects\[9\],\{\{\["replace"\]=\{1,6\},\["with"\]="-- squares\\nlocal n, sum = 10, 0\\nfor i = 1, n do\\n  -- add\\n  sum = sum \+ i \* i\\nend\\nreturn sum\\n"\}\},2,"linear",\{\["id"\]="sum\.3",\["fade"\]=0\.5\}\)/,
+    /objects\[12\] = scene:edit\(objects\[9\],\{\{\["replace"\]=\{1,6\},\["with"\]="-- squares\\nlocal n, sum = 10, 0\\nfor i = 1, n do\\n  -- add\\n  sum = sum \+ i \* i\\nend\\nreturn sum\\n"\}\},\{\["duration"\]=2,\["curve"\]="linear",\["id"\]="sum\.3",\["lag"\]=0,\["fade"\]=0\.5\}\)/,
 );
-assert.match(sumsLua, /objects\[15\] = scene:edit\(objects\[12\],\{\{\["replace"\]=\{1,7\},\["with"\]="-- squares\\nlocal n, sum = 10, 0\\nfor i = 1, n do\\n  sum = sum \+ i\\nend\\nreturn total\\n"\}\},0\.5,"smooth",\{\["id"\]="final"\}\)/);
-assert.match(sumsLua, /objects\[18\] = scene:edit\(objects\[5\],\{\{\["replace"\]=\{1,2\},\["with"\]="cafe = 'naïve'\\nprint\(cafe\)\\n"\}\},1,"smooth",\{\["id"\]="word\.2"\}\)/);
-assert.match(sumsLua, /objects\[21\] = scene:edit\(objects\[18\],\{\{\["replace"\]=\{1,2\},\["with"\]="cafe = 'naïve'\\nprint\(cafe\)\\n\\n\\n"\}\},0\.5,"smooth",\{\["id"\]="word\.3"\}\)/);
+assert.match(sumsLua, /objects\[15\] = scene:edit\(objects\[12\],\{\{\["replace"\]=\{1,7\},\["with"\]="-- squares\\nlocal n, sum = 10, 0\\nfor i = 1, n do\\n  sum = sum \+ i\\nend\\nreturn total\\n"\}\},\{\["duration"\]=0\.5,\["curve"\]="smooth",\["id"\]="final",\["lag"\]=0\}\)/);
+assert.match(sumsLua, /objects\[18\] = scene:edit\(objects\[5\],\{\{\["replace"\]=\{1,2\},\["with"\]="cafe = 'naïve'\\nprint\(cafe\)\\n"\}\},\{\["duration"\]=1,\["curve"\]="smooth",\["id"\]="word\.2",\["lag"\]=0\}\)/);
+assert.match(sumsLua, /objects\[21\] = scene:edit\(objects\[18\],\{\{\["replace"\]=\{1,2\},\["with"\]="cafe = 'naïve'\\nprint\(cafe\)\\n\\n\\n"\}\},\{\["duration"\]=0\.5,\["curve"\]="smooth",\["id"\]="word\.3",\["lag"\]=0\}\)/);
 const failing = vis.scene({ width: 320, height: 180 });
 const small = failing.code({ id: "b", text: "a = 1\nb = a" });
 assert.throws(() => totals.search(""), /Search needs a non-empty string or a RegExp to find/);
@@ -2986,9 +3017,9 @@ assert.throws(() => failing.edit(small, { remove: "a", with: "c" }), /Unknown re
 assert.throws(() => failing.edit(small, { append: 1 }), /Append takes a string/);
 assert.throws(() => failing.edit(small, { remove: "" }), /The text to find cannot be empty/);
 assert.throws(() => failing.edit(small, "a"), /An edit must be a plain object/);
-assert.throws(() => failing.edit(small, { append: "c" }, 1, "smooth", { spin: 1 }), /Unknown Edit option: spin/);
-assert.throws(() => failing.edit(small, { append: "c" }, 1, "smooth", { id: 1 }), /Edit id must be a string/);
-assert.throws(() => failing.edit(small, { append: "c" }, 1, "smooth", { fade: 0 }), /Edit fade must be a share of the duration/);
+assert.throws(() => failing.edit(small, { append: "c" }, {duration: 1, curve: "smooth", spin: 1}), /Unknown Edit option: spin/);
+assert.throws(() => failing.edit(small, { append: "c" }, {duration: 1, curve: "smooth", id: 1}), /Edit id must be a string/);
+assert.throws(() => failing.edit(small, { append: "c" }, {duration: 1, curve: "smooth", fade: 0}), /Edit fade must be a share of the duration/);
 assert.throws(() => failing.edit(failing.circle(), { append: "c" }), /Edit needs a block that code made/);
 
 // Area calls its functions in the builder and emits the polygon Lua area makes.
@@ -3050,9 +3081,9 @@ colored.surface({ points: bowl, size: [2, 2], light: { direction: [-1, 1, 1], am
 // Two surfaces on one grid morph point by point, their colormap read again between them.
 const fromBowl = colored.surface({ points: bowl, size: [2, 2], colors: "viridis" });
 const toSaddle = colored.surface({ points: [[0, 0, 0], [1, 0, 0.25], [0, 1, -0.25], [1, 1, 0]], size: [2, 2], colors: "viridis" });
-colored.morph(fromBowl, toSaddle, 1, "linear");
+colored.morph(fromBowl, toSaddle, {duration: 1, curve: "linear"});
 const surfaceLua = compileScene(colored);
-assert.match(surfaceLua, /scene:morph\(objects\[\d+\],objects\[\d+\],1,"linear"\)/);
+assert.match(surfaceLua, /scene:morph\(objects\[\d+\],objects\[\d+\],\{\["curve"\]="linear",\["duration"\]=1,\["lag"\]=0\}\)/);
 assert.match(surfaceLua, /scene:surface \{\["light"\]=\{\["ambient"\]=0\.3,\["direction"\]=\{-1,1,1\}\},/);
 assert.match(surfaceLua, /scene:surface \{\["mesh"\]=\{2,0\},\["mode"\]="solid_mesh",/);
 assert.match(surfaceLua, /scene:surface \{\["colors"\]=\{"accent","#ff0000","#ff0000","accent"\},\["id"\]="by-function"/);
@@ -3075,7 +3106,7 @@ const labelledContourGroup = labelledContours.contour({ id: "labels", fn: (x, y)
 const labelledContourLevel = labelledContourGroup.children()[0];
 const labelTracker = labelledContours.tracker(0);
 labelledContours.bind(labelledContourLevel, labelTracker, (level) => ({ fn: (x, y) => x+y, level }));
-labelledContours.track(labelTracker, 1, 1, "linear");
+labelledContours.track(labelTracker, 1, {duration: 1, curve: "linear"});
 assert.equal(labelledContourGroup.children().length, 1);
 assert.match(compileScene(labelledContours), /\["labels"\]=\{\["format"\]="%.2f",\["padding"\]=0.05,\["size"\]=0.2,\["spacing"\]=0,\["upright"\]=false\}/);
 const labelledContoursScript = `
@@ -3085,7 +3116,7 @@ local c = s:contour {id="labels",fn=function(x,y) return x+y end,levels={0},
   labels={format="%.2f",size=0.2,spacing=0,padding=0.05,upright=false}}
 local a=s:tracker(0)
 s:bind(c:children()[1],a,function(v) return {fn=function(x,y) return x+y end,level=v} end)
-s:track(a,1,1,"linear")
+s:track(a,1,{duration = 1, curve = "linear"})
 return s
 `;
 const invalidLabels = vis.scene();
@@ -3128,7 +3159,7 @@ assert.throws(() => invalidContour.contour({ ...contourOptions, values: undefine
     fn: () => { invalidContour.circle(); return 0; } }), /Scene authoring is unavailable inside a sampling callback/);
 assert.throws(() => invalidContour.contour({ ...contourOptions, levels: Array(16).fill(0),
     x_range: [0, 255, 1], y_range: [0, 255, 1] }), /samples times levels/);
-contourTwin.create(contourGroup.children()[0], 0.2);
+contourTwin.create(contourGroup.children()[0], {duration: 0.2});
 contourTwin.indicate(contourGroup.children()[0], { duration: 0.2 });
 contourTwin.passingFlash(contourGroup.children()[0], { duration: 0.2 });
 contourTwin.fadeIn(contourGroup, { duration: 0.2 });
@@ -3138,7 +3169,7 @@ local axes = s:space {stroke="#00000000", axis_x="#00000000", axis_y="#00000000"
 local c = axes:contour {fn=function(x,y) return x+y end, levels={0.5,1.5},
   x_range={0,1,1}, y_range={0,1,1}, colors={"#ff0000","#00ff00"}, id="contours", width=3}
 local p = c:children()[1]
-s:create(p, 0.2)
+s:create(p, {duration = 0.2})
 s:indicate(p, {duration = 0.2})
 s:passing_flash(p, {duration = 0.2})
 s:fade_in(c, {duration = 0.2})
@@ -3151,19 +3182,19 @@ const movingEllipse = changingContours.contour({ id: "ellipse", levels: [0],
     fn: (x, y) => x*x/(0.75*0.75)+y*y-1, x_range: [-2, 2, 0.125], y_range: [-1.5, 1.5, 0.125] });
 const ellipseChild = movingEllipse.children()[0];
 changingContours.bind(ellipseChild, axisLength, (a) => ({ fn: (x, y) => x*x/(a*a)+y*y-1 }));
-changingContours.track(axisLength, 1.5, 1, "linear");
+changingContours.track(axisLength, 1.5, {duration: 1, curve: "linear"});
 const movingLevel = changingContours.tracker(0.5);
 const wellField = (x, y) => (x*x-1)*(x*x-1)+y*y;
 const changingTopology = changingContours.contour({ id: "topology", fn: wellField, levels: [0.5],
     x_range: [-2, 2, 0.125], y_range: [-1.5, 1.5, 0.125] });
 changingContours.bind(changingTopology.children()[0], movingLevel, (level) => ({ fn: wellField, level }));
-changingContours.track(movingLevel, 1.1, 0.25, "linear");
-changingContours.track(movingLevel, -0.2, 0.25, "linear");
-changingContours.track(movingLevel, 0.5, 0.25, "linear");
+changingContours.track(movingLevel, 1.1, {duration: 0.25, curve: "linear"});
+changingContours.track(movingLevel, -0.2, {duration: 0.25, curve: "linear"});
+changingContours.track(movingLevel, 0.5, {duration: 0.25, curve: "linear"});
 const contourCopy = changingContours.clone(ellipseChild, { id: "copy", opacity: 0 });
 changingContours.set({ target: contourCopy, values: [0, 1, 2, 3], level: 1,
     x_range: [0, 1, 1], y_range: [0, 1, 1] });
-changingContours.tween({ target: contourCopy, values: [0, 1, 2, 3], level: 2 }, 0.25, "linear");
+changingContours.tween({ target: contourCopy, values: [0, 1, 2, 3], level: 2 }, {duration: 0.25, curve: "linear"});
 const movingContoursLua = compileScene(changingContours);
 assert.match(movingContoursLua, /scene:set\(\{\{target=objects\[2\]\[1\],values=\{/);
 assert.match(movingContoursLua, /level=2,values=\{0,1,2,3\}/);
@@ -3194,17 +3225,17 @@ local function ellipse(a) return samples(function(x,y) return x*x/(a*a)+y*y-1 en
 local a=s:tracker(0.75)
 local e=s:contour{id="ellipse",values=ellipse(0.75),levels={0},x_range={-2,2,0.125},y_range={-1.5,1.5,0.125}}
 s:bind(e:children()[1],a,function(v) return {values=ellipse(v)} end)
-s:track(a,1.5,1,"linear")
+s:track(a,1.5,{duration = 1, curve = "linear"})
 local k=s:tracker(0.5)
 local values=samples(function(x,y) return (x*x-1)*(x*x-1)+y*y end)
 local t=s:contour{id="topology",values=values,levels={0.5},x_range={-2,2,0.125},y_range={-1.5,1.5,0.125}}
 s:bind(t:children()[1],k,function(v) return {values=values,level=v} end)
-s:track(k,1.1,0.25,"linear")
-s:track(k,-0.2,0.25,"linear")
-s:track(k,0.5,0.25,"linear")
+s:track(k,1.1,{duration = 0.25, curve = "linear"})
+s:track(k,-0.2,{duration = 0.25, curve = "linear"})
+s:track(k,0.5,{duration = 0.25, curve = "linear"})
 local copy=s:clone(e:children()[1],{id="copy",opacity=0})
 s:set{target=copy,values={0,1,2,3},level=1,x_range={0,1,1},y_range={0,1,1}}
-s:tween({target=copy,values={0,1,2,3},level=2},0.25,"linear")
+s:tween({target=copy,values={0,1,2,3},level=2},{duration = 0.25, curve = "linear"})
 return s`;
 
 // A vector field calls fn where Lua vector_field would, emits the vectors, and names its arrows
@@ -3289,18 +3320,18 @@ const shelfB = shelfRow.rectangle({ id: "b", size: [1, 1] });
 shelfRow.arrange([1, 0], 0.5);
 shelf.wait(0.5);
 const shelfC = shelfRow.rectangle({ id: "c", size: [1, 1] });
-shelf.arrange([shelfA, shelfC, shelfB], 1, "linear", { gap: 0.5 });
-shelf.arrange(shelfRow, 0.5, { preset: "back", strength: 0.6 }, { direction: [0, -1], gap: 0, center: [2, 0] });
+shelf.arrange([shelfA, shelfC, shelfB], {duration: 1, curve: "linear", gap: 0.5});
+shelf.arrange(shelfRow, {duration: 0.5, curve: {preset: "back", strength: 0.6}, direction: [0, -1], gap: 0, center: [2, 0]});
 assert.throws(() => shelf.arrange([]), /Arrange takes a group or a non-empty array of handles/);
 assert.throws(() => shelf.arrange(shelfA), /Arrange takes a group or a non-empty array of handles/);
-assert.throws(() => shelf.arrange(shelfRow, 1, "smooth", { spin: 1 }), /Unknown Arrange option: spin/);
-assert.throws(() => shelf.arrange(shelfRow, 1, "smooth", { gap: -1 }), /Arrange gap must be a finite number of zero or more/);
-assert.throws(() => shelf.arrange(shelfRow, 1, "smooth", { center: [0] }), /Arrange center must be \[x, y\]/);
+assert.throws(() => shelf.arrange(shelfRow, {duration: 1, curve: "smooth", spin: 1}), /Unknown Arrange option: spin/);
+assert.throws(() => shelf.arrange(shelfRow, {duration: 1, curve: "smooth", gap: -1}), /Arrange gap must be a finite number of zero or more/);
+assert.throws(() => shelf.arrange(shelfRow, {duration: 1, curve: "smooth", center: [0]}), /Arrange center must be \[x, y\]/);
 const shelfLua = compileScene(shelf);
-assert.match(shelfLua, /scene:arrange\(\{objects\[2\],objects\[4\],objects\[3\]\},1,"linear",\{\["gap"\]=0\.5\}\)/);
+assert.match(shelfLua, /scene:arrange\(\{objects\[2\],objects\[4\],objects\[3\]\},\{\["curve"\]="linear",\["duration"\]=1,\["gap"\]=0\.5\}\)/);
 assert.match(
     shelfLua,
-    /scene:arrange\(objects\[1\],0\.5,\{\["preset"\]="back",\["strength"\]=0\.6\},\{\["center"\]=\{2,0\},\["direction"\]=\{0,-1\},\["gap"\]=0\}\)/,
+    /scene:arrange\(objects\[1\],\{\["center"\]=\{2,0\},\["curve"\]=\{\["preset"\]="back",\["strength"\]=0\.6\},\["direction"\]=\{0,-1\},\["duration"\]=0\.5,\["gap"\]=0\}\)/,
 );
 
 // A matrix names its rows, entries and brackets as the native factory does, and its rows,
@@ -3314,7 +3345,7 @@ assert.equal(grid.find("m/1"), matrix.row(1));
 assert.equal(grid.find("m/right"), matrix.children()[3]);
 assert.deepEqual(matrix.column(2), [grid.find("m/1/2"), grid.find("m/2/2")]);
 assert.equal(unnamed.children().length, 1);
-grid.tween({ target: matrix.entry(2, 1), value: 7 }, 1);
+grid.tween({ target: matrix.entry(2, 1), value: 7 }, {duration: 1});
 grid.rectangle({ around: matrix.row(2), fill: "#dbeafe", layer: -1, id: "band" });
 assert.throws(() => grid.matrix({}), /Matrix rows must be an array of rows, each an array of entries/);
 assert.throws(() => grid.matrix({ rows: [[1], []] }), /Matrix row 2 must be an array of at least one entry/);
@@ -3327,7 +3358,7 @@ assert.throws(() => grid.matrix("rows"), /Matrix options must be a plain object/
 const gridLua = compileScene(grid);
 assert.match(gridLua, /objects\[1\] = scene:matrix \{\["id"\]="m",\["justify"\]=\{"left","center","right"\},\["rows"\]=\{\{2,-1,0\},\{1,3,"x"\}\},\["size"\]=24\}/);
 assert.match(gridLua, /objects\[3\] = \{\} for i, row in ipairs\(objects\[2\]\) do objects\[3\]\[i\] = row:children\(\) end/);
-assert.match(gridLua, /scene:tween\(\{\{target=objects\[3\]\[2\]\[1\],value=7\}\},1,"smooth",0\)/);
+assert.match(gridLua, /scene:tween\(\{\{target=objects\[3\]\[2\]\[1\],value=7\}\},\{\["curve"\]="smooth",\["duration"\]=1,\["lag"\]=0\}\)/);
 assert.match(gridLua, /scene:rectangle \{\["around"\]=objects\[2\]\[2\],\["fill"\]="#dbeafe",\["id"\]="band",\["layer"\]=-1\}/);
 
 // A table names its rows and entries with the header as the first row, and tracks its stripes
@@ -3343,7 +3374,7 @@ assert.equal(ledger.find("t/4"), sheet.row(4));
 assert.deepEqual(sheet.column(1), [1, 2, 3, 4].map((r) => ledger.find(`t/${r}/1`)));
 assert.equal(loose.children().length, 4);
 assert.equal(ledger.group().table({ rows: [[1]], header: ["x"] }).children().length, 3);
-ledger.tween({ target: sheet.entry(4, 2), value: 16 }, 1);
+ledger.tween({ target: sheet.entry(4, 2), value: 16 }, {duration: 1});
 ledger.rectangle({ around: sheet.row(3), fill: "#dbeafe", layer: -1, id: "band" });
 assert.throws(() => ledger.table({}), /Table rows must be an array of rows, each an array of entries/);
 assert.throws(() => ledger.table({ rows: [[1, 2]], header: ["a"] }), /Table header must be an array of one entry for each of its 2 columns/);
@@ -3356,7 +3387,7 @@ assert.throws(() => ledger.table(null), /Table options must be a plain object/);
 const ledgerLua = compileScene(ledger);
 assert.match(ledgerLua, /objects\[1\] = scene:table \{\["header"\]=\{"n","n2"\},\["id"\]="t",\["rows"\]=\{\{1,1\},\{2,4\},\{3,9\}\},\["rules"\]="grid",\["stripes"\]=true\}/);
 assert.match(ledgerLua, /objects\[3\] = \{\} for i = 1, 4 do objects\[3\]\[i\] = objects\[2\]\[i\]:children\(\) end/);
-assert.match(ledgerLua, /scene:tween\(\{\{target=objects\[3\]\[4\]\[2\],value=16\}\},1,"smooth",0\)/);
+assert.match(ledgerLua, /scene:tween\(\{\{target=objects\[3\]\[4\]\[2\],value=16\}\},\{\["curve"\]="smooth",\["duration"\]=1,\["lag"\]=0\}\)/);
 assert.match(ledgerLua, /scene:rectangle \{\["around"\]=objects\[2\]\[3\],\["fill"\]="#dbeafe",\["id"\]="band",\["layer"\]=-1\}/);
 
 // A clone copies a handle and the handles below it. The copy's handles mirror the source's
@@ -3381,13 +3412,13 @@ assert.equal(cloning.find("word:copy"), null);
 assert.equal(typeof wordCopy.arrange, "undefined");
 const inner = cloning.clone(pairA, { parent: twinCopy, opacity: 0.5 });
 assert.deepEqual(twinCopy.children(), [cloning.find("twin/a"), cloning.find("twin/b"), inner]);
-cloning.tween({ target: cloning.find("twin/b"), opacity: 0.5 }, 1);
+cloning.tween({ target: cloning.find("twin/b"), opacity: 0.5 }, {duration: 1});
 cloning.at(0.5, (scene) => scene.clone(cloneWord, { id: "half" }));
 const cloningLua = compileScene(cloning);
 assert.match(cloningLua, /objects\[5\],objects\[6\] = scene:clone\(objects\[1\],\{\["id"\]="twin",\["shift"\]=\{0,-2\},\["stroke"\]="#ff0000"\}\)/);
 assert.match(cloningLua, /objects\[7\],objects\[8\] = scene:clone\(objects\[4\]\)/);
 assert.match(cloningLua, /objects\[9\],objects\[10\] = scene:clone\(objects\[2\],\{\["opacity"\]=0\.5,\["parent"\]=objects\[5\]\}\)/);
-assert.match(cloningLua, /scene:tween\(\{\{target=objects\[6\]\[objects\[3\]\],opacity=0\.5\}\},1,"smooth",0\)/);
+assert.match(cloningLua, /scene:tween\(\{\{target=objects\[6\]\[objects\[3\]\],opacity=0\.5\}\},\{\["curve"\]="smooth",\["duration"\]=1,\["lag"\]=0\}\)/);
 assert.match(cloningLua, /scene:seek\(0\.5\)\s*objects\[11\],objects\[12\] = scene:clone\(objects\[4\],\{\["id"\]="half"\}\)/);
 const refusing = vis.scene({ width: 160, height: 90 });
 const refusingSpace = refusing.space();
@@ -3412,33 +3443,33 @@ assert.equal(compileScene(refusing), refusingBefore);
 const copying = vis.scene({ width: 160, height: 90 });
 const copySquare = copying.rectangle({ size: [1, 1] });
 const copyDisc = copying.circle({ radius: 0.5 });
-copying.morph(copySquare, copyDisc, 1, "linear", { copy: true });
+copying.morph(copySquare, copyDisc, {duration: 1, curve: "linear", copy: true});
 const copyLeft = copying.circle({ radius: 0.25 });
 const copyRight = copying.circle({ radius: 0.25 });
 // With copy, one source may give a copy to several targets.
-copying.morph([copySquare, copySquare], [copyLeft, copyRight], 1, "smooth", { lag: 0.5, copy: true });
+copying.morph([copySquare, copySquare], [copyLeft, copyRight], {duration: 1, curve: "smooth", lag: 0.5, copy: true});
 const copyFrom = copying.group();
 copyFrom.circle({ radius: 0.5 });
 copying.wait(1);
 const copyTo = copying.group();
 copyTo.circle({ radius: 0.5 });
-copying.matchTransform(copyFrom, copyTo, 1, "smooth", { copy: true, shapes: true });
+copying.matchTransform(copyFrom, copyTo, {duration: 1, curve: "smooth", copy: true, shapes: true});
 const copyingLua = compileScene(copying);
-assert.match(copyingLua, /scene:morph\(objects\[1\],objects\[2\],1,"linear",\{\["copy"\]=true\}\)/);
-assert.match(copyingLua, /scene:morph\(\{objects\[1\],objects\[1\]\},\{objects\[3\],objects\[4\]\},1,"smooth",\{\["copy"\]=true,\["lag"\]=0\.5\}\)/);
-assert.match(copyingLua, /scene:match_transform\(objects\[5\],objects\[7\],1,"smooth",\{\["shapes"\]=true,\["copy"\]=true\}\)/);
+assert.match(copyingLua, /scene:morph\(objects\[1\],objects\[2\],\{\["copy"\]=true,\["curve"\]="linear",\["duration"\]=1,\["lag"\]=0\}\)/);
+assert.match(copyingLua, /scene:morph\(\{objects\[1\],objects\[1\]\},\{objects\[3\],objects\[4\]\},\{\["copy"\]=true,\["curve"\]="smooth",\["duration"\]=1,\["lag"\]=0\.5\}\)/);
+assert.match(copyingLua, /scene:match_transform\(objects\[5\],objects\[7\],\{\["duration"\]=1,\["curve"\]="smooth",\["lag"\]=0,\["shapes"\]=true,\["copy"\]=true\}\)/);
 const copyingBefore = compileScene(copying);
-assert.throws(() => copying.morph(copySquare, copyDisc, 1, "smooth", { copy: 1 }), /Morph copy must be a boolean/);
-assert.throws(() => copying.morph(copySquare, copyDisc, 1, "smooth", { spin: 1 }), /Unknown morph option: spin/);
-assert.throws(() => copying.morph(copySquare, copyDisc, 1, "smooth", { lag: -1 }), /Morph lag must be a finite number/);
-assert.throws(() => copying.morph(copySquare, copyDisc, 1, "smooth", [1]), /Morph options must be a number or a plain object/);
-assert.throws(() => copying.morph([copySquare, copySquare], [copyLeft, copyRight], 1, "smooth", { copy: false }),
+assert.throws(() => copying.morph(copySquare, copyDisc, {duration: 1, curve: "smooth", copy: 1}), /Morph copy must be a boolean/);
+assert.throws(() => copying.morph(copySquare, copyDisc, {duration: 1, curve: "smooth", spin: 1}), /Unknown Morph option: spin/);
+assert.throws(() => copying.morph(copySquare, copyDisc, {duration: 1, curve: "smooth", lag: -1}), /Lag must be finite and non-negative/);
+assert.throws(() => copying.morph(copySquare, copyDisc, {duration: 1, curve: "smooth", lag: [1]}), /Lag must be finite and non-negative/);
+assert.throws(() => copying.morph([copySquare, copySquare], [copyLeft, copyRight], {duration: 1, curve: "smooth", copy: false}),
     /distinct across all pairs/);
-assert.throws(() => copying.morph([copySquare, copyDisc], [copyLeft, copyLeft], 1, "smooth", { copy: true }),
+assert.throws(() => copying.morph([copySquare, copyDisc], [copyLeft, copyLeft], {duration: 1, curve: "smooth", copy: true}),
     /distinct across all pairs/);
-assert.throws(() => copying.morph([copySquare, copyLeft], [copyLeft, copyRight], 1, "smooth", { copy: true }),
+assert.throws(() => copying.morph([copySquare, copyLeft], [copyLeft, copyRight], {duration: 1, curve: "smooth", copy: true}),
     /distinct across all pairs/);
-assert.throws(() => copying.matchTransform(copyFrom, copyTo, 1, "smooth", { copy: "yes" }), /MatchTransform copy must be a boolean/);
+assert.throws(() => copying.matchTransform(copyFrom, copyTo, {duration: 1, curve: "smooth", copy: "yes"}), /MatchTransform copy must be a boolean/);
 assert.equal(compileScene(copying), copyingBefore);
 
 // A retained guide adds the same detour to each pair without changing its endpoints.
@@ -3451,16 +3482,16 @@ matchGuideScene.wait(1);
 const guidedTo = matchGuideScene.group({ id: "to" });
 guidedTo.circle({ center: [0, 1], radius: 0.2, id: "c" });
 guidedTo.circle({ center: [2, 1], radius: 0.2, id: "d" });
-matchGuideScene.matchTransform(guidedFrom, guidedTo, 1, "linear", { path: matchGuide, copy: true, shapes: true });
-matchGuideScene.shift(matchGuide, [1, -1], 1);
+matchGuideScene.matchTransform(guidedFrom, guidedTo, {duration: 1, curve: "linear", path: matchGuide, copy: true, shapes: true});
+matchGuideScene.shift(matchGuide, [1, -1], {duration: 1});
 const guidedLua = compileScene(matchGuideScene);
 assert.match(guidedLua, /\["path"\]=objects\[1\]/);
 const guidedBefore = compileScene(matchGuideScene);
-assert.throws(() => matchGuideScene.matchTransform(guidedFrom, guidedTo, 1, "linear", { path: matchGuide, arc: 1 }),
+assert.throws(() => matchGuideScene.matchTransform(guidedFrom, guidedTo, {duration: 1, curve: "linear", path: matchGuide, arc: 1}),
     /path and arc cannot be used together/);
-assert.throws(() => matchGuideScene.matchTransform(guidedFrom, guidedTo, 1, "linear", { path: copyFrom }),
+assert.throws(() => matchGuideScene.matchTransform(guidedFrom, guidedTo, {duration: 1, curve: "linear", path: copyFrom}),
     /handles from the same scene/);
-assert.throws(() => matchGuideScene.matchTransform(guidedFrom, guidedTo, 1, "linear", { path: [] }),
+assert.throws(() => matchGuideScene.matchTransform(guidedFrom, guidedTo, {duration: 1, curve: "linear", path: []}),
     /handle/);
 assert.equal(compileScene(matchGuideScene), guidedBefore);
 const guidedTwin = `
@@ -3473,8 +3504,8 @@ s:wait(1)
 local b=s:group {id="to"}
 b:circle {center={0,1},radius=0.2,id="c"}
 b:circle {center={2,1},radius=0.2,id="d"}
-s:match_transform(a,b,1,"linear",{path=p,copy=true,shapes=true})
-s:shift(p,{1,-1},1)
+s:match_transform(a,b,{duration = 1, curve = "linear", path=p,copy=true,shapes=true})
+s:shift(p,{1,-1},{duration = 1})
 return s
 `;
 
@@ -3488,7 +3519,7 @@ const scaledMatchScripts = [false, true].flatMap((copy) => [false, true].map((gu
     const target = scene.text({ text: "copy", font: "Pretendard", size: 40, measure: true,
         point: [200, 0], id: "target" });
     const path = scene.route({ points: [[-200, 0], [0, 80], [200, 0]], opacity: 0 });
-    scene.matchTransform(snapshot, target, 1, "linear", { copy, ...(guided ? { path } : {}) });
+    scene.matchTransform(snapshot, target, {duration: 1, curve: "linear", copy, ...(guided ? { path } : {})});
     return compileScene(scene);
 }));
 
@@ -3501,17 +3532,16 @@ const pieceTo = pieceMorph.path({ commands: [
     { type: "move", to: [1, 2] }, { type: "line", to: [2, 2] },
 ], id: "first" });
 const pieceLast = pieceMorph.plot({ points: [[-2, -2], [-1, -2], [NaN, 0], [1, -2], [2, -2]], id: "second" });
-pieceMorph.morph([pieceFrom, pieceFrom], [pieceTo, pieceLast], 1, "linear",
-    { copy: true, lag: 0.25, pairs: [[1, 2]] });
+pieceMorph.morph([pieceFrom, pieceFrom], [pieceTo, pieceLast], {duration: 1, curve: "linear", copy: true, lag: 0.25, pairs: [[1, 2]]});
 const pieceMorphLua = compileScene(pieceMorph);
 assert.match(pieceMorphLua, /\["pairs"\]=\{\{1,2\}\}/);
 const pieceMorphBefore = compileScene(pieceMorph);
-assert.throws(() => pieceMorph.morph(pieceFrom, pieceTo, 1, "linear", { pairs: [[0, 1]] }), /positive integer/);
-assert.throws(() => pieceMorph.morph(pieceFrom, pieceTo, 1, "linear", { pairs: [[1.5, 1]] }), /positive integer/);
-assert.throws(() => pieceMorph.morph(pieceFrom, pieceTo, 1, "linear", { pairs: [[1]] }), /positive integer/);
-assert.throws(() => pieceMorph.morph(pieceFrom, pieceTo, 1, "linear", { pairs: [[1, 1], [1, 2]] }), /at most once/);
-assert.throws(() => pieceMorph.morph(pieceFrom, pieceTo, 1, "linear", { pairs: [[1, 1], [2, 1]] }), /at most once/);
-assert.throws(() => pieceMorph.morph(pieceFrom, pieceTo, 1, "linear", { pairs: [[1, ,]] }), /positive integer/);
+assert.throws(() => pieceMorph.morph(pieceFrom, pieceTo, {duration: 1, curve: "linear", pairs: [[0, 1]]}), /positive integer/);
+assert.throws(() => pieceMorph.morph(pieceFrom, pieceTo, {duration: 1, curve: "linear", pairs: [[1.5, 1]]}), /positive integer/);
+assert.throws(() => pieceMorph.morph(pieceFrom, pieceTo, {duration: 1, curve: "linear", pairs: [[1]]}), /positive integer/);
+assert.throws(() => pieceMorph.morph(pieceFrom, pieceTo, {duration: 1, curve: "linear", pairs: [[1, 1], [1, 2]]}), /at most once/);
+assert.throws(() => pieceMorph.morph(pieceFrom, pieceTo, {duration: 1, curve: "linear", pairs: [[1, 1], [2, 1]]}), /at most once/);
+assert.throws(() => pieceMorph.morph(pieceFrom, pieceTo, {duration: 1, curve: "linear", pairs: [[1, ,]]}), /positive integer/);
 assert.equal(compileScene(pieceMorph), pieceMorphBefore);
 const pieceMorphScript = `
 local s = vis.scene {width = 320, height = 180, camera = {height = 6}}
@@ -3519,7 +3549,7 @@ local a = s:plot {points={{-2,0},{-1,0},{0/0,0},{1,0},{2,0}},id="source"}
 local b = s:path {commands={{type="move",to={-2,2}},{type="line",to={-1,2}},
     {type="move",to={1,2}},{type="line",to={2,2}}},id="first"}
 local c = s:plot {points={{-2,-2},{-1,-2},{0/0,0},{1,-2},{2,-2}},id="second"}
-s:morph({a,a},{b,c},1,"linear",{copy=true,lag=0.25,pairs={{1,2}}})
+s:morph({a,a},{b,c},{duration = 1, curve = "linear", copy=true,lag=0.25,pairs={{1,2}}})
 return s
 `;
 
@@ -3541,12 +3571,12 @@ assert.equal(typeset.find("sum/3"), terms.children()[2]);
 assert.equal(typeset.find("hyp"), terms.children()[4]);
 assert.equal(typeset.find("sum/5"), null);
 const hypotenuse = terms.part("c^2");
-typeset.write(pythagoras, 1);
-typeset.tween({ target: pythagoras.part("c"), fill: "#0000ff" }, 0.5);
-typeset.tween({ target: hypotenuse.part("2"), fill: "#ffff00" }, 0.5);
+typeset.write(pythagoras, {duration: 1});
+typeset.tween({ target: pythagoras.part("c"), fill: "#0000ff" }, {duration: 0.5});
+typeset.tween({ target: hypotenuse.part("2"), fill: "#ffff00" }, {duration: 0.5});
 typeset.indicate(typeset.find("sum/3"));
 const swapped = typeset.tex({ tex: ["c^2", "=", "a^2", "+", "b^2"], id: "swapped", point: [0, -1.5] });
-typeset.matchTransform(terms, swapped, 1, "smooth", { arc: 0.5 });
+typeset.matchTransform(terms, swapped, {duration: 1, curve: "smooth", arc: 0.5});
 assert.throws(() => typeset.tex(null), /Tex options must be a plain object/);
 assert.throws(() => typeset.tex({ role: "h2" }), /Tex requires tex: a string, or a non-empty array/);
 assert.throws(() => typeset.tex({ tex: [] }), /Tex requires tex/);
@@ -3558,10 +3588,10 @@ const typesetLua = compileScene(typeset);
 assert.match(typesetLua, /objects\[1\] = scene:tex \{\["id"\]="eq",\["point"\]=\{0,1\.5\},\["role"\]="h2",\["tex"\]="a\^2\+b\^2=c\^2"\}/);
 assert.match(typesetLua, /objects\[3\] = objects\[2\]:tex \{\["id"\]="sum",\["tex"\]=\{"a\^2","\+",\{\["color"\]="#ff0000",\["text"\]="b\^2"\},"=",\{\["fill"\]="#00ff00",\["id"\]="hyp",\["text"\]="c\^2"\}\}\}\nobjects\[4\] = objects\[3\]:children\(\)/);
 assert.match(typesetLua, /objects\[7\] = objects\[3\]:part\("c\^2",1\)/);
-assert.match(typesetLua, /objects\[8\] = objects\[1\]:part\("c",1\)\nscene:tween\(\{\{target=objects\[8\],fill="#0000ff"\}\},0\.5,"smooth",0\)/);
+assert.match(typesetLua, /objects\[8\] = objects\[1\]:part\("c",1\)\nscene:tween\(\{\{target=objects\[8\],fill="#0000ff"\}\},\{\["curve"\]="smooth",\["duration"\]=0\.5,\["lag"\]=0\}\)/);
 assert.match(typesetLua, /objects\[9\] = objects\[7\]:part\("2",1\)/);
 assert.match(typesetLua, /scene:indicate\(objects\[4\]\[3\],/);
-assert.match(typesetLua, /scene:match_transform\(objects\[3\],objects\[10\],1,"smooth",\{\["arc"\]=0\.5\}\)/);
+assert.match(typesetLua, /scene:match_transform\(objects\[3\],objects\[10\],\{\["duration"\]=1,\["curve"\]="smooth",\["arc"\]=0\.5,\["lag"\]=0\}\)/);
 
 // A brace names what it spans as the script does and returns the brace and the label at its
 // tip: the text the script makes of a string, named after the brace, or the handle given.
@@ -3581,8 +3611,8 @@ assert.equal(noLabel, undefined);
 assert.deepEqual(braceHolder.children(), [spanBrace]);
 assert.notEqual(sideBrace, underBrace);
 bracing.growFromCenter(underBrace);
-bracing.write(underLabel, 0.5);
-bracing.tween({ target: underLabel, text: "b^2 - 4ac < 0" }, 0.5);
+bracing.write(underLabel, {duration: 0.5});
+bracing.tween({ target: underLabel, text: "b^2 - 4ac < 0" }, {duration: 0.5});
 assert.throws(() => bracing.brace("term"), /Brace options must be a plain object/);
 assert.throws(() => bracing.brace({ around: discriminant, label: 3 }), /Brace label must be a string or a handle/);
 assert.throws(() => bracing.brace({ around: [] }), /Around must be a handle or a non-empty array of handles/);
@@ -3601,7 +3631,7 @@ assert.match(
     /objects\[7\] = objects\[6\]:brace \{\["depth"\]=10,\["direction"\]=\{0,1\},\["fill"\]="#e76f51",\["from"\]=\{-100,-80\},\["id"\]="span",\["to"\]=\{100,-80\}\}/,
 );
 assert.match(bracingLua, /scene:grow_from_center\(objects\[2\],/);
-assert.match(bracingLua, /scene:write\(objects\[3\],0\.5,/);
+assert.match(bracingLua, /scene:write\(objects\[3\],\{\["curve"\]="smooth",\["duration"\]=0\.5,/);
 
 // A tex part of spans is a formula the row holds as a TexHandle, named as the row names its
 // texts, and the groups of a formula set from parts are named after it; leading and baseline
@@ -3619,7 +3649,7 @@ assert.equal(inlined.find("said/6").children().length, 3);
 assert.equal(inlined.find("said/6/1"), inlined.find("said/6").children()[0]);
 assert.equal(inlined.find("root"), inlined.find("said/6").children()[2]);
 assert.equal(inlined.find("said/7"), said.children()[6]);
-inlined.tween({ target: inlined.find("eq").part("c"), fill: "#ff0000" }, 0.5);
+inlined.tween({ target: inlined.find("eq").part("c"), fill: "#ff0000" }, {duration: 0.5});
 inlined.text({ text: "Area", point: [0, -1], baseline: true, id: "area" });
 inlined.number({ value: 2, point: [1, -1], baseline: true });
 inlined.tex({ tex: "x^2", point: [1, -1], baseline: true, align: [0, 0.5], id: "square" });
@@ -3629,7 +3659,7 @@ assert.throws(() => inlined.spans([{ tex: [{ color: "#ff0000" }] }]), /A tex par
 assert.throws(() => inlined.spans([{ tex: "x", text: "y" }]), /A spans part sets text or tex, not both/);
 const inlinedLua = compileScene(inlined);
 assert.match(inlinedLua, /objects\[1\] = scene:spans \{"The sides ",\{\["id"\]="eq",\["tex"\]="a\^2\+b\^2=c\^2"\},", so ",\{\["rise"\]=0\.1,\["tex"\]=\{"c","=",\{\["id"\]="root",\["text"\]="\\\\sqrt\{a\^2\+b\^2\}"\}\}\},"\.",\["baseline"\]=true,\["id"\]="said",\["leading"\]=1\.5,\["point"\]=\{-1\.5,0\.5\},\["split"\]="words",\["wrap"\]=2\}\nobjects\[2\] = objects\[1\]:children\(\)\nobjects\[3\] = objects\[2\]\[6\]:children\(\)\n/);
-assert.match(inlinedLua, /objects\[4\] = objects\[2\]\[3\]:part\("c",1\)\nscene:tween\(\{\{target=objects\[4\],fill="#ff0000"\}\},0\.5,"smooth",0\)/);
+assert.match(inlinedLua, /objects\[4\] = objects\[2\]\[3\]:part\("c",1\)\nscene:tween\(\{\{target=objects\[4\],fill="#ff0000"\}\},\{\["curve"\]="smooth",\["duration"\]=0\.5,\["lag"\]=0\}\)/);
 assert.match(inlinedLua, /scene:text \{\["baseline"\]=true,\["id"\]="area",\["point"\]=\{0,-1\},\["text"\]="Area"\}/);
 assert.match(inlinedLua, /scene:number \{\["baseline"\]=true,\["point"\]=\{1,-1\},\["value"\]=2\}/);
 assert.match(inlinedLua, /scene:tex \{\["align"\]=\{0,0\.5\},\["baseline"\]=true,\["id"\]="square",\["point"\]=\{1,-1\},\["tex"\]="x\^2"\}/);
@@ -3672,6 +3702,23 @@ try {
         return readFileSync(png);
     };
 
+    for (const {name, source, duration} of timingLuaCases) {
+        const loaded = inspectScript(`timing-${name}.lua`, source, fontOptions).scene;
+        assert.ok(Math.abs(loaded.duration - duration) < 1e-6, name);
+    }
+    const timedMotion = inspectScript("timing-motion.lua", timingMotionLua);
+    assert.equal(timedMotion.scene.duration, 3);
+    const timedCenter = (time, id) => {
+        const bounds = layoutAt(timedMotion.path, time).scene.objects.find((object) => object.id === id).bounds;
+        return bounds.x + bounds.width / 2;
+    };
+    const firstStart = timedCenter(0, "first");
+    const secondStart = timedCenter(0, "second");
+    assert.ok(Math.abs(timedCenter(1, "first") - firstStart - 25) < 0.1);
+    assert.ok(Math.abs(timedCenter(1, "second") - secondStart) < 0.1);
+    assert.ok(Math.abs(timedCenter(2, "second") - secondStart - 25) < 0.1);
+    assert.ok(Math.abs(timedCenter(3, "second") - secondStart - 50) < 0.1);
+
     assert.equal(inspectScript("motion.lua", motionLua).scene.duration, 5.5);
 
     // A Lua function holds at most 200 locals, so a scene with more handles and marks than that
@@ -3683,11 +3730,11 @@ try {
     const crowdedInset = vis.scene();
     for (let i = 0; i < 250; i++) crowdedInset.circle({ center: [(i % 25) * 0.2 - 2.5, Math.floor(i / 25) * 0.2 - 1], radius: 0.05 });
     crowded.viewport(crowdedInset, { x: 0.5, y: 0, width: 0.5, height: 0.5 });
-    crowded.tween({ target: crowd, opacity: 0.5 }, 1);
+    crowded.tween({ target: crowd, opacity: 0.5 }, {duration: 1});
     const crowdedLua = compileScene(crowded);
     assert.match(crowdedLua, /^local scene = vis\.scene \{\}\nlocal objects = \{\}\nlocal times = \{\}\n/);
     assert.match(crowdedLua, /\ndo\n    local viewportScene1 = vis\.scene \{\}\n    local objects = \{\}\n/);
-    assert.match(crowdedLua, /\nend\nscene:tween\(\{\{target=objects\[1\],opacity=0\.5\}\},1,"smooth",0\)\n/);
+    assert.match(crowdedLua, /\nend\nscene:tween\(\{\{target=objects\[1\],opacity=0\.5\}\},\{\["curve"\]="smooth",\["duration"\]=1,\["lag"\]=0\}\)\n/);
     const crowdedScene = inspectScript("crowded.lua", crowdedLua).scene;
     assert.equal(crowdedScene.objects.length, 301);
     assert.equal(crowdedScene.viewports[0].scene.objects.length, 250);
@@ -4286,7 +4333,7 @@ s:space{x={-100,100,50},y={-70,70,50},width=1,axis_width=2,ticks=true}
 local n=s:number{tabular=true,value=1.5,decimals=2,reserve="-000.00",align={1,0.5},id="n"}
 s:matrix{tabular=true,rows={{1,2},{3,4}},reserve={"-000.00","00"},justify="right",id="m"}
 s:text{tabular=true,text="x1",reserve="long text",point={0,-50}}
-s:tween({target=n,value=-3},1,"linear")
+s:tween({target=n,value=-3},{duration = 1, curve = "linear"})
 return s
 `);
     for (const time of [0, 0.25, 0.5, 1]) {
@@ -4303,9 +4350,9 @@ local cfg = {width=120,height=60,background="#000000",camera={height=4},antialia
 local root = vis.scene(cfg)
 local a, b = vis.scene(cfg), vis.scene(cfg)
 local dot = a:circle{center={-1,0},radius=0.2,fill="#ffffff",stroke="#00000000"}
-a:shift(dot,{4,0},4,"linear")
+a:shift(dot,{4,0},{duration = 4, curve = "linear"})
 local next = b:circle{center={-1,0},radius=0.2,fill="#ffffff",stroke="#00000000"}
-b:shift(next,{1,0},0.5,"linear")
+b:shift(next,{1,0},{duration = 0.5, curve = "linear"})
 root:scene_transition({a,b},{hold={2,1},duration=1,style="slide",curve="linear"})
 return root
 `);

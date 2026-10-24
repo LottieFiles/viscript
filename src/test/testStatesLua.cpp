@@ -22,7 +22,7 @@ states:define(target, "focused", {
     shift = {2, 1}, rotation = 0.2, scale = {1.5, 1.25},
     opacity = 0.75, progress = 0.5,
 })
-states:transition(target, "focused", 1, "linear")
+states:transition(target, "focused", {duration = 1, curve = "linear"})
 states:advance(0.25)
 local state = states:sample(target)
 if math.abs(state.shift[1] - 0.5) > 0.0001 then error("sample mismatch") end
@@ -91,8 +91,8 @@ return scene
         {"states:transition({{object=a, state='idle', extra=true}})", "extra"},
         {"states:transition({{object=a, state='idle'}, {object=a, state='idle'}})", "transition failed"},
         {"states:transition({{object=a, state='idle'}, {object=b, state='missing'}})", "transition failed"},
-        {"states:transition({{object=a, state='idle'}}, -1)", "duration"},
-        {"states:transition({{object=a, state='idle'}}, 1, 'unknown')", "curve"},
+        {"states:transition({{object=a, state='idle'}}, {duration=-1})", "duration"},
+        {"states:transition({{object=a, state='idle'}}, {duration = 1, curve = 'unknown'})", "curve"},
     };
     for (const auto& batch : batches) {
         char source[1024];
@@ -176,7 +176,7 @@ local target = scene:rectangle {id = "target", size = {1, 1}}
 local states = vis.states(scene)
 states:define(target, "right", {shift = {2, 0}})
 states:define(target, "up", {shift = {1, 2}})
-states:transition(target, "right", 1, "linear")
+states:transition(target, "right", {duration = 1, curve = "linear"})
 vis.runtime(scene, {
     fixed_step = 0.25,
     max_steps = 4,
@@ -187,7 +187,7 @@ vis.runtime(scene, {
             if math.abs(current.shift[1] - 1) > 0.0001 then
                 error("capture-current mismatch")
             end
-            states:transition(target, "up", 1, "linear")
+            states:transition(target, "up", {duration = 1, curve = "linear"})
         end
     end,
 })

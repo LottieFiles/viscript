@@ -124,6 +124,12 @@ assert.equal(api.configs.PanelSampleAreaConfig.targets.type, "Object[]");
 assert.equal(api.configs.PanelSampleAreaConfig.marker.type, "Object");
 assert.equal(api.configs.PanelSampleAreaConfig.swatch.type, "Object");
 assert.equal(api.methods.Panel.toggle, undefined);
+assert.deepEqual(api.methods.Panel.camera.parameters, [
+    {name: "action", type: '"pan"|"orbit"|"zoom"|"reset"|"view2d"|"view3d"'},
+    {name: "delta", type: "Vec2|number", optional: true},
+]);
+assert.equal(api.methods.Panel.camera.returns, "Panel");
+assert.doesNotMatch(api.configs.PanelButtonConfig.camera.type, /"move"/);
 
 assert.deepEqual(Object.keys(api.methods.Diagram).sort(), diagramMethods,
     "Diagram API schema differs from the optional Diagram binding");
@@ -133,6 +139,15 @@ assert.match(diagramBinding, /lua_setfield\(lua, -2, "diagram"\)/);
 assert.deepEqual(api.globals.diagram.parameters,
     [{name: "scene", type: "Scene"}, {name: "config", type: "DiagramConfig"}]);
 assert.equal(api.globals.diagram.returns, "Diagram");
+for (const [name, type, returns] of [
+    ["object", "DiagramNode|DiagramEdge|DiagramZone", "Object"],
+    ["body", "DiagramNode|DiagramZone", "Object"],
+    ["label", "DiagramNode|DiagramEdge|DiagramZone", "Object|nil"],
+    ["detail", "DiagramNode", "Object|nil"],
+]) {
+    assert.equal(api.methods.DiagramBuilt[name].parameters[0].type, type);
+    assert.equal(api.methods.DiagramBuilt[name].returns, returns);
+}
 
 // The tex module adds its factory to the Scene and Object handles and part to Group handles, and
 // wraps match_transform; without it, the core stops a script that calls the factory.
@@ -187,14 +202,38 @@ assertConfig("RuntimeObjectState", optionNames(runtimeBinding, "_objectState"), 
 assertConfig("RuntimeSoundConfig", optionNames(runtimeBinding, "_sound"), []);
 assertConfig("StateOverlay", optionNames(statesBinding, "_state"), []);
 assertConfig("StateTarget", optionNames(statesBinding, "_transition"), ["object", "state"]);
+assert.deepEqual(api.methods.StatesController.transition.parameters, [
+    {name: "object", type: "Object"}, {name: "state", type: "string"},
+    {name: "options", type: "TimingOptions", optional: true},
+]);
 assert.deepEqual(api.methods.StatesController.transition.overloads[0], {
-    parameters: [{name: "targets", type: "StateTarget[]"}, {name: "duration", type: "number", optional: true}, {name: "curve", type: "Curve", optional: true}],
+    parameters: [{name: "targets", type: "StateTarget[]"}, {name: "options", type: "TimingOptions", optional: true}],
     returns: "StatesController",
 });
-assert.deepEqual(api.methods.StatesController.transition.overloads.slice(1).map((overload) => overload.parameters), [
-    [{name: "object", type: "Object"}, {name: "state", type: "string"}, {name: "options", type: "TimingOptions"}],
-    [{name: "targets", type: "StateTarget[]"}, {name: "options", type: "TimingOptions"}],
+assert.equal(api.methods.StatesController.transition.overloads.length, 1);
+// Timing has one options-table signature; track keeps its required options and its list form.
+for (const [owner, methods] of [
+    ["Scene", ["tween", "restore", "create", "uncreate", "fill_reveal", "draw_border_then_fill", "write",
+        "shift", "transform", "warp", "fade", "grow_from_center", "grow_from_edge", "shrink_to_center",
+        "morph", "fade_transform", "match_transform", "edit", "arrange", "transition", "stroke", "fill", "look"]],
+    ["View", ["look", "fade"]],
+]) {
+    for (const name of methods) {
+        const method = api.methods[owner][name];
+        assert.equal(method.overloads, undefined, `${owner}:${name} has a redundant timing overload`);
+        assert.ok(method.parameters.every((parameter) => !["duration", "curve", "lag"].includes(parameter.name)),
+            `${owner}:${name} exposes positional timing`);
+        assert.equal(method.parameters.at(-1).name, "options");
+        assert.equal(method.parameters.at(-1).optional, true);
+    }
+}
+assert.deepEqual(api.methods.Scene.track.parameters, [
+    {name: "tracker", type: "Tracker"}, {name: "value", type: "number"}, {name: "options", type: "TimingOptions"},
 ]);
+assert.deepEqual(api.methods.Scene.track.overloads, [{
+    parameters: [{name: "moves", type: "{[1]: Tracker, [2]: number}[]"}, {name: "options", type: "TimingOptions"}],
+    returns: "Scene",
+}]);
 for (const [name, base] of Object.entries(api.configBases)) {
     assert.ok(api.configs[name] && api.configs[base], `Unknown config inheritance: ${name}`);
 }
@@ -275,7 +314,7 @@ for (const config of [
 ]) assert.match(meta, new RegExp(`---@class vis\\.${config}`));
 assert.match(meta, /function Library\.states\(scene\)/);
 for (const name of statesMethods) assert.match(meta, new RegExp(`function StatesController:${name}\\(`));
-assert.match(meta, /---@overload fun\(self: vis\.StatesController, targets: vis\.StateTarget\[\], duration\?: number, curve\?: vis\.Curve\): vis\.StatesController/);
+assert.match(meta, /---@overload fun\(self: vis\.StatesController, targets: vis\.StateTarget\[\], options\?: vis\.TimingOptions\): vis\.StatesController/);
 for (const config of ["StateOverlay", "StateTarget", "StateCurveRecord", "StateEvent"]) {
     assert.match(meta, new RegExp(`---@class vis\\.${config}`));
 }

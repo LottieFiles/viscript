@@ -35,7 +35,7 @@ local scene = vis.scene {
 
 local ball = scene:circle {id = "ball", center = {-2, 0}, radius = 0.5, fill = "accent"}
 scene:wait(1)
-scene:shift(ball, {4, 0}, 0.8)
+scene:shift(ball, {4, 0}, {duration = 0.8})
 
 return scene
 ```
@@ -48,7 +48,7 @@ const scene = vis.scene({
 
 const ball = scene.circle({id: "ball", center: [-2, 0], radius: 0.5, fill: "accent"});
 scene.wait(1);
-scene.shift(ball, [4, 0], 0.8);
+scene.shift(ball, [4, 0], {duration: 0.8});
 
 return scene;
 ```
@@ -66,7 +66,7 @@ local scene = vis.scene {
 local ball = scene:circle {id = "ball", center = {-2, 0}, radius = 0.5, fill = "accent"}
 scene:wait(0.5)
 scene:mark("move")
-scene:at("move", function(s) s:shift(ball, {4, 0}, 1) end)
+scene:at("move", function(s) s:shift(ball, {4, 0}, {duration = 1}) end)
 
 return scene
 ```
@@ -80,7 +80,7 @@ const scene = vis.scene({
 const ball = scene.circle({id: "ball", center: [-2, 0], radius: 0.5, fill: "accent"});
 scene.wait(0.5);
 scene.mark("move");
-scene.at("move", (s) => s.shift(ball, [4, 0], 1));
+scene.at("move", (s) => s.shift(ball, [4, 0], {duration: 1}));
 
 return scene;
 ```
@@ -97,8 +97,8 @@ local scene = vis.scene {
 
 local ball = scene:circle {id = "ball", center = {-2, 0}, radius = 0.5, fill = "accent"}
 local other = scene:rectangle {id = "other", center = {2, 0}, size = {1, 1}, stroke = "foreground"}
-scene:at(0.4, function(s) s:shift(ball, {4, 0}, 1) end)
-scene:at(0.9, function(s) s:shift(other, {-4, 0}, 1) end)
+scene:at(0.4, function(s) s:shift(ball, {4, 0}, {duration = 1}) end)
+scene:at(0.9, function(s) s:shift(other, {-4, 0}, {duration = 1}) end)
 
 return scene
 ```
@@ -111,8 +111,8 @@ const scene = vis.scene({
 
 const ball = scene.circle({id: "ball", center: [-2, 0], radius: 0.5, fill: "accent"});
 const other = scene.rectangle({id: "other", center: [2, 0], size: [1, 1], stroke: "foreground"});
-scene.at(0.4, (s) => s.shift(ball, [4, 0], 1));
-scene.at(0.9, (s) => s.shift(other, [-4, 0], 1));
+scene.at(0.4, (s) => s.shift(ball, [4, 0], {duration: 1}));
+scene.at(0.9, (s) => s.shift(other, [-4, 0], {duration: 1}));
 
 return scene;
 ```
@@ -130,8 +130,8 @@ local scene = vis.scene {
 local ball = scene:circle {id = "ball", center = {-2, 0}, radius = 0.5, fill = "accent"}
 local other = scene:rectangle {id = "other", center = {2, 0}, size = {1, 1}, stroke = "foreground"}
 scene:parallel(
-    function(s) s:shift(ball, {0, 1.5}, 1) end,
-    function(s) s:shift(other, {0, -1.5}, 1.5) end
+    function(s) s:shift(ball, {0, 1.5}, {duration = 1}) end,
+    function(s) s:shift(other, {0, -1.5}, {duration = 1.5}) end
 )
 
 return scene
@@ -146,8 +146,8 @@ const scene = vis.scene({
 const ball = scene.circle({id: "ball", center: [-2, 0], radius: 0.5, fill: "accent"});
 const other = scene.rectangle({id: "other", center: [2, 0], size: [1, 1], stroke: "foreground"});
 scene.parallel(
-    (s) => s.shift(ball, [0, 1.5], 1),
-    (s) => s.shift(other, [0, -1.5], 1.5),
+    (s) => s.shift(ball, [0, 1.5], {duration: 1}),
+    (s) => s.shift(other, [0, -1.5], {duration: 1.5}),
 );
 
 return scene;
@@ -164,7 +164,7 @@ local scene = vis.scene {
 }
 
 local ball = scene:circle {id = "ball", center = {-2, 0}, radius = 0.5, fill = "accent"}
-scene:shift(ball, {4, 0}, 1)
+scene:shift(ball, {4, 0}, {duration = 1})
 local time = scene:time()
 scene:text {id = "time", text = string.format("cursor = %.1f s", time), point = {0, -1.5}, size = 24}
 
@@ -183,9 +183,9 @@ local scene = vis.scene {
 
 local ball = scene:circle {id = "ball", center = {-2, 0}, radius = 0.5, fill = "accent"}
 local other = scene:rectangle {id = "other", center = {2, 0}, size = {1, 1}, stroke = "foreground"}
-scene:shift(ball, {4, 0}, 1)
+scene:shift(ball, {4, 0}, {duration = 1})
 scene:seek(0)
-scene:shift(other, {-4, 0}, 1)
+scene:shift(other, {-4, 0}, {duration = 1})
 
 return scene
 ```
@@ -201,7 +201,7 @@ local scene = vis.scene {
 }
 
 local ball = scene:circle {id = "ball", center = {-2, 0}, radius = 0.5, fill = "accent"}
-scene:shift(ball, {4, 0}, 1.2)
+scene:shift(ball, {4, 0}, {duration = 1.2})
 local duration = scene:duration()
 scene:text {id = "duration", text = string.format("duration = %.1f s", duration), point = {0, -1.5}, size = 24}
 

@@ -12,6 +12,6 @@ local label = scene:text {
     point = {0, 0}, align = {0.5, 0.5}, role = "text", color = "foreground",
 }
 
-scene:shift(label, {2.2, 0}, 0.25, "linear")
-scene:shift(label, {-2.2, 0}, 0.25, "linear")
+scene:shift(label, {2.2, 0}, {duration = 0.25, curve = "linear"})
+scene:shift(label, {-2.2, 0}, {duration = 0.25, curve = "linear"})
 return scene

@@ -29,8 +29,8 @@ local card = scene:rectangle {center = {2, 2}, size = {1.4, 0.9}, corner = 0.12,
 scene:set {target = card, position = stops[1]}
 scene:wait(0.4)
 
-scene:tween({target = card, position = stops[2]}, 1)
-scene:tween({target = card, position = stops[3], arc = -math.pi / 2}, 1)
+scene:tween({target = card, position = stops[2]}, {duration = 1})
+scene:tween({target = card, position = stops[3], arc = -math.pi / 2}, {duration = 1})
 
 return scene
 ```
@@ -48,8 +48,8 @@ const card = scene.rectangle({center: [2, 2], size: [1.4, 0.9], corner: 0.12, fi
 scene.set({target: card, position: stops[0]});
 scene.wait(0.4);
 
-scene.tween({target: card, position: stops[1]}, 1);
-scene.tween({target: card, position: stops[2], arc: -Math.PI / 2}, 1);
+scene.tween({target: card, position: stops[1]}, {duration: 1});
+scene.tween({target: card, position: stops[2], arc: -Math.PI / 2}, {duration: 1});
 
 return scene;
 ```
@@ -77,9 +77,9 @@ token:text {text = "GET", size = 15}
 scene:set {target = token, position = {-3.1, 0}}
 scene:fade_in(token, {duration = 0.3})
 
-scene:move_along(token, built:edge(ask), {to = 0.7, duration = 1})
-scene:tween({target = token, position = {0, 0.85}, arc = -1.2}, 0.6)
-scene:indicate(built:node_body(server), {duration = 0.5})
+scene:move_along(token, built:object(ask), {to = 0.7, duration = 1})
+scene:tween({target = token, position = {0, 0.85}, arc = -1.2}, {duration = 0.6})
+scene:indicate(built:body(server), {duration = 0.5})
 
 return scene
 ```
@@ -108,7 +108,7 @@ scene.set({target: token, position: [-3.1, 0]});
 scene.fadeIn(token, {duration: 0.3});
 
 scene.moveAlong(token, ask, {to: 0.7, duration: 1});
-scene.tween({target: token, position: [0, 0.85], arc: -1.2}, 0.6);
+scene.tween({target: token, position: [0, 0.85], arc: -1.2}, {duration: 0.6});
 scene.indicate(server, {duration: 0.5});
 
 return scene;
@@ -128,15 +128,15 @@ scene:set {target = dot, position = {-4, 0.5}}
 local caption = scene:text {text = "1. Start on the left", point = {0, -1.8}, size = 30}
 local function say(text)
     local line = scene:text {text = text, point = {0, -1.8}, size = 30}
-    scene:fade_transform(caption, line, 0.4)
+    scene:fade_transform(caption, line, {duration = 0.4})
     caption = line
 end
 
 scene:wait(0.6)
 say("2. Move to the middle")
-scene:tween({target = dot, position = {0, 0.5}}, 0.8)
+scene:tween({target = dot, position = {0, 0.5}}, {duration = 0.8})
 say("3. Hop to the right")
-scene:tween({target = dot, position = {4, 0.5}, arc = -math.pi / 2}, 0.8)
+scene:tween({target = dot, position = {4, 0.5}, arc = -math.pi / 2}, {duration = 0.8})
 scene:wait(0.6)
 
 return scene
@@ -151,15 +151,15 @@ scene.set({target: dot, position: [-4, 0.5]});
 let caption = scene.text({text: "1. Start on the left", point: [0, -1.8], size: 30});
 const say = (text) => {
     const line = scene.text({text, point: [0, -1.8], size: 30});
-    scene.fadeTransform(caption, line, 0.4);
+    scene.fadeTransform(caption, line, {duration: 0.4});
     caption = line;
 };
 
 scene.wait(0.6);
 say("2. Move to the middle");
-scene.tween({target: dot, position: [0, 0.5]}, 0.8);
+scene.tween({target: dot, position: [0, 0.5]}, {duration: 0.8});
 say("3. Hop to the right");
-scene.tween({target: dot, position: [4, 0.5], arc: -Math.PI / 2}, 0.8);
+scene.tween({target: dot, position: [4, 0.5], arc: -Math.PI / 2}, {duration: 0.8});
 scene.wait(0.6);
 
 return scene;

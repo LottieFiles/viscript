@@ -38,7 +38,7 @@ diagram:zone {id = "runtime", label = "Runtime", members = {gateway, service}}
 diagram:zone {id = "state", label = "State", members = {store}}
 
 local built = diagram:build()  -- attaches one ordinary Object subtree to scene
-local flows = {built:edge(request), built:edge(dispatch), built:edge(persist)}
+local flows = {built:object(request), built:object(dispatch), built:object(persist)}
 
 scene:fade_in(built:zones(), {duration = 0.4, curve = "gentle"})
 scene:fade_in(built:nodes(), {duration = 0.6, curve = "ease_out"})
@@ -49,7 +49,7 @@ scene:tween({
     {target = flows[1], dash_offset = -9},
     {target = flows[2], dash_offset = -9},
     {target = flows[3], dash_offset = -9},
-}, 1.15, "linear")
-scene:indicate(built:node_body(store), {color = "result", scale = 1.04, duration = 0.45})
+}, {duration = 1.15, curve = "linear"})
+scene:indicate(built:body(store), {color = "result", scale = 1.04, duration = 0.45})
 scene:wait(2.0)
 return scene

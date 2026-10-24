@@ -7,11 +7,11 @@ local root = vis.scene {width = 200, height = 100, background = "#101820"}
 local left = vis.scene {width = 100, height = 100, background = "#d84040", camera = {height = 4}}
 local leftSpace = left:space {x = {-2, 2, 1}, y = {-2, 2, 1}, opacity = 0}
 local leftVector = leftSpace:vector {value = {1.5, 1}, color = "#ffffff", width = 3}
-left:create(leftVector, 0.5, "linear")
+left:create(leftVector, {duration = 0.5, curve = "linear"})
 local right = vis.scene {width = 100, height = 100, background = "#4080d8", camera = {height = 8}}
 local rightSpace = right:space {x = {-4, 4, 1}, y = {-4, 4, 1}, opacity = 0}
 local rightVector = rightSpace:vector {value = {-2, 2}, color = "#ffffff", width = 3}
-right:create(rightVector, 1.2, "linear")
+right:create(rightVector, {duration = 1.2, curve = "linear"})
 local edge = vis.scene {width = 20, height = 20, background = "#00000000"}
 root:viewport(left, {x = 0, y = 0, width = 0.5, height = 1})
 root:viewport(right, {x = 0.5, y = 0, width = 0.5, height = 1})
@@ -47,7 +47,7 @@ local root = vis.scene {width = 200, height = 100, background = "#080d14", antia
 local first = vis.scene {width = 100, height = 100, background = "#101820", camera = {height = 4}}
 local dot = first:circle {center = {-0.8, 0}, radius = 0.65, fill = "#4cc9f0", id = "hero"}
 first:line {from = {-1.6, -1.2}, to = {0, -1.2}, stroke = "#7bd88f", width = 3, id = "guide-a"}
-first:shift(dot, {1, 0}, 2, "linear")
+first:shift(dot, {1, 0}, {duration = 2, curve = "linear"})
 local second = vis.scene {width = 200, height = 100, background = "#1c1730", camera = {height = 5}}
 second:rectangle {center = {1.1, 0.2}, size = {1.8, 1.2}, corner = 0.16,
     fill = "#f72585", id = "hero"}
@@ -425,7 +425,7 @@ scene:tween({
     {target = box, shift = {0.5, 0}, opacity = 0.6,
      stroke = "#ffd166", fill = "#40d890"},
     {target = mixed, shift = {-0.5, 0}, fill = "#b060e8"}
-}, 1.2, "linear", 0.25)
+}, {duration = 1.2, curve = "linear", lag = 0.25})
 if math.abs(scene:duration() - 1.5) > 0.0001 then error("composite duration mismatch") end
 return scene
 )lua";

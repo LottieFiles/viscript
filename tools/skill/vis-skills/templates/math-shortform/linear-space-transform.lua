@@ -29,18 +29,18 @@ local basis = {
 }
 local sample = localSpace:point {id = "shortform-transform-point", point = areaCorner, fill = "result", radius = 8, layer = 30}
 
-scene:create(world, 0.5, "ease_out")
-scene:create(localSpace, 0.5, "ease_out")
-scene:draw_border_then_fill(region, 0.45, "ease_out")
-scene:create({basis[1], basis[2], sample}, 0.45, "ease_out", 0.05)
+scene:create(world, {duration = 0.5, curve = "ease_out"})
+scene:create(localSpace, {duration = 0.5, curve = "ease_out"})
+scene:draw_border_then_fill(region, {duration = 0.45, curve = "ease_out"})
+scene:create({basis[1], basis[2], sample}, {duration = 0.45, curve = "ease_out", lag = 0.05})
 scene:wait(0.45)
 
 -- Contrasting targets expose shear, rotation/scale, then exact return.
-scene:transform(localSpace, matrices[1], 1.25, "ease_in_out")
+scene:transform(localSpace, matrices[1], {duration = 1.25, curve = "ease_in_out"})
 scene:wait(0.42)
-scene:transform(localSpace, matrices[2], 1.25, "ease_in_out")
+scene:transform(localSpace, matrices[2], {duration = 1.25, curve = "ease_in_out"})
 scene:wait(0.42)
-scene:transform(localSpace, matrices[3], 1.25, {preset = "ease_in_out", reverse = true})
+scene:transform(localSpace, matrices[3], {duration = 1.25, curve = {preset = "ease_in_out", reverse = true}})
 
 local conclusion = scene:text {
     id = "shortform-transform-conclusion", text = "grid · basis · point · area  —  one matrix",

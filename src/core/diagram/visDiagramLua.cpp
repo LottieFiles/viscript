@@ -431,50 +431,42 @@ static int _routes(lua_State* lua) { auto value = _built(lua); return _push(lua,
 static int _nodes(lua_State* lua) { auto value = _built(lua); return _push(lua, value->built->nodes()); }
 static int _annotations(lua_State* lua) { auto value = _built(lua); return _push(lua, value->built->annotations()); }
 
-static int _nodeObject(lua_State* lua, int kind)
+// Select the same semantic part across node, edge and zone handles. Edges have no body
+// separate from their route object, and only their labels may be absent.
+static int _part(lua_State* lua, int kind)
+{
+    auto value = _built(lua);
+    if (luaL_testudata(lua, 2, NODE_METATABLE)) {
+        auto node = _handle<Node>(lua, 2, NODE_METATABLE, value->owner)->value;
+        if (kind == 0) return _push(lua, value->built->object(node));
+        if (kind == 1) return _push(lua, value->built->body(node));
+        return _push(lua, value->built->label(node));
+    }
+    if (luaL_testudata(lua, 2, ZONE_METATABLE)) {
+        auto zone = _handle<Zone>(lua, 2, ZONE_METATABLE, value->owner)->value;
+        if (kind == 0) return _push(lua, value->built->object(zone));
+        if (kind == 1) return _push(lua, value->built->body(zone));
+        return _push(lua, value->built->label(zone));
+    }
+    if (kind != 1 && luaL_testudata(lua, 2, EDGE_METATABLE)) {
+        auto edge = _handle<Edge>(lua, 2, EDGE_METATABLE, value->owner)->value;
+        if (kind == 0) return _push(lua, value->built->object(edge));
+        return _push(lua, value->built->label(edge), true);
+    }
+    _typeError(lua, 2, kind == 1 ? "diagram node or zone" : "diagram node, edge or zone", nullptr);
+    return 0;
+}
+
+static int _object(lua_State* lua) { return _part(lua, 0); }
+static int _body(lua_State* lua) { return _part(lua, 1); }
+static int _label(lua_State* lua) { return _part(lua, 2); }
+
+static int _detail(lua_State* lua)
 {
     auto value = _built(lua);
     auto node = _handle<Node>(lua, 2, NODE_METATABLE, value->owner)->value;
-    Object* object = nullptr;
-    if (kind == 0) object = value->built->object(node);
-    else if (kind == 1) object = value->built->body(node);
-    else if (kind == 2) object = value->built->label(node);
-    else object = value->built->detail(node);
-    return _push(lua, object, kind == 3);
+    return _push(lua, value->built->detail(node), true);
 }
-
-static int _node(lua_State* lua) { return _nodeObject(lua, 0); }
-static int _nodeBody(lua_State* lua) { return _nodeObject(lua, 1); }
-static int _nodeLabel(lua_State* lua) { return _nodeObject(lua, 2); }
-static int _nodeDetail(lua_State* lua) { return _nodeObject(lua, 3); }
-
-static int _edgeObject(lua_State* lua, int kind)
-{
-    auto value = _built(lua);
-    auto edge = _handle<Edge>(lua, 2, EDGE_METATABLE, value->owner)->value;
-    Object* object = nullptr;
-    if (kind == 0) object = value->built->object(edge);
-    else object = value->built->label(edge);
-    return _push(lua, object, kind != 0);
-}
-
-static int _edge(lua_State* lua) { return _edgeObject(lua, 0); }
-static int _edgeLabel(lua_State* lua) { return _edgeObject(lua, 1); }
-
-static int _zoneObject(lua_State* lua, int kind)
-{
-    auto value = _built(lua);
-    auto zone = _handle<Zone>(lua, 2, ZONE_METATABLE, value->owner)->value;
-    Object* object = nullptr;
-    if (kind == 0) object = value->built->object(zone);
-    else if (kind == 1) object = value->built->body(zone);
-    else object = value->built->label(zone);
-    return _push(lua, object);
-}
-
-static int _zone(lua_State* lua) { return _zoneObject(lua, 0); }
-static int _zoneBody(lua_State* lua) { return _zoneObject(lua, 1); }
-static int _zoneLabel(lua_State* lua) { return _zoneObject(lua, 2); }
 
 static int _open(lua_State* lua, void*)
 {
@@ -484,11 +476,8 @@ static int _open(lua_State* lua, void*)
     };
     static const luaL_Reg builtMethods[] = {
         {"root", _root}, {"zones", _zones}, {"routes", _routes},
-        {"nodes", _nodes}, {"annotations", _annotations}, {"node", _node},
-        {"node_body", _nodeBody}, {"node_label", _nodeLabel},
-        {"node_detail", _nodeDetail}, {"edge", _edge},
-        {"edge_label", _edgeLabel}, {"zone", _zone}, {"zone_body", _zoneBody},
-        {"zone_label", _zoneLabel}, {nullptr, nullptr},
+        {"nodes", _nodes}, {"annotations", _annotations}, {"object", _object},
+        {"body", _body}, {"label", _label}, {"detail", _detail}, {nullptr, nullptr},
     };
     detail::luaMetatable(lua, DIAGRAM_METATABLE, _diagramGc, {diagramMethods});
     detail::luaMetatable(lua, NODE_METATABLE, nullptr);

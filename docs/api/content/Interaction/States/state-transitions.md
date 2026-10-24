@@ -13,7 +13,7 @@ Retarget an object's state, advance the controller's independent clock and sampl
 
 | Lua | JavaScript | Purpose |
 | --- | --- | --- |
-| `states:transition(object, name, duration?, curve?)` | — | Begin a transition to one named state; also accepts `(targets, duration?, curve?)` with `{object, state}` entries. |
+| `states:transition(object, name, options?)`<br />`states:transition(targets, options?)` | — | Begin a transition to one named state, or a list of `{object, state}` entries; options: `duration`, `curve`. |
 | `states:advance(elapsed)` | — | Advance the controller's time and active transitions by elapsed seconds. |
 | `states:sample(object)` | — | Return the Object's current state overlay. |
 | `states:time()` | — | Return controller time in seconds. |
@@ -37,7 +37,7 @@ if not vis.states then error("this scene requires -Dmodules=interactive") end
 local dot = scene:circle {id = "dot", radius = 0.45, fill = "accent"}
 local states = vis.states(scene)
 states:define(dot, "right", {shift = {2, 0}})
-states:transition(dot, "right", 1, "linear")
+states:transition(dot, "right", {duration = 1, curve = "linear"})
 if not vis.runtime then error("this scene requires -Dmodules=interactive") end
 vis.runtime(scene, {update = function(runtime, dt) states:advance(dt) end})
 scene:text {id = "hint", text = "The state moves from center to right", point = {0, 2}, size = 18, fill = "foreground"}
@@ -59,7 +59,7 @@ if not vis.states then error("this scene requires -Dmodules=interactive") end
 local dot = scene:circle {id = "dot", radius = 0.45, fill = "accent"}
 local states = vis.states(scene)
 states:define(dot, "right", {shift = {2, 0}})
-states:transition(dot, "right", 1, "linear")
+states:transition(dot, "right", {duration = 1, curve = "linear"})
 states:advance(0.5)
 scene:text {id = "hint", text = "advance(0.5): half of the one-second transition", point = {0, 2}, size = 18, fill = "foreground"}
 
@@ -80,7 +80,7 @@ if not vis.states then error("this scene requires -Dmodules=interactive") end
 local dot = scene:circle {id = "dot", radius = 0.45, fill = "accent"}
 local states = vis.states(scene)
 states:define(dot, "right", {shift = {2, 0}})
-states:transition(dot, "right", 1, "linear")
+states:transition(dot, "right", {duration = 1, curve = "linear"})
 states:advance(0.5)
 local value = states:sample(dot)
 scene:text {id = "value", text = "shift.x = " .. value.shift[1], point = {0, 2}, size = 18}
@@ -122,7 +122,7 @@ if not vis.states then error("this scene requires -Dmodules=interactive") end
 local dot = scene:circle {id = "dot", radius = 0.45, fill = "accent"}
 local states = vis.states(scene)
 states:define(dot, "right", {shift = {2, 0}})
-states:transition(dot, "right", 1)
+states:transition(dot, "right", {duration = 1})
 states:advance(0.4)
 scene:text {id = "value", text = "active = " .. tostring(states:active()), point = {0, 2}, size = 18}
 

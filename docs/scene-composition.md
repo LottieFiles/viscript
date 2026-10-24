@@ -14,7 +14,7 @@ local scene = vis.scene {}
 local node = scene:group {id = "node"}
 node:circle {radius = 0.8}
 node:text {text = "A", id = "label", measure = true}
-scene:shift(node, {2, 0}, 1)
+scene:shift(node, {2, 0}, {duration = 1})
 return scene
 ```
 
@@ -103,7 +103,7 @@ local value = scene:number {
     value = 0, reserve = "-000.00", decimals = 2,
     point = {0, 0}, align = {1, 0}, baseline = true, id = "value",
 }
-scene:tween({target = value, value = 42.5}, 1)
+scene:tween({target = value, value = 42.5}, {duration = 1})
 ```
 
 `spans` measures styled Text parts and places them on shared baselines. `wrap` sets
@@ -176,10 +176,10 @@ Positional calls remain supported:
 
 ```lua
 scene:parallel(
-    function() scene:shift(ball, {4, 0}, 3) end,
+    function() scene:shift(ball, {4, 0}, {duration = 3}) end,
     function() scene:fade_in(label, 1); scene:mark("label") end
 )
-scene:at("label", function() scene:create(arrow, 0.6) end)
+scene:at("label", function() scene:create(arrow, {duration = 0.6}) end)
 ```
 
 A `tween` descriptor changes several properties together:
@@ -188,7 +188,7 @@ A `tween` descriptor changes several properties together:
 scene:tween({
     {target = left, shift = {-1, 0}, fill = "accent", opacity = 0.8},
     {target = right, shift = {1, 0}, stroke = "danger"},
-}, 0.8, "ease_in_out", 0.15)
+}, {duration = 0.8, curve = "ease_in_out", lag = 0.15})
 ```
 
 Later descriptors are staggered by `duration * lag`. Properties use separate
@@ -211,8 +211,8 @@ and return to sampled family states.
 Direction options control outline traversal. Fill animation can use two beats:
 
 ```lua
-scene:create(path, 0.8, "linear")
-scene:fill_reveal(path, 0.35, "ease_out")
+scene:create(path, {duration = 0.8, curve = "linear"})
+scene:fill_reveal(path, {duration = 0.35, curve = "ease_out"})
 ```
 
 A plain Text changes strings by fading out the whole old string, then fading in
@@ -231,7 +231,7 @@ Continue the chain using the target handle:
 ```lua
 scene:wait(0.3)
 local square = scene:rectangle {size = {2.4, 2.4}, id = "square"}
-scene:morph(circle, square, 1, "ease_in_out")
+scene:morph(circle, square, {duration = 1, curve = "ease_in_out"})
 scene:indicate(square)
 ```
 
@@ -247,8 +247,8 @@ Animation curves select timing: `linear`, `smooth`, `ease_in`, `ease_out`,
 strength, reversed timing, or cubic Bezier controls:
 
 ```lua
-scene:shift(card, {4, 0}, 0.8, {preset = "back", strength = 1.35})
-scene:shift(card, {-4, 0}, 0.8, {bezier = {0.18, 0.90, 0.28, 1}, reverse = true})
+scene:shift(card, {4, 0}, {duration = 0.8, curve = {preset = "back", strength = 1.35}})
+scene:shift(card, {-4, 0}, {duration = 0.8, curve = {bezier = {0.18, 0.90, 0.28, 1}, reverse = true}})
 ```
 
 Trackers sample bound functions at frame cadence during authoring and retain

@@ -21,9 +21,9 @@ for i, d in ipairs({1, 2, 3}) do
 end
 
 scene:parallel(
-    function() scene:shift(dots[1], {8, 0}, 1) end,
-    function() scene:shift(dots[2], {8, 0}, 2) end,
-    function() scene:shift(dots[3], {8, 0}, 3) end)
+    function() scene:shift(dots[1], {8, 0}, {duration = 1}) end,
+    function() scene:shift(dots[2], {8, 0}, {duration = 2}) end,
+    function() scene:shift(dots[3], {8, 0}, {duration = 3}) end)
 scene:indicate(dots, {color = "success", duration = 0.6})   -- runs after the longest track
 
 return scene
@@ -35,9 +35,9 @@ const scene = vis.scene();
 const dots = [1, 2, 3].map((i) => scene.circle({center: [-4, 2 - i * 1.2 + 0.4], radius: 0.3, fill: "accent"}));
 
 scene.parallel(
-    () => scene.shift(dots[0], [8, 0], 1),
-    () => scene.shift(dots[1], [8, 0], 2),
-    () => scene.shift(dots[2], [8, 0], 3));
+    () => scene.shift(dots[0], [8, 0], {duration: 1}),
+    () => scene.shift(dots[1], [8, 0], {duration: 2}),
+    () => scene.shift(dots[2], [8, 0], {duration: 3}));
 scene.indicate(dots, {color: "success", duration: 0.6});   // runs after the longest track
 
 return scene;
@@ -52,14 +52,14 @@ local scene = vis.scene {}
 
 local ball = scene:circle {center = {-4, 0}, radius = 0.35, fill = "accent"}
 
-scene:shift(ball, {4, 0}, 1.5, "linear")
+scene:shift(ball, {4, 0}, {duration = 1.5, curve = "linear"})
 scene:mark("middle")
-scene:shift(ball, {4, 0}, 1.5, "linear")
+scene:shift(ball, {4, 0}, {duration = 1.5, curve = "linear"})
 
 -- go back to "middle" and add a clip there; the cursor then returns to the end
 scene:at("middle", function()
     local ring = scene:circle {center = {0, 0}, radius = 0.7, stroke = "warning", width = 4}
-    scene:create(ring, 0.6)
+    scene:create(ring, {duration = 0.6})
     scene:fade_out(ring, {duration = 0.6})
 end)
 scene:wait(0.5)
@@ -72,14 +72,14 @@ const scene = vis.scene();
 
 const ball = scene.circle({center: [-4, 0], radius: 0.35, fill: "accent"});
 
-scene.shift(ball, [4, 0], 1.5, "linear");
+scene.shift(ball, [4, 0], {duration: 1.5, curve: "linear"});
 scene.mark("middle");
-scene.shift(ball, [4, 0], 1.5, "linear");
+scene.shift(ball, [4, 0], {duration: 1.5, curve: "linear"});
 
 // go back to "middle" and add a clip there; the cursor then returns to the end
 scene.at("middle", () => {
     const ring = scene.circle({center: [0, 0], radius: 0.7, stroke: "warning", width: 4});
-    scene.create(ring, 0.6);
+    scene.create(ring, {duration: 0.6});
     scene.fadeOut(ring, {duration: 0.6});
 });
 scene.wait(0.5);
@@ -107,8 +107,8 @@ local dot = axes:circle {radius = 0.15, fill = "danger"}
 local x = scene:tracker(-3)
 scene:bind(dot, x, function(v) return {shift = {v, f(v)}} end)
 
-scene:track(x, 3, 2.5, "smooth")
-scene:track(x, -3, 2.5, "smooth")
+scene:track(x, 3, {duration = 2.5, curve = "smooth"})
+scene:track(x, -3, {duration = 2.5, curve = "smooth"})
 
 return scene
 ```
@@ -124,8 +124,8 @@ const dot = axes.circle({radius: 0.15, fill: "danger"});
 const x = scene.tracker(-3);
 scene.bind(dot, x, (v) => ({shift: [v, f(v)]}));
 
-scene.track(x, 3, 2.5, "smooth");
-scene.track(x, -3, 2.5, "smooth");
+scene.track(x, 3, {duration: 2.5, curve: "smooth"});
+scene.track(x, -3, {duration: 2.5, curve: "smooth"});
 
 return scene;
 ```
@@ -152,8 +152,8 @@ scene:bind(dot, x, function(v) return {shift = {v, f(v)}} end)
 scene:bind(drop, x, function(v) return {from = {v, 0}, to = {v, f(v)}} end)
 scene:bind(value, x, function(v) return {value = v} end)
 
-scene:track(x, 3, 3, "smooth")
-scene:track(x, -1, 1.5, "smooth")
+scene:track(x, 3, {duration = 3, curve = "smooth"})
+scene:track(x, -1, {duration = 1.5, curve = "smooth"})
 
 return scene
 ```
@@ -176,8 +176,8 @@ scene.bind(dot, x, (v) => ({shift: [v, f(v)]}));
 scene.bind(drop, x, (v) => ({from: [v, 0], to: [v, f(v)]}));
 scene.bind(value, x, (v) => ({value: v}));
 
-scene.track(x, 3, 3, "smooth");
-scene.track(x, -1, 1.5, "smooth");
+scene.track(x, 3, {duration: 3, curve: "smooth"});
+scene.track(x, -1, {duration: 1.5, curve: "smooth"});
 
 return scene;
 ```
@@ -198,7 +198,7 @@ scene:bind(ball, elapsed, function(t)
     return {shift = {vis.spring_response(t, {mass = 1, stiffness = omega * omega,
                                              damping = 0.25 * omega, displacement = 3}), 0}}
 end)
-scene:track(elapsed, 4, 4, "linear")   -- linear, so physical time runs evenly
+scene:track(elapsed, 4, {duration = 4, curve = "linear"})   -- linear, so physical time runs evenly
 
 return scene
 ```
@@ -215,7 +215,7 @@ scene.bind(ball, elapsed, (t) => ({
     shift: [vis.springResponse(t, {mass: 1, stiffness: omega * omega,
                                    damping: 0.25 * omega, displacement: 3}), 0],
 }));
-scene.track(elapsed, 4, 4, "linear");   // linear, so physical time runs evenly
+scene.track(elapsed, 4, {duration: 4, curve: "linear"});   // linear, so physical time runs evenly
 
 return scene;
 ```
@@ -231,7 +231,7 @@ local curve = scene:curve {from = {-4, -1.5}, control1 = {-2, 3}, control2 = {2,
                           stroke = "muted", width = 2}
 local dot = scene:circle {center = {-4, -1.5}, radius = 0.2, fill = "warning"}
 
-scene:create(curve, 0.6)
+scene:create(curve, {duration = 0.6})
 scene:move_along(dot, curve, {duration = 2.5, curve = "ease_in_out"})
 
 return scene
@@ -244,7 +244,7 @@ const curve = scene.curve({from: [-4, -1.5], control1: [-2, 3], control2: [2, -3
                           stroke: "muted", width: 2});
 const dot = scene.circle({center: [-4, -1.5], radius: 0.2, fill: "warning"});
 
-scene.create(curve, 0.6);
+scene.create(curve, {duration: 0.6});
 scene.moveAlong(dot, curve, {duration: 2.5, curve: "ease_in_out"});
 
 return scene;

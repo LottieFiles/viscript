@@ -49,7 +49,7 @@ local scene = vis.scene {
 local group = scene:group {id = "pair"}
 group:circle {center = {-0.7, 0}, radius = 0.5, stroke = "accent", width = 2}
 group:rectangle {center = {0.7, 0}, size = {0.8, 1}, stroke = "foreground"}
-scene:shift(group, {1, 0}, 1)
+scene:shift(group, {1, 0}, {duration = 1})
 scene:text {id = "caption", text = "Children share one transform", point = {0, -2.25}, size = 16, fill = "muted"}
 
 return scene
@@ -64,7 +64,7 @@ const scene = vis.scene({
 const group = scene.group({id: "pair"});
 group.circle({center: [-0.7, 0], radius: 0.5, stroke: "accent", width: 2});
 group.rectangle({center: [0.7, 0], size: [0.8, 1], stroke: "foreground"});
-scene.shift(group, [1, 0], 1);
+scene.shift(group, [1, 0], {duration: 1});
 scene.text({id: "caption", text: "Children share one transform", point: [0, -2.25], size: 16, fill: "muted"});
 
 return scene;

@@ -33,7 +33,7 @@ if not vis.states then error("this scene requires -Dmodules=interactive") end
 local dot = scene:circle {id = "dot", radius = 0.45, fill = "accent"}
 local states = vis.states(scene)
 states:define(dot, "right", {shift = {2, 0}})
-states:transition(dot, "right", 1)
+states:transition(dot, "right", {duration = 1})
 scene:text {id = "value", text = "events = " .. states:event_count(), point = {0, 2}, size = 18}
 
 return scene
@@ -53,7 +53,7 @@ if not vis.states then error("this scene requires -Dmodules=interactive") end
 local dot = scene:circle {id = "dot", radius = 0.45, fill = "accent"}
 local states = vis.states(scene)
 states:define(dot, "right", {shift = {2, 0}})
-states:transition(dot, "right", 1)
+states:transition(dot, "right", {duration = 1})
 local event = states:event(1)
 scene:text {id = "value", text = "event.state = " .. event.state, point = {0, 2}, size = 18}
 
@@ -74,7 +74,7 @@ if not vis.states then error("this scene requires -Dmodules=interactive") end
 local dot = scene:circle {id = "dot", radius = 0.45, fill = "accent"}
 local states = vis.states(scene)
 states:define(dot, "right", {shift = {2, 0}})
-states:transition(dot, "right", 1)
+states:transition(dot, "right", {duration = 1})
 states:clear_events()
 scene:text {id = "value", text = "events after clear = " .. states:event_count(), point = {0, 2}, size = 18}
 

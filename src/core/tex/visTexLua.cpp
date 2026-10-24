@@ -788,13 +788,13 @@ static bool _given(lua_State* lua, const LuaSide& source, const LuaSide& target,
     return true;
 }
 
-// Pairs the pieces of formulas for the core's match_transform, with arg 6 replaced by options
+// Pairs the pieces of formulas for the core's match_transform, with the options argument replaced by settings
 // that carry the pairs: true when both sides hold pieces of formulas. With strings = false,
 // which keeps the core to the pairs it is given, the TeX pairs no more pieces either: only
 // the pairs given, a pair with a group pairing the pieces below it.
 static bool _texMatch(lua_State* lua, int arguments)
 {
-    if (arguments < 6) lua_settop(lua, 6);
+    if (arguments < 4) lua_settop(lua, 4);
     auto scene = core::luaHandleScene(lua, 1);
     auto box = lua_gettop(lua);
     auto from = core::luaObject(lua, scene, 2);
@@ -804,12 +804,12 @@ static bool _texMatch(lua_State* lua, int arguments)
     if (!source.keyed || !target.keyed) return false;
     auto given = 0;
     auto strings = true;
-    if (!lua_isnil(lua, 6)) {
-        luaL_checktype(lua, 6, LUA_TTABLE);
+    if (!lua_isnil(lua, 4)) {
+        luaL_checktype(lua, 4, LUA_TTABLE);
         // The core says what is wrong with strings that is not a boolean.
-        if (_get(lua, 6, "strings") == LUA_TBOOLEAN) strings = lua_toboolean(lua, -1);
+        if (_get(lua, 4, "strings") == LUA_TBOOLEAN) strings = lua_toboolean(lua, -1);
         lua_pop(lua, 1);
-        if (_get(lua, 6, "pairs") != LUA_TNIL) {
+        if (_get(lua, 4, "pairs") != LUA_TNIL) {
             // The core says what is wrong with pairs it cannot take.
             if (!lua_istable(lua, -1) || lua_rawlen(lua, -1) > GROUP_LIMIT) return false;
             given = lua_gettop(lua);
@@ -824,9 +824,9 @@ static bool _texMatch(lua_State* lua, int arguments)
     lua_createtable(lua, 0, 0);
     auto pairs = lua_gettop(lua);
     auto count = 0;
-    if (!lua_isnil(lua, 6)) {
+    if (!lua_isnil(lua, 4)) {
         lua_pushnil(lua);
-        while (lua_next(lua, 6)) {
+        while (lua_next(lua, 4)) {
             if (lua_type(lua, -2) == LUA_TSTRING && std::strcmp(lua_tostring(lua, -2), "pairs") == 0) {
                 lua_pop(lua, 1);
                 continue;
@@ -892,7 +892,7 @@ static bool _texMatch(lua_State* lua, int arguments)
     lua_pushvalue(lua, pairs);
     lua_setfield(lua, options, "pairs");
     lua_pushvalue(lua, options);
-    lua_replace(lua, 6);
+    lua_replace(lua, 4);
     return true;
 }
 
@@ -900,9 +900,10 @@ static bool _texMatch(lua_State* lua, int arguments)
 static int _matchTransform(lua_State* lua)
 {
     auto arguments = lua_gettop(lua);
-    if (arguments >= 3 && lua_type(lua, 2) == LUA_TUSERDATA && lua_type(lua, 3) == LUA_TUSERDATA
+    if (arguments >= 3 && arguments <= 4 && lua_type(lua, 2) == LUA_TUSERDATA
+        && lua_type(lua, 3) == LUA_TUSERDATA && (lua_isnoneornil(lua, 4) || lua_istable(lua, 4))
         && _texMatch(lua, arguments)) {
-        arguments = 6;
+        arguments = 4;
     }
     lua_settop(lua, arguments);
     return core::luaCallWrapped(lua, lua_upvalueindex(1));

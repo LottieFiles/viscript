@@ -30,9 +30,9 @@ local arrow = space:arrow {
 local point = space:point {
     point = {2.5, 1.5}, fill = "#4cc9f0", radius = 7, id = "tip"
 }
-s:create({space, arrow, point}, 0.75, "linear", 0.1)
-s:shift(arrow, {0.5, -0.25}, 0.5, "smooth")
-s:fade(point, 0.5, 0.25, "ease_out")
+s:create({space, arrow, point}, {duration = 0.75, curve = "linear", lag = 0.1})
+s:shift(arrow, {0.5, -0.25}, {duration = 0.5, curve = "smooth"})
+s:fade(point, 0.5, {duration = 0.25, curve = "ease_out"})
 s:wait(0.25)
 if math.abs(s:duration() - 1.9) > 0.0001 then error("duration mismatch") end
 return s
@@ -56,8 +56,8 @@ local vector = space:vector {
 local line = space:line {
     from = {-2, -1, -1}, to = {2, 1, 1}, color = "#4cc9f0", id = "diagonal"
 }
-s:create({space, vector, line}, 0.6, "smooth", 0.2)
-s:shift(vector, {0, 0.5, 0}, 0.4, "linear")
+s:create({space, vector, line}, {duration = 0.6, curve = "smooth", lag = 0.2})
+s:shift(vector, {0, 0.5, 0}, {duration = 0.4, curve = "linear"})
 return s
 )lua";
 
@@ -75,7 +75,7 @@ local samples = axes:plot {
     points = {{-2, 2}, {-1, 0.5}, {0, 0}, {1, 0.5}, {2, 2}},
     color = "#ffd166", width = 2, id = "samples"
 }
-s:create({axes, sine, samples}, 0.5, "ease_in_out", 0.1)
+s:create({axes, sine, samples}, {duration = 0.5, curve = "ease_in_out", lag = 0.1})
 return s
 )lua";
 
@@ -91,8 +91,8 @@ local route = axes:route {
     dash = {10, 6}, dash_offset = 0, id = "route"
 }
 local marker = axes:point {point = {0, 0}, radius = 4, fill = "#ffd166"}
-s:create({axes, route, marker}, 0.5, "linear")
-s:tween({target = route, dash_offset = -8, tail = 14, tip = 22}, 0.5, "linear")
+s:create({axes, route, marker}, {duration = 0.5, curve = "linear"})
+s:tween({target = route, dash_offset = -8, tail = 14, tip = 22}, {duration = 0.5, curve = "linear"})
 return s
 )lua";
 
@@ -116,7 +116,7 @@ local bezier = axes:curve {
     from = {-2.4, -1.8}, control1 = {-0.8, 0.8}, control2 = {0.8, -0.8}, to = {2.4, 1.8},
     samples = 32, stroke = "#ffd166", width = 4, id = "bezier"
 }
-s:create({axes, outline, bezier}, 0.5, "ease_in_out", 0.1)
+s:create({axes, outline, bezier}, {duration = 0.5, curve = "ease_in_out", lag = 0.1})
 return s
 )lua";
 
@@ -139,8 +139,8 @@ local contour = s:path {
         {type="line", to={1, 1}}, {type="line", to={-1, 1}}, {type="close"}},
     fill = "#ef6461", stroke = "#ef6461", id = "contour"
 }
-s:create(surface, 0.2, "linear")
-s:write(contour, 0.4, "gentle")
+s:create(surface, {duration = 0.2, curve = "linear"})
+s:write(contour, {duration = 0.4, curve = "gentle"})
 return s
 )lua";
 
@@ -226,13 +226,13 @@ static void _diagnostics()
     _scriptError("local s=vis.scene{}\nlocal t=string.format('%d', 'x')\nreturn s",
                  "diagnostic.lua:2: bad argument #2 to 'format' (number expected, got string)");
     _scriptError("local s=vis.scene{}; local c=s:circle{radius=1}; s:wait(1); s:remove(c);"
-                 " s:shift(c,{1,0},1); return s",
+                 " s:shift(c,{1,0},{duration = 1}); return s",
                  "could not play animation: the object was removed earlier in the timeline");
     _scriptError("local s=vis.scene{}; local a=s:circle{radius=1}; local b=s:arrow{from={0,0},to={1,0}};"
-                 " s:morph(a,b,1); return s",
+                 " s:morph(a,b,{duration = 1}); return s",
                  "morph needs a line, circle, rectangle, polygon, plot, path or curve on both sides");
     _scriptError("local s=vis.scene{}; local a=s:circle{radius=1}; local b=s:plot{points={{0,0},{1,1}}};"
-                 " s:morph(a,b,1); return s",
+                 " s:morph(a,b,{duration = 1}); return s",
                  "morph outlines must both be closed (circle, rectangle, polygon) or both be open");
     _scriptError("local s=vis.scene{}; local a=s:circle{radius=1}; local b=s:circle{radius=1};"
                  " s:wait(1); a:next_to(b,{1,0}); return s",
@@ -243,10 +243,10 @@ static void _diagnostics()
     _scriptError("local s=vis.scene{}; local g=s:group{}; g:arrange(); return s",
                  "could not arrange group: the group has no children with bounds to arrange");
     _scriptError("local s=vis.scene{}; local a=s:circle{radius=1}; local b=s:circle{radius=1};"
-                 " s:fade_in(b); s:fade_transform(a,b,1); return s",
+                 " s:fade_in(b); s:fade_transform(a,b,{duration = 1}); return s",
                  "add the replacing object right before the cross-fade");
     _scriptError("local s=vis.scene{}; local a=s:circle{radius=1};"
-                 " s:tween({target=a,tip=4},1); return s",
+                 " s:tween({target=a,tip=4},{duration = 1}); return s",
                  "tail and tip need an arrow, vector, connector or route");
     _scriptError("local s=vis.scene{}; local a=s:circle{radius=1}; a:next_to(a,{1,0}); return s",
                  "could not place object: the reference must be a different object with the same parent");
@@ -512,7 +512,7 @@ local cells = world:cell {
     origin = {-2.5, -1}, size = {2, 2}, padding = 0.05,
     texture = "pixels", source = {0, 0, 2, 2}, destination = {0, 0, 2, 2}, id = "cells"
 }
-scene:create({image, cells}, 0.4, "linear")
+scene:create({image, cells}, {duration = 0.4, curve = "linear"})
 return scene
 )lua";
     auto scene = _loaded(source, "assets.lua", _asset, asset);
@@ -714,20 +714,20 @@ int main()
     _error("local s=vis.scene{}; local g=s:space{}; local a=g:point{}; local b=g:point{}; s:transition(a,b); return s", "transition-opacity.lua");
     _error("local s=vis.scene{}; local a=s:point{}; s:fade_transform(a,a); return s", "fade-transform-same.lua");
     _error("local s=vis.scene{}; local a=s:point{}; local b=s:point{}; s:wait(0.1); s:fade_transform(a,b); return s", "fade-transform-stale.lua");
-    _error("local s=vis.scene{}; local r=s:circle{}; s:create(r,1,'linear',0,'sideways'); return s", "create-direction.lua");
-    _error("local s=vis.scene{}; local r=s:circle{}; s:uncreate(r,1,'linear',0,{}); return s", "uncreate-direction-type.lua");
-    _error("local s=vis.scene{}; local r=s:circle{}; s:create(r,1,'linear',0,'forward'..string.char(0)..'x'); return s", "create-direction-zero.lua");
+    _error("local s=vis.scene{}; local r=s:circle{}; s:create(r,{duration = 1, curve = 'linear', lag = 0, direction = 'sideways'}); return s", "create-direction.lua");
+    _error("local s=vis.scene{}; local r=s:circle{}; s:uncreate(r,{duration = 1, curve = 'linear', lag = 0, direction = {}}); return s", "uncreate-direction-type.lua");
+    _error("local s=vis.scene{}; local r=s:circle{}; s:create(r,{duration = 1, curve = 'linear', lag = 0, direction = 'forward'..string.char(0)..'x'}); return s", "create-direction-zero.lua");
     _error("local s=vis.scene{}; local r=s:rectangle{}; s:fade_in(r,{scale=0}); return s", "fade-in-scale.lua");
     _error("local s=vis.scene{}; local r=s:rectangle{}; s:fade_out(r,{unknown=true}); return s", "fade-out-option.lua");
     _error("local s=vis.scene{}; local r=s:rectangle{}; s:fade_in(r,0.5); return s", "fade-in-options-type.lua");
     _error("local s=vis.scene{}; local r=s:rectangle{}; s:indicate(r,{scale=1}); return s", "indicate-scale.lua");
     _error("local s=vis.scene{}; local r=s:rectangle{}; s:indicate(r,{curve='warp'}); return s", "indicate-curve.lua");
-    _error("local s=vis.scene{}; local r=s:rectangle{}; s:shift(r,{1,0},1,{preset='back',strength=2.1}); return s", "curve-strength.lua");
-    _error("local s=vis.scene{}; local r=s:rectangle{}; s:shift(r,{1,0},1,{preset='back',reverse=1}); return s", "curve-reverse.lua");
-    _error("local s=vis.scene{}; local r=s:rectangle{}; s:shift(r,{1,0},1,'smooth'..string.char(0)..'x'); return s", "curve-zero.lua");
-    _error("local s=vis.scene{}; local r=s:rectangle{}; s:shift(r,{1,0},1,{bezier={-0.1,0,1,1}}); return s", "curve-bezier-x.lua");
-    _error("local s=vis.scene{}; local r=s:rectangle{}; s:shift(r,{1,0},1,{preset='back',bezier={0,0,1,1}}); return s", "curve-choice.lua");
-    _error("local s=vis.scene{}; local r=s:rectangle{}; s:grow_from_center(r,0); return s", "grow-duration.lua");
+    _error("local s=vis.scene{}; local r=s:rectangle{}; s:shift(r,{1,0},{duration = 1, curve = {preset='back',strength=2.1}}); return s", "curve-strength.lua");
+    _error("local s=vis.scene{}; local r=s:rectangle{}; s:shift(r,{1,0},{duration = 1, curve = {preset='back',reverse=1}}); return s", "curve-reverse.lua");
+    _error("local s=vis.scene{}; local r=s:rectangle{}; s:shift(r,{1,0},{duration = 1, curve = 'smooth'..string.char(0)..'x'}); return s", "curve-zero.lua");
+    _error("local s=vis.scene{}; local r=s:rectangle{}; s:shift(r,{1,0},{duration = 1, curve = {bezier={-0.1,0,1,1}}}); return s", "curve-bezier-x.lua");
+    _error("local s=vis.scene{}; local r=s:rectangle{}; s:shift(r,{1,0},{duration = 1, curve = {preset='back',bezier={0,0,1,1}}}); return s", "curve-choice.lua");
+    _error("local s=vis.scene{}; local r=s:rectangle{}; s:grow_from_center(r,{duration = 0}); return s", "grow-duration.lua");
     _error(R"lua(
 local s = vis.scene {}
 local a = s:polygon {points = {{0, 0}, {1, 0}, {0, 1}}}

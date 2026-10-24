@@ -46,6 +46,8 @@ input:key_move {target = player, key = "D", shift = {1, 0, 0}, period = 0.12}
 
 Button and Toggle Button may use `hover_visual` and `pressed_visual`. The Panel selects authored faces through composed opacity. Transforms include shift, scale, rotation, opacity, and progress.
 
+Camera buttons use `camera = "pan"`, `"orbit"`, `"zoom"`, `"reset"`, `"view2d"`, or `"view3d"`. During scene loading, `panel:camera(action, delta?)` applies the same camera actions directly: pan and orbit require a two-number vector, zoom requires a number, and reset/view actions omit the delta. These direct commands are construction-only; use button bindings or host camera input after loading.
+
 SampleArea returns logical position, normalized `{u, v}`, object identity, and straight RGBA. An optional marker follows `marker_origin + marker_x*u + marker_y*v`; an optional swatch shows the sampled color. A miss preserves the previous sample. Route renderer errors through the host's input-error hook.
 
 PointerFollow maps passive motion into a target's parent space:
@@ -89,8 +91,8 @@ Rendering samples the authored timeline, composes registered object/fill modifie
 local states = vis.states(scene)
 states:define(card, "card.idle", {})
 states:define(card, "card.correct", {shift = {0, 0.12}, scale = {1.08, 1.08}})
-states:transition(card, "card.correct", 0.18, "smooth")
-states:transition({{object = card, state = "card.correct"}}, 0.18, "smooth")
+states:transition(card, "card.correct", {duration = 0.18, curve = "smooth"})
+states:transition({{object = card, state = "card.correct"}}, {duration = 0.18, curve = "smooth"})
 states:advance(1 / 60)
 local visible = states:sample(card)
 ```

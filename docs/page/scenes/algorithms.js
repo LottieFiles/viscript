@@ -26,13 +26,13 @@ local function bars(vals, x0, x1, base, hmax)
 end
 local function paint(list, color, d)
     local fns = {}
-    for i, b in ipairs(list) do fns[i] = function() scene:fill(b.r, color, d or 0.14) end end
+    for i, b in ipairs(list) do fns[i] = function() scene:fill(b.r, color, {duration = d or 0.14}) end end
     scene:parallel(table.unpack(fns))
 end
 local function swap(B, i, j, w, d)
     local a, b = B[i], B[j]
     scene:tween({{target = a.g, shift = {(j - i) * w, 0}, arc = -math.pi / 2},
-                {target = b.g, shift = {(i - j) * w, 0}, arc = -math.pi / 2}}, d or 0.32, "smooth")
+                {target = b.g, shift = {(i - j) * w, 0}, arc = -math.pi / 2}}, {duration = d or 0.32, curve = "smooth"})
     B[i], B[j] = b, a
 end
 `;
@@ -83,7 +83,7 @@ for _, e in ipairs(TRACE) do
     elseif e.kind == "settle" then
         local wx = x0 + (e.i - 1) * w
         together(function() paint({B[e.i]}, C.ok, 0.2) end,
-                 function() scene:shift(wall, {wx - wallX, 0}, 0.3, "smooth") end,
+                 function() scene:shift(wall, {wx - wallX, 0}, {duration = 0.3, curve = "smooth"}) end,
                  function()
                      if not seen.settle then say("largest settles", X(e.i), base + B[e.i].h + 0.3, C.ok) else say(nil) end
                  end)
@@ -93,7 +93,7 @@ for _, e in ipairs(TRACE) do
         local rest = {}
         for i = 1, e.upto do rest[#rest + 1] = B[i] end
         together(function() paint(rest, C.ok, 0.3) end,
-                 function() scene:fade(wall, 0, 0.3) end,
+                 function() scene:fade(wall, 0, {duration = 0.3}) end,
                  function() if #rest > 1 then say("no swaps  sorted", X(1) + w * (e.upto - 1) / 2, cueY, C.ok) else say(nil) end end)
     end
 end
@@ -125,13 +125,13 @@ local lift = 0.6
 paint({B[1]}, C.ok, 0.25)
 for step, e in ipairs(TRACE) do
     local cur = B[e.i]
-    together(function() scene:fill(cur.r, C.accent, 0.15) end,
-             function() scene:shift(cur.g, {0, lift}, 0.28, "smooth") end,
+    together(function() scene:fill(cur.r, C.accent, {duration = 0.15}) end,
+             function() scene:shift(cur.g, {0, lift}, {duration = 0.28, curve = "smooth"}) end,
              function() if step == 1 then say("key", X(e.i), base + cur.h + lift + 0.3, C.accent) else say(nil) end end)
     local pos = e.i
     for k, s in ipairs(e.shifts) do
-        together(function() scene:shift(B[s.from].g, {w, 0}, 0.28, "smooth") end,
-                 function() scene:shift(cur.g, {-w, 0}, 0.28, "smooth") end,
+        together(function() scene:shift(B[s.from].g, {w, 0}, {duration = 0.28, curve = "smooth"}) end,
+                 function() scene:shift(cur.g, {-w, 0}, {duration = 0.28, curve = "smooth"}) end,
                  function()
                      if step == 1 and k == 1 then say(string.format("%d > %d  shift right", s.v, e.key), X(s.from), base + B[s.from].h + 0.35)
                      elseif step == 1 then say(nil) end
@@ -139,8 +139,8 @@ for step, e in ipairs(TRACE) do
         B[pos] = B[s.from]
         pos = s.from
     end
-    together(function() scene:shift(cur.g, {0, -lift}, 0.28, "smooth") end,
-             function() scene:fill(cur.r, C.ok, 0.2) end,
+    together(function() scene:shift(cur.g, {0, -lift}, {duration = 0.28, curve = "smooth"}) end,
+             function() scene:fill(cur.r, C.ok, {duration = 0.2}) end,
              function() if step == 1 then say(nil) end end)
     B[pos] = cur
     scene:wait(0.1)
@@ -167,7 +167,7 @@ local frames, fid = {}, 0
 local function push(lo, hi)
     fid = fid + 1
     local y = 1.2 - #frames * step
-    if #frames > 0 then scene:stroke(frames[#frames].b, C.line, 0.1) end
+    if #frames > 0 then scene:stroke(frames[#frames].b, C.line, {duration = 0.1}) end
     local f = token("frame:" .. fid, string.format("quick_sort(%d..%d)", lo - 1, hi - 1), 3.4, y,
                     {size = {2.9, step * 0.84}, width = 1.2, text = 13, layer = L.subject})
     scene:fade_in(f.g, {shift = {0.25, 0}, duration = 0.22})
@@ -176,7 +176,7 @@ end
 local function pop()
     local f = table.remove(frames)
     scene:fade_out(f.g, {shift = {0.25, 0}, duration = 0.2})
-    if #frames > 0 then scene:stroke(frames[#frames].b, C.accent, 0.1) end
+    if #frames > 0 then scene:stroke(frames[#frames].b, C.accent, {duration = 0.1}) end
 end
 -- pivot height line across the active range
 local th = scene:rectangle {id = "pivot-line", center = {(x0 + x1) / 2, base}, size = {x1 - x0, 0.03},
@@ -184,14 +184,14 @@ local th = scene:rectangle {id = "pivot-line", center = {(x0 + x1) / 2, base}, s
 scene:set({target = th, opacity = 0})
 local function threshold(lo, hi, v)
     local cx, y = x0 + (lo - 1 + hi) / 2 * w, base + v / maxv * hmax
-    scene:tween({target = th, position = {cx, y}, size = {(hi - lo + 1) * w, 0.03}, opacity = 0.9}, 0.3, "smooth")
+    scene:tween({target = th, position = {cx, y}, size = {(hi - lo + 1) * w, 0.03}, opacity = 0.9}, {duration = 0.3, curve = "smooth"})
 end
 -- scan pointers: i = end of the < pivot zone, j = scanner
 local pi = T(scene, "ptr:i", "i", X(1), base - 0.6, 14, C.accent)
 local pj = T(scene, "ptr:j", "j", X(1), base - 0.9, 14, C.warn)
 scene:set({target = pi, opacity = 0}); scene:set({target = pj, opacity = 0})
 local ip, jp = 1, 1
-local function mv(t, from, to) if from ~= to then scene:shift(t, {(to - from) * w, 0}, 0.18, "smooth") end end
+local function mv(t, from, to) if from ~= to then scene:shift(t, {(to - from) * w, 0}, {duration = 0.18, curve = "smooth"}) end end
 local function qs(lo, hi)
     push(lo, hi)
     if lo >= hi then
@@ -200,7 +200,7 @@ local function qs(lo, hi)
     end
     together(function() paint({B[hi]}, C.alt, 0.18) end, function() threshold(lo, hi, vals[hi]) end,
              function() mv(pi, ip, lo) end, function() mv(pj, jp, lo) end,
-             function() scene:fade(pi, 1, 0.2) end, function() scene:fade(pj, 1, 0.2) end)
+             function() scene:fade(pi, 1, {duration = 0.2}) end, function() scene:fade(pj, 1, {duration = 0.2}) end)
     ip, jp = lo, lo
     local i = lo
     for j = lo, hi - 1 do
@@ -217,8 +217,8 @@ local function qs(lo, hi)
     if i ~= hi then swap(B, i, hi, w, 0.4); vals[i], vals[hi] = vals[hi], vals[i] end
     local reset = {}
     for k = lo, hi do if k ~= i then reset[#reset + 1] = B[k] end end
-    together(function() paint(reset, C.bar, 0.15) end, function() scene:fill(B[i].r, C.ok, 0.2) end,
-             function() scene:fade(th, 0, 0.2) end, function() scene:fade(pi, 0, 0.2) end, function() scene:fade(pj, 0, 0.2) end)
+    together(function() paint(reset, C.bar, 0.15) end, function() scene:fill(B[i].r, C.ok, {duration = 0.2}) end,
+             function() scene:fade(th, 0, {duration = 0.2}) end, function() scene:fade(pi, 0, {duration = 0.2}) end, function() scene:fade(pj, 0, {duration = 0.2}) end)
     qs(lo, i - 1)
     qs(i + 1, hi)
     pop()
@@ -247,17 +247,17 @@ local function merge(lo, mid, hi)
     together(function() paint(Lr, C.alt, 0.15) end, function() paint(Rr, C.accent, 0.15) end)
     local a, b, k, tmp = lo, mid + 1, lo, {}
     local function take(col)
-        scene:tween({{target = B[col].g, shift = {(k - col) * w, drop}}, {target = B[col].r, stroke = C.none}}, 0.3, "smooth")
+        scene:tween({{target = B[col].g, shift = {(k - col) * w, drop}}, {target = B[col].r, stroke = C.none}}, {duration = 0.3, curve = "smooth"})
         tmp[k] = {b = B[col], v = vals[col]}
         k = k + 1
     end
     while a <= mid and b <= hi do
-        scene:tween({{target = B[a].r, stroke = C.text, width = 2}, {target = B[b].r, stroke = C.text, width = 2}}, 0.15)
+        scene:tween({{target = B[a].r, stroke = C.text, width = 2}, {target = B[b].r, stroke = C.text, width = 2}}, {duration = 0.15})
         scene:wait(0.12)
         if vals[a] <= vals[b] then
-            scene:stroke(B[b].r, C.none, 0.08); take(a); a = a + 1
+            scene:stroke(B[b].r, C.none, {duration = 0.08}); take(a); a = a + 1
         else
-            scene:stroke(B[a].r, C.none, 0.08); take(b); b = b + 1
+            scene:stroke(B[a].r, C.none, {duration = 0.08}); take(b); b = b + 1
         end
     end
     while a <= mid do take(a); a = a + 1 end
@@ -267,7 +267,7 @@ local function merge(lo, mid, hi)
         up[#up + 1] = {target = tmp[c].b.g, shift = {0, -drop}}
         B[c], vals[c] = tmp[c].b, tmp[c].v
     end
-    scene:tween(up, 0.35, "smooth")
+    scene:tween(up, {duration = 0.35, curve = "smooth"})
     local run = {}
     for c = lo, hi do run[#run + 1] = B[c] end
     paint(run, (lo == 1 and hi == #vals) and C.ok or C.bar, 0.15)
@@ -321,12 +321,12 @@ local pmid = T(scene, "ptr:mid", "mid", X(1), y + 0.65, 13, C.warn)
 scene:set({target = pmid, opacity = 0})
 scene:wait(0.5)
 for _, e in ipairs(TRACE) do
-    together(function() scene:tween({target = pmid, position = {X(e.mid), y + 0.65}, opacity = 1}, 0.35, "smooth") end,
-             function() scene:tween({target = box[e.mid], stroke = C.warn}, 0.25) end)
+    together(function() scene:tween({target = pmid, position = {X(e.mid), y + 0.65}, opacity = 1}, {duration = 0.35, curve = "smooth"}) end,
+             function() scene:tween({target = box[e.mid], stroke = C.warn}, {duration = 0.25}) end)
     local v = arr[e.mid]
     local rel = e.verdict == "hit" and "=" or (e.verdict == "right" and "<" or ">")
     if e.verdict == "hit" then
-        together(function() scene:tween({target = box[e.mid], fill = "#7ee78733", stroke = C.ok}, 0.35) end,
+        together(function() scene:tween({target = box[e.mid], fill = "#7ee78733", stroke = C.ok}, {duration = 0.35}) end,
                  function() say(string.format("%d = %d  found at index %d", v, target, e.mid - 1), X(e.mid), y + 1.1, C.ok) end)
         scene:indicate(box[e.mid], {color = C.ok, scale = 1.12, duration = 0.6})
         break
@@ -344,12 +344,12 @@ for _, e in ipairs(TRACE) do
     end
     local ncx = (X(nlo) + X(nhi)) / 2
     local fns = {
-        function() scene:tween({target = win, position = {ncx, y}, size = {winW(nlo, nhi) + 0.08, 0.8}}, 0.45, "smooth") end,
-        function() if nlo ~= wlo then scene:shift(plo, {(nlo - wlo) * w, 0}, 0.45, "smooth") end end,
-        function() if nhi ~= whi then scene:shift(phi, {(nhi - whi) * w, 0}, 0.45, "smooth") end end,
-        function() scene:stroke(box[e.mid], C.line, 0.2) end,
+        function() scene:tween({target = win, position = {ncx, y}, size = {winW(nlo, nhi) + 0.08, 0.8}}, {duration = 0.45, curve = "smooth"}) end,
+        function() if nlo ~= wlo then scene:shift(plo, {(nlo - wlo) * w, 0}, {duration = 0.45, curve = "smooth"}) end end,
+        function() if nhi ~= whi then scene:shift(phi, {(nhi - whi) * w, 0}, {duration = 0.45, curve = "smooth"}) end end,
+        function() scene:stroke(box[e.mid], C.line, {duration = 0.2}) end,
     }
-    for _, k in ipairs(dim) do fns[#fns + 1] = function() scene:fade(cells[k], 0.25, 0.3) end end
+    for _, k in ipairs(dim) do fns[#fns + 1] = function() scene:fade(cells[k], 0.25, {duration = 0.3}) end end
     scene:parallel(table.unpack(fns))
     wlo, whi = nlo, nhi
 end
@@ -390,7 +390,7 @@ local function strip(id, label, x0, y)
         local d = {}
         for _, q in ipairs(items) do d[#d + 1] = toward(q, q.x - w, q.y) end
         scene:parallel(function() scene:fade_out(o.g, {shift = {-0.3, 0}, duration = 0.25}) end,
-                       function() if #d > 0 then scene:tween(d, 0.25, "smooth") end end)
+                       function() if #d > 0 then scene:tween(d, {duration = 0.25, curve = "smooth"}) end end)
     end
     function S.pop_back()
         local o = table.remove(items)
@@ -405,25 +405,25 @@ local Q = strip("queue", "QUEUE", -5.1, -2.45)
 local queue = {"A"}
 local seen = {A = true}
 scene:wait(0.3)
-scene:tween({target = N.A, stroke = C.warn}, 0.2)
+scene:tween({target = N.A, stroke = C.warn}, {duration = 0.2})
 Q.push("A")
 while #queue > 0 do
     local node = table.remove(queue, 1)
     together(function() Q.pop_front() end,
-             function() scene:tween({target = N[node], fill = "#1b3350", stroke = C.accent}, 0.25) end)
+             function() scene:tween({target = N[node], fill = "#1b3350", stroke = C.accent}, {duration = 0.25}) end)
     for _, nb in ipairs(ADJ[node]) do
-        scene:stroke(E[ekey(node, nb)], C.warn, 0.15)
+        scene:stroke(E[ekey(node, nb)], C.warn, {duration = 0.15})
         if not seen[nb] then
             seen[nb] = true
-            together(function() scene:tween({target = N[nb], stroke = C.warn}, 0.2) end,
-                     function() scene:tween({target = E[ekey(node, nb)], stroke = C.accent, width = 4}, 0.2) end)
+            together(function() scene:tween({target = N[nb], stroke = C.warn}, {duration = 0.2}) end,
+                     function() scene:tween({target = E[ekey(node, nb)], stroke = C.accent, width = 4}, {duration = 0.2}) end)
             Q.push(nb)
             queue[#queue + 1] = nb
         else
-            scene:stroke(E[ekey(node, nb)], C.line, 0.12)
+            scene:stroke(E[ekey(node, nb)], C.line, {duration = 0.12})
         end
     end
-    scene:tween({target = N[node], fill = "#1c3a26", stroke = C.ok}, 0.2)
+    scene:tween({target = N[node], fill = "#1c3a26", stroke = C.ok}, {duration = 0.2})
 end
 scene:wait(2.4)
 return scene`;
@@ -434,17 +434,17 @@ local seen = {}
 local function dfs(node, parent)
     S.push(node)
     seen[node] = true
-    scene:tween({target = N[node], fill = "#1b3350", stroke = C.accent}, 0.25)
+    scene:tween({target = N[node], fill = "#1b3350", stroke = C.accent}, {duration = 0.25})
     for _, nb in ipairs(ADJ[node]) do
-        if nb ~= parent then scene:stroke(E[ekey(node, nb)], C.warn, 0.15) end
+        if nb ~= parent then scene:stroke(E[ekey(node, nb)], C.warn, {duration = 0.15}) end
         if not seen[nb] then
-            scene:tween({target = E[ekey(node, nb)], stroke = C.accent, width = 4}, 0.2)
+            scene:tween({target = E[ekey(node, nb)], stroke = C.accent, width = 4}, {duration = 0.2})
             dfs(nb, node)
         elseif nb ~= parent then
-            scene:stroke(E[ekey(node, nb)], C.line, 0.12)
+            scene:stroke(E[ekey(node, nb)], C.line, {duration = 0.12})
         end
     end
-    scene:tween({target = N[node], fill = "#1c3a26", stroke = C.ok}, 0.2)
+    scene:tween({target = N[node], fill = "#1c3a26", stroke = C.ok}, {duration = 0.2})
     S.pop_back()
 end
 scene:wait(0.3)
@@ -505,37 +505,37 @@ local function sweep(depth, color)
     for d = 0, rows do
         local row = {}
         for v = 1, n do if depth[v] == d then row[#row + 1] = {target = node[v].b, stroke = color} end end
-        scene:tween(row, 0.18)
+        scene:tween(row, {duration = 0.18})
     end
     return deepest
 end
 local function reset()
     local all = {}
     for v = 1, n do all[#all + 1] = {target = node[v].b, stroke = C.line, fill = C.panel} end
-    scene:tween(all, 0.25)
+    scene:tween(all, {duration = 0.25})
 end
 
 scene:wait(0.4)
 say("hold any node — the rest hangs below", 0, -2.75, C.mute, {0.5, 0.5})
 local _, depth = hang(3)
 local a = sweep(depth, C.accent)
-scene:tween({target = node[a].b, stroke = C.danger, fill = "#3a1d1d"}, 0.3)
+scene:tween({target = node[a].b, stroke = C.danger, fill = "#3a1d1d"}, {duration = 0.3})
 say("the lowest node is one end of the diameter", 0, -2.75, C.danger, {0.5, 0.5})
 scene:wait(0.8)
 
 -- pick that node up: every node falls into its new row at once
 reset()
-scene:tween({target = node[a].b, stroke = C.danger, fill = "#3a1d1d"}, 0.2)
+scene:tween({target = node[a].b, stroke = C.danger, fill = "#3a1d1d"}, {duration = 0.2})
 local pos2, depth2, parent2 = hang(a)
 local moves = {}
 for v = 1, n do moves[#moves + 1] = toward(node[v], pos2[v][1], pos2[v][2]) end
 moves[#moves + 1] = {target = hand, from = {pos2[a][1], 3.2}, to = {pos2[a][1], pos2[a][2] + 0.24}}
 say("pick it up", 0, -2.75, C.danger, {0.5, 0.5})
-scene:tween(moves, 1.4, "ease_in_out")
+scene:tween(moves, {duration = 1.4, curve = "ease_in_out"})
 scene:wait(0.3)
 
 local b = sweep(depth2, C.accent)
-scene:tween({target = node[b].b, stroke = C.ok, fill = "#1c3a26"}, 0.3)
+scene:tween({target = node[b].b, stroke = C.ok, fill = "#1c3a26"}, {duration = 0.3})
 
 -- the path from the bottom back up to the hand is the diameter
 local path = {}
@@ -548,7 +548,7 @@ while parent2[v] do
     end
     v = parent2[v]
 end
-scene:tween(path, 0.5)
+scene:tween(path, {duration = 0.5})
 
 -- measure top to bottom
 local mx = 4.6
@@ -556,8 +556,8 @@ local ruler = scene:arrow {id = "ruler", from = {mx, pos2[a][2]}, to = {mx, pos2
 local ticks = {}
 ticks[1] = scene:line {id = "tick:top", from = {mx - 0.2, pos2[a][2]}, to = {mx + 0.2, pos2[a][2]}, stroke = C.warn, width = 2, layer = L.label}
 ticks[2] = scene:line {id = "tick:bottom", from = {mx - 0.2, pos2[b][2]}, to = {mx + 0.2, pos2[b][2]}, stroke = C.warn, width = 2, layer = L.label}
-scene:create(ticks, 0.25)
-scene:create(ruler, 0.6)
+scene:create(ticks, {duration = 0.25})
+scene:create(ruler, {duration = 0.6})
 say("diameter = " .. depth2[b] .. " edges", mx - 0.35, (pos2[a][2] + pos2[b][2]) / 2, C.warn, {1, 0.5})
 scene:wait(2.4)
 return scene`;
@@ -602,7 +602,7 @@ local function compare(s, x, y, color)
                  fill = "#000000", stroke = C.none, layer = L.focus - 1}
     T(g, "cmp:" .. cmpN .. ":text", s, 0, 0, 15, color, nil, L.focus)
     if cmpCur then scene:fade_out(cmpCur, {duration = 0.15}) end
-    scene:tween({target = g, opacity = 1}, 0.2)
+    scene:tween({target = g, opacity = 1}, {duration = 0.2})
     cmpCur = g
 end
 local function compare_clear()
@@ -613,14 +613,14 @@ local total = 0
 for i, e in ipairs(TRACE) do
     local probe = row[i]
     say(nil)
-    scene:tween({target = probe.b, stroke = C.warn}, 0.15)
+    scene:tween({target = probe.b, stroke = C.warn}, {duration = 0.15})
     local x, y, span = 0, 1.45, 2.2
     if #e.path == 0 then say("empty tree: " .. e.key .. " becomes the root", 0, 0.75) end
     for _, p in ipairs(e.path) do
         local nd = placed[p.node]
         -- stand beside the node on the side the key is about to take
         local side = p.go == "left" and -1 or 1
-        scene:tween(toward(probe, nd.x + side * 0.8, nd.y + 0.05), 0.32, "smooth")
+        scene:tween(toward(probe, nd.x + side * 0.8, nd.y + 0.05), {duration = 0.32, curve = "smooth"})
         local lt = p.go == "left"
         say(nil)
         compare(string.format("%d %s %d  →  %s", e.key, lt and "<" or ">", p.node, p.go),
@@ -633,7 +633,7 @@ for i, e in ipairs(TRACE) do
     end
     local parent = e.path[#e.path]
     compare_clear()
-    scene:tween(toward(probe, x, y), 0.35, "smooth")
+    scene:tween(toward(probe, x, y), {duration = 0.35, curve = "smooth"})
     if parent then
         local msg = string.format("empty slot: %s child of %d", parent.go, parent.node)
         say(msg, x, y - 0.52, C.ok)
@@ -642,7 +642,7 @@ for i, e in ipairs(TRACE) do
     local nc = T(scene, "bst:count:" .. i, string.format("%d keys · %d comparison%s", i, total, total == 1 and "" or "s"), 5.1, -2.8, 13, C.mute, {1, 0.5})
     scene:fade_out(count, {duration = 0.12}); scene:fade_in(nc, {duration = 0.15})
     count = nc
-    scene:stroke(probe.b, C.accent, 0.15)
+    scene:stroke(probe.b, C.accent, {duration = 0.15})
     placed[e.key] = {x = x, y = y, o = probe}
     if parent then
         local pn = placed[parent.node]
@@ -651,7 +651,7 @@ for i, e in ipairs(TRACE) do
         local edge = scene:line {id = "edge:" .. parent.node .. "-" .. e.key,
                                  from = {pn.x + ddx / len * R, pn.y + ddy / len * R},
                                  to = {x - ddx / len * R, y - ddy / len * R}, stroke = C.line, width = 2, layer = L.edge}
-        scene:create(edge, 0.25)
+        scene:create(edge, {duration = 0.25})
     end
     scene:wait(0.25)
 end
@@ -686,18 +686,18 @@ local a2 = scene:curve {id = "read:2", from = {X(0), y + 0.32}, control1 = {X(0)
                         to = {X(2) + 0.12, y + 0.34}, stroke = C.alt, width = 2, layer = L.edge}
 for i = 2, n do
     local reads = function()
-        scene:tween({{target = cells[i - 1], stroke = C.accent}, {target = cells[i - 2], stroke = C.alt}}, 0.2)
+        scene:tween({{target = cells[i - 1], stroke = C.accent}, {target = cells[i - 2], stroke = C.alt}}, {duration = 0.2})
     end
     if i == 2 then
-        together(reads, function() scene:create({a1, a2}, 0.4, "smooth") end)
+        together(reads, function() scene:create({a1, a2}, {duration = 0.4, curve = "smooth"}) end)
     else
-        together(reads, function() scene:tween({{target = a1, shift = {w, 0}}, {target = a2, shift = {w, 0}}}, 0.35, "smooth") end)
+        together(reads, function() scene:tween({{target = a1, shift = {w, 0}}, {target = a2, shift = {w, 0}}}, {duration = 0.35, curve = "smooth"}) end)
     end
     put(i)
     scene:tween({{target = cells[i - 1], stroke = C.line}, {target = cells[i - 2], stroke = C.line},
-                {target = cells[i], stroke = C.ok}}, 0.2)
+                {target = cells[i], stroke = C.ok}}, {duration = 0.2})
 end
-scene:uncreate({a1, a2}, 0.3)
+scene:uncreate({a1, a2}, {duration = 0.3})
 say("dp[" .. n .. "] = " .. dp[n], X(n), y - 1.05, C.ok)
 scene:indicate(cells[n], {color = C.ok, scale = 1.1, duration = 0.6})
 scene:wait(2.4)
@@ -722,20 +722,20 @@ end
 local function ptr(id, label, i, color, dy)
     return {t = T(scene, id, label, X(i), y + dy, 13, color), i = i}
 end
-local function move(p, i) scene:shift(p.t, {(i - p.i) * gap, 0}, 0.3, "smooth"); p.i = i end
+local function move(p, i) scene:shift(p.t, {(i - p.i) * gap, 0}, {duration = 0.3, curve = "smooth"}); p.i = i end
 local prev = ptr("ptr:prev", "prev", 0, C.alt, -0.75)
 local head = ptr("ptr:head", "head", 1, C.accent, 0.72)
 local nxt = ptr("ptr:next", "next", 1, C.warn, -1.15)
 scene:set({target = nxt.t, opacity = 0})
 scene:wait(0.4)
 for i = 1, #vals do
-    together(function() move(nxt, i + 1) end, function() scene:fade(nxt.t, 1, 0.2) end,
-             function() scene:stroke(nextArrow[i], C.warn, 0.2) end)
+    together(function() move(nxt, i + 1) end, function() scene:fade(nxt.t, 1, {duration = 0.2}) end,
+             function() scene:stroke(nextArrow[i], C.warn, {duration = 0.2}) end)
     -- the same pointer swings round its node: it now points back at prev
     together(function() scene:rotate(nextArrow[i], -math.pi, {about = {X(i), y}, duration = 0.55, curve = "smooth"}) end,
-             function() scene:stroke(nextArrow[i], C.ok, 0.55) end)
+             function() scene:stroke(nextArrow[i], C.ok, {duration = 0.55}) end)
     move(prev, i)
-    together(function() move(head, i + 1) end, function() scene:fade(nxt.t, 0, 0.2) end)
+    together(function() move(head, i + 1) end, function() scene:fade(nxt.t, 0, {duration = 0.2}) end)
 end
 say("new head", X(#vals), y + 0.72, C.ok)
 scene:indicate(prev.t, {color = C.ok, scale = 1.3, duration = 0.6})
@@ -761,7 +761,7 @@ local tpos = y0 + (#S - 1) * h
 local top = T(scene, "ptr:top", "top", x - 0.85, tpos, 14, C.warn, {1, 0.5})
 local function point()
     local y = y0 + math.max(#S - 1, 0) * h
-    if y ~= tpos then scene:shift(top, {0, y - tpos}, 0.22, "smooth"); tpos = y end
+    if y ~= tpos then scene:shift(top, {0, y - tpos}, {duration = 0.22, curve = "smooth"}); tpos = y end
 end
 scene:wait(0.5)
 for _, op in ipairs(OPS) do
@@ -772,7 +772,7 @@ for _, op in ipairs(OPS) do
         point()
     else
         local o = table.remove(S)
-        scene:tween({target = o.b, stroke = C.warn}, 0.15)
+        scene:tween({target = o.b, stroke = C.warn}, {duration = 0.15})
         scene:parallel(function() scene:fade_out(o.g, {shift = {2.2, 0.6}, duration = 0.3}) end, point)
     end
     scene:wait(0.15)
@@ -802,17 +802,17 @@ for _, op in ipairs(OPS) do
         local o = item(op[2])
         scene:fade_in(o.g, {shift = {1.0, 0}, duration = 0.3})
         Q[#Q + 1] = o
-        if i ~= rpos then scene:shift(rear, {(i - rpos) * gap, 0}, 0.2, "smooth") end
+        if i ~= rpos then scene:shift(rear, {(i - rpos) * gap, 0}, {duration = 0.2, curve = "smooth"}) end
         rpos = i
     else
         local o = table.remove(Q, 1)
-        scene:tween({target = o.b, stroke = C.accent}, 0.12)
+        scene:tween({target = o.b, stroke = C.accent}, {duration = 0.12})
         local m = {}
         for _, q in ipairs(Q) do m[#m + 1] = toward(q, q.x - gap, q.y) end
         m[#m + 1] = {target = rear, shift = {-gap, 0}}
         rpos = rpos - 1
         scene:parallel(function() scene:fade_out(o.g, {shift = {-1.2, 0}, duration = 0.3}) end,
-                       function() scene:tween(m, 0.3, "smooth") end)
+                       function() scene:tween(m, {duration = 0.3, curve = "smooth"}) end)
     end
     scene:wait(0.15)
 end
@@ -881,7 +881,7 @@ local function swap(i, j)
     -- tree tokens pass each other on opposite arcs; in the array both values hop, one higher
     scene:tween({toward(N[i], xj, yj, 0.9), toward(N[j], xi, yi, 0.9),
                 {target = A[i], shift = {(j - i) * aw, 0}, arc = hop(i - j, 0.74)},
-                {target = A[j], shift = {(i - j) * aw, 0}, arc = -hop(i - j, 0.36)}}, 0.45, "smooth")
+                {target = A[j], shift = {(i - j) * aw, 0}, arc = -hop(i - j, 0.36)}}, {duration = 0.45, curve = "smooth"})
     N[i], N[j] = N[j], N[i]; A[i], A[j] = A[j], A[i]
 end
 scene:wait(0.5)
@@ -892,15 +892,15 @@ for k = PRE + 1, #TRACE do
     local ed = edge(e.at)
     together(function() scene:fade_in(N[e.at].g, {scale = 0.6, duration = 0.3}) end,
              function() scene:fade_in(A[e.at], {shift = {0, 0.3}, duration = 0.3}) end,
-             function() scene:create(ed, 0.3) end)
+             function() scene:create(ed, {duration = 0.3}) end)
     for _, s in ipairs(e.steps) do
-        scene:tween({{target = N[s.i].b, stroke = C.warn}, {target = N[s.p].b, stroke = C.warn}}, 0.15)
+        scene:tween({{target = N[s.i].b, stroke = C.warn}, {target = N[s.p].b, stroke = C.warn}}, {duration = 0.15})
         if s.swap then swap(s.i, s.p) else scene:wait(0.15) end
-        scene:tween({{target = N[s.i].b, stroke = C.accent}, {target = N[s.p].b, stroke = C.accent}}, 0.12)
+        scene:tween({{target = N[s.i].b, stroke = C.accent}, {target = N[s.p].b, stroke = C.accent}}, {duration = 0.12})
     end
     scene:wait(0.15)
 end
-scene:tween({target = N[1].b, stroke = C.ok, fill = "#1c3a26"}, 0.3)
+scene:tween({target = N[1].b, stroke = C.ok, fill = "#1c3a26"}, {duration = 0.3})
 local rx, ry = pos(1)
 say("min", rx + 0.5, ry, C.ok, {0, 0.5})
 scene:indicate(N[1].b, {color = C.ok, scale = 1.15, duration = 0.6})
@@ -927,7 +927,7 @@ for k, key in ipairs(keys) do pend[k] = token("key:" .. key, key, -1.6 + (k - 1)
 local sx, sy = 3.4, 0.5   -- where a key is hashed
 local function hashAt(o, key)
     local hv = h(key)
-    scene:tween(toward(o, sx, sy), 0.4, "smooth")
+    scene:tween(toward(o, sx, sy), {duration = 0.4, curve = "smooth"})
     say(string.format("h(%s) = %d,  %d mod %d = %d", key, hv, hv, M, hv % M), sx, sy - 0.55)
     return hv % M
 end
@@ -935,34 +935,34 @@ scene:wait(0.4)
 for k, key in ipairs(keys) do
     local o = pend[k]
     local i = hashAt(o, key)
-    scene:stroke(B[i], C.warn, 0.2)
+    scene:stroke(B[i], C.warn, {duration = 0.2})
     local x, y = bx + 1.25 + #chains[i] * 1.35, by0 - i * bh
     local fx = #chains[i] == 0 and bx + 0.37 or x - 1.35 + 0.45
     say(nil)
-    scene:tween({toward(o, x, y), {target = o.b, stroke = C.accent}}, 0.45, "smooth")
+    scene:tween({toward(o, x, y), {target = o.b, stroke = C.accent}}, {duration = 0.45, curve = "smooth"})
     local a = scene:arrow {id = "link:" .. key, from = {fx, y}, to = {x - 0.45, y}, stroke = C.line, width = 1.5, tip = 7, layer = L.edge}
-    scene:parallel(function() scene:create(a, 0.2) end, function() scene:stroke(B[i], C.line, 0.2) end)
+    scene:parallel(function() scene:create(a, {duration = 0.2}) end, function() scene:stroke(B[i], C.line, {duration = 0.2}) end)
     chains[i][#chains[i] + 1] = {o = o, k = key}
 end
 -- lookup: hash once, then walk one short chain
 local probe = token("query", q .. "?", sx, 2.55, {size = {0.86, 0.46}, stroke = C.warn, text = 14})
 scene:fade_in(probe.g, {shift = {0, -0.3}, duration = 0.3})
 local i = hashAt(probe, q)
-scene:stroke(B[i], C.warn, 0.2)
+scene:stroke(B[i], C.warn, {duration = 0.2})
 local hit = false
 for _, c in ipairs(chains[i]) do
-    scene:tween({target = c.o.b, stroke = C.warn}, 0.2)
+    scene:tween({target = c.o.b, stroke = C.warn}, {duration = 0.2})
     if c.k == q then
         hit = true
-        together(function() scene:tween({target = c.o.b, stroke = C.ok, fill = "#1c3a26"}, 0.3) end,
-                 function() scene:stroke(probe.b, C.ok, 0.3) end,
+        together(function() scene:tween({target = c.o.b, stroke = C.ok, fill = "#1c3a26"}, {duration = 0.3}) end,
+                 function() scene:stroke(probe.b, C.ok, {duration = 0.3}) end,
                  function() say("found in bucket " .. i, sx, sy - 0.55, C.ok) end)
         break
     end
-    scene:tween({target = c.o.b, stroke = C.accent}, 0.15)
+    scene:tween({target = c.o.b, stroke = C.accent}, {duration = 0.15})
 end
 if not hit then
-    together(function() scene:tween({target = B[i], stroke = C.danger}, 0.3) end,
+    together(function() scene:tween({target = B[i], stroke = C.danger}, {duration = 0.3}) end,
              function() say("not in the table", sx, sy - 0.55, C.danger) end)
 end
 scene:wait(2.4)

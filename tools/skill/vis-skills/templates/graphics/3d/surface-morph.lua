@@ -46,12 +46,12 @@ local marker = s:surface {points = sphere, size = {25, 13}, fill = "#ff3030", mo
     light = {direction = {-1, 1, 2}, ambient = 0.65}, id = "marker", layer = 0, opacity = 0}
 local k = s:tracker(0)
 s:bind(marker, k, function(v) return {shift = {0, 0, height(1, 1, v) - height(1, 1, 0)}} end)
-s:fade(axes, 1, 1)
-s:tween({{target = bowl, opacity = 1}, {target = marker, opacity = 1}}, 1)
+s:fade(axes, 1, {duration = 1})
+s:tween({{target = bowl, opacity = 1}, {target = marker, opacity = 1}}, {duration = 1})
 s:wait(0.5)
 local saddle = surface(1, "saddle", 1)
-s:parallel(function() s:morph(bowl, saddle, 2.5, "smooth") end,
-    function() s:track(k, 1, 2.5, "smooth") end)
+s:parallel(function() s:morph(bowl, saddle, {duration = 2.5, curve = "smooth"}) end,
+    function() s:track(k, 1, {duration = 2.5, curve = "smooth"}) end)
 s:orbit(pi / 2, {axis = {0, 0, 1}, duration = 4, curve = "linear"})
 s:wait(1)
 return s

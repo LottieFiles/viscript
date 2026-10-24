@@ -893,6 +893,62 @@ static void cameraBindings(Renderer* renderer)
     delete extreme;
 }
 
+// The Lua camera command uses the same action and delta as the native Panel.
+static void luaCameraBindings(Renderer* renderer)
+{
+    static const struct {
+        const char* call;
+        CameraAction action;
+        Vec2 delta;
+        const char* view;
+    } cases[] = {
+        {"panel:camera('pan', {0.2, -0.1})", CameraAction::Pan, {0.2f, -0.1f}, "2d"},
+        {"panel:camera('orbit', {x = 0.4, y = -0.2})", CameraAction::Orbit, {0.4f, -0.2f}, "3d"},
+        {"panel:camera('zoom', 0.5)", CameraAction::Zoom, {0.0f, 0.5f}, "2d"},
+        {"panel:camera('reset')", CameraAction::Reset, {}, "2d"},
+        {"panel:camera('view2d')", CameraAction::View2D, {}, "3d"},
+        {"panel:camera('view3d')", CameraAction::View3D, {}, "2d"},
+    };
+    for (auto& entry : cases) {
+        char source[1024];
+        auto load = [&](const char* command, detail::LuaHostContext& context) {
+            std::snprintf(source, sizeof(source), R"(
+local scene = vis.scene {width = 200, height = 100, camera = {view = '%s', height = 4}}
+scene:rectangle {id = 'target', center = {1, 0.5}, size = {1, 1}, fill = '#ffffff'}
+local panel = vis.ui.panel(scene)
+assert(panel.camera_move == nil and panel.camera_orbit == nil and panel.camera_zoom == nil)
+assert(panel.camera_reset == nil and panel.camera_view == nil)
+%s
+return scene
+)", entry.view, command);
+            return _loaded(source, "ui-camera.lua", context);
+        };
+        detail::LuaHostContext expectedContext;
+        auto expected = load("", expectedContext);
+        CHECK(expectedContext.ui.panel
+              && expectedContext.ui.panel->camera(CameraAction::Pan, {0.1f, -0.1f}) == Result::Success);
+        CHECK(expectedContext.ui.panel
+              && expectedContext.ui.panel->camera(entry.action, entry.delta) == Result::Success);
+        char command[256];
+        std::snprintf(command, sizeof(command),
+                      "panel:camera('pan', {0.1, -0.1})\nassert(%s == panel)", entry.call);
+        detail::LuaHostContext actualContext;
+        auto actual = load(command, actualContext);
+        BBox expectedBounds;
+        BBox actualBounds;
+        CHECK(expected && renderer->bounds(expected, expected->object("target"), 0.0f,
+                                           expectedBounds) == Result::Success);
+        CHECK(actual && renderer->bounds(actual, actual->object("target"), 0.0f,
+                                         actualBounds) == Result::Success);
+        CHECK(_near(actualBounds.x, expectedBounds.x) && _near(actualBounds.y, expectedBounds.y));
+        CHECK(_near(actualBounds.width, expectedBounds.width)
+              && _near(actualBounds.height, expectedBounds.height));
+        CHECK(actual && expected && actual->view(0.0f) == expected->view(0.0f));
+        delete actual;
+        delete expected;
+    }
+}
+
 static void luaBindings()
 {
     static constexpr const char source[] = R"(
@@ -1114,12 +1170,20 @@ return scene
                  "ui-sample-targets.lua:4: sample_area targets must contain between 1 and 64 objects");
 }
 
-// A value that must be a table and is not stops the script with the name of the option.
+// Invalid control and camera arguments name the option or command in the script error.
 static void luaTables()
 {
     static constexpr const char* cases[][2] = {
-        {"panel:button { visual = visual, region = region, camera = 'move', delta = 'up' }",
+        {"panel:button { visual = visual, region = region, camera = 'pan', delta = 'up' }",
          "delta must be a table, got string"},
+        {"panel:button { visual = visual, region = region, camera = 'move' }",
+         "camera action must be 'pan'"},
+        {"panel:camera('move', {1, 0})", "camera action must be 'pan'"},
+        {"panel:camera('pan')", "bad argument #2 to 'camera' (table expected, got no value)"},
+        {"panel:camera('pan', {1, 2, 3})", "camera delta must contain two numbers"},
+        {"panel:camera('orbit', {x = 1})", "camera delta must contain x and y"},
+        {"panel:camera('zoom', {})", "bad argument #2 to 'camera' (number expected, got table)"},
+        {"panel:camera('zoom', 0 / 0)", "camera zoom must be a finite number"},
         {"panel:button { visual = visual, region = region, target = visual, transform = 1 }",
          "transform must be a table, got number"},
         {"panel:slider { visual = visual, region = region, bindings = 'all' }",
@@ -1158,6 +1222,7 @@ int main()
         buttonStates(renderer);
         sampleAreas(renderer);
         cameraBindings(renderer);
+        luaCameraBindings(renderer);
     }
     delete renderer;
     return report();

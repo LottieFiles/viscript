@@ -17,7 +17,7 @@ The script runs once to *construct* the scene; the host then renders any time `t
 ```lua live
 local scene = vis.scene {}
 local dot = scene:circle {fill = "accent"}
-scene:grow_from_center(dot, 0.6)
+scene:grow_from_center(dot, {duration = 0.6})
 
 return scene
 ```
@@ -25,7 +25,7 @@ return scene
 ```js live
 const scene = vis.scene();
 const dot = scene.circle({fill: "accent"});
-scene.growFromCenter(dot, 0.6);
+scene.growFromCenter(dot, {duration: 0.6});
 
 return scene;
 ```
@@ -52,8 +52,8 @@ local axes = scene:space {x = {-5, 5, 1}, y = {-3, 3, 1}, stroke = "#00000000", 
 local dot = axes:circle {radius = 0.2, fill = "warning"}
 
 scene:fade_in(axes, {duration = 0.4})
-scene:shift(dot, {4, 2}, 1, "smooth")
-scene:shift(dot, {-8, -4}, 1.2, "smooth")
+scene:shift(dot, {4, 2}, {duration = 1, curve = "smooth"})
+scene:shift(dot, {-8, -4}, {duration = 1.2, curve = "smooth"})
 
 return scene
 ```
@@ -65,8 +65,8 @@ const axes = scene.space({x: [-5, 5, 1], y: [-3, 3, 1], stroke: "#00000000", tic
 const dot = axes.circle({radius: 0.2, fill: "warning"});
 
 scene.fadeIn(axes, {duration: 0.4});
-scene.shift(dot, [4, 2], 1, "smooth");
-scene.shift(dot, [-8, -4], 1.2, "smooth");
+scene.shift(dot, [4, 2], {duration: 1, curve: "smooth"});
+scene.shift(dot, [-8, -4], {duration: 1.2, curve: "smooth"});
 
 return scene;
 ```

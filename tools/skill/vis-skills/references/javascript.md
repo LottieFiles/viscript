@@ -52,7 +52,7 @@ Axis/grid styling, ticks, and coordinate labels share the Lua options. Use `spac
 ```js
 const axes = definition.space({x: [-5, 5, 1], y: [-3, 3, 1], ticks: true});
 const graph = axes.plot({fn: Math.tan, x_range: [-5, 5, 0.01], y_range: [-3, 3]});
-definition.create(graph, 2, "linear");
+definition.create(graph, {duration: 2, curve: "linear"});
 const area = axes.area({fn: (x) => x*x, x_range: [0, 2, 0.05], fill: "#2563eb33"});
 ```
 
@@ -70,7 +70,7 @@ const curves = axes.contour({
 const radius = definition.tracker(1);
 definition.bind(curves.children()[0], radius,
     (r) => ({fn: (x, y) => x*x/(r*r) + y*y}));
-definition.track(radius, 2, 1, "linear");
+definition.track(radius, 2, {duration: 1, curve: "linear"});
 ```
 
 ## Text and code
@@ -109,7 +109,7 @@ definition.shift(vector, [1, 0], timing).rotate(vector, Math.PI / 2, timing);
 definition.create([vector, label], {...timing, lag: 0.15});
 ```
 
-Positional duration and curve calls remain supported.
+Pass timing and operation-specific fields in one options object. Omit it to use the operation's defaults; `track` and `warp` require an options object. `wait(seconds)` advances the cursor by a numeric duration.
 
 | Purpose | Calls |
 |---|---|
@@ -125,18 +125,18 @@ Positional duration and curve calls remain supported.
 Playing `text` fades out the whole old string, then fades in the whole replacement. `retype: true` erases to the shared prefix before typing the new suffix; use it when typing from an empty string too. `sweep: true` opts into a character sweep that mixes both strings. Both flags require `text` and cannot both be true. Numeric `value` still interpolates continuously.
 
 ```js
-definition.tween({target: vector, shift: [1, 0], stroke: "success"}, 1, "smooth");
-definition.tween({target: vector, position: [0, 1], arc: Math.PI / 2}, 1);
+definition.tween({target: vector, shift: [1, 0], stroke: "success"}, {duration: 1, curve: "smooth"});
+definition.tween({target: vector, position: [0, 1], arc: Math.PI / 2}, {duration: 1});
 definition.parallel(
-    (scene) => scene.shift(vector, [-1, 0], 1),
-    (scene) => scene.fade(vector, 0.5, 1),
+    (scene) => scene.shift(vector, [-1, 0], {duration: 1}),
+    (scene) => scene.fade(vector, 0.5, {duration: 1}),
 );
 ```
 
 ```js
-definition.tween({target: caption, text: "Ready to play"}, 1);
-definition.tween({target: caption, text: "Ready to export", retype: true}, 1);
-definition.tween({target: caption, text: "EXPORTED", sweep: true}, 1);
+definition.tween({target: caption, text: "Ready to play"}, {duration: 1});
+definition.tween({target: caption, text: "Ready to export", retype: true}, {duration: 1});
+definition.tween({target: caption, text: "EXPORTED", sweep: true}, {duration: 1});
 ```
 
 `morph` resamples outlines to turn source into target; contour `pairs` override automatic matching. `{copy: true}` preserves the source. `clone` snapshots a family at the current time. `fadeTransform` cross-fades into a target attached at the current cursor without clips and removes the source from the timeline on completion. `transition` fades outgoing handles out and incoming handles in without removing them; create every incoming handle with `opacity: 0`. `matchTransform` carries matching text, TeX, and optional shapes into a target attached at the current cursor without clips. Its source must be at rest unless `copy: true` snapshots it; arc or path detours and independent unmatched fades control the handoff.
@@ -144,8 +144,7 @@ definition.tween({target: caption, text: "EXPORTED", sweep: true}, 1);
 `warp` samples a plane mapping over explicit ranges, with `step` controlling initial subdivision. The scene retains the resulting geometry:
 
 ```js
-definition.warp(vector, (x, y) => [x + 0.2*y*y, y], 1, "smooth",
-    {x_range: [-5, 5, 0.1], y_range: [-3, 3, 0.1], step: 0.05});
+definition.warp(vector, (x, y) => [x + 0.2*y*y, y], {duration: 1, curve: "smooth", x_range: [-5, 5, 0.1], y_range: [-3, 3, 0.1], step: 0.05});
 ```
 
 Curves include named presets and `vis.animCurve.preset`, `cubicBezier`, and `reverse`. `vis.random(seed, seed2)` produces repeatable samples matching Lua's seeded generator.
@@ -157,7 +156,7 @@ Curves include named presets and `vis.animCurve.preset`, `cubicBezier`, and `rev
 ```js
 const phase = definition.tracker(0);
 definition.bind(vector, phase, (v) => ({value: [Math.cos(v), Math.sin(v)]}));
-definition.track(phase, 2 * Math.PI, 3, "linear");
+definition.track(phase, 2 * Math.PI, {duration: 3, curve: "linear"});
 ```
 
 For discrete reveals and counters, put every related state in the same `at` event:

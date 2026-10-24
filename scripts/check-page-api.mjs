@@ -94,12 +94,10 @@ const types = {ObjectFactory: "scene.", ObjectHandle: "object.", GroupHandle: "g
     VisScene: "host.", VisAudio: "host.audio."};
 for (const [type, receiver] of Object.entries(types)) {
     const source = type.startsWith("Vis") ? client : bindings;
-    const declaration = type === "SceneBuilder" ? /export class SceneBuilder\s*\{/ :
-        new RegExp(`export interface ${type}(?: extends [^{]+)?\\s*\\{`);
+    const declaration = new RegExp(`export interface ${type}(?: extends [^{]+)?\\s*\\{`);
     const body = block(source, declaration);
     for (const [, name] of body.matchAll(/^    (\w+)(?:<[^\n;]*>)?\??\(/gm)) {
-        if (name === "constructor") requireCall("JavaScript", "new ", "SceneBuilder");
-        else requireCall("JavaScript", receiver, name);
+        requireCall("JavaScript", receiver, name);
     }
 }
 for (const [, name] of `${bindings}\n${client}`.matchAll(/export function (\w+)\(/g)) {

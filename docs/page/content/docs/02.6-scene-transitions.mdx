@@ -83,7 +83,7 @@ local function bars(s, left, width)
     for i, v in ipairs(values) do
         local bar = s:rectangle {center = {left + (i - 0.5) * step, -1.5 + v / 2}, size = {step * 0.6, v},
                                  fill = i == #values and "accent" or "muted", id = "bar" .. i}
-        s:grow_from_edge(bar, "bottom", 0.3)
+        s:grow_from_edge(bar, "bottom", {duration = 0.3})
     end
 end
 
@@ -103,7 +103,7 @@ end)
 local summary = stage(function(s)
     s:text {text = "Quarterly sales", role = "h2", point = {0, 1.4}, id = "title"}
     local up = s:text {text = "+133% from Q1 to Q4", point = {0, 0}, size = 34, color = "accent"}
-    s:write(up, 0.8)
+    s:write(up, {duration = 0.8})
 end)
 
 local root = vis.scene {}
@@ -129,7 +129,7 @@ function bars(s, left, width) {
     values.forEach((v, i) => {
         const bar = s.rectangle({center: [left + (i + 0.5) * step, -1.5 + v / 2], size: [step * 0.6, v],
                                  fill: i === values.length - 1 ? "accent" : "muted", id: `bar${i + 1}`});
-        s.growFromEdge(bar, "bottom", 0.3);
+        s.growFromEdge(bar, "bottom", {duration: 0.3});
     });
 }
 
@@ -149,7 +149,7 @@ const detail = stage((s) => {
 const summary = stage((s) => {
     s.text({text: "Quarterly sales", role: "h2", point: [0, 1.4], id: "title"});
     const up = s.text({text: "+133% from Q1 to Q4", point: [0, 0], size: 34, color: "accent"});
-    s.write(up, 0.8);
+    s.write(up, {duration: 0.8});
 });
 
 const root = vis.scene();

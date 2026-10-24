@@ -4,8 +4,8 @@
 // A scene that names no theme is adaptive, and takes its colors from the Obsidian theme.
 export const SCENE = `local scene = vis.scene {width = 640, height = 360, camera = {height = 7}}
 local ball = scene:circle {center = {-3, 0}, radius = 0.5, fill = "accent"}
-scene:grow_from_center(ball, 0.6)
-scene:shift(ball, {6, 0}, 1.5)
+scene:grow_from_center(ball, {duration = 0.6})
+scene:shift(ball, {6, 0}, {duration = 1.5})
 scene:wait(0.5)
 return scene
 `;

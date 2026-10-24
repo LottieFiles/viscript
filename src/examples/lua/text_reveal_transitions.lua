@@ -196,10 +196,10 @@ scene:fade_in(cursorPanel, { shift = { -0.18, 0 }, duration = 0.25, curve = "sna
 scene:fade_in(defaultCaption, { duration = 0.12, curve = "gentle" })
 scene:fade_in(bulletCaption, { duration = 0.12, curve = "gentle" })
 scene:fade_in(cursorCaption, { duration = 0.12, curve = "gentle" })
-scene:create(divider, 0.24, "linear")
-scene:grow_from_center(handoffPoint, 0.24, { preset = "back", strength = 0.45 })
-scene:create(vector, 0.36, "linear")
-scene:grow_from_center(point, 0.28, { preset = "back", strength = 0.55 })
+scene:create(divider, {duration = 0.24, curve = "linear"})
+scene:grow_from_center(handoffPoint, {duration = 0.24, curve = { preset = "back", strength = 0.45 }})
+scene:create(vector, {duration = 0.36, curve = "linear"})
+scene:grow_from_center(point, {duration = 0.28, curve = { preset = "back", strength = 0.55 }})
 scene:fade_in(handoffLabel, { duration = 0.12, curve = "gentle" })
 scene:fade_in(vectorLabel, { duration = 0.12, curve = "gentle" })
 scene:fade_in(pointLabel, { duration = 0.12, curve = "gentle" })
@@ -222,7 +222,7 @@ local handoffSeed = scene:polygon {
     layer = 7,
     id = "morph-fade-seed",
 }
-scene:morph(handoffCopy, handoffSeed, 0.58, "ease_in_out")
+scene:morph(handoffCopy, handoffSeed, {duration = 0.58, curve = "ease_in_out"})
 local handoffText = scene:text {
     text = "normal vector",
     point = { -1.50, 1.25 },
@@ -233,7 +233,7 @@ local handoffText = scene:text {
     layer = 8,
     id = "morph-fade-text",
 }
-scene:fade_transform(handoffSeed, handoffText, 0.22, "gentle")
+scene:fade_transform(handoffSeed, handoffText, {duration = 0.22, curve = "gentle"})
 scene:wait(0.18)
 
 -- A solid duplicate is consumed by the morph; the authored vector remains visible.
@@ -253,7 +253,7 @@ local bullet = scene:polygon {
     layer = 4,
     id = "vector-bullet-morph-proxy",
 }
-scene:morph(vectorCopy, bullet, 0.62, { preset = "back", strength = 0.45 })
+scene:morph(vectorCopy, bullet, {duration = 0.62, curve = { preset = "back", strength = 0.45 }})
 local bulletCircle = scene:circle {
     center = { -2.18, -0.16 },
     radius = 0.12,
@@ -310,7 +310,7 @@ local bulletWords = {
         id = "bullet-word-direction",
     },
 }
-scene:create(bulletWords, 0.16, "ease_out", 0.38)
+scene:create(bulletWords, {duration = 0.16, curve = "ease_out", lag = 0.38})
 scene:wait(0.24)
 
 -- A second solid copy narrows into a cursor, then moves with each revealed character.
@@ -330,7 +330,7 @@ local cursor = scene:polygon {
     layer = 8,
     id = "text-cursor",
 }
-scene:morph(pointCopy, cursor, 0.58, { preset = "snappy", strength = 0.86 })
+scene:morph(pointCopy, cursor, {duration = 0.58, curve = { preset = "snappy", strength = 0.86 }})
 
 local prefixData = {
     { "dot(", 0.947 },
@@ -364,16 +364,16 @@ for index, prefix in ipairs(prefixData) do
         scene:tween({
             { target = prefixes[index - 1], opacity = 0 },
             { target = cursor, shift = { delta / 3, 0 } },
-        }, 0.025, "linear", 0)
+        }, {duration = 0.025, curve = "linear", lag = 0})
         cursorPosition = cursorPosition + delta / 3
     end
     scene:tween({
         { target = prefixes[index], opacity = 1 },
         { target = cursor, shift = { prefix[2] - cursorPosition, 0 } },
-    }, index > 1 and 0.05 or 0.075, "linear", 0)
+    }, {duration = index > 1 and 0.05 or 0.075, curve = "linear", lag = 0})
     cursorPosition = prefix[2]
 end
-scene:fade(cursor, 0, 0.16, "ease_out")
+scene:fade(cursor, 0, {duration = 0.16, curve = "ease_out"})
 scene:indicate(typedFormula, { color = p.gold, scale = 1.035, duration = 0.42, curve = "gentle" })
 scene:wait(0.65)
 

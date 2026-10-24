@@ -33,7 +33,7 @@ local scene = vis.scene {
 
 local dot = scene:circle {id = "dot", center = {-3, 0}, radius = 0.4, fill = "accent"}
 scene:line {from = {-3, -0.7}, to = {3, -0.7}, stroke = "muted", width = 1}
-scene:shift(dot, {6, 0}, 2, {preset = "bounce", strength = 1})
+scene:shift(dot, {6, 0}, {duration = 2, curve = {preset = "bounce", strength = 1}})
 
 return scene
 ```
@@ -46,7 +46,7 @@ const scene = vis.scene({
 
 const dot = scene.circle({id: "dot", center: [-3, 0], radius: 0.4, fill: "accent"});
 scene.line({from: [-3, -0.7], to: [3, -0.7], stroke: "muted", width: 1});
-scene.shift(dot, [6, 0], 2, vis.animCurve.preset("bounce", 1));
+scene.shift(dot, [6, 0], {duration: 2, curve: vis.animCurve.preset("bounce", 1)});
 
 return scene;
 ```
@@ -63,7 +63,7 @@ local scene = vis.scene {
 
 local dot = scene:circle {id = "dot", center = {-3, 0}, radius = 0.4, fill = "accent"}
 scene:line {from = {-3, -0.7}, to = {3, -0.7}, stroke = "muted", width = 1}
-scene:shift(dot, {6, 0}, 2, {bezier = {0.2, 0, 0.8, 1}, strength = 1})
+scene:shift(dot, {6, 0}, {duration = 2, curve = {bezier = {0.2, 0, 0.8, 1}, strength = 1}})
 
 return scene
 ```
@@ -76,7 +76,7 @@ const scene = vis.scene({
 
 const dot = scene.circle({id: "dot", center: [-3, 0], radius: 0.4, fill: "accent"});
 scene.line({from: [-3, -0.7], to: [3, -0.7], stroke: "muted", width: 1});
-scene.shift(dot, [6, 0], 2, vis.animCurve.cubicBezier(0.2, 0, 0.8, 1));
+scene.shift(dot, [6, 0], {duration: 2, curve: vis.animCurve.cubicBezier(0.2, 0, 0.8, 1)});
 
 return scene;
 ```
@@ -93,7 +93,7 @@ local scene = vis.scene {
 
 local dot = scene:circle {id = "dot", center = {-3, 0}, radius = 0.4, fill = "accent"}
 scene:line {from = {-3, -0.7}, to = {3, -0.7}, stroke = "muted", width = 1}
-scene:shift(dot, {6, 0}, 2, {preset = "ease_in", strength = 1, reverse = true})
+scene:shift(dot, {6, 0}, {duration = 2, curve = {preset = "ease_in", strength = 1, reverse = true}})
 
 return scene
 ```
@@ -106,7 +106,7 @@ const scene = vis.scene({
 
 const dot = scene.circle({id: "dot", center: [-3, 0], radius: 0.4, fill: "accent"});
 scene.line({from: [-3, -0.7], to: [3, -0.7], stroke: "muted", width: 1});
-scene.shift(dot, [6, 0], 2, vis.animCurve.reverse("ease_in"));
+scene.shift(dot, [6, 0], {duration: 2, curve: vis.animCurve.reverse("ease_in")});
 
 return scene;
 ```

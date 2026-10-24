@@ -57,18 +57,18 @@ local linear = {duration = DUR, curve = "linear"}
 scene:wait(0.4)
 scene:parallel(
   function() scene:shift(head, {TL1 - TL0, 0}, linear) end,
-  function() scene:tween({target = played, progress = 1}, DUR, "linear") end,
+  function() scene:tween({target = played, progress = 1}, {duration = DUR, curve = "linear"}) end,
   function() scene:create(OUT[2].plot, linear) end,
   function() scene:create(OUT[3].plot, linear) end,
   function() scene:move_along(OUT[2].dot, OUT[2].plot, linear) end,
   function() scene:move_along(OUT[3].dot, OUT[3].plot, linear) end,
-  function() scene:tween({target = bar, progress = 1}, DUR, "linear") end,
+  function() scene:tween({target = bar, progress = 1}, {duration = DUR, curve = "linear"}) end,
   function()
     scene:wait(STILL)
-    scene:tween({{target = shutter, opacity = 1}, {target = OUT[1].card, stroke = "warning"}, {target = mark, width = 5}}, 0.06, "linear")
-    scene:tween({{target = OUT[1].plot, opacity = 1}, {target = OUT[1].dot, opacity = 1}}, 0.01)
-    scene:tween({target = shutter, opacity = 0}, 0.4, "ease_out")
-    scene:tween({{target = OUT[1].card, stroke = "border"}, {target = mark, width = 3}}, 0.3)
+    scene:tween({{target = shutter, opacity = 1}, {target = OUT[1].card, stroke = "warning"}, {target = mark, width = 5}}, {duration = 0.06, curve = "linear"})
+    scene:tween({{target = OUT[1].plot, opacity = 1}, {target = OUT[1].dot, opacity = 1}}, {duration = 0.01})
+    scene:tween({target = shutter, opacity = 0}, {duration = 0.4, curve = "ease_out"})
+    scene:tween({{target = OUT[1].card, stroke = "border"}, {target = mark, width = 3}}, {duration = 0.3})
   end)
 scene:wait(1.2)
 return scene

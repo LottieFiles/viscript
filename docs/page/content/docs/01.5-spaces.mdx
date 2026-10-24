@@ -21,8 +21,8 @@ local sine = axes:plot {fn = function(x) return math.sin(x) * 1.5 end,
 local para = axes:plot {fn = function(x) return 0.15 * x * x - 1.5 end,
                         x_range = {-4, 4, 0.05}, stroke = "danger", width = 4}
 
-scene:create(axes, 0.8)
-scene:create({sine, para}, 1.4, "smooth", 0.3)
+scene:create(axes, {duration = 0.8})
+scene:create({sine, para}, {duration = 1.4, curve = "smooth", lag = 0.3})
 
 return scene
 ```
@@ -36,8 +36,8 @@ const sine = axes.plot({fn: (x) => Math.sin(x) * 1.5,
 const para = axes.plot({fn: (x) => 0.15 * x * x - 1.5,
                         x_range: [-4, 4, 0.05], stroke: "danger", width: 4});
 
-scene.create(axes, 0.8);
-scene.create([sine, para], 1.4, "smooth", 0.3);
+scene.create(axes, {duration: 0.8});
+scene.create([sine, para], {duration: 1.4, curve: "smooth", lag: 0.3});
 
 return scene;
 ```
@@ -59,8 +59,8 @@ local axes = scene:space {
 }
 local wave = axes:plot {fn = function(x) return math.cos(x) end, x_range = {-4, 4, 0.05}, stroke = "accent", width = 3}
 
-scene:create(axes, 0.8)
-scene:create(wave, 1.2)
+scene:create(axes, {duration = 0.8})
+scene:create(wave, {duration = 1.2})
 
 return scene
 ```
@@ -76,8 +76,8 @@ const axes = scene.space({
 });
 const wave = axes.plot({fn: (x) => Math.cos(x), x_range: [-4, 4, 0.05], stroke: "accent", width: 3});
 
-scene.create(axes, 0.8);
-scene.create(wave, 1.2);
+scene.create(axes, {duration: 0.8});
+scene.create(wave, {duration: 1.2});
 
 return scene;
 ```
@@ -114,9 +114,9 @@ local labels = axes:labels {
 }
 local sine = axes:plot {fn = math.sin, x_range = {-pi, 2 * pi, 0.05}, stroke = "accent", width = 3}
 
-scene:create(axes, 0.6)
+scene:create(axes, {duration = 0.6})
 for _, label in ipairs(labels) do scene:fade_in(label, {duration = 0.2}) end
-scene:create(sine, 1.2)
+scene:create(sine, {duration = 1.2})
 
 return scene
 ```
@@ -134,9 +134,9 @@ const labels = axes.labels({
 });
 const sine = axes.plot({fn: Math.sin, x_range: [-pi, 2 * pi, 0.05], stroke: "accent", width: 3});
 
-scene.create(axes, 0.6);
+scene.create(axes, {duration: 0.6});
 for (const label of labels) scene.fadeIn(label, {duration: 0.2});
-scene.create(sine, 1.2);
+scene.create(sine, {duration: 1.2});
 
 return scene;
 ```
@@ -179,9 +179,9 @@ for i = 0, 120 do
 end
 local helix = space:path {commands = commands, stroke = "warning", width = 3}
 
-scene:create(space, 0.8)
-scene:create(helix, 1.5)
-scene:look({eye = {-6, 4.5, 8}}, 2, "ease_in_out")
+scene:create(space, {duration = 0.8})
+scene:create(helix, {duration = 1.5})
+scene:look({eye = {-6, 4.5, 8}}, {duration = 2, curve = "ease_in_out"})
 
 return scene
 ```
@@ -203,9 +203,9 @@ for (let i = 0; i <= 120; i++) {
 }
 const helix = space.path({commands, stroke: "warning", width: 3});
 
-scene.create(space, 0.8);
-scene.create(helix, 1.5);
-scene.look({eye: [-6, 4.5, 8]}, 2, "ease_in_out");
+scene.create(space, {duration: 0.8});
+scene.create(helix, {duration: 1.5});
+scene.look({eye: [-6, 4.5, 8]}, {duration: 2, curve: "ease_in_out"});
 
 return scene;
 ```

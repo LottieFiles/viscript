@@ -16,7 +16,7 @@ In Obsidian, click **Play** to hear the cue. The examples use `assets/tone.wav` 
 | Lua | JavaScript | Purpose |
 | --- | --- | --- |
 | `vis.audio.cue(scene, options)` | `scene.sound(options)` | Return an audio cue for `asset`; options: `bus` (`music`, `effect`, `ui`), `begin`, `end`, `gain`, `loop`. |
-| `cue:gain(value, begin, duration?, curve?)`<br />`cue:gain(value, begin, timing)` | `cue.gain(value, begin, duration?, curve?)`<br />`cue.gain(value, begin, timing)` | Animate cue gain (0–4) from absolute `begin`; default duration 1 and curve `smooth`. |
+| `cue:gain(value, begin, options?)` | `cue.gain(value, begin, options?)` | Animate cue gain (0–4) from absolute `begin`; default duration 1 and curve `smooth`. |
 
 ## Examples
 
@@ -68,10 +68,10 @@ local bar = scene:rectangle {id = "gain", size = {4, 0.6}, fill = "accent"}
 scene:text {id = "label", text = "gain: 1 to 0", point = {0, -1}, size = 24}
 if vis.audio then
     local cue = vis.audio.cue(scene, {asset = "gain.wav", gain = 1, ["end"] = 1.5})
-    cue:gain(0, 0.3, 1, "linear")
+    cue:gain(0, 0.3, {duration = 1, curve = "linear"})
 end
 scene:wait(0.3)
-scene:fade(bar, 0, 1, "linear")
+scene:fade(bar, 0, {duration = 1, curve = "linear"})
 
 return scene
 ```
@@ -85,9 +85,9 @@ const scene = vis.scene({
 const bar = scene.rectangle({id: "gain", size: [4, 0.6], fill: "accent"});
 scene.text({id: "label", text: "gain: 1 to 0", point: [0, -1], size: 24});
 const cue = scene.sound({asset: "gain.wav", gain: 1, end: 1.5});
-cue.gain(0, 0.3, 1, "linear");
+cue.gain(0, 0.3, {duration: 1, curve: "linear"});
 scene.wait(0.3);
-scene.fade(bar, 0, 1, "linear");
+scene.fade(bar, 0, {duration: 1, curve: "linear"});
 
 return scene;
 ```

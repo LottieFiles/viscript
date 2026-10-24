@@ -18,9 +18,9 @@ local body = scene:text {text = "Body text sized by the theme", role = "text", p
 local code = scene:text {text = "Monospace for code", font = "JetBrainsMono", size = 22,
                          color = "warning", point = {0, -1.1}}
 
-scene:write(title, 0.8)
-scene:write(body, 0.8)
-scene:write(code, 0.8)
+scene:write(title, {duration = 0.8})
+scene:write(body, {duration = 0.8})
+scene:write(code, {duration = 0.8})
 
 return scene
 ```
@@ -33,9 +33,9 @@ const body = scene.text({text: "Body text sized by the theme", role: "text", poi
 const code = scene.text({text: "Monospace for code", font: "JetBrainsMono", size: 22,
                          color: "warning", point: [0, -1.1]});
 
-scene.write(title, 0.8);
-scene.write(body, 0.8);
-scene.write(code, 0.8);
+scene.write(title, {duration: 0.8});
+scene.write(body, {duration: 0.8});
+scene.write(code, {duration: 0.8});
 
 return scene;
 ```
@@ -62,7 +62,7 @@ local left = scene:text {text = "align {0, 0.5}", point = {0, 1}, align = {0, 0.
 local mid = scene:text {text = "align {0.5, 0.5}", point = {0, 0}, align = {0.5, 0.5}, size = 22}
 local right = scene:text {text = "align {1, 0.5}", point = {0, -1}, align = {1, 0.5}, size = 22}
 
-scene:create(guide, 0.4)
+scene:create(guide, {duration = 0.4})
 scene:fade_in(left, {duration = 0.4})
 scene:fade_in(mid, {duration = 0.4})
 scene:fade_in(right, {duration = 0.4})
@@ -78,7 +78,7 @@ const left = scene.text({text: "align {0, 0.5}", point: [0, 1], align: [0, 0.5],
 const mid = scene.text({text: "align {0.5, 0.5}", point: [0, 0], align: [0.5, 0.5], size: 22});
 const right = scene.text({text: "align {1, 0.5}", point: [0, -1], align: [1, 0.5], size: 22});
 
-scene.create(guide, 0.4);
+scene.create(guide, {duration: 0.4});
 scene.fadeIn(left, {duration: 0.4});
 scene.fadeIn(mid, {duration: 0.4});
 scene.fadeIn(right, {duration: 0.4});
@@ -97,8 +97,8 @@ local dot = scene:circle {center = {-3, 0}, radius = 0.5, fill = "accent"}
 dot:label {text = "label", point = {-3, -0.9}, align = {0.5, 1}, size = 20, layer = 2}
 local fixed = scene:text {text = "text", point = {-3, 1}, align = {0.5, 0}, size = 20, color = "muted"}
 
-scene:grow_from_center(dot, 0.4)
-scene:shift(dot, {6, 0}, 1.4, "ease_in_out")  -- the label follows, the text stays
+scene:grow_from_center(dot, {duration = 0.4})
+scene:shift(dot, {6, 0}, {duration = 1.4, curve = "ease_in_out"})  -- the label follows, the text stays
 
 return scene
 ```
@@ -110,8 +110,8 @@ const dot = scene.circle({center: [-3, 0], radius: 0.5, fill: "accent"});
 dot.label({text: "label", point: [-3, -0.9], align: [0.5, 1], size: 20, layer: 2});
 const fixed = scene.text({text: "text", point: [-3, 1], align: [0.5, 0], size: 20, color: "muted"});
 
-scene.growFromCenter(dot, 0.4);
-scene.shift(dot, [6, 0], 1.4, "ease_in_out");  // the label follows, the text stays
+scene.growFromCenter(dot, {duration: 0.4});
+scene.shift(dot, [6, 0], {duration: 1.4, curve: "ease_in_out"});  // the label follows, the text stays
 
 return scene;
 ```
@@ -147,9 +147,9 @@ local pythagoras = scene:tex {
 local inline = scene:tex {tex = "\\sum_{k=1}^{n} k = \\frac{n(n+1)}{2}", display = false,
                           point = {0, -2}, size = 22, color = "muted"}
 
-scene:write(identity, 1)
-scene:write(pythagoras, 1)
-scene:tween({target = pythagoras:part("c^2"), fill = "accent"}, 0.5)
+scene:write(identity, {duration = 1})
+scene:write(pythagoras, {duration = 1})
+scene:tween({target = pythagoras:part("c^2"), fill = "accent"}, {duration = 0.5})
 scene:fade_in(inline, {duration = 0.5})
 
 return scene
@@ -166,9 +166,9 @@ const pythagoras = scene.tex({
 const inline = scene.tex({tex: "\\sum_{k=1}^{n} k = \\frac{n(n+1)}{2}", display: false,
                           point: [0, -2], size: 22, color: "muted"});
 
-scene.write(identity, 1);
-scene.write(pythagoras, 1);
-scene.tween({target: pythagoras.part("c^2"), fill: "accent"}, 0.5);
+scene.write(identity, {duration: 1});
+scene.write(pythagoras, {duration: 1});
+scene.tween({target: pythagoras.part("c^2"), fill: "accent"}, {duration: 0.5});
 scene.fadeIn(inline, {duration: 0.5});
 
 return scene;
@@ -198,11 +198,11 @@ local listing = scene:code {
     language = "lua", point = {0, 0}, align = {0.5, 0.5}, size = 22, id = "listing",
 }
 
-scene:write(listing, 1.2)
+scene:write(listing, {duration = 1.2})
 scene:highlight(listing, listing:search("total", {match = "all", whole = true}))
 scene:wait(0.6)
 scene:highlight(listing)
-listing = scene:edit(listing, {replace = "total", with = "sum", match = "all", whole = true}, 1)
+listing = scene:edit(listing, {replace = "total", with = "sum", match = "all", whole = true}, {duration = 1})
 
 return scene
 ```
@@ -215,11 +215,11 @@ let listing = scene.code({
     language: "lua", point: [0, 0], align: [0.5, 0.5], size: 22, id: "listing",
 });
 
-scene.write(listing, 1.2);
+scene.write(listing, {duration: 1.2});
 scene.highlight(listing, listing.search("total", {match: "all", whole: true}));
 scene.wait(0.6);
 scene.highlight(listing);
-listing = scene.edit(listing, {replace: "total", with: "sum", match: "all", whole: true}, 1);
+listing = scene.edit(listing, {replace: "total", with: "sum", match: "all", whole: true}, {duration: 1});
 
 return scene;
 ```
@@ -238,7 +238,7 @@ return scene;
 | `block:row(n)` | The nth line, from 1. |
 | `block:search(find, {match, lines, whole})` | Tokens a literal string covers; JavaScript `block.search` also accepts a `RegExp`. `match` is `"first"`, `"last"`, `"all"` or an occurrence number. |
 | `scene:highlight(block, selection)` | Dims everything but the selected lines or tokens; no selection restores the block. |
-| `scene:edit(block, edits, duration)` | Returns the edited block and animates the diff. Edits: `replace`/`with`, `insert` + `before`/`after`, `remove`, `append`, `prepend`. |
+| `scene:edit(block, edits, options?)` | Returns the edited block and animates the diff. Edits: `replace`/`with`, `insert` + `before`/`after`, `remove`, `append`, `prepend`. |
 
 ## Matrices and tables
 

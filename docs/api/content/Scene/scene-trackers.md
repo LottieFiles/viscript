@@ -16,7 +16,9 @@ Trackers drive sampled object properties. Callbacks return a state table/object 
 | `scene:tracker(value)` | `scene.tracker(value)` | Return a tracker with an initial finite number. |
 | `tracker.get()` | `tracker.get()` | Return the value reached at this point in the script. |
 | `scene:bind(target, trackers, fn)` | `scene.bind(target, trackers, fn)` | Bind one object to one tracker or a list; apply the initial state and return the object. |
-| `scene:track(tracker, value, duration, curve?)`<br />`scene:track(tracker, value, timing)`<br />`scene:track(moves, duration, curve?)`<br />`scene:track(moves, timing)` | `scene.track(tracker, value, duration, curve?)`<br />`scene.track(tracker, value, timing)`<br />`scene.track(moves, duration, curve?)`<br />`scene.track(moves, timing)` | Move one tracker, or a list of tracker/value pairs, while baking bound states at scene fps. |
+| `scene:track(tracker, value, options)`<br />`scene:track(moves, options)` | `scene.track(tracker, value, options)`<br />`scene.track(moves, options)` | Move one tracker, or a list of tracker/value pairs, while baking bound states at scene fps. |
+
+`track` requires an options table/object with `duration` and `curve`; omitted fields default to 1 second and `smooth`.
 
 Bindings accept the [animation descriptor properties](../Animation/index.md) except `position`, `arc`, `text`, `retype`, `sweep`, and `layer`. One object has one binding; different trackers can overlap on shared objects, but one tracker cannot run overlapping tracks.
 
@@ -35,7 +37,7 @@ local scene = vis.scene {
 local ball = scene:circle {id = "ball", center = {-2, 0}, radius = 0.5, fill = "accent"}
 local tracker = scene:tracker(0)
 scene:bind(ball, tracker, function(value) return {shift = {value, 0}} end)
-scene:track(tracker, 4, 1.5)
+scene:track(tracker, 4, {duration = 1.5})
 
 return scene
 ```
@@ -49,7 +51,7 @@ const scene = vis.scene({
 const ball = scene.circle({id: "ball", center: [-2, 0], radius: 0.5, fill: "accent"});
 const tracker = scene.tracker(0);
 scene.bind(ball, tracker, (value) => ({shift: [value, 0]}));
-scene.track(tracker, 4, 1.5);
+scene.track(tracker, 4, {duration: 1.5});
 
 return scene;
 ```
@@ -99,7 +101,7 @@ local phase = scene:tracker(0)
 scene:bind(ball, phase, function(value)
     return {shift = {2 + 1.5 * math.cos(value), 1.5 * math.sin(value)}}
 end)
-scene:track(phase, 2 * math.pi, 2, "linear")
+scene:track(phase, 2 * math.pi, {duration = 2, curve = "linear"})
 
 return scene
 ```
@@ -113,7 +115,7 @@ const scene = vis.scene({
 const ball = scene.circle({id: "ball", center: [-2, 0], radius: 0.5, fill: "accent"});
 const phase = scene.tracker(0);
 scene.bind(ball, phase, (value) => ({shift: [2 + 1.5 * Math.cos(value), 1.5 * Math.sin(value)]}));
-scene.track(phase, 2 * Math.PI, 2, "linear");
+scene.track(phase, 2 * Math.PI, {duration: 2, curve: "linear"});
 
 return scene;
 ```

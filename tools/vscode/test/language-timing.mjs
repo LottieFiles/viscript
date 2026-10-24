@@ -42,10 +42,20 @@ try {
         getText: () => `local scene = vis.scene{}\n${call}`,
     }, new Position(1, call.length));
     const named = signature("scene:create({a, b}, {duration = ");
-    assert.equal(named.activeSignature, 1);
+    assert.equal(named.signatures.length, 1);
+    assert.equal(named.activeSignature, 0);
     assert.equal(named.activeParameter, 1);
-    assert.match(named.signatures[1].label, /options: RevealOptions/);
-    assert.equal(signature("scene:create(a, 0.4, ").activeSignature, 0);
+    assert.match(named.signatures[0].label, /options\?: RevealOptions/);
+    const positional = signature("scene:create(a, 0.4, ");
+    assert.equal(positional.signatures.length, 1);
+    assert.equal(positional.activeSignature, 0);
+    assert.doesNotMatch(positional.signatures[0].label, /duration\??: number/);
+    const track = signature("scene:track(tracker, 1, {duration = ");
+    assert.equal(track.signatures.length, 2);
+    for (const item of track.signatures) {
+        assert.match(item.label, /options: TimingOptions/);
+        assert.doesNotMatch(item.label, /duration\??: number/);
+    }
 } finally {
     Module._load = load;
 }

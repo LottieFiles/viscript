@@ -161,6 +161,18 @@ try {
     assert.ok(center(transitionMid) > center(transitionStart));
     assert.ok(center(transitionMid) < center(transitionEnd));
     assert.ok(Math.abs(center(transitionEnd) - center(transitionStart) - 25) < 0.1);
+
+    runtime.load(`
+local scene = vis.scene {width = 200, height = 100}
+scene:rectangle {id = "target", size = {1, 1}}
+local panel = vis.ui.panel(scene)
+panel:camera("pan", {0.2, 0})
+vis.runtime(scene, {fixed_step = 0.1, update = function()
+    panel:camera("reset")
+end})
+return scene
+`, "runtime-ui-camera.lua");
+    assert.throws(() => runtime.advanceRuntime(0.1), /UI authoring is unavailable after loading/);
 } finally {
     runtime.destroy();
 }

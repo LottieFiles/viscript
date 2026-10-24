@@ -29,7 +29,7 @@ local states = vis.states(scene)
 states:define(subject, "idle", {})
 states:define(subject, "right", {shift = {2, 0}})
 states:define(subject, "up", {shift = {1, 2}})
-states:transition(subject, "right", 1, "linear")
+states:transition(subject, "right", {duration = 1, curve = "linear"})
 vis.runtime(scene, {
     fixed_step = 0.25,
     max_steps = 4,
@@ -38,7 +38,7 @@ vis.runtime(scene, {
         if tick == 2 then
             local visible = states:sample(subject)
             assert(math.abs(visible.shift[1] - 1) < 0.0001)
-            states:transition(subject, "up", 1, "linear")
+            states:transition(subject, "up", {duration = 1, curve = "linear"})
             assert(states:event_count() == 2)
             assert(states:event(1).transaction == "1")
             assert(states:event(2).transaction == "2")
@@ -75,7 +75,7 @@ local scene = vis.scene {
 local subject = scene:circle {center = {0, 0}, radius = 0.5, id = "states-static"}
 local states = vis.states(scene)
 states:define(subject, "visible", {shift = {1, 0}})
-states:transition(subject, "visible", 0)
+states:transition(subject, "visible", {duration = 0})
 assert(states:sample(subject).shift[1] == 1)
 return scene
 `, "ordinary-states.lua");

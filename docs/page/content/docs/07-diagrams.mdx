@@ -17,7 +17,7 @@ The diagram module turns nodes and edges into a laid-out, animatable object tree
 <tr><td>Connect</td><td><code>d:connect&#123;id, from, to, label, route, flow&#125;</code></td><td>Edge handle</td></tr>
 <tr><td>Group</td><td><code>d:zone&#123;id, label, members&#125;</code></td><td>Zone handle</td></tr>
 <tr><td>Lower</td><td><code>d:build()</code></td><td>Built diagram</td></tr>
-<tr><td>Animate</td><td><code>built:nodes()</code>, <code>built:routes()</code>, <code>built:edge(e)</code>, <code>built:node_body(n)</code></td><td>Object handles</td></tr>
+<tr><td>Animate</td><td><code>built:nodes()</code>, <code>built:routes()</code>, <code>built:object(e)</code>, <code>built:body(n)</code></td><td>Object handles</td></tr>
 </table>
 <p>With <code>flow = true</code> an edge is dashed; animate its <code>dash_offset</code> to show data moving.</p>
 
@@ -36,10 +36,10 @@ local e2 = d:connect {id = "e2", from = xform, to = output, flow = true}
 local built = d:build()
 
 scene:fade_in(built:nodes(), {duration = 0.4})
-scene:create(built:routes(), 0.6, "ease_out")
-scene:tween({{target = built:edge(e1), dash_offset = -18},
-            {target = built:edge(e2), dash_offset = -18}}, 1.5, "linear")
-scene:indicate(built:node_body(output), {color = "success", duration = 0.5})
+scene:create(built:routes(), {duration = 0.6, curve = "ease_out"})
+scene:tween({{target = built:object(e1), dash_offset = -18},
+            {target = built:object(e2), dash_offset = -18}}, {duration = 1.5, curve = "linear"})
+scene:indicate(built:body(output), {color = "success", duration = 0.5})
 
 return scene
 ```
@@ -76,7 +76,7 @@ local built = d:build()
 
 scene:fade_in(built:zones(), {duration = 0.4})
 scene:fade_in(built:nodes(), {duration = 0.4})
-scene:create(built:routes(), 0.8, "smooth", 0.2)
+scene:create(built:routes(), {duration = 0.8, curve = "smooth", lag = 0.2})
 
 return scene
 ```
@@ -106,7 +106,7 @@ local ship   = d:node {id = "ship", label = "Ship", kind = "task", row = 2, star
 local built = d:build()
 
 for _, n in ipairs({design, build, ship}) do
-    scene:grow_from_edge(built:node(n), "left", 0.5, "smooth")
+    scene:grow_from_edge(built:object(n), "left", {duration = 0.5, curve = "smooth"})
 end
 
 return scene

@@ -201,13 +201,13 @@ local resultLabel = scenarioPanel:text {
 
 scene:fade_in(title, {shift = {0, -6}, duration = 0.42, curve = "gentle"})
 scene:fade_in(subtitle, {shift = {0, -4}, duration = 0.32, curve = "gentle"})
-scene:create({divider, viewDivider}, 0.28, "ease_out")
+scene:create({divider, viewDivider}, {duration = 0.28, curve = "ease_out"})
 scene:fade_in(structurePanel, {shift = {0, 5}, duration = 0.50, curve = "gentle"})
 scene:fade_in(scenarioPanel, {shift = {0, 5}, duration = 0.50, curve = "gentle"})
-scene:create({objectToRegistry, divRelation, modRelationInitial}, 0.62, "ease_out", 0.08, "forward")
+scene:create({objectToRegistry, divRelation, modRelationInitial}, {duration = 0.62, curve = "ease_out", lag = 0.08, direction = "forward"})
 scene:wait(0.55)
 
-scene:create(detachMessage.route, 0.46, "ease_out")
+scene:create(detachMessage.route, {duration = 0.46, curve = "ease_out"})
 scene:fade_in(detachMessage.label, {shift = {0, -3}, duration = 0.24, curve = "gentle"})
 local modRelationFinal = structurePanel:route {
     points = {{slotCenters[1], 102}, {slotCenters[1], 56}, {-170, 56}, {-170, -8}}, tip = 7,
@@ -227,21 +227,21 @@ slotFinal:text {
     text = "empty", point = {slotCenters[2], 122}, role = "code", fill = "muted",
     layer = LAYER.text, id = "field:observers:slot:2:final",
 }
-scene:fade_transform(slotInitial, slotFinal, 0.38, "ease_in_out")
+scene:fade_transform(slotInitial, slotFinal, {duration = 0.38, curve = "ease_in_out"})
 scene:tween({
     {target = divRelation, opacity = 0},
     {target = modRelationInitial, opacity = 0},
-}, 0.36, "ease_in_out", 0)
-scene:create(modRelationFinal, 0.40, "ease_out")
+}, {duration = 0.36, curve = "ease_in_out", lag = 0})
+scene:create(modRelationFinal, {duration = 0.40, curve = "ease_out"})
 scene:tween({
     {target = divObject.body, opacity = 0.4},
     {target = divObject.title, opacity = 0.4},
     {target = divObject.detail, opacity = 0.4},
-}, 0.28, "ease_in_out", 0)
+}, {duration = 0.28, curve = "ease_in_out", lag = 0})
 scene:fade_in(detachedBadgeLabel, {duration = 0.18, curve = "gentle"})
 scene:wait(0.55)
 
-scene:create(setValueMessage.route, 0.42, "ease_out")
+scene:create(setValueMessage.route, {duration = 0.42, curve = "ease_out"})
 scene:fade_in(setValueMessage.label, {shift = {0, -3}, duration = 0.22, curve = "gentle"})
 scene:fade_in(scenarioStateBody, {scale = 0.96, duration = 0.24, curve = "gentle"})
 scene:fade_in(scenarioStateLabel, {duration = 0.18, curve = "gentle"})
@@ -249,12 +249,12 @@ local stateValueFinal = structurePanel:text {
     text = "val_ = 20", point = {-502, -204}, role = "code", fill = "foreground",
     layer = LAYER.text, id = "field:val:value:20",
 }
-scene:fade_transform(stateValue, stateValueFinal, 0.30, "gentle")
+scene:fade_transform(stateValue, stateValueFinal, {duration = 0.30, curve = "gentle"})
 stateValue = stateValueFinal
 scene:indicate(stateBody, {color = "focus", scale = 1.03, duration = 0.30, curve = "ease_in_out"})
 scene:wait(0.50)
 
-scene:create(notifyMessage.route, 0.48, "ease_out")
+scene:create(notifyMessage.route, {duration = 0.48, curve = "ease_out"})
 scene:fade_in(notifyMessage.label, {shift = {0, -3}, duration = 0.22, curve = "gentle"})
 -- The receiver takes the result hue only when the callback reaches it.
 scene:tween({
@@ -262,7 +262,7 @@ scene:tween({
     {target = modObject.title, fill = "result"},
     {target = actorHandles.mod.body, stroke = "result", width = 1.5},
     {target = actorHandles.mod.label, fill = "result"},
-}, 0.30, "ease_in_out", 0)
+}, {duration = 0.30, curve = "ease_in_out", lag = 0})
 scene:indicate(modObject.body, {color = "result", scale = 1.035, duration = 0.38, curve = "ease_in_out"})
 scene:indicate(actorHandles.mod.body, {color = "result", scale = 1.035, duration = 0.34, curve = "ease_in_out"})
 scene:fade_in(resultLabel, {shift = {0, -4}, duration = 0.32, curve = "gentle"})

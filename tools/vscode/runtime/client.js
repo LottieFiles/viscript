@@ -6,7 +6,7 @@
 import createModule from "./vis-wasm.js";
 import {compileScene} from "./bindings.js";
 
-export {compileScene, evaluateScene, SceneBuilder, vis} from "./bindings.js";
+export {compileScene, evaluateScene, vis} from "./bindings.js";
 
 // The tables stay plain and private, and the module does nothing when imported, so a bundle that
 // takes only inputKeyName leaves the rest out.

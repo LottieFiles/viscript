@@ -107,11 +107,11 @@ static UITransform _fieldTransform(lua_State* lua, int index, const char* name)
     return value;
 }
 
-// The names of a slider's axis and of the camera action of a button; move and pan both pan.
+// The names of a slider's axis and of camera actions shared by buttons and direct commands.
 static constexpr LuaName<SliderAxis> SLIDER_AXES[] = {
     {"horizontal", SliderAxis::Horizontal}, {"vertical", SliderAxis::Vertical}};
 static constexpr LuaName<CameraAction> CAMERA_ACTIONS[] = {
-    {"move", CameraAction::Pan}, {"pan", CameraAction::Pan}, {"orbit", CameraAction::Orbit},
+    {"pan", CameraAction::Pan}, {"orbit", CameraAction::Orbit},
     {"zoom", CameraAction::Zoom}, {"reset", CameraAction::Reset},
     {"view2d", CameraAction::View2D}, {"view3d", CameraAction::View3D}};
 
@@ -325,33 +325,17 @@ static int _sampleArea(lua_State* lua)
     return _result(lua, panel->bind(control, binding));
 }
 
-static int _cameraMove(lua_State* lua)
+static int _camera(lua_State* lua)
 {
-    return _result(lua, _panel(lua)->camera(CameraAction::Pan, _vec2(lua, 2, "camera move")));
-}
-
-static int _cameraOrbit(lua_State* lua)
-{
-    auto delta = _vec2(lua, 2, "camera orbit");
-    return _result(lua, _panel(lua)->camera(CameraAction::Orbit, delta));
-}
-
-static int _cameraZoom(lua_State* lua)
-{
-    auto delta = _number(lua, 2, "camera zoom");
-    return _result(lua, _panel(lua)->camera(CameraAction::Zoom, {0.0f, delta}));
-}
-
-static int _cameraReset(lua_State* lua)
-{
-    return _result(lua, _panel(lua)->camera(CameraAction::Reset));
-}
-
-static int _cameraView(lua_State* lua)
-{
-    auto view = _enum(lua, 2, "camera view", CAMERA_VIEWS);
-    auto action = view == CameraView::TwoD ? CameraAction::View2D : CameraAction::View3D;
-    return _result(lua, _panel(lua)->camera(action));
+    auto panel = _panel(lua);
+    auto action = _enum(lua, 2, "camera action", CAMERA_ACTIONS);
+    Vec2 delta;
+    if (action == CameraAction::Pan || action == CameraAction::Orbit) {
+        delta = _vec2(lua, 3, "camera delta");
+    } else if (action == CameraAction::Zoom) {
+        delta.y = _number(lua, 3, "camera zoom");
+    }
+    return _result(lua, panel->camera(action, delta));
 }
 
 static int _newPanel(lua_State* lua)
@@ -386,11 +370,7 @@ static int _open(lua_State* lua, void* data)
         {"toggle_button", _toggleButton},
         {"slider", _slider},
         {"sample_area", _sampleArea},
-        {"camera_move", _cameraMove},
-        {"camera_orbit", _cameraOrbit},
-        {"camera_zoom", _cameraZoom},
-        {"camera_reset", _cameraReset},
-        {"camera_view", _cameraView},
+        {"camera", _camera},
         {nullptr, nullptr},
     };
     detail::luaMetatable(lua, PANEL_METATABLE, nullptr, {methods});

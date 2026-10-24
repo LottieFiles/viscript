@@ -16,7 +16,7 @@ A <code>shift</code> and a <code>fade</code> of the same object may overlap; two
 Breaking that rule fails with an error that names it.</p>
 <p>Because the result is a plain timeline, any frame can be sampled directly — drag the
 scrubber under the player.</p>
-<p>The last argument picks the curve: a preset name, or a cubic Bézier.</p>
+<p>The options table's <code>curve</code> field picks the timing curve: a preset name, or a cubic Bézier.</p>
 <table>
 <tr><th>Curve</th><th>Shape</th><th>Feels like</th></tr>
 <tr><td><code>"linear"</code></td><td>Constant speed</td><td>Mechanical; scanning, playheads</td></tr>
@@ -47,7 +47,7 @@ for i, curve in ipairs(curves) do
                 font = "JetBrainsMono", color = "muted"}
     scene:line {from = {-2, y}, to = {4, y}, stroke = "muted", width = 1, opacity = 0.3}
     local dot = scene:circle {center = {-2, y}, radius = 0.13, fill = "accent"}
-    moves[i] = function() scene:shift(dot, {6, 0}, 2, curve) end
+    moves[i] = function() scene:shift(dot, {6, 0}, {duration = 2, curve = curve}) end
 end
 
 scene:wait(0.3)
@@ -70,7 +70,7 @@ const moves = curves.map((curve, i) => {
                 font: "JetBrainsMono", color: "muted"});
     scene.line({from: [-2, y], to: [4, y], stroke: "muted", width: 1, opacity: 0.3});
     const dot = scene.circle({center: [-2, y], radius: 0.13, fill: "accent"});
-    return () => scene.shift(dot, [6, 0], 2, curve);
+    return () => scene.shift(dot, [6, 0], {duration: 2, curve: curve});
 });
 
 scene.wait(0.3);
@@ -111,11 +111,11 @@ local dot = scene:circle {center = {-3.4, -1.5}, radius = 0.55, fill = "warning"
 local bar = scene:rectangle {center = {0, -1.5}, size = {1.6, 0.5}, fill = "info"}
 local star = scene:circle {center = {3.4, -1.5}, radius = 0.45, fill = "accent"}
 
-scene:create(ring, 0.8)
-scene:draw_border_then_fill(box, 2)
+scene:create(ring, {duration = 0.8})
+scene:draw_border_then_fill(box, {duration = 2})
 scene:fade_in(card, {shift = {0, -0.4}, duration = 0.6})
-scene:grow_from_center(dot, 0.6)
-scene:grow_from_edge(bar, "left", 0.7)
+scene:grow_from_center(dot, {duration = 0.6})
+scene:grow_from_edge(bar, "left", {duration = 0.7})
 scene:indicate(star, {color = "danger", scale = 1.4, duration = 0.8})
 scene:wait(0.6)
 
@@ -140,11 +140,11 @@ const dot = scene.circle({center: [-3.4, -1.5], radius: 0.55, fill: "warning"});
 const bar = scene.rectangle({center: [0, -1.5], size: [1.6, 0.5], fill: "info"});
 const star = scene.circle({center: [3.4, -1.5], radius: 0.45, fill: "accent"});
 
-scene.create(ring, 0.8);
-scene.drawBorderThenFill(box, 2);
+scene.create(ring, {duration: 0.8});
+scene.drawBorderThenFill(box, {duration: 2});
 scene.fadeIn(card, {shift: [0, -0.4], duration: 0.6});
-scene.growFromCenter(dot, 0.6);
-scene.growFromEdge(bar, "left", 0.7);
+scene.growFromCenter(dot, {duration: 0.6});
+scene.growFromEdge(bar, "left", {duration: 0.7});
 scene.indicate(star, {color: "danger", scale: 1.4, duration: 0.8});
 scene.wait(0.6);
 
@@ -153,7 +153,7 @@ return scene;
 
 ### Staggering with lag
 
-Pass an array and a fourth argument, `lag`, to delay each item by that fraction of `duration`. The whole span is `duration × (1 + lag × (n − 1))` — here `0.8 × (1 + 0.25 × 5) = 1.8` s for the lower row, with starts 0.2 s apart.
+Pass an array and set `lag` in the options table to delay each item by that fraction of `duration`. The whole span is `duration × (1 + lag × (n − 1))` — here `0.8 × (1 + 0.25 × 5) = 1.8` s for the lower row, with starts 0.2 s apart.
 
 ```lua live
 local scene = vis.scene {}
@@ -165,8 +165,8 @@ for i = 1, 6 do
     staggered[i] = scene:circle {center = {x, -1}, radius = 0.4, fill = "warning"}
 end
 
-scene:draw_border_then_fill(together, 0.8)              -- lag 0: all at once
-scene:draw_border_then_fill(staggered, 0.8, "smooth", 0.25)  -- each starts 0.8 * 0.25 = 0.2 s later
+scene:draw_border_then_fill(together, {duration = 0.8})              -- lag 0: all at once
+scene:draw_border_then_fill(staggered, {duration = 0.8, curve = "smooth", lag = 0.25})  -- each starts 0.8 * 0.25 = 0.2 s later
 scene:wait(0.5)
 
 return scene
@@ -182,8 +182,8 @@ for (let i = 1; i <= 6; i++) {
     staggered.push(scene.circle({center: [x, -1], radius: 0.4, fill: "warning"}));
 }
 
-scene.drawBorderThenFill(together, 0.8);              // lag 0: all at once
-scene.drawBorderThenFill(staggered, 0.8, "smooth", 0.25);  // each starts 0.8 * 0.25 = 0.2 s later
+scene.drawBorderThenFill(together, {duration: 0.8});              // lag 0: all at once
+scene.drawBorderThenFill(staggered, {duration: 0.8, curve: "smooth", lag: 0.25});  // each starts 0.8 * 0.25 = 0.2 s later
 scene.wait(0.5);
 
 return scene;

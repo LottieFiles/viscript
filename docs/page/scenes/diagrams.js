@@ -3,7 +3,7 @@
 // the structure, tokens with identity travel along real edges, one short phrase names each step.
 import {PRELUDE as SHARED} from "./prelude.js";
 
-const PRELUDE = SHARED + `local function go(o, x, y, d, arc) scene:tween(toward(o, x, y, arc), d or 0.45, "smooth") end
+const PRELUDE = SHARED + `local function go(o, x, y, d, arc) scene:tween(toward(o, x, y, arc), {duration = d or 0.45, curve = "smooth"}) end
 `;
 
 // ---------------------------------------------------------------- 1. HTTP request lifecycle
@@ -35,7 +35,7 @@ d:connect {id = "query", from = N.server, to = N.db, from_port = "bottom", to_po
 local B = d:build()
 -- node label/detail Text come from the diagram (theme font = Pretendard)
 local body = {}
-for _, s in ipairs(spec) do body[s.id] = B:node_body(N[s.id]) end
+for _, s in ipairs(spec) do body[s.id] = B:body(N[s.id]) end
 -- park points beside a node, clear of the arrow tip
 local function side(id, dir)
     local s, g = P[id], 0.42
@@ -45,7 +45,7 @@ local function side(id, dir)
     else return s.x, s.y - H / 2 - 0.3 end
 end
 local function hop(o, id, dir, d, arc) local x, y = side(id, dir); go(o, x, y, d, arc) end
-local function mark(id, color) scene:stroke(body[id], color, 0.2) end
+local function mark(id, color) scene:stroke(body[id], color, {duration = 0.2}) end
 local TS = {size = {0.56, 0.3}, text = 13}
 local function tok(id, s, color, x, y)
     local o = token(id, s, x, y, {size = TS.size, text = TS.text, stroke = color})
@@ -89,7 +89,7 @@ hop(req, "server", "bottom", 0.45)
 together(function() scene:fade_out(req.g, {duration = 0.2}) end, function() mark("db", C.line) end)
 local resp = tok("resp1", "200", C.ok, req.x, req.y)
 say("5  store the row in cache", 2.9, 1.95, C.ok)
-local old = B:node_detail(N.cache)
+local old = B:detail(N.cache)
 local ox, oy = P.cache.x, P.cache.y - 0.29
 together(function() scene:fade_out(old, {duration = 0.2}) end, function() mark("cache", C.ok) end)
 local filled = T(scene, "node:cache:detail:filled", "users/7", ox, oy, 15, C.ok)
@@ -169,7 +169,7 @@ local function message(a, b)
     return {{a.x + SW / 2, a.y}, {ex, a.y}, {ex, ey}}
 end
 local function activate(st, color)
-    together(function() scene:stroke(st.box, color, 0.2) end, function() scene:fill(st.text, C.text, 0.2) end)
+    together(function() scene:stroke(st.box, color, {duration = 0.2}) end, function() scene:fill(st.text, C.text, {duration = 0.2}) end)
 end
 scene:wait(0.6)
 activate(steps[1], C.accent)
@@ -187,7 +187,7 @@ for i = 1, #steps - 1 do
     local a, b = steps[i], steps[i + 1]
     local pts = message(a, b)
     local r = scene:route {id = "msg:" .. i, points = pts, tip = 9, stroke = C.mute, width = 1.5, layer = L.edge}
-    scene:create(r, 0.45, "ease_out")
+    scene:create(r, {duration = 0.45, curve = "ease_out"})
     -- payload starts clear of the sender's box and stops before the receiver's
     local len = (pts[2][1] - pts[1][1]) + math.abs(pts[3][2] - pts[2][2])
     local f0, f1 = 0.45 / len, 1 - 0.36 / len
@@ -195,7 +195,7 @@ for i = 1, #steps - 1 do
     scene:fade_in(tk.g, {duration = 0.15})
     scene:move_along(tk.g, r, {from = f0, to = f1, duration = 0.8, curve = "smooth"})
     together(function() scene:fade_out(tk.g, {duration = 0.15}) end,
-             function() scene:stroke(a.box, C.mute, 0.2) end,
+             function() scene:stroke(a.box, C.mute, {duration = 0.2}) end,
              function() activate(b, i == #steps - 1 and C.ok or (i == 2 and C.warn or C.accent)) end,
              function()
                  local n = notes[i + 1]
@@ -206,7 +206,7 @@ for i = 1, #steps - 1 do
     scene:wait(i == 4 and 0.9 or 0.5)
 end
 -- the pending row from step 3 is the one the last step flips
-together(function() scene:stroke(steps[3].box, C.ok, 0.3) end, function() scene:stroke(steps[7].box, C.ok, 0.3) end)
+together(function() scene:stroke(steps[3].box, C.ok, {duration = 0.3}) end, function() scene:stroke(steps[7].box, C.ok, {duration = 0.3}) end)
 scene:wait(2.6)
 return scene`;
 
@@ -263,7 +263,7 @@ local function out(s, from)
     go(o, -4.75 + (outN - 1) * 0.6, -1.95, 0.55)
 end
 local function line(i)
-    scene:tween({target = cursor, position = {-3.25, code[i].y}, opacity = 1}, 0.25, "smooth")
+    scene:tween({target = cursor, position = {-3.25, code[i].y}, opacity = 1}, {duration = 0.25, curve = "smooth"})
 end
 local function cb(id, label, color, x, y)
     local o = token(id, label, x, y, {size = {1.1, 0.36}, text = 13, stroke = color})
@@ -310,7 +310,7 @@ f = push('log("D")')
 out("D", f)
 pop()
 -- script ends: stack empties, microtasks drain before the next task
-scene:fade(cursor, 0, 0.25)
+scene:fade(cursor, 0, {duration = 0.25})
 pop()
 say("stack empty: microtasks run first", SX, SY, C.alt, {0, 0.5})
 scene:wait(0.4)
@@ -365,7 +365,7 @@ local function newcommit(id, hash, lane, x, color, ...)
     for _, p in ipairs({...}) do es[#es + 1] = edge(p, c) end
     scene:set({target = c.g, opacity = 0})
     for _, e in ipairs(es) do scene:set({target = e, progress = 0}) end
-    for _, e in ipairs(es) do scene:create(e, 0.35, "ease_out") end
+    for _, e in ipairs(es) do scene:create(e, {duration = 0.35, curve = "ease_out"}) end
     scene:fade_in(c.g, {duration = 0.3})
     return c
 end
@@ -438,11 +438,11 @@ end
 d:connect {id = "test-report", from = N.test, to = N.report, from_port = "bottom", to_port = "top", route = "straight"}
 local B = d:build()
 local body = {}
-for _, s in ipairs(spec) do body[s.id] = B:node_body(N[s.id]) end
-body.report = B:node_body(N.report)
-local function mark(id, color, dur) scene:stroke(body[id], color, dur or 0.2) end
+for _, s in ipairs(spec) do body[s.id] = B:body(N[s.id]) end
+body.report = B:body(N.report)
+local function mark(id, color, dur) scene:stroke(body[id], color, {duration = dur or 0.2}) end
 -- test detail is the stage's state: swap its Text in place
-local det = B:node_detail(N.test)
+local det = B:detail(N.test)
 local detN = 0
 local function setTest(s, color)
     scene:fade_out(det, {duration = 0.15})
@@ -472,12 +472,12 @@ stage(r1, "test")
 together(function() mark("test", C.danger) end, function() setTest("1 failed", C.danger) end,
          function() say("test fails  pipeline stops", 0.95, 2.55, C.danger, {0, 0.5}) end)
 together(function() mark("report", C.danger, 0.3) end,
-         function() scene:fade(B:node(N.package), 0.35, 0.3) end, function() scene:fade(B:node(N.deploy), 0.35, 0.3) end)
+         function() scene:fade(B:object(N.package), 0.35, {duration = 0.3}) end, function() scene:fade(B:object(N.deploy), 0.35, {duration = 0.3}) end)
 scene:wait(1.6)
 -- run 2: the fix goes through every stage
 together(function() scene:fade_out(r1.g, {duration = 0.25}) end,
          function() for _, id in ipairs({"push", "build", "test", "report"}) do mark(id, C.line, 0.25) end end,
-         function() scene:fade(B:node(N.package), 1, 0.25) end, function() scene:fade(B:node(N.deploy), 1, 0.25) end,
+         function() scene:fade(B:object(N.package), 1, {duration = 0.25}) end, function() scene:fade(B:object(N.deploy), 1, {duration = 0.25}) end,
          function() say("run 2  fix pushed", -5.1, 2.55, C.warn, {0, 0.5}) end)
 setTest("unit tests", C.mute)
 local r2 = run("b7c2", C.ok)
@@ -530,14 +530,14 @@ local function flow(dur, speed)
     for _, id in ipairs(ORDER) do
         offset[id] = (offset[id] or 0) - (speed and speed[id] or 48) * dur
         local o = offset[id]
-        tracks[#tracks + 1] = function() scene:tween({target = E[id], dash_offset = o}, dur, "linear") end
+        tracks[#tracks + 1] = function() scene:tween({target = E[id], dash_offset = o}, {duration = dur, curve = "linear"}) end
     end
     together(table.unpack(tracks))
 end
 local function tint(ids, color)
     local tracks = {}
     for _, id in ipairs(ids) do
-        tracks[#tracks + 1] = function() scene:stroke(E[id], color, 0.3) end
+        tracks[#tracks + 1] = function() scene:stroke(E[id], color, {duration = 0.3}) end
     end
     together(table.unpack(tracks))
 end
@@ -549,14 +549,14 @@ tint(ORDER, C.accent)
 flow(3)
 -- 2. a spike: sources speed up, but the single worker cannot keep pace with the dashboard
 say("traffic spike  dashboard lags", 0, 2.55, C.warn)
-together(function() tint({"dashboard"}, C.warn) end, function() scene:stroke(box.dashboard, C.warn, 0.3) end)
+together(function() tint({"dashboard"}, C.warn) end, function() scene:stroke(box.dashboard, C.warn, {duration = 0.3}) end)
 flow(3, {clicks = 96, orders = 96, sensors = 96, read = 60, warehouse = 48, dashboard = 14})
 -- 3. a second worker joins and the whole path runs fast
 together(function() scene:fade_out(jobDetail, {duration = 0.2}) end,
          function() scene:fade_in(T(scene, "job:detail2", "2 workers", 1.4, -0.18, 13, C.ok), {duration = 0.3}) end,
-         function() scene:stroke(box.job, C.ok, 0.3) end,
+         function() scene:stroke(box.job, C.ok, {duration = 0.3}) end,
          function() say("second worker  caught up", 0, 2.55, C.ok) end)
-together(function() tint({"dashboard"}, C.accent) end, function() scene:stroke(box.dashboard, C.line, 0.3) end)
+together(function() tint({"dashboard"}, C.accent) end, function() scene:stroke(box.dashboard, C.line, {duration = 0.3}) end)
 flow(3.4, {clicks = 96, orders = 96, sensors = 96, read = 96, warehouse = 72, dashboard = 72})
 return scene`;
 

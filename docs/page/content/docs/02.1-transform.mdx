@@ -16,9 +16,9 @@ local scene = vis.scene {}
 local box = scene:rectangle {center = {-3, -1}, size = {1, 1}, corner = 0.15, fill = "accent"}
 
 -- each shift is relative to where the box is now
-scene:shift(box, {6, 0}, 1)
-scene:shift(box, {0, 2}, 0.8)
-scene:shift(box, {-3, 0}, 0.8, "back")
+scene:shift(box, {6, 0}, {duration = 1})
+scene:shift(box, {0, 2}, {duration = 0.8})
+scene:shift(box, {-3, 0}, {duration = 0.8, curve = "back"})
 scene:wait(0.4)
 
 return scene
@@ -30,9 +30,9 @@ const scene = vis.scene();
 const box = scene.rectangle({center: [-3, -1], size: [1, 1], corner: 0.15, fill: "accent"});
 
 // each shift is relative to where the box is now
-scene.shift(box, [6, 0], 1);
-scene.shift(box, [0, 2], 0.8);
-scene.shift(box, [-3, 0], 0.8, "back");
+scene.shift(box, [6, 0], {duration: 1});
+scene.shift(box, [0, 2], {duration: 0.8});
+scene.shift(box, [-3, 0], {duration: 0.8, curve: "back"});
 scene.wait(0.4);
 
 return scene;
@@ -169,7 +169,7 @@ local box = scene:rectangle {size = {2, 2}, fill = "accent"}
 scene:transform(box, {1, 0.6, 0, 0,
                       0, 1,   0, 0,
                       0, 0,   1, 0,
-                      0, 0,   0, 1}, 1.2)
+                      0, 0,   0, 1}, {duration = 1.2})
 scene:wait(0.6)
 
 return scene
@@ -184,7 +184,7 @@ const box = scene.rectangle({size: [2, 2], fill: "accent"});
 scene.transform(box, [1, 0.6, 0, 0,
                       0, 1,   0, 0,
                       0, 0,   1, 0,
-                      0, 0,   0, 1], 1.2);
+                      0, 0,   0, 1], {duration: 1.2});
 scene.wait(0.6);
 
 return scene;

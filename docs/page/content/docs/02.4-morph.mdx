@@ -25,7 +25,7 @@ end
 local source = scene:polygon {points = ring, fill = "accent"}
 local target = scene:polygon {points = star, fill = "warning"}
 
-scene:morph(source, target, 1.5, "smooth")
+scene:morph(source, target, {duration = 1.5, curve = "smooth"})
 scene:wait(0.3)
 
 return scene
@@ -45,7 +45,7 @@ for (let i = 0; i <= 9; i++) {
 const source = scene.polygon({points: ring, fill: "accent"});
 const target = scene.polygon({points: star, fill: "warning"});
 
-scene.morph(source, target, 1.5, "smooth");
+scene.morph(source, target, {duration: 1.5, curve: "smooth"});
 scene.wait(0.3);
 
 return scene;
@@ -68,11 +68,11 @@ local function ngon(cx, cy, r, n)
 end
 
 local source = scene:polygon {points = ngon(-3.5, 0, 0.9, 6), fill = "accent"}
-scene:grow_from_center(source, 0.5)
+scene:grow_from_center(source, {duration = 0.5})
 
 for i, n in ipairs({3, 4, 5}) do
     local target = scene:polygon {points = ngon(2.5, 3.4 - i * 1.7, 0.6, n), fill = "warning"}
-    scene:morph(source, target, 1, "smooth", {copy = true})
+    scene:morph(source, target, {duration = 1, curve = "smooth", copy = true})
 end
 scene:wait(0.6)
 
@@ -88,11 +88,11 @@ const ngon = (cx, cy, r, n) => Array.from({length: n}, (_, i) => {
 });
 
 const source = scene.polygon({points: ngon(-3.5, 0, 0.9, 6), fill: "accent"});
-scene.growFromCenter(source, 0.5);
+scene.growFromCenter(source, {duration: 0.5});
 
 [3, 4, 5].forEach((n, i) => {
     const target = scene.polygon({points: ngon(2.5, 3.4 - (i + 1) * 1.7, 0.6, n), fill: "warning"});
-    scene.morph(source, target, 1, "smooth", {copy: true});
+    scene.morph(source, target, {duration: 1, curve: "smooth", copy: true});
 });
 scene.wait(0.6);
 

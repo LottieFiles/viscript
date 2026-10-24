@@ -19,11 +19,11 @@ function bars(vals, x0, x1, base, hmax) {
     }
     return [B, w];
 }
-const paint = (list, color, d) => scene.parallel(...list.map((b) => () => scene.fill(b.r, color, d ?? 0.14)));
+const paint = (list, color, d) => scene.parallel(...list.map((b) => () => scene.fill(b.r, color, {duration: d ?? 0.14})));
 function swap(B, i, j, w, d) {
     const a = B[i], b = B[j];
     scene.tween([{target: a.g, shift: [(j - i) * w, 0], arc: -Math.PI / 2},
-                {target: b.g, shift: [(i - j) * w, 0], arc: -Math.PI / 2}], d ?? 0.32, "smooth");
+                {target: b.g, shift: [(i - j) * w, 0], arc: -Math.PI / 2}], {duration: d ?? 0.32, curve: "smooth"});
     B[i] = b; B[j] = a;
 }
 `;
@@ -72,7 +72,7 @@ for (const e of TRACE) {
     } else if (e.kind === "settle") {
         const wx = x0 + (e.i - 1) * w;
         together(() => paint([B[e.i]], C.ok, 0.2),
-                 () => scene.shift(wall, [wx - wallX, 0], 0.3, "smooth"),
+                 () => scene.shift(wall, [wx - wallX, 0], {duration: 0.3, curve: "smooth"}),
                  () => {
                      if (!seen.settle) say("largest settles", X(e.i), base + B[e.i].h + 0.3, C.ok);
                      else say(null);
@@ -82,7 +82,7 @@ for (const e of TRACE) {
     } else {
         const rest = B.slice(1, e.upto + 1);
         together(() => paint(rest, C.ok, 0.3),
-                 () => scene.fade(wall, 0, 0.3),
+                 () => scene.fade(wall, 0, {duration: 0.3}),
                  () => {
                      if (rest.length > 1) say("no swaps  sorted", X(1) + w * (e.upto - 1) / 2, cueY, C.ok);
                      else say(null);
@@ -118,13 +118,13 @@ paint([B[1]], C.ok, 0.25);
 TRACE.forEach((e, index) => {
     const step = index + 1;
     const cur = B[e.i];
-    together(() => scene.fill(cur.r, C.accent, 0.15),
-             () => scene.shift(cur.g, [0, lift], 0.28, "smooth"),
+    together(() => scene.fill(cur.r, C.accent, {duration: 0.15}),
+             () => scene.shift(cur.g, [0, lift], {duration: 0.28, curve: "smooth"}),
              () => { if (step === 1) say("key", X(e.i), base + cur.h + lift + 0.3, C.accent); else say(null); });
     let pos = e.i;
     e.shifts.forEach((s, k) => {
-        together(() => scene.shift(B[s.from].g, [w, 0], 0.28, "smooth"),
-                 () => scene.shift(cur.g, [-w, 0], 0.28, "smooth"),
+        together(() => scene.shift(B[s.from].g, [w, 0], {duration: 0.28, curve: "smooth"}),
+                 () => scene.shift(cur.g, [-w, 0], {duration: 0.28, curve: "smooth"}),
                  () => {
                      if (step === 1 && k === 0) say(s.v + " > " + e.key + "  shift right", X(s.from), base + B[s.from].h + 0.35);
                      else if (step === 1) say(null);
@@ -132,8 +132,8 @@ TRACE.forEach((e, index) => {
         B[pos] = B[s.from];
         pos = s.from;
     });
-    together(() => scene.shift(cur.g, [0, -lift], 0.28, "smooth"),
-             () => scene.fill(cur.r, C.ok, 0.2),
+    together(() => scene.shift(cur.g, [0, -lift], {duration: 0.28, curve: "smooth"}),
+             () => scene.fill(cur.r, C.ok, {duration: 0.2}),
              () => { if (step === 1) say(null); });
     B[pos] = cur;
     scene.wait(0.1);
@@ -161,7 +161,7 @@ let fid = 0;
 function push(lo, hi) {
     fid++;
     const y = 1.2 - frames.length * step;
-    if (frames.length) scene.stroke(frames.at(-1).b, C.line, 0.1);
+    if (frames.length) scene.stroke(frames.at(-1).b, C.line, {duration: 0.1});
     const f = token("frame:" + fid, "quick_sort(" + (lo - 1) + ".." + (hi - 1) + ")", 3.4, y,
                     {size: [2.9, step * 0.84], width: 1.2, text: 13, layer: L.subject});
     scene.fadeIn(f.g, {shift: [0.25, 0], duration: 0.22});
@@ -170,7 +170,7 @@ function push(lo, hi) {
 function pop() {
     const f = frames.pop();
     scene.fadeOut(f.g, {shift: [0.25, 0], duration: 0.2});
-    if (frames.length) scene.stroke(frames.at(-1).b, C.accent, 0.1);
+    if (frames.length) scene.stroke(frames.at(-1).b, C.accent, {duration: 0.1});
 }
 // pivot height line across the active range
 const th = scene.rectangle({id: "pivot-line", center: [(x0 + x1) / 2, base], size: [x1 - x0, 0.03],
@@ -178,14 +178,14 @@ const th = scene.rectangle({id: "pivot-line", center: [(x0 + x1) / 2, base], siz
 scene.set({target: th, opacity: 0});
 function threshold(lo, hi, v) {
     const cx = x0 + (lo - 1 + hi) / 2 * w, y = base + v / maxv * hmax;
-    scene.tween({target: th, position: [cx, y], size: [(hi - lo + 1) * w, 0.03], opacity: 0.9}, 0.3, "smooth");
+    scene.tween({target: th, position: [cx, y], size: [(hi - lo + 1) * w, 0.03], opacity: 0.9}, {duration: 0.3, curve: "smooth"});
 }
 // scan pointers: i = end of the < pivot zone, j = scanner
 const pi = T(scene, "ptr:i", "i", X(1), base - 0.6, 14, C.accent);
 const pj = T(scene, "ptr:j", "j", X(1), base - 0.9, 14, C.warn);
 scene.set({target: pi, opacity: 0}); scene.set({target: pj, opacity: 0});
 let ip = 1, jp = 1;
-const mv = (t, from, to) => { if (from !== to) scene.shift(t, [(to - from) * w, 0], 0.18, "smooth"); };
+const mv = (t, from, to) => { if (from !== to) scene.shift(t, [(to - from) * w, 0], {duration: 0.18, curve: "smooth"}); };
 function qs(lo, hi) {
     push(lo, hi);
     if (lo >= hi) {
@@ -194,7 +194,7 @@ function qs(lo, hi) {
     }
     together(() => paint([B[hi]], C.alt, 0.18), () => threshold(lo, hi, vals[hi]),
              () => mv(pi, ip, lo), () => mv(pj, jp, lo),
-             () => scene.fade(pi, 1, 0.2), () => scene.fade(pj, 1, 0.2));
+             () => scene.fade(pi, 1, {duration: 0.2}), () => scene.fade(pj, 1, {duration: 0.2}));
     ip = lo; jp = lo;
     let i = lo;
     for (let j = lo; j <= hi - 1; j++) {
@@ -211,8 +211,8 @@ function qs(lo, hi) {
     if (i !== hi) { swap(B, i, hi, w, 0.4); [vals[i], vals[hi]] = [vals[hi], vals[i]]; }
     const reset = [];
     for (let k = lo; k <= hi; k++) if (k !== i) reset.push(B[k]);
-    together(() => paint(reset, C.bar, 0.15), () => scene.fill(B[i].r, C.ok, 0.2),
-             () => scene.fade(th, 0, 0.2), () => scene.fade(pi, 0, 0.2), () => scene.fade(pj, 0, 0.2));
+    together(() => paint(reset, C.bar, 0.15), () => scene.fill(B[i].r, C.ok, {duration: 0.2}),
+             () => scene.fade(th, 0, {duration: 0.2}), () => scene.fade(pi, 0, {duration: 0.2}), () => scene.fade(pj, 0, {duration: 0.2}));
     qs(lo, i - 1);
     qs(i + 1, hi);
     pop();
@@ -240,15 +240,15 @@ function merge(lo, mid, hi) {
     let a = lo, b = mid + 1, k = lo;
     const tmp = [];
     const take = (col) => {
-        scene.tween([{target: B[col].g, shift: [(k - col) * w, drop]}, {target: B[col].r, stroke: C.none}], 0.3, "smooth");
+        scene.tween([{target: B[col].g, shift: [(k - col) * w, drop]}, {target: B[col].r, stroke: C.none}], {duration: 0.3, curve: "smooth"});
         tmp[k] = {b: B[col], v: vals[col]};
         k++;
     };
     while (a <= mid && b <= hi) {
-        scene.tween([{target: B[a].r, stroke: C.text, width: 2}, {target: B[b].r, stroke: C.text, width: 2}], 0.15);
+        scene.tween([{target: B[a].r, stroke: C.text, width: 2}, {target: B[b].r, stroke: C.text, width: 2}], {duration: 0.15});
         scene.wait(0.12);
-        if (vals[a] <= vals[b]) { scene.stroke(B[b].r, C.none, 0.08); take(a); a++; }
-        else { scene.stroke(B[a].r, C.none, 0.08); take(b); b++; }
+        if (vals[a] <= vals[b]) { scene.stroke(B[b].r, C.none, {duration: 0.08}); take(a); a++; }
+        else { scene.stroke(B[a].r, C.none, {duration: 0.08}); take(b); b++; }
     }
     while (a <= mid) { take(a); a++; }
     while (b <= hi) { take(b); b++; }
@@ -257,7 +257,7 @@ function merge(lo, mid, hi) {
         up.push({target: tmp[c].b.g, shift: [0, -drop]});
         B[c] = tmp[c].b; vals[c] = tmp[c].v;
     }
-    scene.tween(up, 0.35, "smooth");
+    scene.tween(up, {duration: 0.35, curve: "smooth"});
     paint(B.slice(lo, hi + 1), lo === 1 && hi === n ? C.ok : C.bar, 0.15);
 }
 function ms(lo, hi) {
@@ -311,12 +311,12 @@ const pmid = T(scene, "ptr:mid", "mid", X(1), y + 0.65, 13, C.warn);
 scene.set({target: pmid, opacity: 0});
 scene.wait(0.5);
 for (const e of TRACE) {
-    together(() => scene.tween({target: pmid, position: [X(e.mid), y + 0.65], opacity: 1}, 0.35, "smooth"),
-             () => scene.tween({target: box[e.mid], stroke: C.warn}, 0.25));
+    together(() => scene.tween({target: pmid, position: [X(e.mid), y + 0.65], opacity: 1}, {duration: 0.35, curve: "smooth"}),
+             () => scene.tween({target: box[e.mid], stroke: C.warn}, {duration: 0.25}));
     const v = arr[e.mid];
     const rel = e.verdict === "hit" ? "=" : e.verdict === "right" ? "<" : ">";
     if (e.verdict === "hit") {
-        together(() => scene.tween({target: box[e.mid], fill: "#7ee78733", stroke: C.ok}, 0.35),
+        together(() => scene.tween({target: box[e.mid], fill: "#7ee78733", stroke: C.ok}, {duration: 0.35}),
                  () => say(v + " = " + target + "  found at index " + (e.mid - 1), X(e.mid), y + 1.1, C.ok));
         scene.indicate(box[e.mid], {color: C.ok, scale: 1.12, duration: 0.6});
         break;
@@ -334,11 +334,11 @@ for (const e of TRACE) {
     }
     const ncx = (X(nlo) + X(nhi)) / 2;
     scene.parallel(
-        () => scene.tween({target: win, position: [ncx, y], size: [winW(nlo, nhi) + 0.08, 0.8]}, 0.45, "smooth"),
-        () => { if (nlo !== wlo) scene.shift(plo, [(nlo - wlo) * w, 0], 0.45, "smooth"); },
-        () => { if (nhi !== whi) scene.shift(phi, [(nhi - whi) * w, 0], 0.45, "smooth"); },
-        () => scene.stroke(box[e.mid], C.line, 0.2),
-        ...dim.map((k) => () => scene.fade(cells[k], 0.25, 0.3)),
+        () => scene.tween({target: win, position: [ncx, y], size: [winW(nlo, nhi) + 0.08, 0.8]}, {duration: 0.45, curve: "smooth"}),
+        () => { if (nlo !== wlo) scene.shift(plo, [(nlo - wlo) * w, 0], {duration: 0.45, curve: "smooth"}); },
+        () => { if (nhi !== whi) scene.shift(phi, [(nhi - whi) * w, 0], {duration: 0.45, curve: "smooth"}); },
+        () => scene.stroke(box[e.mid], C.line, {duration: 0.2}),
+        ...dim.map((k) => () => scene.fade(cells[k], 0.25, {duration: 0.3})),
     );
     wlo = nlo; whi = nhi;
 }
@@ -378,7 +378,7 @@ function strip(id, label, x0, y) {
             const o = items.shift();
             const d = items.map((q) => toward(q, q.x - w, q.y));
             scene.parallel(() => scene.fadeOut(o.g, {shift: [-0.3, 0], duration: 0.25}),
-                           () => { if (d.length) scene.tween(d, 0.25, "smooth"); });
+                           () => { if (d.length) scene.tween(d, {duration: 0.25, curve: "smooth"}); });
         },
         popBack() {
             const o = items.pop();
@@ -393,25 +393,25 @@ const Q = strip("queue", "QUEUE", -5.1, -2.45);
 const queue = ["A"];
 const seen = {A: true};
 scene.wait(0.3);
-scene.tween({target: N.A, stroke: C.warn}, 0.2);
+scene.tween({target: N.A, stroke: C.warn}, {duration: 0.2});
 Q.push("A");
 while (queue.length) {
     const node = queue.shift();
     together(() => Q.popFront(),
-             () => scene.tween({target: N[node], fill: "#1b3350", stroke: C.accent}, 0.25));
+             () => scene.tween({target: N[node], fill: "#1b3350", stroke: C.accent}, {duration: 0.25}));
     for (const nb of ADJ[node]) {
-        scene.stroke(E[ekey(node, nb)], C.warn, 0.15);
+        scene.stroke(E[ekey(node, nb)], C.warn, {duration: 0.15});
         if (!seen[nb]) {
             seen[nb] = true;
-            together(() => scene.tween({target: N[nb], stroke: C.warn}, 0.2),
-                     () => scene.tween({target: E[ekey(node, nb)], stroke: C.accent, width: 4}, 0.2));
+            together(() => scene.tween({target: N[nb], stroke: C.warn}, {duration: 0.2}),
+                     () => scene.tween({target: E[ekey(node, nb)], stroke: C.accent, width: 4}, {duration: 0.2}));
             Q.push(nb);
             queue.push(nb);
         } else {
-            scene.stroke(E[ekey(node, nb)], C.line, 0.12);
+            scene.stroke(E[ekey(node, nb)], C.line, {duration: 0.12});
         }
     }
-    scene.tween({target: N[node], fill: "#1c3a26", stroke: C.ok}, 0.2);
+    scene.tween({target: N[node], fill: "#1c3a26", stroke: C.ok}, {duration: 0.2});
 }
 scene.wait(2.4);
 return scene;`;
@@ -422,17 +422,17 @@ const seen = {};
 function dfs(node, parent) {
     S.push(node);
     seen[node] = true;
-    scene.tween({target: N[node], fill: "#1b3350", stroke: C.accent}, 0.25);
+    scene.tween({target: N[node], fill: "#1b3350", stroke: C.accent}, {duration: 0.25});
     for (const nb of ADJ[node]) {
-        if (nb !== parent) scene.stroke(E[ekey(node, nb)], C.warn, 0.15);
+        if (nb !== parent) scene.stroke(E[ekey(node, nb)], C.warn, {duration: 0.15});
         if (!seen[nb]) {
-            scene.tween({target: E[ekey(node, nb)], stroke: C.accent, width: 4}, 0.2);
+            scene.tween({target: E[ekey(node, nb)], stroke: C.accent, width: 4}, {duration: 0.2});
             dfs(nb, node);
         } else if (nb !== parent) {
-            scene.stroke(E[ekey(node, nb)], C.line, 0.12);
+            scene.stroke(E[ekey(node, nb)], C.line, {duration: 0.12});
         }
     }
-    scene.tween({target: N[node], fill: "#1c3a26", stroke: C.ok}, 0.2);
+    scene.tween({target: N[node], fill: "#1c3a26", stroke: C.ok}, {duration: 0.2});
     S.popBack();
 }
 scene.wait(0.3);
@@ -489,37 +489,37 @@ function sweep(depth, color) {
     for (let d = 0; d <= rows; d++) {
         const row = [];
         for (let v = 1; v <= n; v++) if (depth[v] === d) row.push({target: node[v].b, stroke: color});
-        scene.tween(row, 0.18);
+        scene.tween(row, {duration: 0.18});
     }
     return deepest;
 }
 function reset() {
     const all = [];
     for (let v = 1; v <= n; v++) all.push({target: node[v].b, stroke: C.line, fill: C.panel});
-    scene.tween(all, 0.25);
+    scene.tween(all, {duration: 0.25});
 }
 
 scene.wait(0.4);
 say("hold any node — the rest hangs below", 0, -2.75, C.mute, [0.5, 0.5]);
 const [, depth] = hang(3);
 const a = sweep(depth, C.accent);
-scene.tween({target: node[a].b, stroke: C.danger, fill: "#3a1d1d"}, 0.3);
+scene.tween({target: node[a].b, stroke: C.danger, fill: "#3a1d1d"}, {duration: 0.3});
 say("the lowest node is one end of the diameter", 0, -2.75, C.danger, [0.5, 0.5]);
 scene.wait(0.8);
 
 // pick that node up: every node falls into its new row at once
 reset();
-scene.tween({target: node[a].b, stroke: C.danger, fill: "#3a1d1d"}, 0.2);
+scene.tween({target: node[a].b, stroke: C.danger, fill: "#3a1d1d"}, {duration: 0.2});
 const [pos2, depth2, parent2] = hang(a);
 const moves = [];
 for (let v = 1; v <= n; v++) moves.push(toward(node[v], pos2[v][0], pos2[v][1]));
 moves.push({target: hand, from: [pos2[a][0], 3.2], to: [pos2[a][0], pos2[a][1] + 0.24]});
 say("pick it up", 0, -2.75, C.danger, [0.5, 0.5]);
-scene.tween(moves, 1.4, "ease_in_out");
+scene.tween(moves, {duration: 1.4, curve: "ease_in_out"});
 scene.wait(0.3);
 
 const b = sweep(depth2, C.accent);
-scene.tween({target: node[b].b, stroke: C.ok, fill: "#1c3a26"}, 0.3);
+scene.tween({target: node[b].b, stroke: C.ok, fill: "#1c3a26"}, {duration: 0.3});
 
 // the path from the bottom back up to the hand is the diameter
 const path = [];
@@ -529,7 +529,7 @@ for (let v = b; parent2[v]; v = parent2[v]) {
             path.push({target: link[i], stroke: C.warn, width: 4});
     });
 }
-scene.tween(path, 0.5);
+scene.tween(path, {duration: 0.5});
 
 // measure top to bottom
 const mx = 4.6;
@@ -538,8 +538,8 @@ const ticks = [
     scene.line({id: "tick:top", from: [mx - 0.2, pos2[a][1]], to: [mx + 0.2, pos2[a][1]], stroke: C.warn, width: 2, layer: L.label}),
     scene.line({id: "tick:bottom", from: [mx - 0.2, pos2[b][1]], to: [mx + 0.2, pos2[b][1]], stroke: C.warn, width: 2, layer: L.label}),
 ];
-scene.create(ticks, 0.25);
-scene.create(ruler, 0.6);
+scene.create(ticks, {duration: 0.25});
+scene.create(ruler, {duration: 0.6});
 say("diameter = " + depth2[b] + " edges", mx - 0.35, (pos2[a][1] + pos2[b][1]) / 2, C.warn, [1, 0.5]);
 scene.wait(2.4);
 return scene;`;
@@ -570,14 +570,14 @@ const a1 = scene.curve({id: "read:1", from: [X(1), y + 0.32], control1: [X(1), y
 const a2 = scene.curve({id: "read:2", from: [X(0), y + 0.32], control1: [X(0), y + 1.35], control2: [X(2) + 0.12, y + 1.35],
                         to: [X(2) + 0.12, y + 0.34], stroke: C.alt, width: 2, layer: L.edge});
 for (let i = 2; i <= n; i++) {
-    const reads = () => scene.tween([{target: cells[i - 1], stroke: C.accent}, {target: cells[i - 2], stroke: C.alt}], 0.2);
-    if (i === 2) together(reads, () => scene.create([a1, a2], 0.4, "smooth"));
-    else together(reads, () => scene.tween([{target: a1, shift: [w, 0]}, {target: a2, shift: [w, 0]}], 0.35, "smooth"));
+    const reads = () => scene.tween([{target: cells[i - 1], stroke: C.accent}, {target: cells[i - 2], stroke: C.alt}], {duration: 0.2});
+    if (i === 2) together(reads, () => scene.create([a1, a2], {duration: 0.4, curve: "smooth"}));
+    else together(reads, () => scene.tween([{target: a1, shift: [w, 0]}, {target: a2, shift: [w, 0]}], {duration: 0.35, curve: "smooth"}));
     put(i);
     scene.tween([{target: cells[i - 1], stroke: C.line}, {target: cells[i - 2], stroke: C.line},
-                {target: cells[i], stroke: C.ok}], 0.2);
+                {target: cells[i], stroke: C.ok}], {duration: 0.2});
 }
-scene.uncreate([a1, a2], 0.3);
+scene.uncreate([a1, a2], {duration: 0.3});
 say("dp[" + n + "] = " + dp[n], X(n), y - 1.05, C.ok);
 scene.indicate(cells[n], {color: C.ok, scale: 1.1, duration: 0.6});
 scene.wait(2.4);

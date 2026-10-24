@@ -52,7 +52,7 @@ try {
         "s:vector {value={1,0}, buff=1}",
         "s:brace {from={0,0}, to={1,0}, buff=1}",
         "s:rectangle {size={1,1}, buff=1}",
-        "local l=s:line {from={0,0}, to={1,0}} s:tween({target=l, buff=1}, 1)",
+        "local l=s:line {from={0,0}, to={1,0}} s:tween({target=l, buff=1}, {duration = 1})",
         "local l=s:line {from={0,0}, to={1,0}} local t=s:tracker(0) s:bind(l,t,function(v) return {buff=v} end)",
     ]) {
         assert.throws(() => runtimes[0].load(`local s=vis.scene{} ${body} return s`),

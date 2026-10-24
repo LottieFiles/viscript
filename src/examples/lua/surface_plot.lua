@@ -48,7 +48,7 @@ local surface = scene:surface {
     width = 0.75,
     id = "gaussian-surface",
 }
-scene:create(surface, 1.0, "gentle")
-scene:look({ eye = { -5.4, 4.8, 6.0 } }, 1.2, "ease_in_out")
+scene:create(surface, {duration = 1.0, curve = "gentle"})
+scene:look({ eye = { -5.4, 4.8, 6.0 } }, {duration = 1.2, curve = "ease_in_out"})
 scene:wait(0.8)
 return scene

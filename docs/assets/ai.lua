@@ -75,30 +75,30 @@ local function seq(t) local o = {} for _, l in ipairs(t) do for _, d in ipairs(l
 scene:focus(agentP, {padding = 0.08, duration = 0.01})
 -- Beat 1: prompt → draft.
 scene:wait(0.5)
-scene:tween(seq({{{target = r1, opacity = 1}, {target = r1t, opacity = 1}}, pillOn(1, true)}), 0.3, "ease_out")
+scene:tween(seq({{{target = r1, opacity = 1}, {target = r1t, opacity = 1}}, pillOn(1, true)}), {duration = 0.3, curve = "ease_out"})
 scene:focus({agentP[1], agentP[2], codeP[1], codeP[2]}, {padding = 0.08, duration = 0.6, curve = "ease_in_out"})
 scene:set({target = listing, opacity = 1})
-scene:write(listing, 1.4)
-scene:tween({{target = leaf, fill = "accent"}, {target = ball, opacity = 1}}, 0.3, "ease_out")
+scene:write(listing, {duration = 1.4})
+scene:tween({{target = leaf, fill = "accent"}, {target = ball, opacity = 1}}, {duration = 0.3, curve = "ease_out"})
 scene:focus({codeP[1], codeP[2], sceneP[1], sceneP[2]}, {padding = 0.08, duration = 0.6, curve = "ease_in_out"})
 -- Beat 2: check.
-scene:tween(seq({pillOn(1, false), pillOn(2, true)}), 0.25)
-scene:tween({target = okText, opacity = 1}, 0.25, "ease_out")
+scene:tween(seq({pillOn(1, false), pillOn(2, true)}), {duration = 0.25})
+scene:tween({target = okText, opacity = 1}, {duration = 0.25, curve = "ease_out"})
 scene:wait(0.3)
 -- Beat 3: render — changing a property animates it; push in on the scene.
-scene:tween(seq({pillOn(2, false), pillOn(3, true)}), 0.25)
+scene:tween(seq({pillOn(2, false), pillOn(3, true)}), {duration = 0.25})
 scene:focus(sceneP, {padding = 0.08, duration = 0.6, curve = "ease_in_out"})
 scene:parallel(
-  function() scene:shift(ball, {3.2, 0}, 1.0, "ease_in_out") end,
-  function() scene:tween({target = center, text = "center = { 2, 0}", fill = "accent"}, 1.0, "ease_in_out") end)
-scene:tween({{target = center, fill = "muted"}}, 0.2)
-scene:tween(seq({pillOn(3, false)}), 0.2)
+  function() scene:shift(ball, {3.2, 0}, {duration = 1.0, curve = "ease_in_out"}) end,
+  function() scene:tween({target = center, text = "center = { 2, 0}", fill = "accent"}, {duration = 1.0, curve = "ease_in_out"}) end)
+scene:tween({{target = center, fill = "muted"}}, {duration = 0.2})
+scene:tween(seq({pillOn(3, false)}), {duration = 0.2})
 -- Beat 4: refine; pull back to see the whole loop.
 scene:focus(nil, {duration = 0.8, curve = "ease_in_out"})
-scene:tween({{target = p2, opacity = 1}, {target = p2t, opacity = 1}}, 0.3, "ease_out")
+scene:tween({{target = p2, opacity = 1}, {target = p2t, opacity = 1}}, {duration = 0.3, curve = "ease_out"})
 local edited = scene:edit(listing, {replace = "\"accent\"", with = "\"#ff6a00\""})
-scene:tween(seq({{{target = r2, opacity = 1}, {target = r2t, opacity = 1}}, pillOn(3, true)}), 0.25)
-scene:tween({{target = ball, fill = "#ff6a00"}, {target = fill, text = "fill   = #ff6a00", fill = "#ff6a00"}}, 0.4, "ease_out")
-scene:tween(seq({pillOn(3, false), {{target = fill, fill = "muted"}}}), 0.3)
+scene:tween(seq({{{target = r2, opacity = 1}, {target = r2t, opacity = 1}}, pillOn(3, true)}), {duration = 0.25})
+scene:tween({{target = ball, fill = "#ff6a00"}, {target = fill, text = "fill   = #ff6a00", fill = "#ff6a00"}}, {duration = 0.4, curve = "ease_out"})
+scene:tween(seq({pillOn(3, false), {{target = fill, fill = "muted"}}}), {duration = 0.3})
 scene:wait(1.2)
 return scene

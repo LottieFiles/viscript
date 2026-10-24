@@ -41,13 +41,13 @@ scene:set({target = goal, opacity = 0})
 
 -- Timeline: type the prompt, then the agent's scene appears and runs.
 scene:wait(0.2)
-scene:write(prompt, 1.6)
+scene:write(prompt, {duration = 1.6})
 scene:wait(0.3)
-scene:tween({{target = goal, opacity = 1}, {target = range, opacity = 1}}, 0.3)
+scene:tween({{target = goal, opacity = 1}, {target = range, opacity = 1}}, {duration = 0.3})
 local show = {}
 for i, h in ipairs(all) do show[i] = {target = h, opacity = 1} end
-scene:tween(show, 0.5)
-scene:tween({target = mid, opacity = 1}, 0.2)
+scene:tween(show, {duration = 0.5})
+scene:tween({target = mid, opacity = 1}, {duration = 0.2})
 local plo, phi = 1, #DATA
 for k, s in ipairs(trace) do
   if k > 1 then
@@ -56,15 +56,15 @@ for k, s in ipairs(trace) do
     for i = plo, phi do if i < s.lo or i > s.hi then dims[#dims + 1] = {target = cells[i], opacity = 0.25}; dims[#dims + 1] = {target = nums[i], opacity = 0.25} end end
     dims[#dims + 1] = {target = range, size = {w, 1.04}, position = {(cx(s.lo) + cx(s.hi)) / 2, Y}}
     dims[#dims + 1] = {target = mid, shift = {cx(s.mid) - cx(trace[k - 1].mid), 0}}
-    scene:tween(dims, 0.6, "ease_in_out")
+    scene:tween(dims, {duration = 0.6, curve = "ease_in_out"})
   end
   scene:tween({{target = cells[s.mid], fill = "warning", stroke = "warning"},
-              {target = nums[s.mid], fill = "background"}}, 0.25)
+              {target = nums[s.mid], fill = "background"}}, {duration = 0.25})
   scene:wait(0.35)
   if DATA[s.mid] == TARGET then
-    scene:tween({{target = cells[s.mid], fill = "success", stroke = "success"}, {target = range, stroke = "success"}}, 0.3)
+    scene:tween({{target = cells[s.mid], fill = "success", stroke = "success"}, {target = range, stroke = "success"}}, {duration = 0.3})
   else
-    scene:tween({{target = cells[s.mid], fill = "background", stroke = "border"}, {target = nums[s.mid], fill = "foreground"}}, 0.2)
+    scene:tween({{target = cells[s.mid], fill = "background", stroke = "border"}, {target = nums[s.mid], fill = "foreground"}}, {duration = 0.2})
   end
   plo, phi = s.lo, s.hi
 end

@@ -28,7 +28,7 @@ local function swap_ids(a, b)
   scene:tween({
     {target=owners[a], position={slot_x[sb], slot_y}},
     {target=owners[b], position={slot_x[sa], slot_y}},
-  }, swap_time, "ease_in_out", 0)
+  }, {duration = swap_time, curve = "ease_in_out", lag = 0})
   slot_of[a], slot_of[b] = sb, sa
 end
 ```

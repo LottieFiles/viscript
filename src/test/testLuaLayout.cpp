@@ -40,7 +40,7 @@ if s:find("body") ~= body or s:find("card") ~= card or s:find("missing") ~= nil 
 local seen = {[body] = true}
 if not seen[s:find("body")] then error("table key") end
 s:find("card"):arrange({1, 0}, 0.2)
-s:tween({{target = s:find("body"), fill = "#ff0000"}, {target = kids[2], opacity = 0.5}}, 1)
+s:tween({{target = s:find("body"), fill = "#ff0000"}, {target = kids[2], opacity = 0.5}}, {duration = 1})
 return s
 )lua";
     auto scene = _loaded(source, "queries.lua");
@@ -69,7 +69,7 @@ if #first ~= 2 or first[1] ~= a1 or first[2] ~= b1 then error("the first column"
 local second = grid:column(2)
 if #second ~= 1 or second[1] ~= a2 then error("a shorter row has no entry there") end
 if grid:children()[2] ~= between then error("the rectangle stays a child") end
-s:tween({{target = grid:entry(1, 2), fill = "#ff0000"}, {target = grid:row(2), opacity = 0.5}}, 1)
+s:tween({{target = grid:entry(1, 2), fill = "#ff0000"}, {target = grid:row(2), opacity = 0.5}}, {duration = 1})
 return s
 )lua";
     auto scene = _loaded(source, "rows.lua");
@@ -105,8 +105,8 @@ local b = row:rectangle {id = "b", size = {1, 1}}
 row:arrange({1, 0}, 0.5)
 s:wait(0.5)
 local c = row:rectangle {id = "c", size = {1, 1}}
-s:arrange({a, c, b}, 1, "linear", {gap = 0.5})
-s:arrange(row, 0.5, "smooth", {direction = {0, -1}, gap = 0, center = {2, 0}})
+s:arrange({a, c, b}, {duration = 1, curve = "linear", gap = 0.5})
+s:arrange(row, {duration = 0.5, curve = "smooth", direction = {0, -1}, gap = 0, center = {2, 0}})
 return s
 )lua";
     auto scene = _loaded(source, "arrange.lua");
@@ -123,10 +123,10 @@ return s
     _scriptError("local s=vis.scene{}; s:arrange('row'); return s", "arrange takes a group or a list of handles");
     _scriptError("local s=vis.scene{}; s:arrange(s:group{}); return s", "arrange needs a group with children");
     _scriptError("local s=vis.scene{}; local a=s:circle{radius=1}; local b=s:circle{radius=1};"
-                 "s:arrange({a, b}, 1, 'smooth', {gap = -1}); return s",
+                 "s:arrange({a, b}, {duration = 1, curve = 'smooth', gap = -1}); return s",
                  "could not arrange: the arrange gap must be zero or positive");
     _scriptError("local s=vis.scene{}; local a=s:circle{radius=1}; local b=s:circle{radius=1};"
-                 "s:arrange({a, b}, 1, 'smooth', {spin = 1}); return s",
+                 "s:arrange({a, b}, {duration = 1, curve = 'smooth', spin = 1}); return s",
                  "unknown option 'spin'");
     _scriptError("local s=vis.scene{}; local a=s:circle{radius=1}; local g=s:group{}; local b=g:circle{radius=1};"
                  "s:arrange({a, b}); return s",
@@ -280,7 +280,7 @@ local both = s:bounds({word, dot})
 if not (near(both.left, -2.5) and near(both.right, w.right) and near(both.top, 1)) then error("list") end
 local frame = s:rectangle {around = {word, dot}, padding = 0}
 if not same(s:bounds(frame), both) then error("around") end
-s:shift(dot, {1, 0}, 1)
+s:shift(dot, {1, 0}, {duration = 1})
 local moved = s:bounds(dot)
 if not (near(moved.left, -1.5) and near(moved.right, -0.5)) then error("moved") end
 return s

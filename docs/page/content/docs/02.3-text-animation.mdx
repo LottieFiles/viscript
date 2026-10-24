@@ -16,7 +16,7 @@ Playing a new `text` fades out the old whole string, then fades in the new one. 
 local scene = vis.scene {}
 
 local line = scene:text {text = "VISCRIPT", size = 42, fill = "accent"}
-scene:tween({target = line, text = "Hello, API"}, 1.4)
+scene:tween({target = line, text = "Hello, API"}, {duration = 1.4})
 
 return scene
 ```
@@ -25,7 +25,7 @@ return scene
 const scene = vis.scene();
 
 const line = scene.text({text: "VISCRIPT", size: 42, fill: "accent"});
-scene.tween({target: line, text: "Hello, API"}, 1.4);
+scene.tween({target: line, text: "Hello, API"}, {duration: 1.4});
 
 return scene;
 ```
@@ -39,9 +39,9 @@ local scene = vis.scene {}
 
 local line = scene:text {text = "", point = {-4, 0}, align = {0, 0.5}, size = 40}
 
-scene:tween({target = line, text = "Hello, viscript", retype = true}, 1.2, "linear")
+scene:tween({target = line, text = "Hello, viscript", retype = true}, {duration = 1.2, curve = "linear"})
 scene:wait(0.5)
-scene:tween({target = line, text = "Hello, world", retype = true}, 1, "linear")
+scene:tween({target = line, text = "Hello, world", retype = true}, {duration = 1, curve = "linear"})
 scene:wait(0.8)
 
 return scene
@@ -52,9 +52,9 @@ const scene = vis.scene();
 
 const line = scene.text({text: "", point: [-4, 0], align: [0, 0.5], size: 40});
 
-scene.tween({target: line, text: "Hello, viscript", retype: true}, 1.2, "linear");
+scene.tween({target: line, text: "Hello, viscript", retype: true}, {duration: 1.2, curve: "linear"});
 scene.wait(0.5);
-scene.tween({target: line, text: "Hello, world", retype: true}, 1, "linear");
+scene.tween({target: line, text: "Hello, world", retype: true}, {duration: 1, curve: "linear"});
 scene.wait(0.8);
 
 return scene;
@@ -68,7 +68,7 @@ Use `sweep = true` / `sweep: true` for a stylized character sweep that temporari
 local scene = vis.scene {}
 
 local line = scene:text {text = "LOADING", size = 42, font = "JetBrainsMono", fill = "accent"}
-scene:tween({target = line, text = "SUCCESS", sweep = true}, 1.4, "linear")
+scene:tween({target = line, text = "SUCCESS", sweep = true}, {duration = 1.4, curve = "linear"})
 
 return scene
 ```
@@ -77,7 +77,7 @@ return scene
 const scene = vis.scene();
 
 const line = scene.text({text: "LOADING", size: 42, font: "JetBrainsMono", fill: "accent"});
-scene.tween({target: line, text: "SUCCESS", sweep: true}, 1.4, "linear");
+scene.tween({target: line, text: "SUCCESS", sweep: true}, {duration: 1.4, curve: "linear"});
 
 return scene;
 ```
@@ -92,7 +92,7 @@ local scene = vis.scene {}
 local n = scene:number {value = 0, point = {0, 0}, align = {0.5, 0.5}, size = 72,
                         decimals = 1, suffix = " %", tabular = true}
 
-scene:tween({target = n, value = 99.9}, 2, "ease_out")
+scene:tween({target = n, value = 99.9}, {duration = 2, curve = "ease_out"})
 scene:wait(0.8)
 
 return scene
@@ -104,7 +104,7 @@ const scene = vis.scene();
 const n = scene.number({value: 0, point: [0, 0], align: [0.5, 0.5], size: 72,
                          decimals: 1, suffix: " %", tabular: true});
 
-scene.tween({target: n, value: 99.9}, 2, "ease_out");
+scene.tween({target: n, value: 99.9}, {duration: 2, curve: "ease_out"});
 scene.wait(0.8);
 
 return scene;
@@ -119,7 +119,7 @@ local scene = vis.scene {}
 
 local word = scene:spans {"viscript", point = {0, 0}, align = {0.5, 0.5}, size = 72, split = "letters"}
 
-scene:write(word:children(), 0.4, "smooth", 0.12)
+scene:write(word:children(), {duration = 0.4, curve = "smooth", lag = 0.12})
 scene:wait(0.8)
 
 return scene
@@ -130,7 +130,7 @@ const scene = vis.scene();
 
 const word = scene.spans(["viscript"], {point: [0, 0], align: [0.5, 0.5], size: 72, split: "letters"});
 
-scene.write(word.children(), 0.4, "smooth", 0.12);
+scene.write(word.children(), {duration: 0.4, curve: "smooth", lag: 0.12});
 scene.wait(0.8);
 
 return scene;
@@ -149,7 +149,7 @@ scene:wait(0.6)
 
 for _, label in ipairs({"2. Sort each half", "3. Merge the halves"}) do
     local next_step = scene:text {text = label, size = 40}
-    scene:fade_transform(step, next_step, 0.6)
+    scene:fade_transform(step, next_step, {duration = 0.6})
     step = next_step
     scene:wait(0.6)
 end
@@ -166,7 +166,7 @@ scene.wait(0.6);
 
 for (const label of ["2. Sort each half", "3. Merge the halves"]) {
     const next = scene.text({text: label, size: 40});
-    scene.fadeTransform(step, next, 0.6);
+    scene.fadeTransform(step, next, {duration: 0.6});
     step = next;
     scene.wait(0.6);
 }
@@ -188,7 +188,7 @@ scene:wait(0.5)
 
 local after = scene:spans {"total = ( price + tax ) * qty", point = {0, 0}, align = {0.5, 0.5}, size = 34,
                           font = "JetBrainsMono", split = "words"}
-scene:match_transform(before, after, 1.2)
+scene:match_transform(before, after, {duration = 1.2})
 scene:wait(0.8)
 
 return scene
@@ -204,7 +204,7 @@ scene.wait(0.5);
 
 const after = scene.spans(["total = ( price + tax ) * qty"], {point: [0, 0], align: [0.5, 0.5], size: 34,
                                                              font: "JetBrainsMono", split: "words"});
-scene.matchTransform(before, after, 1.2);
+scene.matchTransform(before, after, {duration: 1.2});
 scene.wait(0.8);
 
 return scene;
@@ -222,7 +222,7 @@ scene:fade_in(a, {duration = 0.6})
 scene:wait(0.4)
 
 local b = scene:tex {tex = "c^2 = a^2 + b^2", point = {0, 0}, size = 60}
-scene:match_transform(a, b, 1.4)
+scene:match_transform(a, b, {duration = 1.4})
 scene:wait(0.8)
 
 return scene
@@ -236,7 +236,7 @@ scene.fadeIn(a, {duration: 0.6});
 scene.wait(0.4);
 
 const b = scene.tex({tex: "c^2 = a^2 + b^2", point: [0, 0], size: 60});
-scene.matchTransform(a, b, 1.4);
+scene.matchTransform(a, b, {duration: 1.4});
 scene.wait(0.8);
 
 return scene;

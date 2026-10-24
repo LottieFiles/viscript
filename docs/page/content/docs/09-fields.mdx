@@ -151,7 +151,7 @@ scene:create(triangle, {duration = 0.8, curve = "ease_out"})
 scene:fade_in(scan, {duration = 0.2})
 for _, row in ipairs(rows) do
     scene:parallel(
-        function() scene:shift(scan, {0, -1}, 0.18, "linear") end,
+        function() scene:shift(scan, {0, -1}, {duration = 0.18, curve = "linear"}) end,
         function() scene:fade_in(row, {duration = 0.18}) end)
 end
 scene:fade_out(scan, {duration = 0.3})
@@ -207,7 +207,7 @@ scene.create(triangle, {duration: 0.8, curve: "ease_out"});
 scene.fadeIn(scan, {duration: 0.2});
 for (const row of rows) {
     scene.parallel(
-        () => scene.shift(scan, [0, -1], 0.18, "linear"),
+        () => scene.shift(scan, [0, -1], {duration: 0.18, curve: "linear"}),
         () => scene.fadeIn(row, {duration: 0.18}));
 }
 scene.fadeOut(scan, {duration: 0.3});

@@ -35,8 +35,8 @@ More style options: `gradient`, `blend`, `blur`, `shadow`, `isolate = true` to c
 Tweening `text` with `retype = true` erases to the shared prefix before typing the new suffix (use it when typing from an empty string too); `sweep = true` mixes both strings in a character sweep. Both need `text` and cannot both be true.
 
 ```lua
-scene:tween({target = caption, text = "Ready to export", retype = true}, 1)
-scene:tween({target = caption, text = "EXPORTED", sweep = true}, 1)
+scene:tween({target = caption, text = "Ready to export", retype = true}, {duration = 1})
+scene:tween({target = caption, text = "EXPORTED", sweep = true}, {duration = 1})
 ```
 
 `match_transform` options are `pairs`, `strings`, `diff`, `shapes`, `fade`, `lag`, `arc`, `path`, and `copy`. In 3D, `space:labels {placement = "screen"}` sets billboard endpoint text outward from the projected origin at each camera sample; see [surface-recipe.md](surface-recipe.md).
@@ -54,7 +54,7 @@ Surfaces use `"solid"`, `"mesh"`, or `"solid_mesh"`. Colors can be a colormap na
 `warp` maps authored points in each target's parent space. It subdivides straight segments using `step` before bending them. Geometry stays warped after the animation, so later bounds, cloning, and motion paths use its new outline.
 
 ```lua
-scene:warp(ball, function(x, y) return x + 0.2 * y * y, y end, 1, "smooth", {step = 0.05})
+scene:warp(ball, function(x, y) return x + 0.2 * y * y, y end, {duration = 1, curve = "smooth", step = 0.05})
 ```
 
 ## Inset views
@@ -79,7 +79,7 @@ scene:bind(ball, elapsed, function(time)
         {mass = 1, stiffness = omega * omega, damping = 0.3 * omega, displacement = 2}), 0}}
 end)
 scene:wait(0.5)
-scene:track(elapsed, 7.5, 7.5, "linear")
+scene:track(elapsed, 7.5, {duration = 7.5, curve = "linear"})
 ```
 
 `space:cell(fn, config)` and `space:voxel(fn, config)` sample colors over space ranges and time during authoring. Use duration, fps, mode, and fractional padding to control the field.

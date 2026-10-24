@@ -39,7 +39,7 @@ local content = scene:rectangle {size = {3.6, 2.2}, fill = "accent", stroke = "#
 local mask = scene:circle {radius = 1, fill = "foreground", stroke = "#00000000"}
 content:mask(mask, "alpha")
 scene:text {id = "caption", text = "Only the circle's alpha reveals the rectangle", point = {0, -2.25}, size = 16, fill = "muted"}
-scene:shift(mask, {1.3, 0}, 1.2)
+scene:shift(mask, {1.3, 0}, {duration = 1.2})
 
 return scene
 ```
@@ -54,7 +54,7 @@ const content = scene.rectangle({size: [3.6, 2.2], fill: "accent", stroke: "#000
 const mask = scene.circle({radius: 1, fill: "foreground", stroke: "#00000000"});
 content.mask(mask, "alpha");
 scene.text({id: "caption", text: "Only the circle's alpha reveals the rectangle", point: [0, -2.25], size: 16, fill: "muted"});
-scene.shift(mask, [1.3, 0], 1.2);
+scene.shift(mask, [1.3, 0], {duration: 1.2});
 
 return scene;
 ```

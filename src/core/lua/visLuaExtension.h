@@ -54,7 +54,7 @@ void luaClose(lua_State* lua) noexcept;
 Scene* luaScene(lua_State* lua, int index);
 Object* luaObject(lua_State* lua, Scene* scene, int index);
 AnimCurve luaAnimCurve(lua_State* lua, int index);
-// Expands a named timing table into the existing positional call without changing the table.
+// Validates the sole timing-options argument and unpacks it for the native handler.
 bool luaTiming(lua_State* lua, int index, int options = 0, bool stagger = false,
                std::initializer_list<const char*> fields = {});
 using LuaObjectTransfer = void (*)(void* data) noexcept;

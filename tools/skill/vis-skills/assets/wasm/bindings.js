@@ -979,12 +979,13 @@ function _timing(options, fields = [], fallback = 1, name = "Timing") {
     return {duration, curve, lag, options: Object.fromEntries(given)};
 }
 
-// The timing a call takes as positional values, or as one options object in their place at
-// args[index], which is then the last argument and may hold fields too.
-function _timingArguments(args, index, values, fields = [], fallback = 1) {
-    if (typeof args[index] !== "object") return values;
-    if (args.length > index + 1) throw new TypeError("Timing options cannot be combined with positional arguments");
-    return _timing(args[index], fields, fallback);
+// Animation timing and method-specific settings share one final options object.
+function _timingOptions(args, index, fields = [], fallback = 1, name = "Timing") {
+    if (args.length > index + 1) throw new TypeError("Animation timing takes one options object");
+    const options = args[index] === undefined ? {} : args[index];
+    const {duration, curve, lag} = _timing(options, fields, fallback, name);
+    const given = Object.fromEntries(Object.entries(options).filter(([, value]) => value !== undefined));
+    return {...given, duration, curve, ...(fields.includes("lag") ? {lag} : {})};
 }
 
 // The options of an effect over its defaults, checked: the timing, a scale past minimumScale and
@@ -1098,8 +1099,8 @@ export class AudioCueHandle {
         Object.freeze(this);
     }
 
-    gain(value, begin, duration = 1, curve = "smooth") {
-        ({duration, curve} = _timingArguments(arguments, 2, {duration, curve}));
+    gain(value, begin, options = {}) {
+        options = _timingOptions(arguments, 2);
         this.owner._assertQuiet();
         if (!Number.isFinite(value) || value < 0 || value > 4) {
             throw new RangeError("Audio gain must be finite and between 0 and 4");
@@ -1107,10 +1108,7 @@ export class AudioCueHandle {
         if (!Number.isFinite(begin) || begin < 0) {
             throw new RangeError("Audio gain begin must be finite and non-negative");
         }
-        if (!Number.isFinite(duration) || duration <= 0) {
-            throw new RangeError("Audio gain duration must be finite and positive");
-        }
-        const values = [value, begin, duration, curve].map(_lua).join(",");
+        const values = [value, begin, options].map(_lua).join(",");
         // A cue exists only where the scene has the audio module; see sound().
         SCENE_STATES.get(this.owner).lines.push(() => `if ${this.name} then ${this.name}:gain(${values}) end`);
         return this;
@@ -1126,8 +1124,8 @@ export class ViewHandle {
         Object.freeze(this);
     }
 
-    look(camera, duration = 1, curve = "smooth") {
-        return this.owner._look(this, camera, _timingArguments(arguments, 1, {duration, curve}));
+    look(camera, options = {}) {
+        return this.owner._look(this, camera, _timingOptions(arguments, 1));
     }
 
     orbit(radians, options = {}) {
@@ -1140,17 +1138,13 @@ export class ViewHandle {
     }
 
     // Fades the whole view; the fades of a view follow one another.
-    fade(opacity, duration = 1, curve = "smooth") {
-        ({duration, curve} = _timingArguments(arguments, 1, {duration, curve}));
+    fade(opacity, options = {}) {
+        options = _timingOptions(arguments, 1);
         this.owner._assertMutable();
         if (!Number.isFinite(opacity) || opacity < 0 || opacity > 1) {
             throw new RangeError("View opacity must be between 0 and 1");
         }
-        if (!Number.isFinite(duration) || duration <= 0) {
-            throw new RangeError("View fade duration must be a positive number");
-        }
-        _curveValue(curve);
-        return this.owner._callOn(this, "fade", _lua(opacity), _lua(duration), _lua(curve));
+        return this.owner._callOn(this, "fade", _lua(opacity), _lua(options));
     }
 }
 
@@ -2006,7 +2000,7 @@ function _playGroup(scene, group, lines) {
         lines.push((name) => {
             const begin = `times[${from.track.first + from.step}]`;
             const duration = `times[${to.track.first + to.step}]-${begin}`;
-            return `${name}:seek(${begin});${name}:tween({${descriptor}},${duration},"linear",0)`;
+            return `${name}:seek(${begin});${name}:tween({${descriptor}},{duration=${duration},curve="linear",lag=0})`;
         });
     }
 }
@@ -2046,7 +2040,7 @@ function _flushTracks(scene) {
                     lines.push((name) => {
                         const begin = `times[${track.first + step}]`;
                         const end = `times[${track.first + step + 1}]`;
-                        return `${name}:seek(${begin});${name}:tween({${batch.join(",")}},${end}-${begin},"linear",0)`;
+                        return `${name}:seek(${begin});${name}:tween({${batch.join(",")}},{duration=${end}-${begin},curve="linear",lag=0})`;
                     });
                 }
             }
@@ -2080,7 +2074,7 @@ function _trackStep(name, track, step) {
     return `${open}${name}:seek(times[${track.first}]+${offset});times[${track.first + step}]=${name}:time()`;
 }
 
-export class SceneBuilder {
+class SceneBuilder {
     constructor(config = {}) {
         SCENE_STATES.set(this, {
             config: _lua(config), lines: [], handles: 0, audio: 0, timelines: 0, views: 0,
@@ -3030,9 +3024,8 @@ export class SceneBuilder {
         return this._call(method, this._target(target), ...values.map(_lua));
     }
 
-    fillReveal(target, duration = 1, curve = "smooth", lag = 0) {
-        ({duration, curve, lag} = _timingArguments(arguments, 1, {duration, curve, lag}, ["lag"]));
-        return this._animate("fill_reveal", target, [duration, curve, lag]);
+    fillReveal(target, options = {}) {
+        return this._animate("fill_reveal", target, [_timingOptions(arguments, 1, ["lag"])]);
     }
 
     // Plays the effect method on the handle target, checking the target, then the options over the
@@ -3051,11 +3044,11 @@ export class SceneBuilder {
         return this._effect("fade_out", target, options, FADE_OPTIONS, "FadeOut");
     }
 
-    growFromEdge(target, edge, duration = 1, curve = "smooth") {
-        ({duration, curve} = _timingArguments(arguments, 2, {duration, curve}));
+    growFromEdge(target, edge, options = {}) {
+        options = _timingOptions(arguments, 2);
         this._assertMutable();
         _growthEdge(edge);
-        return this._animate("grow_from_edge", target, [edge, duration, curve]);
+        return this._animate("grow_from_edge", target, [edge, options]);
     }
 
     // Flashes a handle, or each of an array of handles at once, such as the tokens a search
@@ -3092,9 +3085,8 @@ export class SceneBuilder {
         return this._effect("ripple", target, options, RIPPLE_OPTIONS, "Ripple");
     }
 
-    morph(source, target, duration = 1, curve = "smooth", lag) {
-        ({duration, curve, options: lag} =
-            _timingArguments(arguments, 2, {duration, curve, options: lag}, ["lag", "copy", "pairs"]));
+    morph(source, target, options = {}) {
+        options = _timingOptions(arguments, 2, ["lag", "copy", "pairs"], 1, "Morph");
         this._assertMutable();
         const sourceArray = Array.isArray(source);
         const targetArray = Array.isArray(target);
@@ -3104,39 +3096,24 @@ export class SceneBuilder {
         if (sourceArray && (!source.length || source.length !== target.length)) {
             throw new TypeError("Morph arrays must be non-empty and equally sized");
         }
-        // The lag, or options: with copy, a copy of each source morphs in its place.
-        const lagValues = [];
-        let copy = false;
-        if (lag === null || typeof lag !== "object") {
-            if (lag !== undefined) lagValues.push(_lua(lag));
-        } else {
-            if (!_plain(lag)) {
-                throw new TypeError("Morph options must be a number or a plain object");
-            }
-            _known(lag, ["lag", "copy", "pairs"], "Unknown morph option");
-            if (lag.lag !== undefined && !(Number.isFinite(lag.lag) && lag.lag >= 0)) {
-                throw new RangeError("Morph lag must be a finite number of zero or more");
-            }
-            if (lag.copy !== undefined && typeof lag.copy !== "boolean") {
-                throw new TypeError("Morph copy must be a boolean");
-            }
-            if (lag.pairs !== undefined) {
-                if (!Array.isArray(lag.pairs) || lag.pairs.some((pair) => !Array.isArray(pair) || pair.length !== 2
-                    || [pair[0], pair[1]].some((index) => !Number.isInteger(index) || index < 1 || index > 0xffffffff))) {
-                    throw new TypeError("Morph pairs must be an array of positive integer index pairs");
-                }
-                const from = new Set();
-                const to = new Set();
-                for (const [a, b] of lag.pairs) {
-                    if (from.has(a) || to.has(b)) throw new TypeError("Morph pairs must use each piece at most once");
-                    from.add(a);
-                    to.add(b);
-                }
-            }
-            copy = lag.copy === true;
-            const fields = Object.keys(lag).filter((key) => lag[key] !== undefined).sort();
-            lagValues.push(`{${fields.map((key) => `[${_string(key)}]=${_lua(lag[key])}`).join(",")}}`);
+        // With copy, a copy of each source morphs in its place.
+        if (options.copy !== undefined && typeof options.copy !== "boolean") {
+            throw new TypeError("Morph copy must be a boolean");
         }
+        if (options.pairs !== undefined) {
+            if (!Array.isArray(options.pairs) || options.pairs.some((pair) => !Array.isArray(pair) || pair.length !== 2
+                || [pair[0], pair[1]].some((index) => !Number.isInteger(index) || index < 1 || index > 0xffffffff))) {
+                throw new TypeError("Morph pairs must be an array of positive integer index pairs");
+            }
+            const from = new Set();
+            const to = new Set();
+            for (const [a, b] of options.pairs) {
+                if (from.has(a) || to.has(b)) throw new TypeError("Morph pairs must use each piece at most once");
+                from.add(a);
+                to.add(b);
+            }
+        }
+        const copy = options.copy === true;
         const sources = sourceArray ? source : [source];
         const targets = targetArray ? target : [target];
         const sourceNames = new Set();
@@ -3155,31 +3132,29 @@ export class SceneBuilder {
             sourceNames.add(sourceName);
             targetNames.add(targetName);
         }
-        return this._call("morph", this._target(source), this._target(target), _lua(duration), _lua(curve),
-            ...lagValues);
+        return this._call("morph", this._target(source), this._target(target), _lua(options));
     }
 
-    fadeTransform(source, target, duration = 1, curve = "smooth") {
-        ({duration, curve} = _timingArguments(arguments, 2, {duration, curve}));
+    fadeTransform(source, target, options = {}) {
+        options = _timingOptions(arguments, 2);
         this._assertMutable();
         const sourceName = this._handle(source);
         const targetName = this._handle(target);
         if (sourceName === targetName) {
             throw new TypeError("FadeTransform source and target must be distinct handles");
         }
-        return this._call("fade_transform", sourceName, targetName, _lua(duration), _lua(curve));
+        return this._call("fade_transform", sourceName, targetName, _lua(options));
     }
 
     // Serializes rotate, scale, and moveAlong options; an `about` handle names its local.
-    matchTransform(source, target, duration = 1, curve = "smooth", options = {}) {
-        ({duration, curve, options} = _timingArguments(arguments, 2, {duration, curve, options}, MATCH_OPTIONS));
+    matchTransform(source, target, options = {}) {
+        options = _timingOptions(arguments, 2, MATCH_OPTIONS, 1, "MatchTransform");
         this._assertMutable();
         const sourceName = this._handle(source);
         const targetName = this._handle(target);
         if (sourceName === targetName) {
             throw new TypeError("MatchTransform source and target must be distinct handles");
         }
-        _plainOptions(options, "MatchTransform", MATCH_OPTIONS);
         if (options.arc !== undefined && !(Number.isFinite(options.arc) && Math.abs(options.arc) < 2 * Math.PI)) {
             throw new RangeError("MatchTransform arc must be a finite angle between -2*pi and 2*pi radians");
         }
@@ -3204,7 +3179,7 @@ export class SceneBuilder {
         if (options.path !== undefined && options.arc !== undefined && options.arc !== 0) {
             throw new TypeError("MatchTransform path and arc cannot be used together");
         }
-        const entries = [];
+        const entries = [`["duration"]=${_lua(options.duration)}`, `["curve"]=${_lua(options.curve)}`];
         if (options.path !== undefined) entries.push(`["path"]=${this._handle(options.path)}`);
         if (options.arc !== undefined) entries.push(`["arc"]=${_lua(options.arc)}`);
         if (options.lag !== undefined) entries.push(`["lag"]=${_lua(options.lag)}`);
@@ -3222,9 +3197,7 @@ export class SceneBuilder {
         if (options.shapes !== undefined) entries.push(`["shapes"]=${_lua(options.shapes)}`);
         if (options.fade !== undefined) entries.push(`["fade"]=${_lua(options.fade)}`);
         if (options.copy !== undefined) entries.push(`["copy"]=${_lua(options.copy)}`);
-        const values = [sourceName, targetName, _lua(duration), _lua(curve)];
-        if (entries.length) values.push(`{${entries.join(",")}}`);
-        return this._call("match_transform", ...values);
+        return this._call("match_transform", sourceName, targetName, `{${entries.join(",")}}`);
     }
 
     // Makes the code block that the text of block turns into after edits, one edit or an array
@@ -3232,15 +3205,14 @@ export class SceneBuilder {
     // The builder applies the edits, so the script receives the edited text whole; the new
     // block keeps the look, place and parent of block and takes options.id or the id of block
     // with the first free .2, .3 and so on.
-    edit(block, edits, duration = 1, curve = "smooth", options = {}) {
-        ({duration, curve, options} = _timingArguments(arguments, 2, {duration, curve, options}, EDIT_OPTIONS));
+    edit(block, edits, options = {}) {
+        options = _timingOptions(arguments, 2, EDIT_OPTIONS, 1, "Edit");
         this._assertMutable();
         const blockName = this._handle(block);
         const code = CODE_BLOCKS.get(block);
         if (!code) throw new TypeError("Edit needs a block that code made");
         const list = Array.isArray(edits) ? edits : [edits];
         if (!list.length || list.length > 1024) throw new TypeError("Edit takes an edit or an array of 1 to 1024 edits");
-        _plainOptions(options, "Edit", EDIT_OPTIONS);
         if (options.id !== undefined && typeof options.id !== "string") throw new TypeError("Edit id must be a string");
         if (options.arc !== undefined && !(Number.isFinite(options.arc) && Math.abs(options.arc) < 2 * Math.PI)) {
             throw new RangeError("Edit arc must be a finite angle between -2*pi and 2*pi radians");
@@ -3263,7 +3235,8 @@ export class SceneBuilder {
                 if (!state.ids.has(`${base}.${number}`)) id = `${base}.${number}`;
             }
         }
-        const entries = id === null ? [] : [`["id"]=${_string(id)}`];
+        const entries = [`["duration"]=${_lua(options.duration)}`, `["curve"]=${_lua(options.curve)}`];
+        if (id !== null) entries.push(`["id"]=${_string(id)}`);
         for (const key of ["arc", "lag", "fade"]) {
             if (options[key] !== undefined) entries.push(`[${_string(key)}]=${_lua(options[key])}`);
         }
@@ -3274,17 +3247,16 @@ export class SceneBuilder {
         const value = ended ? text : `${text}\n`;
         const held = ended && !text.endsWith("\n") ? `${text}\n` : text;
         const values = [
-            blockName, `{{["replace"]={1,${_codeLineCount(code.text)}},["with"]=${_string(value)}}}`, _lua(duration),
-            _lua(curve),
+            blockName, `{{["replace"]={1,${_codeLineCount(code.text)}},["with"]=${_string(value)}}}`,
+            `{${entries.join(",")}}`,
         ];
-        if (entries.length) values.push(`{${entries.join(",")}}`);
         return this._codeBlock(this._make(`edit(${values.join(",")})`), code.parent, id, held, code.language);
     }
 
     // Lays items, a group's children or an array of sibling handles in order, one after
     // another over duration, as Lua arrange does; an item added at the cursor grows in.
-    arrange(items, duration = 1, curve = "smooth", options = {}) {
-        ({duration, curve, options} = _timingArguments(arguments, 1, {duration, curve, options}, ARRANGE_OPTIONS));
+    arrange(items, options = {}) {
+        options = _timingOptions(arguments, 1, ARRANGE_OPTIONS, 1, "Arrange");
         this._assertMutable();
         let itemsValue;
         if (items instanceof GroupHandle) {
@@ -3294,7 +3266,6 @@ export class SceneBuilder {
         } else {
             throw new TypeError("Arrange takes a group or a non-empty array of handles");
         }
-        _plainOptions(options, "Arrange", ARRANGE_OPTIONS);
         if (options.gap !== undefined && !(Number.isFinite(options.gap) && options.gap >= 0)) {
             throw new RangeError("Arrange gap must be a finite number of zero or more");
         }
@@ -3305,9 +3276,7 @@ export class SceneBuilder {
                 throw new TypeError(`Arrange ${key} must be [x, y] or [x, y, z] of finite numbers`);
             }
         }
-        const values = [itemsValue, _lua(duration), _lua(curve)];
-        if (Object.keys(options).length) values.push(_lua(options));
-        return this._call("arrange", ...values);
+        return this._call("arrange", itemsValue, _lua(options));
     }
 
     // Brings every object below target that is not a group to full opacity inside the
@@ -3406,20 +3375,11 @@ export class SceneBuilder {
 
     // Sample the plane map in target-parent space and emit its images; z stays unchanged.
     // The grid must cover every target point. Native spline interpolation preserves quadratic maps.
-    warp(target, fn, duration = 1, curve = "smooth", options = undefined) {
+    warp(target, fn, options) {
         this._assertMutable();
-        if (duration !== null && typeof duration === "object") {
-            if (arguments.length > 3) {
-                throw new TypeError("Warp takes (target, fn, options) or (target, fn, duration, curve, options)");
-            }
-            ({duration, curve, options} = _timing(duration, WARP_OPTIONS, 1, "Warp"));
-        }
+        options = _timingOptions(arguments, 2, WARP_OPTIONS, 1, "Warp");
         const targetName = this._target(target);
         if (typeof fn !== "function") throw new TypeError("Warp fn must be a function of x and y that returns [x, y]");
-        if (!_plain(options)) {
-            throw new TypeError("Warp requires options with x_range and y_range, the samples the builder calls fn at");
-        }
-        _known(options, WARP_OPTIONS, "Unknown Warp option");
         if (options.x_range === undefined) throw new TypeError("Warp requires x_range");
         if (options.y_range === undefined) throw new TypeError("Warp requires y_range");
         const columns = _warpSamples(options.x_range, "Warp x_range");
@@ -3432,27 +3392,29 @@ export class SceneBuilder {
         if (options.step !== undefined && !(Number.isFinite(options.step) && options.step > 0)) {
             throw new RangeError("Warp step must be a positive length");
         }
-        const timing = [_lua(duration), _lua(curve)];
         const values = _sampling(this, () => rows.samples.flatMap((y) =>
             columns.samples.map((x) => _sampleVector(fn, x, y, "Warp fn").map(_single))));
         const samples = `{["values"]=${_lua(values)},["x_range"]=${_lua(columns.range)},["y_range"]=${_lua(rows.range)}}`;
-        const settings = options.step === undefined ? [] : [`{["step"]=${_lua(options.step)}}`];
-        return this._call("warp", targetName, samples, ...timing, ...settings);
+        const {duration, curve, step} = options;
+        const timing = {duration, curve};
+        if (step !== undefined) timing.step = step;
+        return this._call("warp", targetName, samples, _lua(timing));
     }
 
-    transition(from, to, duration = 1, curve = "smooth") {
-        ({duration, curve} = _timingArguments(arguments, 2, {duration, curve}));
+    transition(from, to, options = {}) {
+        options = _timingOptions(arguments, 2);
         this._assertMutable();
-        return this._call("transition", this._target(from), this._target(to), _lua(duration), _lua(curve));
+        return this._call("transition", this._target(from), this._target(to), _lua(options));
     }
 
-    tween(specification, duration = 1, curve = "smooth", lag = 0) {
-        ({duration, curve, lag} = _timingArguments(arguments, 1, {duration, curve, lag}, ["lag"]));
+    tween(specification, options = {}) {
+        options = _timingOptions(arguments, 1, ["lag"]);
+        const {duration, lag} = options;
         const timing = SCENE_TRACKERS.get(this);
         const { anchor, time } = timing.clock;
         this._assertMutable();
         const descriptors = this._descriptors(specification, "tween");
-        this._call("tween", `{${descriptors.join(",")}}`, _lua(duration), _lua(curve), _lua(lag));
+        this._call("tween", `{${descriptors.join(",")}}`, _lua(options));
         // A tween lasts its duration and the lag of each later target, as the scene counts it.
         if (Number.isFinite(duration) && duration > 0 && Number.isFinite(lag) && lag >= 0) {
             const span = _decimal(duration) * (1 + _decimal(lag) * (descriptors.length - 1));
@@ -3478,15 +3440,11 @@ export class SceneBuilder {
 
     // Brings each target back to the newest state save recorded for it: over duration seconds,
     // each later target lag of the duration later, or at once without a duration.
-    restore(target, duration = 0, curve = "smooth", lag = 0) {
-        ({duration, curve, lag} = _timingArguments(arguments, 1, {duration, curve, lag}, ["lag"], 0));
+    restore(target, options = {}) {
+        options = _timingOptions(arguments, 1, ["lag"], 0, "Restore");
         this._assertMutable();
         const targetName = this._target(target);
-        if (!(Number.isFinite(duration) && duration >= 0)) {
-            throw new RangeError("Restore duration must be zero or a positive number of seconds");
-        }
-        if (!(Number.isFinite(lag) && lag >= 0)) throw new RangeError("Restore lag must be zero or positive");
-        return this._call("restore", targetName, _lua(duration), _lua(curve), _lua(lag));
+        return this._call("restore", targetName, _lua(options));
     }
 
     // A number for objects to follow, starting at value.
@@ -3529,32 +3487,26 @@ export class SceneBuilder {
 
     // Moves trackers to their values over duration seconds, eased by curve: the objects bound to
     // them play one linear segment a frame through the states their functions give.
-    // Takes (tracker, value, duration, curve) or ([[tracker, value], ...], duration, curve). The
+    // Takes (tracker, value, options) or ([[tracker, value], ...], options). The
     // trackers move and the functions run at once, but the segments wait for the next call that
     // adds or reads clips, so a later track of other trackers that overlaps this one on a binding
     // merges with it there, as in a Lua scene.
     track(first, ...rest) {
         this._assertQuiet();
         let moves;
-        let duration;
-        let curve;
+        let optionIndex;
         if (TRACKERS.has(first)) {
             moves = [[first, rest[0]]];
-            [, duration, curve] = rest;
+            optionIndex = 2;
         } else {
             if (!Array.isArray(first) || !first.length) {
                 throw new TypeError("Track requires a tracker or an array of [tracker, value]");
             }
             moves = first;
-            [duration, curve] = rest;
+            optionIndex = 1;
         }
-        if (typeof duration === "object") {
-            if (curve !== undefined) throw new TypeError("Timing options cannot be combined with positional arguments");
-            ({duration, curve} = _timing(duration));
-        }
-        if (typeof duration !== "number" || !(duration > 0) || duration === Infinity) {
-            throw new RangeError("Track duration must be a positive finite number");
-        }
+        if (arguments[optionIndex] === undefined) throw new TypeError("Track requires timing options");
+        const {duration, curve} = _timingOptions(arguments, optionIndex, [], 1, "Track");
         const moving = moves.map((move) => {
             const [tracker, target] = Array.isArray(move) ? move : [];
             const entry = this._trackerEntry(tracker);
@@ -3862,14 +3814,14 @@ export class SceneBuilder {
 
     // Moves the camera; a target that is a handle or an array of handles aims it at the center of
     // their authored bounds, as focus frames them, and the eye keeps its offset.
-    look(camera, duration = 1, curve = "smooth") {
-        return this._look(null, camera, _timingArguments(arguments, 1, {duration, curve}));
+    look(camera, options = {}) {
+        return this._look(null, camera, _timingOptions(arguments, 1));
     }
 
     // The camera calls below move the scene's camera, or with a receiver the camera of that view.
-    _look(receiver, camera, {duration, curve}) {
+    _look(receiver, camera, options) {
         this._assertMutable();
-        return this._callOn(receiver, "look", this._camera(camera), _lua(duration), _lua(curve));
+        return this._callOn(receiver, "look", this._camera(camera), _lua(options));
     }
 
     // Circles a 3D camera about its target by any angle, about the camera's up by default.
@@ -3985,15 +3937,6 @@ export class SceneBuilder {
         if (!timing.markers.has(name)) timing.markers.set(name, timing.clock);
         return this;
     }
-
-    _compile(scene, depth) {
-        return _compile(SCENE_STATES.get(this), scene, depth);
-    }
-
-    compile() {
-        this._assertMutable("instant");
-        return [...this._compile("scene", 0), "return scene", ""].join("\n");
-    }
 }
 
 for (const method of FACTORIES) {
@@ -4017,30 +3960,30 @@ for (const method of ["tex", "brace", "code", "area", "riemann", "vectorField", 
 for (const [method, lua] of [["create", "create"], ["uncreate", "uncreate"], ["write", "write"],
     ["drawBorderThenFill", "draw_border_then_fill"]]) {
     const fallback = method === "uncreate" ? "forward" : undefined;
-    SceneBuilder.prototype[method] = function (target, duration = 1, curve = "smooth", lag = 0, direction = fallback) {
-        ({duration, curve, lag, options: {direction = fallback}} =
-            _timingArguments(arguments, 1, {duration, curve, lag, options: {direction}}, ["lag", "direction"]));
-        if (direction === undefined) return this._animate(lua, target, [duration, curve, lag]);
-        this._assertMutable();
-        _direction(direction);
-        return this._animate(lua, target, [duration, curve, lag, direction]);
+    SceneBuilder.prototype[method] = function (target, options = {}) {
+        options = _timingOptions(arguments, 1, ["lag", "direction"]);
+        const direction = options.direction === undefined ? fallback : options.direction;
+        if (direction !== undefined) {
+            _direction(direction);
+            options.direction = direction;
+        }
+        return this._animate(lua, target, [options]);
     };
 }
 
 // The animations that grow targets from their centers or shrink them to them.
 for (const [method, lua] of [["growFromCenter", "grow_from_center"], ["shrinkToCenter", "shrink_to_center"]]) {
-    SceneBuilder.prototype[method] = function (target, duration = 1, curve = "smooth") {
-        ({duration, curve} = _timingArguments(arguments, 1, {duration, curve}));
-        return this._animate(lua, target, [duration, curve]);
+    SceneBuilder.prototype[method] = function (target, options = {}) {
+        return this._animate(lua, target, [_timingOptions(arguments, 1)]);
     };
 }
 
 // The animations of targets to a value; shift and transform move them, which a connector cannot.
 for (const method of ["shift", "transform", "fade", "stroke", "fill"]) {
-    SceneBuilder.prototype[method] = function (target, value, duration = 1, curve = "smooth") {
-        ({duration, curve} = _timingArguments(arguments, 2, {duration, curve}));
+    SceneBuilder.prototype[method] = function (target, value, options = {}) {
+        options = _timingOptions(arguments, 2);
         if (method === "shift" || method === "transform") this._assertTransformable(target);
-        return this._animate(method, target, [value, duration, curve]);
+        return this._animate(method, target, [value, options]);
     };
 }
 
@@ -4116,7 +4059,8 @@ export const vis = Object.freeze({
 
 export function compileScene(scene) {
     if (!(scene instanceof SceneBuilder)) throw new TypeError("Expected a viscript JS scene");
-    return scene.compile();
+    scene._assertMutable("instant");
+    return [..._compile(SCENE_STATES.get(scene), "scene", 0), "return scene", ""].join("\n");
 }
 
 export function evaluateScene(source, name = "scene.js") {

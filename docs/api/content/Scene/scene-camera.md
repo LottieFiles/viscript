@@ -13,11 +13,11 @@ Animate the root camera by moving it, orbiting its target, or fitting objects in
 
 | Lua | JavaScript | Purpose |
 | --- | --- | --- |
-| `scene:look(camera, duration?, curve?)`<br />`scene:look(camera, timing)` | `scene.look(camera, duration?, curve?)`<br />`scene.look(camera, timing)` | Animate the scene camera; default duration 1 and curve `smooth`. |
+| `scene:look(camera, options?)` | `scene.look(camera, options?)` | Animate the scene camera; default duration 1 and curve `smooth`. |
 | `scene:orbit(radians, options?)` | `scene.orbit(radians, options?)` | Rotate a 3D camera around its target; options: `axis`, `duration`, `curve`. Default axis is camera up. |
 | `scene:focus(targets?, options?)` | `scene.focus(targets?, options?)` | Fit targets with a 2D camera, or restore the opening camera when omitted. Options: `padding` (0.15), `duration`, `curve`. |
 
-`timing` is a table/object with `duration` and `curve`; do not combine it with positional timing arguments.
+`options` is a table/object with `duration` and `curve`, plus the camera operation's fields. Omit it to use the defaults.
 
 ## Camera fields
 
@@ -37,8 +37,8 @@ local scene = vis.scene {
 
 local ball = scene:circle {id = "ball", center = {-2, 0}, radius = 0.5, fill = "accent"}
 local other = scene:rectangle {id = "other", center = {2, 0}, size = {1, 1}, stroke = "foreground"}
-scene:look({target = ball, height = 2.5}, 1)
-scene:look({target = other, height = 2.5}, 1)
+scene:look({target = ball, height = 2.5}, {duration = 1})
+scene:look({target = other, height = 2.5}, {duration = 1})
 
 return scene
 ```
@@ -51,8 +51,8 @@ const scene = vis.scene({
 
 const ball = scene.circle({id: "ball", center: [-2, 0], radius: 0.5, fill: "accent"});
 const other = scene.rectangle({id: "other", center: [2, 0], size: [1, 1], stroke: "foreground"});
-scene.look({target: ball, height: 2.5}, 1);
-scene.look({target: other, height: 2.5}, 1);
+scene.look({target: ball, height: 2.5}, {duration: 1});
+scene.look({target: other, height: 2.5}, {duration: 1});
 
 return scene;
 ```

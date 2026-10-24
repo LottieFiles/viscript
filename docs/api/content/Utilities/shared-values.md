@@ -35,7 +35,7 @@ local scene = vis.scene {
 
 scene:text {id = "caption", text = "tween: transform", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
 local subject = scene:rectangle {id = "subject", size = {2.6, 1.5}, stroke = "accent", fill = "accent", width = 3}
-scene:tween({target = subject, transform = {0,-1,0,1, 1,0,0,0, 0,0,1,0, 0,0,0,1}}, 1.4)
+scene:tween({target = subject, transform = {0,-1,0,1, 1,0,0,0, 0,0,1,0, 0,0,0,1}}, {duration = 1.4})
 
 return scene
 ```
@@ -48,7 +48,7 @@ const scene = vis.scene({
 
 scene.text({id: "caption", text: "tween: transform", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
 const subject = scene.rectangle({id: "subject", size: [2.6, 1.5], stroke: "accent", fill: "accent", width: 3});
-scene.tween({target: subject, transform: [0,-1,0,1, 1,0,0,0, 0,0,1,0, 0,0,0,1]}, 1.4);
+scene.tween({target: subject, transform: [0,-1,0,1, 1,0,0,0, 0,0,1,0, 0,0,0,1]}, {duration: 1.4});
 
 return scene;
 ```

@@ -7,7 +7,7 @@ parent: utilities
 
 # Scene Compilation
 
-Compile a JavaScript builder to Lua, or evaluate trusted editor JavaScript into a builder before loading it.
+Host and editor tools can compile a JavaScript builder to Lua, or evaluate trusted JavaScript into a builder before loading it. Scene scripts create builders with `vis.scene()` and return them directly.
 
 ## Functions
 
@@ -16,7 +16,7 @@ Compile a JavaScript builder to Lua, or evaluate trusted editor JavaScript into 
 | — | `compileScene(scene)` | Compile a JavaScript `SceneBuilder` to Lua source. |
 | — | `evaluateScene(source, name?)` | Evaluate trusted JavaScript source that returns an owning root `SceneBuilder`; default name is `scene.js`. |
 
-These exports are available from `bindings.js` and `client.js`. `evaluateScene` runs JavaScript in the host environment; use trusted authoring code. A builder also exposes [scene.compile](../Scene/scene-construction.md).
+These tooling exports are available from `bindings.js` and `client.js`. Hosts can pass a builder directly to `createVis` or `host.load`; explicit compilation is needed when a tool wants Lua source. `evaluateScene` runs JavaScript in the host environment; use trusted authoring code.
 
 Host snippets use the variables from [Shared Host Setup](../Host/setup.md).
 

@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "project": "viscript",
   "projectVersion": "0.1.0",
-  "sourceCommit": "841b00ea5103",
+  "sourceCommit": "86a1f000319a",
   "sourceDirty": true,
-  "buildDate": "2026-10-20",
+  "buildDate": "2026-10-23",
   "toolchain": {
     "emscripten": "4.0.19",
     "buildType": "minsize",
@@ -33,32 +33,32 @@
     {
       "path": "vis-wasm.js",
       "bytes": 22366,
-      "sha256": "cfdce928cffa1f0cd456d0ee80e76c6165f429e2273bea626eb23a51b4d4b4b9"
+      "sha256": "b13bd4232ad6a3532d7293d8186ceee41c53083a8573ce0abb333031f1debcc5"
     },
     {
       "path": "vis-wasm.wasm",
-      "bytes": 1184580,
-      "sha256": "931f96db752ea19e0cb74850f1109663391cb0ec5e79e8b7f3af93af4fc39aca"
+      "bytes": 1185571,
+      "sha256": "5f6d49c197f3cd667608ae11d997601c28d1ae0c8147ba3f66c5bf2cb940f72a"
     },
     {
       "path": "client.js",
-      "bytes": 31852,
-      "sha256": "0fc654f7a372f1ad158917426d8f14f4827501edc069ae0fa62c83928f331623"
+      "bytes": 31838,
+      "sha256": "a1152f5c9d55c4ec0f93f87974fe3cd53b82e562a96edf9d0b03ef4c235a24f8"
     },
     {
       "path": "client.d.ts",
-      "bytes": 14115,
-      "sha256": "108d5cdbc41e0acaa4a96ad24abcece85ccd1d214e5da53ebb1728b8c8ce491a"
+      "bytes": 14150,
+      "sha256": "848e7b0ebd508c1c9e83c415d95d9525c98602ad783603bfe548cb4e4dea6c2c"
     },
     {
       "path": "bindings.js",
-      "bytes": 197971,
-      "sha256": "a3a0aed3443a402af10e3b641e62b64d0350a563016bfcd8ded9bce26838b1b8"
+      "bytes": 194157,
+      "sha256": "e9bc0094600c4fc9e10781a231aa7ae5a311651bb6df537c3acb0945b20a05e1"
     },
     {
       "path": "bindings.d.ts",
-      "bytes": 71925,
-      "sha256": "2cf2e18ca9225fd77821e803ec28061204a71cedf38a1575b8ef650a484c3ed0"
+      "bytes": 68684,
+      "sha256": "e125b758f82c7243349abfe3656a316a4ca46ea68adab9ba4e43a37bff1daf52"
     },
     {
       "path": "Pretendard.ttf",

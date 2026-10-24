@@ -30,7 +30,7 @@ local basis = space:vector {
     id = "basis-x",
 }
 
-scene:create({ world, space, square, basis }, 0.8, "ease_out", 0.12)
+scene:create({ world, space, square, basis }, {duration = 0.8, curve = "ease_out", lag = 0.12})
 scene:transform(space, {
     1.0,
     0.65,
@@ -48,6 +48,6 @@ scene:transform(space, {
     0,
     0,
     1,
-}, 1.4, "ease_in_out")
+}, {duration = 1.4, curve = "ease_in_out"})
 scene:wait(0.5)
 return scene

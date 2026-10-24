@@ -23,10 +23,10 @@ Use the handle returned by `scene:view` / `scene.view`.
 
 | Lua | JavaScript | Purpose |
 | --- | --- | --- |
-| `view:look(camera, duration?, curve?)`<br />`view:look(camera, timing)` | `view.look(camera, duration?, curve?)`<br />`view.look(camera, timing)` | Animate this view's camera with the scene camera's arguments. |
+| `view:look(camera, options?)` | `view.look(camera, options?)` | Animate this view's camera with the scene camera's arguments. |
 | `view:orbit(radians, options?)` | `view.orbit(radians, options?)` | Orbit this view's 3D camera; options: `axis`, `duration`, `curve`. |
 | `view:focus(targets?, options?)` | `view.focus(targets?, options?)` | Fit targets inside this view, or restore its opening camera; options: `padding`, `duration`, `curve`. |
-| `view:fade(opacity, duration?, curve?)`<br />`view:fade(opacity, timing)` | `view.fade(opacity, duration?, curve?)`<br />`view.fade(opacity, timing)` | Fade the whole view to opacity 0–1; default duration 1 and curve `smooth`. |
+| `view:fade(opacity, options?)` | `view.fade(opacity, options?)` | Fade the whole view to opacity 0–1; default duration 1 and curve `smooth`. |
 
 ## Examples
 
@@ -45,7 +45,7 @@ local other = scene:rectangle {id = "other", center = {2, 0}, size = {1, 1}, str
 local view = scene:view({x = 0.55, y = 0.05, width = 0.4, height = 0.4}, {
     camera = {target = {-2, 0}, height = 2.5}, background = "surface", layer = 20,
 })
-scene:shift(ball, {4, 0}, 1.5)
+scene:shift(ball, {4, 0}, {duration = 1.5})
 
 return scene
 ```
@@ -61,7 +61,7 @@ const other = scene.rectangle({id: "other", center: [2, 0], size: [1, 1], stroke
 const view = scene.view({x: 0.55, y: 0.05, width: 0.4, height: 0.4}, {
     camera: {target: [-2, 0], height: 2.5}, background: "surface", layer: 20,
 });
-scene.shift(ball, [4, 0], 1.5);
+scene.shift(ball, [4, 0], {duration: 1.5});
 
 return scene;
 ```
@@ -81,7 +81,7 @@ local other = scene:rectangle {id = "other", center = {2, 0}, size = {1, 1}, str
 local view = scene:view({x = 0.55, y = 0.05, width = 0.4, height = 0.4}, {
     camera = {target = {-2, 0}, height = 2.5}, background = "surface", layer = 20,
 })
-view:look({target = other}, 1.5)
+view:look({target = other}, {duration = 1.5})
 
 return scene
 ```
@@ -97,7 +97,7 @@ const other = scene.rectangle({id: "other", center: [2, 0], size: [1, 1], stroke
 const view = scene.view({x: 0.55, y: 0.05, width: 0.4, height: 0.4}, {
     camera: {target: [-2, 0], height: 2.5}, background: "surface", layer: 20,
 });
-view.look({target: other}, 1.5);
+view.look({target: other}, {duration: 1.5});
 
 return scene;
 ```
@@ -195,8 +195,8 @@ local other = scene:rectangle {id = "other", center = {2, 0}, size = {1, 1}, str
 local view = scene:view({x = 0.55, y = 0.05, width = 0.4, height = 0.4}, {
     camera = {target = {-2, 0}, height = 2.5}, background = "surface", layer = 20,
 })
-view:fade(0, 1)
-view:fade(1, 1)
+view:fade(0, {duration = 1})
+view:fade(1, {duration = 1})
 
 return scene
 ```
@@ -212,8 +212,8 @@ const other = scene.rectangle({id: "other", center: [2, 0], size: [1, 1], stroke
 const view = scene.view({x: 0.55, y: 0.05, width: 0.4, height: 0.4}, {
     camera: {target: [-2, 0], height: 2.5}, background: "surface", layer: 20,
 });
-view.fade(0, 1);
-view.fade(1, 1);
+view.fade(0, {duration: 1});
+view.fade(1, {duration: 1});
 
 return scene;
 ```

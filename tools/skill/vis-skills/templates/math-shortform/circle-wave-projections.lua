@@ -57,14 +57,14 @@ local axes = {
     scene:line {id = "projection-cos-axis", from = {graph.x0, graph.cosineY}, to = {graph.x0 + graph.width, graph.cosineY}, stroke = "border", width = 1},
 }
 local live = members(0)
-scene:create({circle, axes[1], axes[2], axes[3], axes[4]}, 0.55, "ease_out", 0.04)
-scene:create(array(live), 0.45, "ease_out", 0.02)
+scene:create({circle, axes[1], axes[2], axes[3], axes[4]}, {duration = 0.55, curve = "ease_out", lag = 0.04})
+scene:create(array(live), {duration = 0.45, curve = "ease_out", lag = 0.02})
 scene:wait(0.35)
 
 -- Constant-point traces accumulate while every dependent reaches the same phase.
 for step = 1, steps do
     local target = members(step)
-    scene:morph(array(live), array(target), 0.065, "linear", 0)
+    scene:morph(array(live), array(target), {duration = 0.065, curve = "linear", lag = 0})
     live = target
 end
 

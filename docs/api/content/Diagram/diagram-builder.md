@@ -94,7 +94,7 @@ local output = diagram:node {id = "output", label = "Output", detail = "result",
 local edge = diagram:connect {id = "process", from = input, to = output, label = "process"}
 local zone = diagram:zone {id = "pipeline", label = "Pipeline", members = {input, output}}
 local built = diagram:build()
-scene:set {target = built:edge(edge), stroke = "accent"}
+scene:set {target = built:object(edge), stroke = "accent"}
 
 return scene
 ```
@@ -117,8 +117,8 @@ local output = diagram:node {id = "output", label = "Output", detail = "result",
 local edge = diagram:connect {id = "process", from = input, to = output, label = "process"}
 local zone = diagram:zone {id = "pipeline", label = "Pipeline", members = {input, output}}
 local built = diagram:build()
-scene:set {target = built:zone_body(zone), stroke = "accent"}
-scene:set {target = built:zone_label(zone), fill = "accent"}
+scene:set {target = built:body(zone), stroke = "accent"}
+scene:set {target = built:label(zone), fill = "accent"}
 
 return scene
 ```

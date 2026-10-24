@@ -14,7 +14,7 @@ Rules for every viscript scene. Profiles may narrow a default; they never weaken
 Leave out every option that equals its default; write a default only beside variants that set the same option otherwise, such as one centered label among left-aligned ones.
 
 - A Scene is 960×540 at 30 fps, has `loop = false`, takes the `adaptive` theme, and looks at the origin through a fixed 2D camera 6 units tall: `camera = {height = 8}` names only what differs.
-- A `3d` camera is perspective with +y up, and a 2D one orthographic. `look` changes only the fields it names (`scene:look({eye = {-6, 4.5, 8}}, 2)`), so a 2D camera turned `3d` stays orthographic unless it names `projection = "perspective"`.
+- A `3d` camera is perspective with +y up, and a 2D one orthographic. `look` changes only the fields it names (`scene:look({eye = {-6, 4.5, 8}}, {duration = 2})`), so a 2D camera turned `3d` stays orthographic unless it names `projection = "perspective"`.
 - A shape has no fill until given one, so an outline needs only `stroke`. A filled shape without `stroke` still gets an outline in a Theme color, so a fill-only shape sets `width = 0`. A circle sits on the origin with radius 1, and a rectangle on the origin.
 - Text sits on the origin, centered (`align = {0.5, 0.5}`), in the `text` role.
 

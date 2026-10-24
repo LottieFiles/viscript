@@ -58,16 +58,16 @@ local labels = {
 }
 
 -- Establish direction and stops before connecting the projected sample to its ramp cell.
-scene:create(direction, 0.55, "ease_out")
-scene:grow_from_center(stops[1], 0.18, "ease_out")
-scene:grow_from_center(stops[2], 0.18, "ease_out")
+scene:create(direction, {duration = 0.55, curve = "ease_out"})
+scene:grow_from_center(stops[1], {duration = 0.18, curve = "ease_out"})
+scene:grow_from_center(stops[2], {duration = 0.18, curve = "ease_out"})
 scene:fade_in(labels[1], {shift = {0, 0.08}, duration = 0.22, curve = "gentle"})
 scene:fade_in(labels[3], {shift = {0, 0.08}, duration = 0.22, curve = "gentle"})
-scene:grow_from_center(sample, 0.22, "ease_out")
-scene:create(guide, 0.36, "ease_out")
+scene:grow_from_center(sample, {duration = 0.22, curve = "ease_out"})
+scene:create(guide, {duration = 0.36, curve = "ease_out"})
 scene:fade_in(labels[2], {shift = {0, 0.08}, duration = 0.22, curve = "gentle"})
-scene:create(gradient, 0.95, "linear")
-scene:create(selected, 0.28, "ease_out")
+scene:create(gradient, {duration = 0.95, curve = "linear"})
+scene:create(selected, {duration = 0.28, curve = "ease_out"})
 scene:fade_in(labels[4], {shift = {0, -0.08}, duration = 0.28, curve = "gentle"})
 scene:wait(1.2)
 return scene

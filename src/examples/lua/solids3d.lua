@@ -104,7 +104,7 @@ local cylinder_label = space:text {
     fill = "#7bd88f",
 }
 
-scene:create(shapes, 1.2, "ease_out", 0.025)
-scene:create({ cube_label, pyramid_label, cylinder_label }, 0.45, "ease_out", 0.08)
+scene:create(shapes, {duration = 1.2, curve = "ease_out", lag = 0.025})
+scene:create({ cube_label, pyramid_label, cylinder_label }, {duration = 0.45, curve = "ease_out", lag = 0.08})
 scene:wait(0.7)
 return scene

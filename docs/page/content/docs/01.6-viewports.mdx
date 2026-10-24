@@ -33,31 +33,31 @@ local cards = {
         local ray = s:line {from = {0, 0}, to = {math.cos(0.9), math.sin(0.9)}, stroke = "accent", width = 3}
         local mark = s:angle {vertex = {0, 0}, from = {1, 0}, to = {math.cos(0.9), math.sin(0.9)}, radius = 0.35,
                               stroke = "warning", width = 2, label = "θ"}
-        s:create(ring, 0.6)
-        s:create(ray, 0.4)
-        s:create(mark, 0.4)
+        s:create(ring, {duration = 0.6})
+        s:create(ray, {duration = 0.4})
+        s:create(mark, {duration = 0.4})
     end),
     card("sin and cos", function(s)
         local axes = s:space {x = {-2.2, 2.2, 1.1}, y = {-1.1, 1.1, 1}}
         local sin = axes:plot {fn = function(x) return math.sin(1.4 * x) end, x_range = {-2.2, 2.2, 0.05}, stroke = "accent", width = 2.5}
         local cos = axes:plot {fn = function(x) return math.cos(1.4 * x) end, x_range = {-2.2, 2.2, 0.05}, stroke = "warning", width = 2.5}
-        s:create(axes, 0.4)
-        s:create({sin, cos}, 1, "smooth", 0.2)
+        s:create(axes, {duration = 0.4})
+        s:create({sin, cos}, {duration = 1, curve = "smooth", lag = 0.2})
     end),
     card("Pythagorean identity", function(s)
         local eq = s:tex {tex = {{"\\sin^2\\theta", color = "accent"}, "+", {"\\cos^2\\theta", color = "warning"}, "=", "1"},
                           point = {0, 0.1}, size = 26}
-        s:write(eq, 1)
+        s:write(eq, {duration = 1})
     end),
     card("right triangle", function(s)
         local tri = s:polygon {points = {{-1.3, -0.9}, {1.3, -0.9}, {1.3, 0.9}}, stroke = "foreground", width = 2}
         local h = s:text {text = "hyp", point = {-0.2, 0.25}, size = 14, color = "muted"}
         local o = s:text {text = "opp", point = {1.6, 0}, size = 14, color = "accent"}
         local a = s:text {text = "adj", point = {0, -1.15}, size = 14, color = "warning"}
-        s:create(tri, 0.6)
-        s:write(o, 0.3)
-        s:write(a, 0.3)
-        s:write(h, 0.3)
+        s:create(tri, {duration = 0.6})
+        s:write(o, {duration = 0.3})
+        s:write(a, {duration = 0.3})
+        s:write(h, {duration = 0.3})
     end),
     card("special angles", function(s)
         local t = s:table {header = {"θ", "sin", "cos"},
@@ -68,8 +68,8 @@ local cards = {
     card("derivatives", function(s)
         local d1 = s:tex {tex = "\\frac{d}{dx}\\sin x = \\cos x", point = {0, 0.6}, size = 18}
         local d2 = s:tex {tex = "\\frac{d}{dx}\\cos x = -\\sin x", point = {0, -0.5}, size = 18}
-        s:write(d1, 0.8)
-        s:write(d2, 0.8)
+        s:write(d1, {duration = 0.8})
+        s:write(d2, {duration = 0.8})
     end),
 }
 
@@ -104,31 +104,31 @@ const cards = [
         const ray = s.line({from: [0, 0], to: tip, stroke: "accent", width: 3});
         const mark = s.angle({vertex: [0, 0], from: [1, 0], to: tip, radius: 0.35,
                               stroke: "warning", width: 2, label: "θ"});
-        s.create(ring, 0.6);
-        s.create(ray, 0.4);
-        s.create(mark, 0.4);
+        s.create(ring, {duration: 0.6});
+        s.create(ray, {duration: 0.4});
+        s.create(mark, {duration: 0.4});
     }),
     card("sin and cos", (s) => {
         const axes = s.space({x: [-2.2, 2.2, 1.1], y: [-1.1, 1.1, 1]});
         const sin = axes.plot({fn: (x) => Math.sin(1.4 * x), x_range: [-2.2, 2.2, 0.05], stroke: "accent", width: 2.5});
         const cos = axes.plot({fn: (x) => Math.cos(1.4 * x), x_range: [-2.2, 2.2, 0.05], stroke: "warning", width: 2.5});
-        s.create(axes, 0.4);
-        s.create([sin, cos], 1, "smooth", 0.2);
+        s.create(axes, {duration: 0.4});
+        s.create([sin, cos], {duration: 1, curve: "smooth", lag: 0.2});
     }),
     card("Pythagorean identity", (s) => {
         const eq = s.tex({tex: [{text: "\\sin^2\\theta", color: "accent"}, "+", {text: "\\cos^2\\theta", color: "warning"}, "=", "1"],
                           point: [0, 0.1], size: 26});
-        s.write(eq, 1);
+        s.write(eq, {duration: 1});
     }),
     card("right triangle", (s) => {
         const tri = s.polygon({points: [[-1.3, -0.9], [1.3, -0.9], [1.3, 0.9]], stroke: "foreground", width: 2});
         const h = s.text({text: "hyp", point: [-0.2, 0.25], size: 14, color: "muted"});
         const o = s.text({text: "opp", point: [1.6, 0], size: 14, color: "accent"});
         const a = s.text({text: "adj", point: [0, -1.15], size: 14, color: "warning"});
-        s.create(tri, 0.6);
-        s.write(o, 0.3);
-        s.write(a, 0.3);
-        s.write(h, 0.3);
+        s.create(tri, {duration: 0.6});
+        s.write(o, {duration: 0.3});
+        s.write(a, {duration: 0.3});
+        s.write(h, {duration: 0.3});
     }),
     card("special angles", (s) => {
         const t = s.table({header: ["θ", "sin", "cos"],
@@ -139,8 +139,8 @@ const cards = [
     card("derivatives", (s) => {
         const d1 = s.tex({tex: "\\frac{d}{dx}\\sin x = \\cos x", point: [0, 0.6], size: 18});
         const d2 = s.tex({tex: "\\frac{d}{dx}\\cos x = -\\sin x", point: [0, -0.5], size: 18});
-        s.write(d1, 0.8);
-        s.write(d2, 0.8);
+        s.write(d1, {duration: 0.8});
+        s.write(d2, {duration: 0.8});
     }),
 ];
 

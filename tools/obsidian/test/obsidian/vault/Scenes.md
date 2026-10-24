@@ -10,8 +10,8 @@ local scene = vis.scene {
 local ball = scene:circle {center = {-3, 0}, radius = 0.5, fill = "accent"}
 scene:text {text = "안녕하세요, viscript", point = {0, 2.2}, size = 26}
 scene:text {text = "local x = 42 -- 코드", point = {0, -2.2}, size = 16, role = "code"}
-scene:grow_from_center(ball, 0.6)
-scene:shift(ball, {6, 0}, 1.5)
+scene:grow_from_center(ball, {duration = 0.6})
+scene:shift(ball, {6, 0}, {duration = 1.5})
 scene:wait(0.5)
 return scene
 ```
@@ -26,7 +26,7 @@ A JavaScript scene:
 const scene = vis.scene({width: 640, height: 240, camera: {view: "2d", target: [0, 0], height: 4}});
 const dot = scene.circle({center: [-2, 0], radius: 0.4, fill: "accent"});
 scene.text({text: "JavaScript", point: [0, 1.3], size: 18});
-scene.growFromCenter(dot, 0.5).shift(dot, [4, 0], 1).wait(0.3);
+scene.growFromCenter(dot, {duration: 0.5}).shift(dot, [4, 0], {duration: 1}).wait(0.3);
 return scene;
 ```
 

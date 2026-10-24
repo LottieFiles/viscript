@@ -65,8 +65,8 @@ for i, item in ipairs({ { -4.2, "linear · from → to" }, { 0, "radial · cente
     }
 end
 
-scene:create(title, 0.4, "ease_out")
-scene:create({ linear, radial, conic }, 0.8, "ease_out", 0.1)
-scene:create(labels, 0.4, "ease_out", 0.05)
+scene:create(title, {duration = 0.4, curve = "ease_out"})
+scene:create({ linear, radial, conic }, {duration = 0.8, curve = "ease_out", lag = 0.1})
+scene:create(labels, {duration = 0.4, curve = "ease_out", lag = 0.05})
 scene:wait(0.6)
 return scene

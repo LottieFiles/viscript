@@ -196,7 +196,7 @@ local function playGroup(group)
         local state = evaluate(binding, args, 1)
         local duration = to.time - from.time
         scene:seek(from.time)
-        scene:tween({descriptor(binding, state)}, duration, "linear")
+        scene:tween({descriptor(binding, state)}, {duration = duration, curve = "linear"})
     end
 end
 
@@ -229,7 +229,7 @@ local function run()
             end
             if #batch > 0 then
                 scene:seek(track.bounds[step - 1])
-                scene:tween(batch, track.bounds[step] - track.bounds[step - 1], "linear")
+                scene:tween(batch, {duration = track.bounds[step] - track.bounds[step - 1], curve = "linear"})
             end
         end
         for _, binding in ipairs(track.affected) do
@@ -281,27 +281,27 @@ function methods.bind(scene, object, source, fn)
     return object
 end
 
--- scene:track(tracker, value, duration, curve) or scene:track({{tracker, value}, ...}, duration, curve)
+-- scene:track(tracker, value, options) or scene:track({{tracker, value}, ...}, options)
 -- moves the trackers now, samples the bound functions once a frame and leaves room on the
 -- timeline; the segments play at the next scene call that adds or reads clips, or when the
 -- script ends. Until then a later track that overlaps this one on a binding of other trackers
 -- merges with it, and the binding shows the values of all of them at every sample.
 function methods.track(scene, first, ...)
-    local moves, duration, curve
+    local moves, options
     if trackers[first] then
+        if select("#", ...) ~= 2 then error("track requires a value and timing options", 2) end
         moves = {{first, (...)}}
-        duration, curve = select(2, ...)
+        options = select(2, ...)
     else
         if type(first) ~= "table" or #first == 0 then error("track requires a tracker or an array of {tracker, value}", 2) end
+        if select("#", ...) ~= 1 then error("track requires timing options", 2) end
         moves = first
-        duration, curve = ...
+        options = ...
     end
-    if type(duration) == "table" then
-        if curve ~= nil then error("timing options cannot be combined with positional arguments", 2) end
-        local values = call(2, timing, duration)
-        duration, curve = values[1], values[2]
-        if duration == nil then duration = 1 end
-    end
+    if type(options) ~= "table" then error("track requires timing options", 2) end
+    local values = call(2, timing, options)
+    local duration, curve = values[1], values[2]
+    if duration == nil then duration = 1 end
     if type(duration) ~= "number" or not (duration > 0) or duration == math.huge then
         error("track duration must be a positive finite number", 2)
     end

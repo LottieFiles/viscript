@@ -15,7 +15,7 @@ Follow an outline with `move_along`, integrate a vector field with `advect`, or 
 | --- | --- | --- |
 | `scene:move_along(targets, path, options?)` | `scene.moveAlong(targets, path, options?)` | Move bounds centers along an outline. Options: `from` (0), `to` (1), `orient` (false), `duration`, `curve`, `lag`. |
 | `scene:advect(targets, fn, options?)` | — | Integrate motion through `fn(x, y)` returning a field vector; options: `speed` (1, nonzero), `duration`, `curve` (`linear`). |
-| `scene:warp(targets, fnOrSamples, duration?, curve?, options?)`<br />`scene:warp(targets, fnOrSamples, timingAndStep)` | `scene.warp(targets, fn, options)`<br />`scene.warp(targets, fn, duration, curve, options)` | Bend geometry toward a sampled parent-space map. Lua accepts `fn(x, y, z)` or sampled `x_range`, `y_range`, `values`; JS samples `fn(x, y)` using required `x_range`, `y_range`. Options: `step` (0.05), timing. |
+| `scene:warp(targets, fnOrSamples, options?)` | `scene.warp(targets, fn, options)` | Bend geometry toward a sampled parent-space map. Lua accepts `fn(x, y, z)` or sampled `x_range`, `y_range`, `values`; JS samples `fn(x, y)` using required `x_range`, `y_range`. Options: `step` (0.05), timing. |
 
 Ordinary path outlines are copied when scheduled; connector paths retain live endpoints. Timing follows the [shared rules](./index.md).
 

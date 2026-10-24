@@ -36,13 +36,13 @@ local edge = diagram:connect {
 diagram:zone {id = "frontend", label = "Frontend", members = {parser, lower}}
 local built_diagram = diagram:build()
 scene:fade_in(built_diagram:nodes(), {duration = 0.2})
-scene:create(built_diagram:routes(), 0.2, "linear")
-scene:tween({target = built_diagram:edge(edge), dash_offset = -0.36}, 0.2, "linear")
-scene:indicate(built_diagram:node(lower), {duration = 0.2, scale = 1.05})
+scene:create(built_diagram:routes(), {duration = 0.2, curve = "linear"})
+scene:tween({target = built_diagram:object(edge), dash_offset = -0.36}, {duration = 0.2, curve = "linear"})
+scene:indicate(built_diagram:object(lower), {duration = 0.2, scale = 1.05})
 
 if vis.ui then
     local panel = vis.ui.panel(scene)
-    panel:camera_reset()
+    panel:camera("reset")
 end
 return scene
 )lua";
@@ -64,6 +64,76 @@ return scene
 #endif
 
 #if defined(VIS_DIAGRAM)
+// Part selection dispatches on semantic handle types while returning the Scene's ordinary
+// object handles, including nil for an absent edge label or node detail.
+static void diagramParts()
+{
+    static constexpr char source[] = R"lua(
+local scene = vis.scene {}
+local diagram = vis.diagram(scene, {id = "parts"})
+local a = diagram:node {id = "a", label = "A", detail = "source"}
+local b = diagram:node {id = "b", label = "B"}
+local c = diagram:node {id = "c", label = "C"}
+local edge = diagram:connect {id = "ab", from = a, to = b, label = "flow"}
+local unlabelled = diagram:connect {id = "bc", from = b, to = c}
+local zone = diagram:zone {id = "scope", label = "Scope", members = {a, b}}
+local built = diagram:build()
+local selections = {
+    {built:object(a), "parts:node:a"},
+    {built:body(a), "parts:node:a:body"},
+    {built:label(a), "parts:node:a:label"},
+    {built:detail(a), "parts:node:a:detail"},
+    {built:object(edge), "parts:edge:ab"},
+    {built:label(edge), "parts:edge:ab:label"},
+    {built:object(zone), "parts:zone:scope"},
+    {built:body(zone), "parts:zone:scope:body"},
+    {built:label(zone), "parts:zone:scope:label"},
+}
+for _, selection in ipairs(selections) do
+    if selection[1] ~= scene:find(selection[2]) then error("wrong semantic part") end
+end
+if built:detail(b) ~= nil then error("unexpected node detail") end
+if built:label(unlabelled) ~= nil then error("unexpected edge label") end
+return scene
+)lua";
+    delete _loaded(source, "diagram-parts.lua");
+
+    static constexpr const char* invalid[][2] = {
+        {"built:object({})", "diagram node, edge or zone expected"},
+        {"built:label(scene)", "diagram node, edge or zone expected"},
+        {"built:body(edge)", "diagram node or zone expected"},
+        {"built:detail(edge)", "vis.diagram.Node expected"},
+        {"built:detail(zone)", "vis.diagram.Node expected"},
+        {"built:object(foreign_node)", "another diagram"},
+        {"built:object(foreign_edge)", "another diagram"},
+        {"built:object(foreign_zone)", "another diagram"},
+        {"built:body(foreign_node)", "another diagram"},
+        {"built:body(foreign_zone)", "another diagram"},
+        {"built:label(foreign_node)", "another diagram"},
+        {"built:label(foreign_edge)", "another diagram"},
+        {"built:label(foreign_zone)", "another diagram"},
+        {"built:detail(foreign_node)", "another diagram"},
+    };
+    for (auto& item : invalid) {
+        char script[1024];
+        std::snprintf(script, sizeof(script), R"lua(
+local scene = vis.scene {}
+local diagram = vis.diagram(scene, {id = "parts"})
+local a, b = diagram:node {id = "a"}, diagram:node {id = "b"}
+local edge = diagram:connect {id = "ab", from = a, to = b}
+local zone = diagram:zone {id = "scope", members = {a, b}}
+local foreign = vis.diagram(scene, {id = "foreign"})
+local foreign_node, other = foreign:node {id = "a"}, foreign:node {id = "b"}
+local foreign_edge = foreign:connect {id = "ab", from = foreign_node, to = other}
+local foreign_zone = foreign:zone {id = "scope", members = {foreign_node, other}}
+local built = diagram:build()
+%s
+return scene
+)lua", item[0]);
+        _scriptError(script, "diagram-parts.lua", item[1]);
+    }
+}
+
 static void diagramScriptFailures()
 {
     static constexpr char mutation[] = R"lua(
@@ -331,6 +401,7 @@ int main()
 {
 #if defined(VIS_DIAGRAM)
     combinedModules();
+    diagramParts();
     diagramScriptFailures();
     luaReceipt();
     numericDiagramText();

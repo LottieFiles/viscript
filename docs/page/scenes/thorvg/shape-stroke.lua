@@ -218,11 +218,11 @@ end
 -- ------------------------------------------------------------------ timeline helpers (durations x SL)
 local function wait(d) scene:wait(d * SL) end
 local function play(list, d, curve)
-  if #list > 0 then scene:tween(list, d * SL, curve or "linear") else scene:wait(d * SL) end
+  if #list > 0 then scene:tween(list, {duration = d * SL, curve = curve or "linear"}) else scene:wait(d * SL) end
 end
-local function create(list, d, curve, lag) scene:create(list, d * SL, curve or "linear", (lag or 0) * SL) end
-local function grow(o, d) scene:grow_from_center(o, d * SL, "ease_out") end
-local function look(c, d) scene:look(c, d * SL, "ease_in_out") end
+local function create(list, d, curve, lag) scene:create(list, {duration = d * SL, curve = curve or "linear", lag = (lag or 0) * SL}) end
+local function grow(o, d) scene:grow_from_center(o, {duration = d * SL, curve = "ease_out"}) end
+local function look(c, d) scene:look(c, {duration = d * SL, curve = "ease_in_out"}) end
 local function mark(n) scene:mark(n) end
 local function show(list, value)
   local out = {}
@@ -854,7 +854,7 @@ for _, e in ipairs(importedData.STROKER) do
     local st = side[s]
     local last = st.pieces[#st.pieces]
     local newMain = pathObj(map({last.from, p}, W), STYLE[s])
-    scene:morph({last.main}, {newMain}, 0.28 * SL, "ease_in_out")
+    scene:morph({last.main}, {newMain}, {duration = 0.28 * SL, curve = "ease_in_out"})
     last.main = newMain
     st.pts[#st.pts] = p
     st.samples[#st.samples] = p

@@ -17,7 +17,7 @@ let tpos = y0 + (S.length - 1) * h;
 const top = T(scene, "ptr:top", "top", x - 0.85, tpos, 14, C.warn, [1, 0.5]);
 function point() {
     const y = y0 + Math.max(S.length - 1, 0) * h;
-    if (y !== tpos) { scene.shift(top, [0, y - tpos], 0.22, "smooth"); tpos = y; }
+    if (y !== tpos) { scene.shift(top, [0, y - tpos], {duration: 0.22, curve: "smooth"}); tpos = y; }
 }
 scene.wait(0.5);
 for (const [op, v] of OPS) {
@@ -28,7 +28,7 @@ for (const [op, v] of OPS) {
         point();
     } else {
         const o = S.pop();
-        scene.tween({target: o.b, stroke: C.warn}, 0.15);
+        scene.tween({target: o.b, stroke: C.warn}, {duration: 0.15});
         scene.parallel(() => scene.fadeOut(o.g, {shift: [2.2, 0.6], duration: 0.3}), point);
     }
     scene.wait(0.15);
@@ -56,16 +56,16 @@ for (const [op, v] of OPS) {
         const o = item(v);
         scene.fadeIn(o.g, {shift: [1.0, 0], duration: 0.3});
         Q.push(o);
-        if (i !== rpos) scene.shift(rear, [(i - rpos) * gap, 0], 0.2, "smooth");
+        if (i !== rpos) scene.shift(rear, [(i - rpos) * gap, 0], {duration: 0.2, curve: "smooth"});
         rpos = i;
     } else {
         const o = Q.shift();
-        scene.tween({target: o.b, stroke: C.accent}, 0.12);
+        scene.tween({target: o.b, stroke: C.accent}, {duration: 0.12});
         const m = Q.map((q) => toward(q, q.x - gap, q.y));
         m.push({target: rear, shift: [-gap, 0]});
         rpos -= 1;
         scene.parallel(() => scene.fadeOut(o.g, {shift: [-1.2, 0], duration: 0.3}),
-                       () => scene.tween(m, 0.3, "smooth"));
+                       () => scene.tween(m, {duration: 0.3, curve: "smooth"}));
     }
     scene.wait(0.15);
 }
@@ -91,20 +91,20 @@ for (let i = 1; i <= vals.length; i++) {
                                 stroke: C.line, width: 2, tip: 8, layer: L.edge});
 }
 const ptr = (id, label, i, color, dy) => ({t: T(scene, id, label, X(i), y + dy, 13, color), i});
-function move(p, i) { scene.shift(p.t, [(i - p.i) * gap, 0], 0.3, "smooth"); p.i = i; }
+function move(p, i) { scene.shift(p.t, [(i - p.i) * gap, 0], {duration: 0.3, curve: "smooth"}); p.i = i; }
 const prev = ptr("ptr:prev", "prev", 0, C.alt, -0.75);
 const head = ptr("ptr:head", "head", 1, C.accent, 0.72);
 const nxt = ptr("ptr:next", "next", 1, C.warn, -1.15);
 scene.set({target: nxt.t, opacity: 0});
 scene.wait(0.4);
 for (let i = 1; i <= vals.length; i++) {
-    together(() => move(nxt, i + 1), () => scene.fade(nxt.t, 1, 0.2),
-             () => scene.stroke(nextArrow[i], C.warn, 0.2));
+    together(() => move(nxt, i + 1), () => scene.fade(nxt.t, 1, {duration: 0.2}),
+             () => scene.stroke(nextArrow[i], C.warn, {duration: 0.2}));
     // the same pointer swings round its node: it now points back at prev
     together(() => scene.rotate(nextArrow[i], -Math.PI, {about: [X(i), y], duration: 0.55, curve: "smooth"}),
-             () => scene.stroke(nextArrow[i], C.ok, 0.55));
+             () => scene.stroke(nextArrow[i], C.ok, {duration: 0.55}));
     move(prev, i);
-    together(() => move(head, i + 1), () => scene.fade(nxt.t, 0, 0.2));
+    together(() => move(head, i + 1), () => scene.fade(nxt.t, 0, {duration: 0.2}));
 }
 say("new head", X(vals.length), y + 0.72, C.ok);
 scene.indicate(prev.t, {color: C.ok, scale: 1.3, duration: 0.6});
@@ -151,7 +151,7 @@ function compare(s, x, y, color) {
                  fill: "#000000", stroke: C.none, layer: L.focus - 1});
     T(g, "cmp:" + cmpN + ":text", s, 0, 0, 15, color, undefined, L.focus);
     if (cmpCur) scene.fadeOut(cmpCur, {duration: 0.15});
-    scene.tween({target: g, opacity: 1}, 0.2);
+    scene.tween({target: g, opacity: 1}, {duration: 0.2});
     cmpCur = g;
 }
 function compareClear() {
@@ -163,14 +163,14 @@ TRACE.forEach((e, k) => {
     const i = k + 1;
     const probe = row[k];
     say(null);
-    scene.tween({target: probe.b, stroke: C.warn}, 0.15);
+    scene.tween({target: probe.b, stroke: C.warn}, {duration: 0.15});
     let x = 0, y = 1.45, span = 2.2;
     if (e.path.length === 0) say("empty tree: " + e.key + " becomes the root", 0, 0.75);
     for (const p of e.path) {
         const nd = placed[p.node];
         // stand beside the node on the side the key is about to take
         const side = p.go === "left" ? -1 : 1;
-        scene.tween(toward(probe, nd.x + side * 0.8, nd.y + 0.05), 0.32, "smooth");
+        scene.tween(toward(probe, nd.x + side * 0.8, nd.y + 0.05), {duration: 0.32, curve: "smooth"});
         const lt = p.go === "left";
         say(null);
         compare(\`\${e.key} \${lt ? "<" : ">"} \${p.node}  →  \${p.go}\`,
@@ -183,13 +183,13 @@ TRACE.forEach((e, k) => {
     }
     const parent = e.path[e.path.length - 1];
     compareClear();
-    scene.tween(toward(probe, x, y), 0.35, "smooth");
+    scene.tween(toward(probe, x, y), {duration: 0.35, curve: "smooth"});
     if (parent) say(\`empty slot: \${parent.go} child of \${parent.node}\`, x, y - 0.52, C.ok);
     total += e.path.length;
     const nc = T(scene, "bst:count:" + i, \`\${i} keys · \${total} comparison\${total === 1 ? "" : "s"}\`, 5.1, -2.8, 13, C.mute, [1, 0.5]);
     scene.fadeOut(count, {duration: 0.12}); scene.fadeIn(nc, {duration: 0.15});
     count = nc;
-    scene.stroke(probe.b, C.accent, 0.15);
+    scene.stroke(probe.b, C.accent, {duration: 0.15});
     placed[e.key] = {x, y, o: probe};
     if (parent) {
         const pn = placed[parent.node];
@@ -198,7 +198,7 @@ TRACE.forEach((e, k) => {
         const edge = scene.line({id: "edge:" + parent.node + "-" + e.key,
                                  from: [pn.x + ddx / len * R, pn.y + ddy / len * R],
                                  to: [x - ddx / len * R, y - ddy / len * R], stroke: C.line, width: 2, layer: L.edge});
-        scene.create(edge, 0.25);
+        scene.create(edge, {duration: 0.25});
     }
     scene.wait(0.25);
 });
@@ -275,7 +275,7 @@ function swap(i, j) {
     // tree tokens pass each other on opposite arcs; in the array both values hop, one higher
     scene.tween([toward(N[i], xj, yj, 0.9), toward(N[j], xi, yi, 0.9),
                 {target: A[i], shift: [(j - i) * aw, 0], arc: hop(i - j, 0.74)},
-                {target: A[j], shift: [(i - j) * aw, 0], arc: -hop(i - j, 0.36)}], 0.45, "smooth");
+                {target: A[j], shift: [(i - j) * aw, 0], arc: -hop(i - j, 0.36)}], {duration: 0.45, curve: "smooth"});
     [N[i], N[j]] = [N[j], N[i]];
     [A[i], A[j]] = [A[j], A[i]];
 }
@@ -286,15 +286,15 @@ for (const e of TRACE.slice(PRE)) {
     const ed = edge(e.at);
     together(() => scene.fadeIn(N[e.at].g, {scale: 0.6, duration: 0.3}),
              () => scene.fadeIn(A[e.at], {shift: [0, 0.3], duration: 0.3}),
-             () => scene.create(ed, 0.3));
+             () => scene.create(ed, {duration: 0.3}));
     for (const s of e.steps) {
-        scene.tween([{target: N[s.i].b, stroke: C.warn}, {target: N[s.p].b, stroke: C.warn}], 0.15);
+        scene.tween([{target: N[s.i].b, stroke: C.warn}, {target: N[s.p].b, stroke: C.warn}], {duration: 0.15});
         if (s.swap) swap(s.i, s.p); else scene.wait(0.15);
-        scene.tween([{target: N[s.i].b, stroke: C.accent}, {target: N[s.p].b, stroke: C.accent}], 0.12);
+        scene.tween([{target: N[s.i].b, stroke: C.accent}, {target: N[s.p].b, stroke: C.accent}], {duration: 0.12});
     }
     scene.wait(0.15);
 }
-scene.tween({target: N[1].b, stroke: C.ok, fill: "#1c3a26"}, 0.3);
+scene.tween({target: N[1].b, stroke: C.ok, fill: "#1c3a26"}, {duration: 0.3});
 const [rx, ry] = pos(1);
 say("min", rx + 0.5, ry, C.ok, [0, 0.5]);
 scene.indicate(N[1].b, {color: C.ok, scale: 1.15, duration: 0.6});
@@ -320,7 +320,7 @@ const pend = keys.map((key, k) => token("key:" + key, key, -1.6 + k * 1.0, 2.55,
 const sx = 3.4, sy = 0.5;   // where a key is hashed
 function hashAt(o, key) {
     const hv = h(key);
-    scene.tween(toward(o, sx, sy), 0.4, "smooth");
+    scene.tween(toward(o, sx, sy), {duration: 0.4, curve: "smooth"});
     say(\`h(\${key}) = \${hv},  \${hv} mod \${M} = \${hv % M}\`, sx, sy - 0.55);
     return hv % M;
 }
@@ -328,34 +328,34 @@ scene.wait(0.4);
 keys.forEach((key, k) => {
     const o = pend[k];
     const i = hashAt(o, key);
-    scene.stroke(B[i], C.warn, 0.2);
+    scene.stroke(B[i], C.warn, {duration: 0.2});
     const x = bx + 1.25 + chains[i].length * 1.35, y = by0 - i * bh;
     const fx = chains[i].length === 0 ? bx + 0.37 : x - 1.35 + 0.45;
     say(null);
-    scene.tween([toward(o, x, y), {target: o.b, stroke: C.accent}], 0.45, "smooth");
+    scene.tween([toward(o, x, y), {target: o.b, stroke: C.accent}], {duration: 0.45, curve: "smooth"});
     const a = scene.arrow({id: "link:" + key, from: [fx, y], to: [x - 0.45, y], stroke: C.line, width: 1.5, tip: 7, layer: L.edge});
-    scene.parallel(() => scene.create(a, 0.2), () => scene.stroke(B[i], C.line, 0.2));
+    scene.parallel(() => scene.create(a, {duration: 0.2}), () => scene.stroke(B[i], C.line, {duration: 0.2}));
     chains[i].push({o, k: key});
 });
 // lookup: hash once, then walk one short chain
 const probe = token("query", q + "?", sx, 2.55, {size: [0.86, 0.46], stroke: C.warn, text: 14});
 scene.fadeIn(probe.g, {shift: [0, -0.3], duration: 0.3});
 const i = hashAt(probe, q);
-scene.stroke(B[i], C.warn, 0.2);
+scene.stroke(B[i], C.warn, {duration: 0.2});
 let hit = false;
 for (const c of chains[i]) {
-    scene.tween({target: c.o.b, stroke: C.warn}, 0.2);
+    scene.tween({target: c.o.b, stroke: C.warn}, {duration: 0.2});
     if (c.k === q) {
         hit = true;
-        together(() => scene.tween({target: c.o.b, stroke: C.ok, fill: "#1c3a26"}, 0.3),
-                 () => scene.stroke(probe.b, C.ok, 0.3),
+        together(() => scene.tween({target: c.o.b, stroke: C.ok, fill: "#1c3a26"}, {duration: 0.3}),
+                 () => scene.stroke(probe.b, C.ok, {duration: 0.3}),
                  () => say("found in bucket " + i, sx, sy - 0.55, C.ok));
         break;
     }
-    scene.tween({target: c.o.b, stroke: C.accent}, 0.15);
+    scene.tween({target: c.o.b, stroke: C.accent}, {duration: 0.15});
 }
 if (!hit) {
-    together(() => scene.tween({target: B[i], stroke: C.danger}, 0.3),
+    together(() => scene.tween({target: B[i], stroke: C.danger}, {duration: 0.3}),
              () => say("not in the table", sx, sy - 0.55, C.danger));
 }
 scene.wait(2.4);

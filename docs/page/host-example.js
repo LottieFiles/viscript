@@ -29,7 +29,7 @@ function definition(vis) {
   const scene = vis.scene({width: 640, height: 360, camera: {mode: "interactive"}});
   const dot = scene.circle({id: "dot", center: [-1, 0], radius: 0.6, fill: "accent"});
   scene.rectangle({id: "box", center: [1.3, 0], size: [2, 2], stroke: "foreground", fill: "#00000000"});
-  scene.shift(dot, [1.5, 0], 1);
+  scene.shift(dot, [1.5, 0], {duration: 1});
   return scene;
 }
 

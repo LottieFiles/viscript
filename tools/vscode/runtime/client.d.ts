@@ -1,6 +1,7 @@
 import type {AudioBus, SceneBuilder} from "./bindings.js";
 
-export {compileScene, evaluateScene, SceneBuilder, vis} from "./bindings.js";
+export {compileScene, evaluateScene, vis} from "./bindings.js";
+export type {SceneBuilder} from "./bindings.js";
 export type * from "./bindings.js";
 
 /** A loaded WebAssembly instance from `createVisModule`; it can host many scenes. */

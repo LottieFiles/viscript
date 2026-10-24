@@ -115,7 +115,7 @@ transition {
 scene:fade_in(header, {duration = 0.4, curve = "gentle"})
 scene:fade_in(states, {shift = {0, -6}, duration = 0.65, curve = "gentle"})
 for _, item in ipairs(transitionHandles) do
-    scene:create(item.geometry, 0.42, "ease_out")
+    scene:create(item.geometry, {duration = 0.42, curve = "ease_out"})
     scene:fade_in(item.label, {shift = {0, -4}, duration = 0.18, curve = "gentle"})
 end
 

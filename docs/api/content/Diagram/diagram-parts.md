@@ -7,37 +7,22 @@ parent: diagram
 
 # Built parts
 
-Select individual diagram parts using the semantic handles returned by [the builder](./diagram-builder.md). Each call returns an ordinary Object or Group for styling and animation.
-
-## Nodes
+Select generated objects using semantic handles from the same diagram. These selectors return ordinary scene objects for styling and animation after `build()`.
 
 | Lua | JavaScript | Purpose |
 | --- | --- | --- |
-| `built:node(node)` | — | Return the node's complete Group. |
-| `built:node_body(node)` | — | Return the node's body shape. |
-| `built:node_label(node)` | — | Return the node's label. |
-| `built:node_detail(node)` | — | Return the node's detail text, or `nil` if absent. |
+| `built:object(handle)` | — | Return a node or zone's generated Group, or an edge's route object. |
+| `built:body(handle)` | — | Return a node or zone's body shape. Edge handles are rejected; use `object(edge)` for the route. |
+| `built:label(handle)` | — | Return a node, edge, or zone's label. Return `nil` for an edge without a label. |
+| `built:detail(node)` | — | Return a node's detail text, or `nil` if absent. Only node handles are accepted. |
 
-## Edges
-
-| Lua | JavaScript | Purpose |
-| --- | --- | --- |
-| `built:edge(edge)` | — | Return the edge's route object. |
-| `built:edge_label(edge)` | — | Return the edge's label, or `nil` if absent. |
-
-## Zones
-
-| Lua | JavaScript | Purpose |
-| --- | --- | --- |
-| `built:zone(zone)` | — | Return the zone's complete Group. |
-| `built:zone_body(zone)` | — | Return the zone's background/border shape. |
-| `built:zone_label(zone)` | — | Return the zone's label. |
+A handle from another diagram is rejected. Use [Built groups](./diagram-groups.md) to select an entire layer.
 
 ## Examples
 
-### built.node
+### built.object
 
-<!-- api-example: built.node -->
+<!-- api-example: built.object -->
 
 ```viscript
 local scene = vis.scene {
@@ -53,15 +38,15 @@ local output = diagram:node {id = "output", label = "Output", detail = "result",
 local edge = diagram:connect {id = "process", from = input, to = output, label = "process"}
 local zone = diagram:zone {id = "pipeline", label = "Pipeline", members = {input, output}}
 local built = diagram:build()
-local selected = built:node(output)
+local selected = built:object(output)
 scene:set {target = selected, stroke = "accent"}
 
 return scene
 ```
 
-### built.node_body
+### built.body
 
-<!-- api-example: built.node_body -->
+<!-- api-example: built.body -->
 
 ```viscript
 local scene = vis.scene {
@@ -77,15 +62,15 @@ local output = diagram:node {id = "output", label = "Output", detail = "result",
 local edge = diagram:connect {id = "process", from = input, to = output, label = "process"}
 local zone = diagram:zone {id = "pipeline", label = "Pipeline", members = {input, output}}
 local built = diagram:build()
-local selected = built:node_body(output)
+local selected = built:body(output)
 scene:set {target = selected, stroke = "accent"}
 
 return scene
 ```
 
-### built.node_label
+### built.label
 
-<!-- api-example: built.node_label -->
+<!-- api-example: built.label -->
 
 ```viscript
 local scene = vis.scene {
@@ -101,39 +86,15 @@ local output = diagram:node {id = "output", label = "Output", detail = "result",
 local edge = diagram:connect {id = "process", from = input, to = output, label = "process"}
 local zone = diagram:zone {id = "pipeline", label = "Pipeline", members = {input, output}}
 local built = diagram:build()
-local selected = built:node_label(output)
+local selected = built:label(output)
 scene:set {target = selected, fill = "accent"}
 
 return scene
 ```
 
-### built.node_detail
+### built.detail
 
-<!-- api-example: built.node_detail -->
-
-```viscript
-local scene = vis.scene {
-    width = 960,
-    height = 540,
-}
-
-local diagram = vis.diagram(scene, {
-    id = "flow", layout = "manual", node_size = {2.3, 1},
-})
-local input = diagram:node {id = "input", label = "Input", detail = "source", position = {-2, 0}}
-local output = diagram:node {id = "output", label = "Output", detail = "result", position = {2, 0}}
-local edge = diagram:connect {id = "process", from = input, to = output, label = "process"}
-local zone = diagram:zone {id = "pipeline", label = "Pipeline", members = {input, output}}
-local built = diagram:build()
-local selected = built:node_detail(output)
-scene:set {target = selected, fill = "accent"}
-
-return scene
-```
-
-### built.edge
-
-<!-- api-example: built.edge -->
+<!-- api-example: built.detail -->
 
 ```viscript
 local scene = vis.scene {
@@ -149,103 +110,7 @@ local output = diagram:node {id = "output", label = "Output", detail = "result",
 local edge = diagram:connect {id = "process", from = input, to = output, label = "process"}
 local zone = diagram:zone {id = "pipeline", label = "Pipeline", members = {input, output}}
 local built = diagram:build()
-local selected = built:edge(edge)
-scene:set {target = selected, stroke = "accent"}
-
-return scene
-```
-
-### built.edge_label
-
-<!-- api-example: built.edge_label -->
-
-```viscript
-local scene = vis.scene {
-    width = 960,
-    height = 540,
-}
-
-local diagram = vis.diagram(scene, {
-    id = "flow", layout = "manual", node_size = {2.3, 1},
-})
-local input = diagram:node {id = "input", label = "Input", detail = "source", position = {-2, 0}}
-local output = diagram:node {id = "output", label = "Output", detail = "result", position = {2, 0}}
-local edge = diagram:connect {id = "process", from = input, to = output, label = "process"}
-local zone = diagram:zone {id = "pipeline", label = "Pipeline", members = {input, output}}
-local built = diagram:build()
-local selected = built:edge_label(edge)
-scene:set {target = selected, fill = "accent"}
-
-return scene
-```
-
-### built.zone
-
-<!-- api-example: built.zone -->
-
-```viscript
-local scene = vis.scene {
-    width = 960,
-    height = 540,
-}
-
-local diagram = vis.diagram(scene, {
-    id = "flow", layout = "manual", node_size = {2.3, 1},
-})
-local input = diagram:node {id = "input", label = "Input", detail = "source", position = {-2, 0}}
-local output = diagram:node {id = "output", label = "Output", detail = "result", position = {2, 0}}
-local edge = diagram:connect {id = "process", from = input, to = output, label = "process"}
-local zone = diagram:zone {id = "pipeline", label = "Pipeline", members = {input, output}}
-local built = diagram:build()
-local selected = built:zone(zone)
-scene:set {target = selected, stroke = "accent"}
-
-return scene
-```
-
-### built.zone_body
-
-<!-- api-example: built.zone_body -->
-
-```viscript
-local scene = vis.scene {
-    width = 960,
-    height = 540,
-}
-
-local diagram = vis.diagram(scene, {
-    id = "flow", layout = "manual", node_size = {2.3, 1},
-})
-local input = diagram:node {id = "input", label = "Input", detail = "source", position = {-2, 0}}
-local output = diagram:node {id = "output", label = "Output", detail = "result", position = {2, 0}}
-local edge = diagram:connect {id = "process", from = input, to = output, label = "process"}
-local zone = diagram:zone {id = "pipeline", label = "Pipeline", members = {input, output}}
-local built = diagram:build()
-local selected = built:zone_body(zone)
-scene:set {target = selected, stroke = "accent"}
-
-return scene
-```
-
-### built.zone_label
-
-<!-- api-example: built.zone_label -->
-
-```viscript
-local scene = vis.scene {
-    width = 960,
-    height = 540,
-}
-
-local diagram = vis.diagram(scene, {
-    id = "flow", layout = "manual", node_size = {2.3, 1},
-})
-local input = diagram:node {id = "input", label = "Input", detail = "source", position = {-2, 0}}
-local output = diagram:node {id = "output", label = "Output", detail = "result", position = {2, 0}}
-local edge = diagram:connect {id = "process", from = input, to = output, label = "process"}
-local zone = diagram:zone {id = "pipeline", label = "Pipeline", members = {input, output}}
-local built = diagram:build()
-local selected = built:zone_label(zone)
+local selected = built:detail(output)
 scene:set {target = selected, fill = "accent"}
 
 return scene

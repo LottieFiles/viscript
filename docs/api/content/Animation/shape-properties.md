@@ -54,7 +54,7 @@ local scene = vis.scene {
 
 scene:text {id = "caption", text = "tween: radius", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
 local subject = scene:circle {id = "subject", radius = 1.1, stroke = "accent", fill = "#00000000", width = 3}
-scene:tween({target = subject, radius = 1.8}, 1.4)
+scene:tween({target = subject, radius = 1.8}, {duration = 1.4})
 
 return scene
 ```
@@ -67,7 +67,7 @@ const scene = vis.scene({
 
 scene.text({id: "caption", text: "tween: radius", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
 const subject = scene.circle({id: "subject", radius: 1.1, stroke: "accent", fill: "#00000000", width: 3});
-scene.tween({target: subject, radius: 1.8}, 1.4);
+scene.tween({target: subject, radius: 1.8}, {duration: 1.4});
 
 return scene;
 ```
@@ -84,7 +84,7 @@ local scene = vis.scene {
 
 scene:text {id = "caption", text = "tween: center", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
 local subject = scene:arc {id = "subject", radius = 1.2, start = 0, angle = math.pi, stroke = "accent", width = 4}
-scene:tween({target = subject, center = {1.2, -0.7}}, 1.4)
+scene:tween({target = subject, center = {1.2, -0.7}}, {duration = 1.4})
 
 return scene
 ```
@@ -97,7 +97,7 @@ const scene = vis.scene({
 
 scene.text({id: "caption", text: "tween: center", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
 const subject = scene.arc({id: "subject", radius: 1.2, start: 0, angle: Math.PI, stroke: "accent", width: 4});
-scene.tween({target: subject, center: [1.2, -0.7]}, 1.4);
+scene.tween({target: subject, center: [1.2, -0.7]}, {duration: 1.4});
 
 return scene;
 ```
@@ -114,7 +114,7 @@ local scene = vis.scene {
 
 scene:text {id = "caption", text = "tween: start", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
 local subject = scene:arc {id = "subject", radius = 1.2, start = 0, angle = math.pi, stroke = "accent", width = 4}
-scene:tween({target = subject, start = math.pi}, 1.4)
+scene:tween({target = subject, start = math.pi}, {duration = 1.4})
 
 return scene
 ```
@@ -127,7 +127,7 @@ const scene = vis.scene({
 
 scene.text({id: "caption", text: "tween: start", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
 const subject = scene.arc({id: "subject", radius: 1.2, start: 0, angle: Math.PI, stroke: "accent", width: 4});
-scene.tween({target: subject, start: Math.PI}, 1.4);
+scene.tween({target: subject, start: Math.PI}, {duration: 1.4});
 
 return scene;
 ```
@@ -144,7 +144,7 @@ local scene = vis.scene {
 
 scene:text {id = "caption", text = "tween: angle", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
 local subject = scene:arc {id = "subject", radius = 1.2, start = 0, angle = math.pi, stroke = "accent", width = 4}
-scene:tween({target = subject, angle = 1.8 * math.pi}, 1.4)
+scene:tween({target = subject, angle = 1.8 * math.pi}, {duration = 1.4})
 
 return scene
 ```
@@ -157,7 +157,7 @@ const scene = vis.scene({
 
 scene.text({id: "caption", text: "tween: angle", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
 const subject = scene.arc({id: "subject", radius: 1.2, start: 0, angle: Math.PI, stroke: "accent", width: 4});
-scene.tween({target: subject, angle: 1.8 * Math.PI}, 1.4);
+scene.tween({target: subject, angle: 1.8 * Math.PI}, {duration: 1.4});
 
 return scene;
 ```
@@ -174,7 +174,7 @@ local scene = vis.scene {
 
 scene:text {id = "caption", text = "tween: vertex", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
 local subject = scene:angle {id = "subject", vertex = {-1, -0.5}, from = {2, -0.5}, to = {1, 1}, radius = 0.7, stroke = "accent", width = 4}
-scene:tween({target = subject, vertex = {0, -1.2}}, 1.4)
+scene:tween({target = subject, vertex = {0, -1.2}}, {duration = 1.4})
 
 return scene
 ```
@@ -187,7 +187,7 @@ const scene = vis.scene({
 
 scene.text({id: "caption", text: "tween: vertex", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
 const subject = scene.angle({id: "subject", vertex: [-1, -0.5], from: [2, -0.5], to: [1, 1], radius: 0.7, stroke: "accent", width: 4});
-scene.tween({target: subject, vertex: [0, -1.2]}, 1.4);
+scene.tween({target: subject, vertex: [0, -1.2]}, {duration: 1.4});
 
 return scene;
 ```
@@ -204,7 +204,7 @@ local scene = vis.scene {
 
 scene:text {id = "caption", text = "tween: size", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
 local subject = scene:rectangle {id = "subject", size = {2.6, 1.5}, stroke = "accent", fill = "accent", width = 3}
-scene:tween({target = subject, size = {4, 0.6}}, 1.4)
+scene:tween({target = subject, size = {4, 0.6}}, {duration = 1.4})
 
 return scene
 ```
@@ -217,7 +217,7 @@ const scene = vis.scene({
 
 scene.text({id: "caption", text: "tween: size", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
 const subject = scene.rectangle({id: "subject", size: [2.6, 1.5], stroke: "accent", fill: "accent", width: 3});
-scene.tween({target: subject, size: [4, 0.6]}, 1.4);
+scene.tween({target: subject, size: [4, 0.6]}, {duration: 1.4});
 
 return scene;
 ```
@@ -234,7 +234,7 @@ local scene = vis.scene {
 
 scene:text {id = "caption", text = "tween: corner", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
 local subject = scene:rectangle {id = "subject", size = {2.6, 1.5}, stroke = "accent", fill = "accent", width = 3}
-scene:tween({target = subject, corner = 0.7}, 1.4)
+scene:tween({target = subject, corner = 0.7}, {duration = 1.4})
 
 return scene
 ```
@@ -247,7 +247,7 @@ const scene = vis.scene({
 
 scene.text({id: "caption", text: "tween: corner", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
 const subject = scene.rectangle({id: "subject", size: [2.6, 1.5], stroke: "accent", fill: "accent", width: 3});
-scene.tween({target: subject, corner: 0.7}, 1.4);
+scene.tween({target: subject, corner: 0.7}, {duration: 1.4});
 
 return scene;
 ```
@@ -264,7 +264,7 @@ local scene = vis.scene {
 
 scene:text {id = "caption", text = "tween: trim_distance", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
 local subject = scene:arrow {id = "subject", from = {-2, 0}, to = {2, 0}, stroke = "accent", width = 3, tip = 10}
-scene:tween({target = subject, trim_distance = {0.8, 0.8}}, 1.4)
+scene:tween({target = subject, trim_distance = {0.8, 0.8}}, {duration = 1.4})
 
 return scene
 ```
@@ -277,7 +277,7 @@ const scene = vis.scene({
 
 scene.text({id: "caption", text: "tween: trim_distance", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
 const subject = scene.arrow({id: "subject", from: [-2, 0], to: [2, 0], stroke: "accent", width: 3, tip: 10});
-scene.tween({target: subject, trimDistance: [0.8, 0.8]}, 1.4);
+scene.tween({target: subject, trimDistance: [0.8, 0.8]}, {duration: 1.4});
 
 return scene;
 ```
@@ -294,7 +294,7 @@ local scene = vis.scene {
 
 scene:text {id = "caption", text = "tween: points", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
 local subject = scene:polygon {id = "subject", points = {{-1,-1}, {1,-1}, {0,1}}, fill = "accent"}
-scene:tween({target = subject, points = {{-2,-0.6}, {2,-0.6}, {1,1.4}}}, 1.4)
+scene:tween({target = subject, points = {{-2,-0.6}, {2,-0.6}, {1,1.4}}}, {duration = 1.4})
 
 return scene
 ```
@@ -307,7 +307,7 @@ const scene = vis.scene({
 
 scene.text({id: "caption", text: "tween: points", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
 const subject = scene.polygon({id: "subject", points: [[-1,-1], [1,-1], [0,1]], fill: "accent"});
-scene.tween({target: subject, points: [[-2,-0.6], [2,-0.6], [1,1.4]]}, 1.4);
+scene.tween({target: subject, points: [[-2,-0.6], [2,-0.6], [1,1.4]]}, {duration: 1.4});
 
 return scene;
 ```
@@ -324,7 +324,7 @@ local scene = vis.scene {
 
 scene:text {id = "caption", text = "tween: from", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
 local subject = scene:arrow {id = "subject", from = {-2, 0}, to = {2, 0}, stroke = "accent", width = 3, tip = 10}
-scene:tween({target = subject, from = {-1, -1.4}}, 1.4)
+scene:tween({target = subject, from = {-1, -1.4}}, {duration = 1.4})
 
 return scene
 ```
@@ -337,7 +337,7 @@ const scene = vis.scene({
 
 scene.text({id: "caption", text: "tween: from", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
 const subject = scene.arrow({id: "subject", from: [-2, 0], to: [2, 0], stroke: "accent", width: 3, tip: 10});
-scene.tween({target: subject, from: [-1, -1.4]}, 1.4);
+scene.tween({target: subject, from: [-1, -1.4]}, {duration: 1.4});
 
 return scene;
 ```
@@ -354,7 +354,7 @@ local scene = vis.scene {
 
 scene:text {id = "caption", text = "tween: to", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
 local subject = scene:arrow {id = "subject", from = {-2, 0}, to = {2, 0}, stroke = "accent", width = 3, tip = 10}
-scene:tween({target = subject, to = {1, 1.4}}, 1.4)
+scene:tween({target = subject, to = {1, 1.4}}, {duration = 1.4})
 
 return scene
 ```
@@ -367,7 +367,7 @@ const scene = vis.scene({
 
 scene.text({id: "caption", text: "tween: to", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
 const subject = scene.arrow({id: "subject", from: [-2, 0], to: [2, 0], stroke: "accent", width: 3, tip: 10});
-scene.tween({target: subject, to: [1, 1.4]}, 1.4);
+scene.tween({target: subject, to: [1, 1.4]}, {duration: 1.4});
 
 return scene;
 ```
@@ -384,7 +384,7 @@ local scene = vis.scene {
 
 scene:text {id = "caption", text = "tween: origin", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
 local subject = scene:vector {id = "subject", value = {2, 1}, origin = {-1, -0.5}, stroke = "accent", width = 3, tip = 10}
-scene:tween({target = subject, origin = {0, -1.5}}, 1.4)
+scene:tween({target = subject, origin = {0, -1.5}}, {duration = 1.4})
 
 return scene
 ```
@@ -397,7 +397,7 @@ const scene = vis.scene({
 
 scene.text({id: "caption", text: "tween: origin", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
 const subject = scene.vector({id: "subject", value: [2, 1], origin: [-1, -0.5], stroke: "accent", width: 3, tip: 10});
-scene.tween({target: subject, origin: [0, -1.5]}, 1.4);
+scene.tween({target: subject, origin: [0, -1.5]}, {duration: 1.4});
 
 return scene;
 ```
@@ -414,7 +414,7 @@ local scene = vis.scene {
 
 scene:text {id = "caption", text = "tween: control1", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
 local subject = scene:curve {id = "subject", from = {-2, -0.6}, control1 = {-1, 1.5}, control2 = {1, -1.5}, to = {2, 0.6}, stroke = "accent", width = 4}
-scene:tween({target = subject, control1 = {-1, -1.5}}, 1.4)
+scene:tween({target = subject, control1 = {-1, -1.5}}, {duration = 1.4})
 
 return scene
 ```
@@ -427,7 +427,7 @@ const scene = vis.scene({
 
 scene.text({id: "caption", text: "tween: control1", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
 const subject = scene.curve({id: "subject", from: [-2, -0.6], control1: [-1, 1.5], control2: [1, -1.5], to: [2, 0.6], stroke: "accent", width: 4});
-scene.tween({target: subject, control1: [-1, -1.5]}, 1.4);
+scene.tween({target: subject, control1: [-1, -1.5]}, {duration: 1.4});
 
 return scene;
 ```
@@ -444,7 +444,7 @@ local scene = vis.scene {
 
 scene:text {id = "caption", text = "tween: control2", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
 local subject = scene:curve {id = "subject", from = {-2, -0.6}, control1 = {-1, 1.5}, control2 = {1, -1.5}, to = {2, 0.6}, stroke = "accent", width = 4}
-scene:tween({target = subject, control2 = {1, 1.5}}, 1.4)
+scene:tween({target = subject, control2 = {1, 1.5}}, {duration = 1.4})
 
 return scene
 ```
@@ -457,7 +457,7 @@ const scene = vis.scene({
 
 scene.text({id: "caption", text: "tween: control2", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
 const subject = scene.curve({id: "subject", from: [-2, -0.6], control1: [-1, 1.5], control2: [1, -1.5], to: [2, 0.6], stroke: "accent", width: 4});
-scene.tween({target: subject, control2: [1, 1.5]}, 1.4);
+scene.tween({target: subject, control2: [1, 1.5]}, {duration: 1.4});
 
 return scene;
 ```

@@ -106,7 +106,7 @@ local graph = s:plot {id="graph", fn=function(x) return 2*x end,
     x_range={-2,2,1}, y_range={-1,1}, endpoint_radius=3, width=0, progress=0}
 s:clone(graph, {id="copy", shift={0,2}})
 s:wait(1)
-s:tween({target=graph, fn=function(x) return 2*x+1 end}, 1, "linear")
+s:tween({target=graph, fn=function(x) return 2*x+1 end}, {duration = 1, curve = "linear"})
 s:wait(1)
 s:set {target=graph, points={{-1,0},{1,0}}}
 s:wait(1)
@@ -158,17 +158,17 @@ local space=s:space{x={-3,3,1},y={-3,3,1},stroke="#00000000",axis_x="#00000000",
 local spaced=space:plot{id="spaced",points={{-2,2.5},{2,2.5}},endpoint_radius=4,width=0,progress=0}
 local reset=s:plot{id="reset",points={{-2,-2.5},{2,-2.5}},endpoint_radius=4,width=0,progress=1}
 local future=s:plot{id="future",points={{-1,0},{1,0}},endpoint_radius=4,width=0,progress=0}
-s:uncreate(reset,1,"linear")
+s:uncreate(reset,{duration = 1, curve = "linear"})
 s:at(1,function()
-    s:tween({{target=down,progress=0},{target=up,progress=1},{target=stay,progress=0}},1,"linear")
+    s:tween({{target=down,progress=0},{target=up,progress=1},{target=stay,progress=0}},{duration = 1, curve = "linear"})
 end)
-s:at(1,function() s:create({group,space},1,"linear") end)
-s:at(1.5,function() s:tween({target=reset,progress=0},1,"linear") end)
-s:at(2,function() s:uncreate({group,space},1,"linear") end)
-s:at(1,function() s:tween({target=future,progress=0},1,"linear") end)
-s:at(3,function() s:create(future,1,"linear") end)
-s:at(3.5,function() s:create(reset,1,"linear") end)
-s:at(4,function() s:create({group,space},1,"linear") end)
+s:at(1,function() s:create({group,space},{duration = 1, curve = "linear"}) end)
+s:at(1.5,function() s:tween({target=reset,progress=0},{duration = 1, curve = "linear"}) end)
+s:at(2,function() s:uncreate({group,space},{duration = 1, curve = "linear"}) end)
+s:at(1,function() s:tween({target=future,progress=0},{duration = 1, curve = "linear"}) end)
+s:at(3,function() s:create(future,{duration = 1, curve = "linear"}) end)
+s:at(3.5,function() s:create(reset,{duration = 1, curve = "linear"}) end)
+s:at(4,function() s:create({group,space},{duration = 1, curve = "linear"}) end)
 s:seek(5)
 return s
 )lua";
@@ -350,8 +350,8 @@ local z = s:tracker(1)
 local n = s:number {value = 0, decimals = 2, id = "n"}
 s:bind(n, {x, z}, function(xv, zv) return {value = 100 * xv + zv} end)
 local axes = s:space {id = "axes", x = {-2, 2, 1}, y = {-1, 1, 1}, ticks = true}
-s:parallel(function() s:track(x, 4, 4, "linear") end,
-    function() s:wait(1) axes:labels {x = {{1, "one"}}} s:track(z, 3, 1, "linear") end)
+s:parallel(function() s:track(x, 4, {duration = 4, curve = "linear"}) end,
+    function() s:wait(1) axes:labels {x = {{1, "one"}}} s:track(z, 3, {duration = 1, curve = "linear"}) end)
 return s
 )lua";
     scene = _loaded(tracked, "tracked.lua");
@@ -411,9 +411,9 @@ axes:labels {placement = "screen", x = {{-2, "x"}}, gap = 10, size = 18}
 local supplied = axes:text {id = "supplied", text = "y", size = 24}
 local labels = axes:labels {placement = "screen", y = {{1, supplied}}, gap = 10}
 if labels[1] ~= supplied then error("screen labels changed a supplied handle") end
-s:look({height = 4}, 1, "linear")
+s:look({height = 4}, {duration = 1, curve = "linear"})
 axes:labels {placement = "screen", x = {{2, "late"}}, gap = 10}
-s:warp(axes, function(x, y, z) return x + 3, y, z end, 1, "linear")
+s:warp(axes, function(x, y, z) return x + 3, y, z end, {duration = 1, curve = "linear"})
 return s
 )lua";
     auto scene = _loaded(script, "screen-labels.lua");
@@ -776,7 +776,7 @@ s:contour {id = "v", values = {0, 1, 1, 2}, levels = {0.5, 1.5}, x_range = {0, 1
 s:contour {id = "plain", fn = function(x, y) return x+y end, levels = {1},
   x_range = {0, 1, 1}, y_range = {0, 1, 1}, stroke = "#123456", dash = {3, 2}}
 local p = c:children()[1]
-s:create(p, 0.2)
+s:create(p, {duration = 0.2})
 s:indicate(p, {duration = 0.2})
 s:passing_flash(p, {duration = 0.2})
 s:fade_in(c, {duration = 0.2})
@@ -853,7 +853,7 @@ local c = s:contour {id="labels", fn=function(x,y) return x+y end, levels={0},
 local child = c:children()[1]
 assert(#c:children()==1 and #child:children()==1)
 s:bind(child, a, function(v) return {fn=function(x,y) return x+y end, level=v} end)
-s:track(a, 1, 1, "linear")
+s:track(a, 1, {duration = 1, curve = "linear"})
 local copy = s:clone(child, {id="copy", opacity=0})
 assert(#copy:children()==1)
 local empty = s:contour {id="empty", fn=function(x,y) return (x*x-1)^2+y*y end,
@@ -861,8 +861,8 @@ local empty = s:contour {id="empty", fn=function(x,y) return (x*x-1)^2+y*y end,
 assert(#empty:children()[1]:children()==0)
 s:set {target=empty:children()[1], fn=function(x,y) return (x*x-1)^2+y*y end, level=0.5}
 assert(#empty:children()[1]:children()==2)
-s:tween({target=empty:children()[1], fn=function(x,y) return (x*x-1)^2+y*y end, level=1.5}, 0.5, "linear")
-s:tween({target=empty:children()[1], fn=function(x,y) return (x*x-1)^2+y*y end, level=-1}, 0.5, "linear")
+s:tween({target=empty:children()[1], fn=function(x,y) return (x*x-1)^2+y*y end, level=1.5}, {duration = 0.5, curve = "linear"})
+s:tween({target=empty:children()[1], fn=function(x,y) return (x*x-1)^2+y*y end, level=-1}, {duration = 0.5, curve = "linear"})
 return s
 )lua";
     auto scene = _loaded(source, "contour-labels.lua");
@@ -911,19 +911,19 @@ local ellipse = s:contour {id = "ellipse", fn = function(x,y) return x*x/(0.75*0
 s:bind(ellipse:children()[1], {a}, function(v)
   return {fn = function(x,y) return x*x/(v*v)+y*y-1 end}
 end)
-s:track(a, 1.5, 1, "linear")
+s:track(a, 1.5, {duration = 1, curve = "linear"})
 local k = s:tracker(0.5)
 local function wells(x,y) return (x*x-1)^2+y*y end
 local topology = s:contour {id = "topology", fn = wells, levels = {0.5},
   x_range = {-2,2,0.125}, y_range = {-1.5,1.5,0.125}}
 local child = topology:children()[1]
 s:bind(child, k, function(v) return {fn = wells, level = v} end)
-s:track(k, 1.1, 0.25, "linear")
-s:track(k, -0.2, 0.25, "linear")
-s:track(k, 0.5, 0.25, "linear")
+s:track(k, 1.1, {duration = 0.25, curve = "linear"})
+s:track(k, -0.2, {duration = 0.25, curve = "linear"})
+s:track(k, 0.5, {duration = 0.25, curve = "linear"})
 local copy = s:clone(child, {id = "copy", opacity = 0})
 s:set {target = copy, values = {0,1,1,2}, level = 0.5, x_range = {0,1,1}, y_range = {0,1,1}}
-s:tween({target = copy, values = {0,1,1,2}, level = 1.5}, 0.25, "linear")
+s:tween({target = copy, values = {0,1,1,2}, level = 1.5}, {duration = 0.25, curve = "linear"})
 return s
 )lua";
     auto scene = _loaded(source, "bound-contour.lua");
@@ -975,7 +975,7 @@ return s
     fails("s:bind(p,s:tracker(0),function(v) return {fn=function(x,y) while true do end end} end)", "instruction limit exceeded");
     fails("s:set {target=p,fn=function(x,y) return x+y end,x_range={0,0,1}}", "at least two samples");
     fails("s:set {target=s:plot{points={{0,0},{1,1}}},values={0,1,1,2}}", "level and values need a contour child");
-    _scriptError("local s=vis.scene{fps=16}; local g=s:contour {fn=function() return 0 end,levels={-1},x_range={0,255,1},y_range={0,255,1}}; local t=s:tracker(0); s:bind(g:children()[1],t,function(v) return {fn=function() return 0 end} end); s:track(t,1,1); return s", "scene point limit exceeded");
+    _scriptError("local s=vis.scene{fps=16}; local g=s:contour {fn=function() return 0 end,levels={-1},x_range={0,255,1},y_range={0,255,1}}; local t=s:tracker(0); s:bind(g:children()[1],t,function(v) return {fn=function() return 0 end} end); s:track(t,1,{duration = 1}); return s", "scene point limit exceeded");
 }
 
 void _vectorFields()
@@ -1165,7 +1165,7 @@ local s = vis.scene {width = 640, height = 360}
 local shape = s:circle {id = "circle", radius = 1}
 s:wait(0.5)
 local square = s:rectangle {id = "square", size = {2, 2}}
-s:morph(shape, square, 1)
+s:morph(shape, square, {duration = 1})
 local points = {}
 for k = 0, 9 do
     local a = math.pi / 2 + k * math.pi / 5
@@ -1173,10 +1173,10 @@ for k = 0, 9 do
     points[#points + 1] = {r * math.cos(a), r * math.sin(a)}
 end
 local star = s:polygon {id = "star", points = points}
-s:morph(square, star, 1)
+s:morph(square, star, {duration = 1})
 local line = s:line {id = "line", from = {-2, -2}, to = {2, -2}}
 local graph = s:plot {id = "graph", points = {{2, -1}, {0, -1.5}, {-2, -1}}}
-s:morph(line, graph, 1)
+s:morph(line, graph, {duration = 1})
 return s
 )lua";
     auto scene = _loaded(source, "shape-morph.lua");
@@ -1306,7 +1306,7 @@ void _samplingCallbacks()
         stops(script, expected);
     };
     fails("s:plot{fn=author, x_range={0,1,0.5}}");
-    fails("local p=s:plot{points={{0,0},{1,1}}}; s:tween({target=p, fn=author, x_range={0,1,0.5}}, 1)");
+    fails("local p=s:plot{points={{0,0},{1,1}}}; s:tween({target=p, fn=author, x_range={0,1,0.5}}, {duration = 1})");
     fails("s:area{fn=author, x_range={0,1,0.5}}");
     fails("s:area{fn=function() return 1 end, base=author, x_range={0,1,0.5}}");
     fails("s:riemann{fn=author, x_range={0,1,0.5}}");
@@ -1341,8 +1341,8 @@ void _samplingCallbacks()
     later("local p={{0,0,0},{1,0,0},{0,1,0},{1,1,0}}; local function f() return author('#fff') end\n"
           "local a=s:surface{points=p, size={2,2}, colors=f}; local b=s:surface{points=p, size={2,2}, colors=f}",
           "s:morph(a, b)");
-    later("local t=s:tracker(0); s:bind(c, t, function(v) return {opacity=author(1)} end)", "s:track(t, 1, 1)");
+    later("local t=s:tracker(0); s:bind(c, t, function(v) return {opacity=author(1)} end)", "s:track(t, 1, {duration = 1})");
     later("local x, z=s:tracker(0), s:tracker(0)\n"
           "s:bind(c, {x, z}, function(a, b) return {opacity=author(1)} end)\n"
-          "s:parallel(function() s:track(x, 1, 1) end, function() s:track(z, 1, 1) end)", "");
+          "s:parallel(function() s:track(x, 1, {duration = 1}) end, function() s:track(z, 1, {duration = 1}) end)", "");
 }

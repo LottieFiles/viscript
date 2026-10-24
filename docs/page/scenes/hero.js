@@ -99,7 +99,7 @@ scene:wait(0.5)
 scene:passing_flash(a1, {duration = 0.4})
 scene:parallel(
   function() scene:focus(nil, {duration = 0.9, curve = "ease_in_out"}) end,
-  function() scene:wait(0.7); scene:tween(show(allHostLabels, 1), 0.2) end,
+  function() scene:wait(0.7); scene:tween(show(allHostLabels, 1), {duration = 0.2}) end,
   table.unpack((function()
     local fs = {}
     for i = 1, #routes do fs[i] = function() scene:wait(0.2); scene:passing_flash(routes[i], {duration = 0.7}) end end
@@ -112,19 +112,19 @@ end
 scene:parallel(table.unpack(fs))
 local on = {}
 for i = 1, #dots do on[i] = {target = dots[i], opacity = 1} end
-scene:tween(on, 0.2)
+scene:tween(on, {duration = 0.2})
 local ride = {}
 for i = 1, #dots do ride[i] = function() scene:move_along(dots[i], waves[i], {duration = 1.8, curve = "ease_in_out"}) end end
 scene:parallel(table.unpack(ride))
 -- Push in on the VS Code preview, then back out.
 scene:parallel(
   function() scene:focus(scene:find("host3"), {padding = 0.18, duration = 0.6, curve = "ease_in_out"}) end,
-  function() scene:tween(show(otherLabels, 0), 0.1) end)
+  function() scene:tween(show(otherLabels, 0), {duration = 0.1}) end)
 local back = {}
 for i = 1, #dots do back[i] = function() scene:move_along(dots[i], waves[i], {duration = 1.8, curve = {preset = "ease_in_out", reverse = true}}) end end
 scene:parallel(table.unpack(back))
 scene:parallel(
   function() scene:focus(nil, {duration = 0.7, curve = "ease_in_out"}) end,
-  function() scene:wait(0.55); scene:tween(show(otherLabels, 1), 0.15) end)
+  function() scene:wait(0.55); scene:tween(show(otherLabels, 1), {duration = 0.15}) end)
 scene:wait(0.6)
 return scene`;

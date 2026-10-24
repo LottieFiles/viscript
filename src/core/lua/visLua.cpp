@@ -5899,10 +5899,9 @@ static AnimCurve _fieldCurve(lua_State* lua, int index,
 bool detail::luaTiming(lua_State* lua, int index, int options, bool stagger,
                        std::initializer_list<const char*> fields)
 {
-    if (!lua_istable(lua, index)) return false;
-    for (auto i = index + 1; i <= lua_gettop(lua); i++) {
-        if (!lua_isnil(lua, i)) luaL_error(lua, "timing options cannot be combined with positional arguments");
-    }
+    if (lua_gettop(lua) > index) luaL_error(lua, "animation timing accepts one options table");
+    if (lua_isnoneornil(lua, index)) return false;
+    if (!lua_istable(lua, index)) luaL_error(lua, "animation timing requires an options table");
     lua_pushnil(lua);
     while (lua_next(lua, index)) {
         if (lua_type(lua, -2) != LUA_TSTRING) luaL_error(lua, "option names must be strings");
@@ -7002,7 +7001,7 @@ static int _save(lua_State* lua)
     return 0;
 }
 
-// scene:restore(target_or_list, duration, curve, lag) takes the newest state scene:save recorded
+// scene:restore(target_or_list, options) takes the newest state scene:save recorded
 // for each target and brings the target and the objects below it back to it: over duration
 // seconds, each later target lag of the duration later, or at the cursor without a duration.
 static int _restore(lua_State* lua)
@@ -7947,11 +7946,9 @@ static uint32_t _pieceCount(const Object* object)
     return count;
 }
 
-// scene:match_transform(source, target, duration, curve, {arc = 0, lag = 0, pairs = {{from, to}},
-//                       strings = true, diff = false, fade = 1, copy = false})
-static int _matchTransform(lua_State* lua)
+// Reads normalized timing and match settings, also used by edit after it builds its target.
+static int _matchTransformImpl(lua_State* lua)
 {
-    detail::luaTiming(lua, 4, 6, true, {"arc", "lag", "pairs", "strings", "diff", "shapes", "fade", "copy", "path"});
     auto box = _scene(lua);
     auto scene = box->scene;
     auto source = _object(lua, scene, 2);
@@ -8011,6 +8008,12 @@ static int _matchTransform(lua_State* lua)
     _check(lua, scene, result, "could not match transform");
     _spend(box, copies);
     return _charge(lua, box, before);
+}
+
+static int _matchTransform(lua_State* lua)
+{
+    detail::luaTiming(lua, 4, 6, true, {"arc", "lag", "pairs", "strings", "diff", "shapes", "fade", "copy", "path"});
+    return _matchTransformImpl(lua);
 }
 
 // ---------- Code edits, highlights and group transitions ----------
@@ -8188,7 +8191,7 @@ static void _codeNextId(lua_State* lua, const Scene* scene, const char* id)
     }
 }
 
-// scene:edit(block, edits, duration, curve, {id, arc, lag, fade}): makes the code block that the
+// scene:edit(block, edits, {duration, curve, id, arc, lag, fade}): makes the code block that the
 // source of block turns into after edits, which apply in order, each to the text the one before
 // left, with the look and place of block, and carries block into it as match_transform with
 // diff = true does. The new block joins the parent of block in its transform, at the cursor.
@@ -8276,7 +8279,7 @@ static int _edit(lua_State* lua)
     }
     lua_replace(lua, 6);
     lua_settop(lua, 6);
-    _matchTransform(lua);
+    _matchTransformImpl(lua);
     lua_settop(lua, 3);
     return 1;
 }
@@ -8351,7 +8354,7 @@ static int _highlight(lua_State* lua)
     return _charge(lua, box, before);
 }
 
-// scene:arrange(items, duration, curve, {direction = {1, 0}, gap = 0.25, center = {0, 0}}): lays
+// scene:arrange(items, {duration, curve, direction = {1, 0}, gap = 0.25, center = {0, 0}}): lays
 // items, a list of sibling handles in order or a group whose children they are, one after
 // another over duration; an item added at the cursor grows into its place.
 static int _arrangeOver(lua_State* lua)
@@ -8393,7 +8396,7 @@ static int _arrangeOver(lua_State* lua)
     return _charge(lua, box, before);
 }
 
-// scene:transition(outgoing, incoming, duration = 1, curve = "smooth"): fades out a handle or a
+// scene:transition(outgoing, incoming, {duration = 1, curve = "smooth"}): fades out a handle or a
 // list of handles while the incoming ones, which must stand at opacity 0, fade in.
 static int _transition(lua_State* lua)
 {
@@ -8714,10 +8717,9 @@ static void _lookFields(lua_State* lua, LuaScene* box, int index, Camera& camera
     camera.projection = _fieldEnum(lua, index, "projection", camera.projection, PROJECTIONS);
 }
 
-// look(camera, duration = 1, curve = "smooth") on the scene or on one of its views.
+// Reads normalized camera timing, also used by focus after it calculates the camera.
 static int _lookCamera(lua_State* lua, const LuaCamera& target)
 {
-    detail::luaTiming(lua, 3);
     auto camera = target.camera;
     auto view = target.cameraView;
     _lookFields(lua, target.box, 2, camera, view);
@@ -8728,6 +8730,7 @@ static int _lookCamera(lua_State* lua, const LuaCamera& target)
 
 static int _look(lua_State* lua)
 {
+    detail::luaTiming(lua, 3);
     return _lookCamera(lua, _sceneCamera(_scene(lua)));
 }
 
@@ -9625,6 +9628,7 @@ static int _sceneView(lua_State* lua)
 // names move the scene's, and frame targets in the view's rectangle.
 static int _viewLook(lua_State* lua)
 {
+    detail::luaTiming(lua, 3);
     return _lookCamera(lua, _viewCamera(lua));
 }
 
@@ -9638,7 +9642,7 @@ static int _viewOrbit(lua_State* lua)
     return _orbitCamera(lua, _viewCamera(lua));
 }
 
-// view:fade(opacity, duration = 1, curve = "smooth") fades the whole view; the fades of a view
+// view:fade(opacity, {duration = 1, curve = "smooth"}) fades the whole view; the fades of a view
 // follow one another.
 static int _viewFade(lua_State* lua)
 {

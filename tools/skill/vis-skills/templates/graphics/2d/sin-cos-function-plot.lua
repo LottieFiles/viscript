@@ -31,9 +31,9 @@ local labels = {
 }
 
 -- The two curves reveal together so their quarter-period offset remains comparable.
-scene:create(plane, 0.42, "ease_out")
-scene:create({sine, cosine}, 1.10, "ease_out", 0)
-scene:create(period, 0.34, "ease_out")
+scene:create(plane, {duration = 0.42, curve = "ease_out"})
+scene:create({sine, cosine}, {duration = 1.10, curve = "ease_out", lag = 0})
+scene:create(period, {duration = 0.34, curve = "ease_out"})
 scene:fade_in(labels[1], {shift = {0.12, 0}, duration = 0.24, curve = "ease_out"})
 scene:fade_in(labels[2], {shift = {0.12, 0}, duration = 0.24, curve = "ease_out"})
 scene:fade_in(labels[3], {shift = {0, -0.10}, duration = 0.24, curve = "ease_out"})

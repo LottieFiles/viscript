@@ -75,8 +75,8 @@ if not rawequal(hyp:part("2"), scene:find("hyp/2")) or not rawequal(eq:part("2",
     error("part finds glyphs in a part and in the whole")
 end
 if not rawequal(eq:part(" b ^ 2 "), scene:find("eq/3")) then error("part reads TeX without blanks") end
-scene:write(eq, 1)
-scene:tween({target = eq:part("+"), fill = "#0000ff"}, 0.5)
+scene:write(eq, {duration = 1})
+scene:tween({target = eq:part("+"), fill = "#0000ff"}, {duration = 0.5})
 scene:indicate(eq:part("="), {color = "#ff00ff", duration = 0.5})
 return scene
 )lua";
@@ -160,11 +160,11 @@ local a = scene:tex {tex = "a+b"}
 scene:wait(1)
 local b = scene:tex {tex = "b+a", point = {0, -1}}
 scene:wait(1)
-scene:match_transform(a, b, 1)
+scene:match_transform(a, b, {duration = 1})
 return scene
 )lua",
            "tex-match-late.lua", "tex-match-late.lua:7: could not match transform: add the object to match into");
-    _scriptError("local scene = vis.scene {}\nlocal a = scene:circle {}\nscene:match_transform(a, a, 'long')\nreturn scene",
+    _scriptError("local scene = vis.scene {}\nlocal a = scene:circle {}\nscene:match_transform(a, a, {duration = 'long'})\nreturn scene",
            "tex-match-duration.lua",
            "tex-match-duration.lua:3: bad argument #3 to 'match_transform' (number expected, got string)");
     _scriptError("local scene = vis.scene {}\nscene:circle {id = 'taken'}\nscene:tex {tex = {'a', {'b', id = 'taken'}}}\n"
@@ -224,7 +224,7 @@ local scene = vis.scene {}
 local a = scene:tex {tex = "a^2+b^2=c^2", id = "a"}
 scene:wait(0.5)
 local b = scene:tex {tex = "a^2=c^2-b^2", id = "b", point = {0, -1}}
-scene:match_transform(a, b, 1, "smooth", {arc = 0.5})
+scene:match_transform(a, b, {duration = 1, curve = "smooth", arc = 0.5})
 return scene
 )lua";
     auto scene = _loaded(whole, "tex-match.lua");
@@ -243,9 +243,9 @@ local a = scene:tex {tex = {"a^2", "+", "b^2", "=", "c^2"}, id = "a"}
 local x = scene:tex {tex = {"x^2", "+", "y"}, id = "x", point = {0, 1}}
 scene:wait(0.5)
 local b = scene:tex {tex = {"c^2", "=", "a^2", "+", "b^2"}, id = "b", point = {0, -1}}
-scene:match_transform(a, b, 1)
+scene:match_transform(a, b, {duration = 1})
 local y = scene:tex {tex = {"y", "+", "z^2"}, id = "y", point = {0, 2}}
-scene:match_transform(x, y, 1, "smooth", {pairs = {{x:part("x^2"), y:part("z^2")}}})
+scene:match_transform(x, y, {duration = 1, curve = "smooth", pairs = {{x:part("x^2"), y:part("z^2")}}})
 return scene
 )lua";
     scene = _loaded(parts, "tex-match-parts.lua");
@@ -258,6 +258,52 @@ return scene
         CHECK(_at(_center(renderer, scene, "y/1/1", 1.5f), _center(renderer, scene, "x/3/1", 1.4f)));
     }
     delete scene;
+}
+
+// TeX expands group pairs in a private copy of the canonical timing options, preserving
+// both the caller's tables and the timing passed to the core match operation.
+static void _matchingOptions(Renderer* renderer)
+{
+    static constexpr char source[] = R"lua(
+local scene = vis.scene {}
+local a = scene:tex {tex = "x", id = "a", point = {-2, 0}}
+scene:wait(0.5)
+local b = scene:tex {tex = "x", id = "b", point = {2, 0}}
+local curve = {preset = "ease_in", strength = 0.8}
+local pair = {a, b}
+local pairs = {pair}
+local options = {duration = 2, curve = curve, pairs = pairs, strings = false}
+scene:match_transform(a, b, options)
+if options.duration ~= 2 or not rawequal(options.curve, curve)
+    or curve.preset ~= "ease_in" or curve.strength ~= 0.8
+    or options.strings ~= false or #vis.keys(options) ~= 4 then
+    error("match changed caller timing options")
+end
+if not rawequal(options.pairs, pairs) or #pairs ~= 1 or not rawequal(pairs[1], pair)
+    or #pair ~= 2 or not rawequal(pair[1], a) or not rawequal(pair[2], b) then
+    error("match changed caller pairs")
+end
+return scene
+)lua";
+    auto scene = _loaded(source, "tex-match-options.lua");
+    if (scene) {
+        CHECK(std::fabs(scene->duration() - 2.5f) < 1.0e-4f);
+        auto start = _center(renderer, scene, "a/1", 0.4f);
+        auto end = _center(renderer, scene, "b/1", 2.6f);
+        CHECK(_at(_center(renderer, scene, "b/1", 0.5f), start));
+        // Halfway through a tuned ease_in: 0.5 + (0.25 - 0.5) * 0.8 = 0.3.
+        CHECK(_at(_center(renderer, scene, "b/1", 1.5f), start + (end - start) * 0.3f));
+    }
+    delete scene;
+
+    for (auto timing : {"1", "1, 'linear'", "{duration = 1}, 'linear'"}) {
+        char script[256];
+        std::snprintf(script, sizeof(script),
+                      "local scene = vis.scene {}\nlocal a = scene:tex {tex = 'x'}\n"
+                      "local b = scene:tex {tex = 'y'}\nscene:match_transform(a, b, %s)\nreturn scene",
+                      timing);
+        _scriptError(script, "tex-match-positional.lua", "animation timing");
+    }
 }
 
 // With strings = false a match of formulas pairs only the pieces given, as it pairs texts: the
@@ -273,7 +319,7 @@ s:wait(0.5)
 local delta = s:tex {tex = [[\Delta = b^2 - 4ac]], point = {0, -120}, size = 40, id = "delta"}
 local pairs = {}
 for i = 9, 14 do pairs[#pairs + 1] = {s:find("eq/" .. i), s:find("delta/" .. (i - 6))} end
-s:match_transform(eq, delta, 1, "smooth", {copy = true, strings = strings, pairs = pairs})
+s:match_transform(eq, delta, {duration = 1, curve = "smooth", copy = true, strings = strings, pairs = pairs})
 return s
 )lua";
     char source[1024];
@@ -300,7 +346,7 @@ local scene = vis.scene {}
 local x = scene:tex {tex = {"x^2", "+", "y"}, id = "x", point = {0, 1}}
 scene:wait(0.5)
 local y = scene:tex {tex = {"y", "+", "z^2"}, id = "y", point = {0, 2}}
-scene:match_transform(x, y, 1, "smooth", {strings = false, pairs = {{x:part("x^2"), y:part("z^2")}}})
+scene:match_transform(x, y, {duration = 1, curve = "smooth", strings = false, pairs = {{x:part("x^2"), y:part("z^2")}}})
 return scene
 )lua";
     scene = _loaded(parts, "tex-match-given-parts.lua");
@@ -439,9 +485,9 @@ s:spans {"a b ", {tex = "x_1+x_2+x_3+x_4+x_5", id = "long"}, " c", split = "word
 s:spans {{tex = "\\sum_{i=1}^n i", id = "inline"}, {tex = "\\sum_{i=1}^n i", id = "display", display = true},
          size = 30, point = {0, -200}}
 s:spans {"x", {tex = "n", id = "raised", rise = 0.5}, size = 30, id = "rise", point = {0, -300}}
-s:fill(eq, "#ffffff", 0.5)
+s:fill(eq, "#ffffff", {duration = 0.5})
 local target = s:tex {tex = "c^2=a^2+b^2", point = {0, 250}, id = "target"}
-s:match_transform(eq, target, 1)
+s:match_transform(eq, target, {duration = 1})
 return s
 )lua";
     auto scene = _loaded(source, "tex-inline.lua");
@@ -691,7 +737,7 @@ local s = vis.scene {width = 1280, height = 720, camera = {mode = "fixed", view 
 local m = s:matrix {rows = {{1, "x^2", "\\frac{1}{2}"}, {"", "y_i", 3}}, size = 30, color = "#336699", id = "m"}
 if not rawequal(m:entry(1, 2), s:find("m/1/2")) then error("a formula entry keeps its name") end
 if not rawequal(m:entry(1, 2):part("x"), s:find("m/1/2/1")) then error("part finds a glyph of an entry") end
-s:tween({target = m:entry(1, 1), value = 7}, 1)
+s:tween({target = m:entry(1, 1), value = 7}, {duration = 1})
 return s
 )lua";
     auto scene = _loaded(source, "tex-matrix.lua");
@@ -799,6 +845,7 @@ int main()
         _empties();
         _partLimit();
         _matching(renderer);
+        _matchingOptions(renderer);
         _choosing(renderer);
         _framing(renderer);
         _bracing(renderer);

@@ -95,7 +95,7 @@ local invariant = scene:text {
 
 scene:fade_in(contract, {shift = {0, -5}, duration = 0.34, curve = "gentle"})
 scene:fade_in(array, {shift = {0, 7}, duration = 0.55, curve = "ease_out"})
-scene:create(range, 0.42, "ease_out")
+scene:create(range, {duration = 0.42, curve = "ease_out"})
 scene:fade_in(invariant, {duration = 0.28, curve = "gentle"})
 
 local status
@@ -109,7 +109,7 @@ local function setStatus(event, step)
         point = {0, -100}, role = "code", fill = "foreground",
         layer = LAYER.text, id = "status:step-" .. step,
     }
-    if status then scene:fade_transform(status, nextStatus, 0.20, "gentle")
+    if status then scene:fade_transform(status, nextStatus, {duration = 0.20, curve = "gentle"})
     else scene:fade_in(nextStatus, {duration = 0.28, curve = "gentle"}) end
     status = nextStatus
 end
@@ -119,7 +119,7 @@ for step, event in ipairs(TRACE) do
     scene:tween({
         {target = bodies[event.mid + 1], stroke = "focus", width = 2},
         {target = values[event.mid + 1], fill = "focus"},
-    }, 0.42, "ease_in_out", 0)
+    }, {duration = 0.42, curve = "ease_in_out", lag = 0})
     scene:wait(0.45)
 
     if event.relation ~= "=" then
@@ -130,9 +130,9 @@ for step, event in ipairs(TRACE) do
         for logical = event.rejectedLo, event.rejectedHi do
             reject[#reject + 1] = {target = cells[logical + 1], opacity = 0.4}
         end
-        scene:tween(reject, 0.45, "ease_in_out", 0)
+        scene:tween(reject, {duration = 0.45, curve = "ease_in_out", lag = 0})
         local nextRange = rangeBox(event.nextLo, event.nextHi, "range:step-" .. (step + 1))
-        scene:fade_transform(range, nextRange, 0.30, "ease_in_out")
+        scene:fade_transform(range, nextRange, {duration = 0.30, curve = "ease_in_out"})
         range = nextRange
     end
 end
@@ -144,13 +144,13 @@ local result = scene:text {
     fill = "result", layer = LAYER.text,
     id = FOUND_INDEX and "result:found-index" or "result:not-found",
 }
-scene:fade_transform(status, result, 0.22, "gentle")
+scene:fade_transform(status, result, {duration = 0.22, curve = "gentle"})
 local finish = {{target = range, stroke = "result"}}
 if FOUND_INDEX then
     -- A stroke highlight, with the value recolored in the same tween, keeps the text readable.
     finish[#finish + 1] = {target = bodies[FOUND_INDEX + 1], stroke = "result", width = 2}
     finish[#finish + 1] = {target = values[FOUND_INDEX + 1], fill = "result"}
 end
-scene:tween(finish, 0.48, "ease_in_out", 0)
+scene:tween(finish, {duration = 0.48, curve = "ease_in_out", lag = 0})
 scene:wait(2.2)
 return scene

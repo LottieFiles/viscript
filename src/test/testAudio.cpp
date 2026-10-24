@@ -574,7 +574,7 @@ local cue = vis.audio.cue(scene, {asset = "tone.wav"})
 vis.runtime(scene, {
     fixed_step = 0.1,
     update = function(ctx, dt, time, tick)
-        cue:gain(0.5, time, 0.1, "linear")
+        cue:gain(0.5, time, {duration = 0.1, curve = "linear"})
     end,
 })
 return scene

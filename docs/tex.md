@@ -36,8 +36,8 @@ local sum = scene:tex {
     tex = {"a^2", "+", {"b^2", color = "danger"}, "=", {"c^2", id = "hyp"}},
     point = {0, -0.6}, role = "h2", id = "sum",
 }
-scene:write(identity, 1)
-scene:tween({target = sum:part("c^2"), fill = "accent"}, 0.5)
+scene:write(identity, {duration = 1})
+scene:tween({target = sum:part("c^2"), fill = "accent"}, {duration = 0.5})
 scene:wait(0.3)
 return scene
 ```
@@ -76,7 +76,7 @@ local target = scene:tex {
     tex = {{"c^2", color = "accent"}, "=", "a^2", "+", {"b^2", color = "danger"}},
     point = {0, -0.6}, role = "h2", id = "target",
 }
-scene:match_transform(sum, target, 1.2, "smooth", {arc = math.pi / 2})
+scene:match_transform(sum, target, {duration = 1.2, curve = "smooth", arc = math.pi / 2})
 ```
 
 Explicit `pairs` select correspondences. `strings=false` uses those pairs, and
@@ -84,10 +84,8 @@ Explicit `pairs` select correspondences. `strings=false` uses those pairs, and
 
 ```lua
 local target = scene:tex {tex = {"c^2"}, point = {2, 0}, id = "selected"}
-scene:match_transform(sum, target, 1, "smooth", {
-    copy = true, strings = false,
-    pairs = {{sum:part("c^2"), target:part("c^2")}},
-})
+scene:match_transform(sum, target, {duration = 1, curve = "smooth", copy = true, strings = false,
+    pairs = {{sum:part("c^2"), target:part("c^2")}},})
 ```
 
 ## Inline math
@@ -103,7 +101,7 @@ local proof = scene:spans {
     {tex = "c = \\sqrt{a^2 + b^2}", color = "accent"}, ".",
     split = "words", wrap = 8, leading = 1.5, size = 32, id = "proof",
 }
-scene:write(proof:children(), 1.5, "smooth", 0.05)
+scene:write(proof:children(), {duration = 1.5, curve = "smooth", lag = 0.05})
 ```
 
 Inline parts use text style by default. Their font, size, role, fill, and layer come
@@ -119,7 +117,7 @@ const sum = scene.tex({
     tex: ["a^2", "+", {text: "b^2", color: "danger"}, "=", "c^2"],
     id: "sum", role: "h2",
 });
-scene.tween({target: sum.part("c^2"), fill: "accent"}, 0.5);
+scene.tween({target: sum.part("c^2"), fill: "accent"}, {duration: 0.5});
 
 const proof = scene.spans([
     "For a right triangle, ", {tex: "a^2 + b^2 = c^2", id: "pyth"}, ".",

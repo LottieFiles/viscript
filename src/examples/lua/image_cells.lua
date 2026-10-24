@@ -30,7 +30,7 @@ local cells = world:cell {
     id = "pixel-cells",
 }
 
-scene:create({ image, cells }, 0.9, "ease_out", 0.15)
+scene:create({ image, cells }, {duration = 0.9, curve = "ease_out", lag = 0.15})
 scene:wait(0.4)
 scene:look({
     view = "3d",
@@ -39,6 +39,6 @@ scene:look({
     fov = 0.75,
     near = 0.1,
     far = 100,
-}, 1.2, "ease_in_out")
+}, {duration = 1.2, curve = "ease_in_out"})
 scene:wait(0.7)
 return scene

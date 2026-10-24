@@ -96,7 +96,7 @@ local function leave(i) scene:tween({target = acts[i].g, shift = {-SLIDE, 0}, op
 -- 1. Math
 scene:wait(0.3)
 scene:parallel(
-  function() scene:track(theta, 2 * math.pi, 2.6, "ease_in_out") end,
+  function() scene:track(theta, 2 * math.pi, {duration = 2.6, curve = "ease_in_out"}) end,
   function() scene:create(wave, {duration = 2.6, curve = "ease_in_out"}) end)
 scene:indicate(eq, {duration = 0.5})
 leave(1)
@@ -112,19 +112,19 @@ scene:rotate(A2, -0.12, {about = {0, SY}, duration = 0.5, curve = "ease_in_out"}
 leave(2)
 -- 3. Motion
 enter(3)
-scene:track(clock, 2.6, 2.6, "linear")
+scene:track(clock, 2.6, {duration = 2.6, curve = "linear"})
 leave(3)
 -- 4. Drawing
 enter(4)
 scene:create(rose, {duration = 1.8, curve = "ease_in_out"})
 scene:parallel(
-  function() scene:tween({target = rose, fill = "#0a66c233"}, 0.5, "ease_out") end,
-  function() scene:tween({target = core, opacity = 1}, 0.3, "ease_out") end,
+  function() scene:tween({target = rose, fill = "#0a66c233"}, {duration = 0.5, curve = "ease_out"}) end,
+  function() scene:tween({target = core, opacity = 1}, {duration = 0.3, curve = "ease_out"}) end,
   function() scene:rotate(A4, math.pi / 4, {about = {0, SY}, duration = 1.2, curve = "ease_in_out"}) end)
 scene:wait(1.4)
 leave(4)
 -- Back to the opening act for the loop: reset it off-stage, then slide it in.
-scene:track(theta, 0, 0.01)
-scene:tween({{target = wave, progress = 0}, {target = acts[1].g, shift = {2 * SLIDE, 0}}}, 0.01)
+scene:track(theta, 0, {duration = 0.01})
+scene:tween({{target = wave, progress = 0}, {target = acts[1].g, shift = {2 * SLIDE, 0}}}, {duration = 0.01})
 enter(1)
 return scene

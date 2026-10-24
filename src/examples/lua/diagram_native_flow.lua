@@ -17,11 +17,11 @@ local second = diagram:connect {
 local built = diagram:build()
 
 scene:fade_in(built:nodes(), {duration = 0.35, curve = "gentle"})
-scene:create(built:routes(), 0.55, "ease_out")
+scene:create(built:routes(), {duration = 0.55, curve = "ease_out"})
 scene:tween({
-    {target = built:edge(first), dash_offset = -9},
-    {target = built:edge(second), dash_offset = -9},
-}, 1.1, "linear")
-scene:indicate(built:node_body(output), {color = "result", duration = 0.35})
+    {target = built:object(first), dash_offset = -9},
+    {target = built:object(second), dash_offset = -9},
+}, {duration = 1.1, curve = "linear"})
+scene:indicate(built:body(output), {color = "result", duration = 0.35})
 scene:wait(0.8)
 return scene

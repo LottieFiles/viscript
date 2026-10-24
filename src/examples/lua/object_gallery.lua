@@ -198,11 +198,11 @@ shapePanel:text {
     fill = p.orange,
     id = "path-label",
 }
-shapePanel:grow_from_center(shapeCircle, 0.34, { preset = "back", strength = 0.50 })
-shapePanel:grow_from_center(shapeRectangle, 0.34, { preset = "back", strength = 0.50 })
-shapePanel:grow_from_center(shapePolygon, 0.34, { preset = "back", strength = 0.50 })
-shapePanel:create(shapeCurve, 0.42, "ease_out")
-shapePanel:draw_border_then_fill(shapePath, 0.72, "ease_in_out")
+shapePanel:grow_from_center(shapeCircle, {duration = 0.34, curve = { preset = "back", strength = 0.50 }})
+shapePanel:grow_from_center(shapeRectangle, {duration = 0.34, curve = { preset = "back", strength = 0.50 }})
+shapePanel:grow_from_center(shapePolygon, {duration = 0.34, curve = { preset = "back", strength = 0.50 }})
+shapePanel:create(shapeCurve, {duration = 0.42, curve = "ease_out"})
+shapePanel:draw_border_then_fill(shapePath, {duration = 0.72, curve = "ease_in_out"})
 shapePanel:wait(0.42)
 
 local vectorPanel = panel("03", "LINE / VECTOR / POINT", p.a)
@@ -260,10 +260,10 @@ vectorPanel:text {
     fill = p.cyan,
     id = "vector-label",
 }
-vectorPanel:create(line, 0.28, "linear")
-vectorPanel:create(arrow, 0.34, "linear")
-vectorPanel:create(vector, 0.42, "linear")
-vectorPanel:grow_from_center(point, 0.24, { preset = "back", strength = 0.55 })
+vectorPanel:create(line, {duration = 0.28, curve = "linear"})
+vectorPanel:create(arrow, {duration = 0.34, curve = "linear"})
+vectorPanel:create(vector, {duration = 0.42, curve = "linear"})
+vectorPanel:grow_from_center(point, {duration = 0.24, curve = { preset = "back", strength = 0.55 }})
 vectorPanel:wait(0.42)
 
 local textPanel = panel("04", "TEXT", p.b)
@@ -319,9 +319,9 @@ local spaceVector = space:vector {
 }
 local spacePoint =
     space:point { point = spacePointPosition, fill = p.gold, radius = 6, id = "space-point" }
-spacePanel:create(space, 0.46, "linear")
-spacePanel:create(spaceVector, 0.38, "linear")
-spacePanel:grow_from_center(spacePoint, 0.24, { preset = "back", strength = 0.55 })
+spacePanel:create(space, {duration = 0.46, curve = "linear"})
+spacePanel:create(spaceVector, {duration = 0.38, curve = "linear"})
+spacePanel:grow_from_center(spacePoint, {duration = 0.24, curve = { preset = "back", strength = 0.55 }})
 spacePanel:wait(0.42)
 
 local groupPanel = panel("06", "GROUP / CONNECTOR", p.b)
@@ -372,10 +372,10 @@ local rightEdge = groupPanel:connector {
     id = "edge-b-c",
 }
 for _, node in ipairs(nodeItems) do
-    groupPanel:grow_from_center(node, 0.24, { preset = "back", strength = 0.50 })
+    groupPanel:grow_from_center(node, {duration = 0.24, curve = { preset = "back", strength = 0.50 }})
 end
-groupPanel:create({ leftEdge, rightEdge }, 0.34, "linear", 0.08)
-groupPanel:shift(nodes, { 0, 0.18 }, 0.40, "ease_in_out")
+groupPanel:create({ leftEdge, rightEdge }, {duration = 0.34, curve = "linear", lag = 0.08})
+groupPanel:shift(nodes, { 0, 0.18 }, {duration = 0.40, curve = "ease_in_out"})
 groupPanel:wait(0.42)
 
 local gallery = vis.scene {

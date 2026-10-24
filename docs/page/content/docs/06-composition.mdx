@@ -27,8 +27,8 @@ iso:circle {center = {2.2, 0}}
 iso:circle {center = {3.4, 0}}
 
 scene:parallel(
-    function() scene:fade(plain, 0.4, 1.2) end,
-    function() scene:fade(iso, 0.4, 1.2) end)
+    function() scene:fade(plain, 0.4, {duration = 1.2}) end,
+    function() scene:fade(iso, 0.4, {duration = 1.2}) end)
 scene:wait(0.6)
 
 return scene
@@ -46,8 +46,8 @@ iso.circle({center: [2.2, 0]});
 iso.circle({center: [3.4, 0]});
 
 scene.parallel(
-    () => scene.fade(plain, 0.4, 1.2),
-    () => scene.fade(iso, 0.4, 1.2));
+    () => scene.fade(plain, 0.4, {duration: 1.2}),
+    () => scene.fade(iso, 0.4, {duration: 1.2}));
 scene.wait(0.6);
 
 return scene;
@@ -84,7 +84,7 @@ stripes:mask(hole)
 
 scene:circle {center = {1, 0.4}, radius = 1, fill = "accent", blend = "screen"}
 
-scene:shift(hole, {5, 0}, 2, "smooth")
+scene:shift(hole, {5, 0}, {duration = 2, curve = "smooth"})
 
 return scene
 ```
@@ -101,7 +101,7 @@ stripes.mask(hole);
 
 scene.circle({center: [1, 0.4], radius: 1, fill: "accent", blend: "screen"});
 
-scene.shift(hole, [5, 0], 2, "smooth");
+scene.shift(hole, [5, 0], {duration: 2, curve: "smooth"});
 
 return scene;
 ```
@@ -118,9 +118,9 @@ local scene = vis.scene {}
 local card = scene:rectangle {center = {-2.5, 0}, size = {3, 2}, corner = 0.15, fill = "#e6e8ee"}
 local soft = scene:circle {center = {2.5, 0}, radius = 1.1, fill = "accent"}
 
-scene:tween({target = card, shadow = {blur = 24, offset = {0, -12}, color = "#000000cc"}}, 1)
-scene:tween({target = soft, blur = 18}, 1)
-scene:tween({target = soft, blur = 0}, 0.8)
+scene:tween({target = card, shadow = {blur = 24, offset = {0, -12}, color = "#000000cc"}}, {duration = 1})
+scene:tween({target = soft, blur = 18}, {duration = 1})
+scene:tween({target = soft, blur = 0}, {duration = 0.8})
 
 return scene
 ```
@@ -131,9 +131,9 @@ const scene = vis.scene();
 const card = scene.rectangle({center: [-2.5, 0], size: [3, 2], corner: 0.15, fill: "#e6e8ee"});
 const soft = scene.circle({center: [2.5, 0], radius: 1.1, fill: "accent"});
 
-scene.tween({target: card, shadow: {blur: 24, offset: [0, -12], color: "#000000cc"}}, 1);
-scene.tween({target: soft, blur: 18}, 1);
-scene.tween({target: soft, blur: 0}, 0.8);
+scene.tween({target: card, shadow: {blur: 24, offset: [0, -12], color: "#000000cc"}}, {duration: 1});
+scene.tween({target: soft, blur: 18}, {duration: 1});
+scene.tween({target: soft, blur: 0}, {duration: 0.8});
 
 return scene;
 ```

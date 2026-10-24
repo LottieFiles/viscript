@@ -25,7 +25,7 @@ s:clone(row, {id = "pair", stroke = "#ff0000", shift = {0, -2}, opacity = 0.5})
 local inside = s:clone(a, {parent = twin})
 if inside ~= s:find("row/a:copy") or #twin:children() ~= 3 then error("the given parent") end
 s:clone(word, {id = "masked", mask = r})
-s:tween({{target = word, text = "horse", sweep = true}, {target = n, value = 100}, {target = a, shift = {2, 0}}}, 1, "linear")
+s:tween({{target = word, text = "horse", sweep = true}, {target = n, value = 100}, {target = a, shift = {2, 0}}}, {duration = 1, curve = "linear"})
 s:at(0.5, function()
     s:clone(word, {id = "half"})
     s:clone(n, {id = "count"})
@@ -84,16 +84,16 @@ void _copyTransforms(Renderer* renderer)
 local s = vis.scene {width = 320, height = 180}
 local square = s:polygon {points = {{-4, 2}, {-2, 2}, {-2, 4}, {-4, 4}}, id = "square"}
 local disc = s:circle {center = {3, 3}, radius = 1, id = "disc"}
-s:morph(square, disc, 1, "linear", {copy = true})
+s:morph(square, disc, {duration = 1, curve = "linear", copy = true})
 local left = s:circle {center = {-3, -3}, radius = 0.5, id = "left"}
 local right = s:circle {center = {3, -3}, radius = 0.5, id = "right"}
-s:morph({square, disc}, {left, right}, 1, "linear", {lag = 0.5, copy = true})
+s:morph({square, disc}, {left, right}, {duration = 1, curve = "linear", lag = 0.5, copy = true})
 local from = s:group {id = "from"}
 from:circle {center = {-3, -1}, radius = 0.5, id = "from/dot"}
 s:wait(1)
 local to = s:group {id = "to"}
 to:circle {center = {3, -1}, radius = 0.5, id = "to/dot"}
-s:match_transform(from, to, 1, "linear", {copy = true, shapes = true})
+s:match_transform(from, to, {duration = 1, curve = "linear", copy = true, shapes = true})
 return s
 )lua";
     auto scene = _loaded(source, "copy.lua");
@@ -117,26 +117,26 @@ return s
     delete scene;
 
     _scriptError("local s=vis.scene{}; local a=s:circle{radius=1}; local b=s:circle{radius=2};"
-                 " s:morph(a, b, 1, 'smooth', {copy=true, spin=1}); return s",
+                 " s:morph(a, b, {duration = 1, curve = 'smooth', copy=true, spin=1}); return s",
                  "unknown option 'spin'");
     _scriptError("local s=vis.scene{}; local a=s:circle{radius=1}; local b=s:circle{radius=2};"
-                 " s:morph(a, b, 1, 'smooth', {copy=1}); return s",
+                 " s:morph(a, b, {duration = 1, curve = 'smooth', copy=1}); return s",
                  "copy must be a boolean");
     _scriptError("local s=vis.scene{}; local a=s:circle{radius=1}; local b=s:circle{radius=2};"
-                 " s:morph(a, b, 1, 'smooth', {lag=-1}); return s",
+                 " s:morph(a, b, {duration = 1, curve = 'smooth', lag=-1}); return s",
                  "lag cannot be negative");
     _scriptError("local s=vis.scene{}; local a=s:circle{radius=1}; local b=s:circle{radius=2}; s:wait(1);"
-                 " s:morph(a, b, 1, 'smooth', {copy=true}); return s",
+                 " s:morph(a, b, {duration = 1, curve = 'smooth', copy=true}); return s",
                  "could not play animation: add the morph target right before the morph");
     _scriptError("local s=vis.scene{}; local a=s:group{}; local b=s:group{};"
-                 " s:match_transform(a, b, 1, 'smooth', {copy='yes'}); return s",
+                 " s:match_transform(a, b, {duration = 1, curve = 'smooth', copy='yes'}); return s",
                  "copy must be a boolean");
 }
 
 // Measured billboard text preserves its ink bounds across scaling, cloning and matching.
 void _matchingBillboard(Renderer* renderer)
 {
-    const char* variants[] = {"", ", {copy=true}", ", {path=guide}", ", {copy=true,path=guide}"};
+    const char* variants[] = {"", ", copy=true", ", path=guide", ", copy=true,path=guide"};
     for (auto variant : variants) {
         char source[1800];
         std::snprintf(source, sizeof(source), R"lua(
@@ -148,7 +148,7 @@ s:wait(.2)
 local snapshot=s:clone(a,{id="snapshot"})
 local b=s:text {text="copy",font="Pretendard",size=40,measure=true,point={200,0},id="target"}
 local guide=s:route {points={{-200,0},{0,80},{200,0}},opacity=0}
-s:match_transform(snapshot,b,1,"linear"%s)
+s:match_transform(snapshot,b,{duration = 1, curve = "linear"%s})
 return s
 )lua", variant);
         auto scene = _loaded(source, "match-billboard.lua");
@@ -181,8 +181,8 @@ s:wait(1)
 local to = s:group {id = "to"}
 to:circle {center = {0, 1}, radius = 0.2, id = "c"}
 to:circle {center = {2, 1}, radius = 0.2, id = "d"}
-s:match_transform(from, to, 1, "linear", {copy = true, shapes = true, path = guide})
-s:shift(guide, {1, -1}, 1)
+s:match_transform(from, to, {duration = 1, curve = "linear", copy = true, shapes = true, path = guide})
+s:shift(guide, {1, -1}, {duration = 1})
 return s
 )lua";
     auto scene = _loaded(source, "match-path.lua");
@@ -202,12 +202,12 @@ return s
     }
     delete scene;
     _scriptError("local s=vis.scene{}; local a=s:circle{}; local b=s:circle{};"
-                 "local p=s:line{from={0,0},to={1,1}}; s:match_transform(a,b,1,'linear',{path=p,arc=1}); return s",
+                 "local p=s:line{from={0,0},to={1,1}}; s:match_transform(a,b,{duration = 1, curve = 'linear', path=p,arc=1}); return s",
                  "path and arc cannot be used together");
     _scriptError("local s=vis.scene{}; local a=s:circle{}; local b=s:circle{};"
-                 "s:match_transform(a,b,1,'linear',{path={}}); return s", "expected one object handle");
+                 "s:match_transform(a,b,{duration = 1, curve = 'linear', path={}}); return s", "expected one object handle");
     _scriptError("local s=vis.scene{}; local a=s:circle{}; local b=s:circle{center={1,0}};"
-                 "local p=s:connector{from=a,to=b}; s:match_transform(a,b,1,'linear',{path=p}); return s",
+                 "local p=s:connector{from=a,to=b}; s:match_transform(a,b,{duration = 1, curve = 'linear', path=p}); return s",
                  "a match path must be a snapshot outline, not a live connector");
 }
 
@@ -218,10 +218,10 @@ local s = vis.scene {width = 640, height = 360}
 local first = s:spans {"a²", " + ", "b²", " = ", {"c²", color = "#ff0000"}, size = 28, point = {0, 1}, id = "first"}
 s:wait(1)
 local second = s:spans {{"c²", color = "#ff0000"}, " = ", "a²", " + ", "b²", size = 28, point = {0, 1}, id = "second"}
-s:match_transform(first, second, 2, "linear", {arc = math.pi / 2})
+s:match_transform(first, second, {duration = 2, curve = "linear", arc = math.pi / 2})
 local third = s:spans {{"c", color = "#ff0000"}, " = ", "√(", "a²", " + ", "b²", ")", size = 28, point = {0, -1},
                        id = "third"}
-s:match_transform(second, third, 1, "smooth", {pairs = {{s:find("second/1"), s:find("third/1")}}, lag = 0.1})
+s:match_transform(second, third, {duration = 1, curve = "smooth", pairs = {{s:find("second/1"), s:find("third/1")}}, lag = 0.1})
 return s
 )lua";
     auto scene = _loaded(source, "match.lua");
@@ -262,7 +262,7 @@ from:text {text = "x"}
 s:wait(1)
 local to = s:group {}
 to:text {text = "x", point = {1, 0}}
-s:match_transform(from, to, 1, "smooth", {strings = false})
+s:match_transform(from, to, {duration = 1, curve = "smooth", strings = false})
 return s
 )lua";
     scene = _loaded(twins, "twins.lua");
@@ -279,7 +279,7 @@ local s = vis.scene {}
 local before = s:code {text = "a b\nc", language = "lua"}
 s:wait(1)
 local after = s:code {text = "c\nb a", language = "lua"}
-s:match_transform(before, after, 1, "smooth", {diff = %s, fade = 0.4})
+s:match_transform(before, after, {duration = 1, curve = "smooth", diff = %s, fade = 0.4})
 return s
 )lua", diff);
         scene = _loaded(edited, "edited.lua");
@@ -299,7 +299,7 @@ for i = 1, 2 do two:rectangle {center = {2 * i - 3, 0}, size = {2, 1}} end
 s:wait(1)
 local four = s:group {}
 for i = 1, 4 do four:rectangle {center = {i - 2.5, 0}, size = {0.8, 1}} end
-s:match_transform(two, four, 1, "smooth", {shapes = %s})
+s:match_transform(two, four, {duration = 1, curve = "smooth", shapes = %s})
 return s
 )lua", shapes);
         scene = _loaded(split, "split.lua");
@@ -313,15 +313,15 @@ return s
         std::snprintf(script, sizeof(script), "%s%s return s", pieces, body);
         _scriptError(script, expected);
     };
-    fails("s:match_transform(a, b, 1, 'smooth', {spin = 1})", "unknown option 'spin'");
-    fails("s:match_transform(a, b, 1, 'smooth', {pairs = {{a}}})", "pairs must be an array of {source_piece, target_piece}");
-    fails("s:match_transform(a, b, 1, 'smooth', {pairs = {{b, a}}})", "each pair needs a piece of each object");
-    fails("s:match_transform(a, b, 1, 'smooth', {arc = 7})", "arc must be greater than -2*pi and less than 2*pi radians");
-    fails("s:match_transform(a, b, 1, 'smooth', {lag = -1})", "lag cannot be negative");
-    fails("s:match_transform(a, b, 1, 'smooth', {strings = 1})", "strings must be a boolean");
-    fails("s:match_transform(a, b, 1, 'smooth', {diff = 'yes'})", "diff must be a boolean");
-    fails("s:match_transform(a, b, 1, 'smooth', {shapes = 1})", "shapes must be a boolean");
-    fails("s:match_transform(a, b, 1, 'smooth', {fade = 0})", "fade must be a share of the duration greater than 0 and at most 1");
+    fails("s:match_transform(a, b, {duration = 1, curve = 'smooth', spin = 1})", "unknown option 'spin'");
+    fails("s:match_transform(a, b, {duration = 1, curve = 'smooth', pairs = {{a}}})", "pairs must be an array of {source_piece, target_piece}");
+    fails("s:match_transform(a, b, {duration = 1, curve = 'smooth', pairs = {{b, a}}})", "each pair needs a piece of each object");
+    fails("s:match_transform(a, b, {duration = 1, curve = 'smooth', arc = 7})", "arc must be greater than -2*pi and less than 2*pi radians");
+    fails("s:match_transform(a, b, {duration = 1, curve = 'smooth', lag = -1})", "lag cannot be negative");
+    fails("s:match_transform(a, b, {duration = 1, curve = 'smooth', strings = 1})", "strings must be a boolean");
+    fails("s:match_transform(a, b, {duration = 1, curve = 'smooth', diff = 'yes'})", "diff must be a boolean");
+    fails("s:match_transform(a, b, {duration = 1, curve = 'smooth', shapes = 1})", "shapes must be a boolean");
+    fails("s:match_transform(a, b, {duration = 1, curve = 'smooth', fade = 0})", "fade must be a share of the duration greater than 0 and at most 1");
     fails("s:wait(1); s:match_transform(a, b)",
           "could not match transform: add the object to match into right before the match");
 }
@@ -337,16 +337,16 @@ local calls = 0
 s:warp(plane, function(x, y)
     calls = calls + 1
     return x * x - y * y, 2 * x * y
-end, 1, "linear")
+end, {duration = 1, curve = "linear"})
 if calls ~= 8051 then error("the warp called fn " .. calls .. " times") end
 local dot = s:point {id = "dot", point = {1, 1}, radius = 6}
 local lifted = s:point {id = "lifted", point = {-1, 1}, radius = 6}
 local bar = s:line {id = "bar", from = {-1.5, -3.5}, to = {1.5, -3.5}}
-s:warp(dot, function(x, y) return {x + 1, y} end, 0.5)
-s:warp(lifted, function(x, y, z) return x, y + 1, z + 2 end, 0.5)
+s:warp(dot, function(x, y) return {x + 1, y} end, {duration = 0.5})
+s:warp(lifted, function(x, y, z) return x, y + 1, z + 2 end, {duration = 0.5})
 -- A step of 0.5 cuts the line 3 long into six pieces.
 calls = 0
-s:warp(bar, function(x, y) calls = calls + 1; return {x, y + 0.5, 0} end, 0.5, "smooth", {step = 0.5})
+s:warp(bar, function(x, y) calls = calls + 1; return {x, y + 0.5, 0} end, {duration = 0.5, curve = "smooth", step = 0.5})
 if calls ~= 7 then error("the step left " .. calls .. " points") end
 return s
 )lua";
@@ -364,11 +364,11 @@ end
 -- Points between samples land on their exact images, inside and past the last samples.
 local inner = s:point {id = "inner", point = {0.25, 0.75}, radius = 2}
 local corner = s:point {id = "corner", point = {-3.75, -2.75}, radius = 2}
-s:warp({plane, inner, corner}, {x_range = {-4, 4, 0.5}, y_range = {-3, 3, 0.5}, values = values}, 1, "linear")
+s:warp({plane, inner, corner}, {x_range = {-4, 4, 0.5}, y_range = {-3, 3, 0.5}, values = values}, {duration = 1, curve = "linear"})
 -- Two samples a side map in a straight line, here doubling, and a point keeps its z.
 local dot = s:point {id = "dot", point = {0.25, 0.5}, radius = 6}
 local high = s:point {id = "high", point = {0.5, 1, 2}, radius = 6}
-s:warp({dot, high}, {x_range = {0, 1, 1}, y_range = {0, 1, 1}, values = {{0, 0}, {2, 0}, {0, 2}, {2, 2}}}, 0.5)
+s:warp({dot, high}, {x_range = {0, 1, 1}, y_range = {0, 1, 1}, values = {{0, 0}, {2, 0}, {0, 2}, {2, 2}}}, {duration = 0.5})
 return s
 )lua";
     auto background = pixel(Color::hex("#000000"));
@@ -441,9 +441,9 @@ return s
     };
     fails("s:warp(a)", "warp requires fn, a function of x, y and z that returns the image point, "
                        "or its images sampled as {x_range, y_range, values}");
-    fails("s:warp(a, F, 0)", "duration must be positive");
-    fails("s:warp(a, F, 1, 'linear', {step = 0})", "warp step must be a positive length");
-    fails("s:warp(a, F, 1, 'linear', {steps = 1})", "unknown option 'steps'");
+    fails("s:warp(a, F, {duration = 0})", "duration must be positive");
+    fails("s:warp(a, F, {duration = 1, curve = 'linear', step = 0})", "warp step must be a positive length");
+    fails("s:warp(a, F, {duration = 1, curve = 'linear', steps = 1})", "unknown option 'steps'");
     fails("s:warp({a, a}, F)", "animation targets must be distinct");
     fails("s:warp(a, function() return 'x' end)",
           "warp fn must return x and y, or x, y and z, as numbers or {x, y, z}; at (1.0, 0.0, 0.0) it did not");
@@ -454,7 +454,7 @@ return s
           "could not warp: the warp function gives no finite image of the point (1, 0, 0)");
     fails("s:warp(s:surface{points={{0,0,0},{1,0,0},{0,1,0},{1,1,0}}, size={2,2}}, F)",
           "could not warp: a warp cannot bend cells or surfaces");
-    fails("s:warp(s:line{from={0,0}, to={3,0}}, F, 1, 'linear', {step = 1e-6})",
+    fails("s:warp(s:line{from={0,0}, to={3,0}}, F, {duration = 1, curve = 'linear', step = 1e-6})",
           "could not warp: the scene warps too many points; raise the step or warp fewer objects");
     fails("local c=s:circle{}; s:warp(c, F); s:tween({target=c, radius=2})",
           "keeps the outline its warp gave, so its radius, size and corner no longer change");
@@ -485,14 +485,14 @@ local s = vis.scene {width = 320, height = 180, camera = {mode = "fixed", view =
 local bar = s:rectangle {center = {-4, 0}, size = {4, 0.5}, fill = "#ff0000", stroke = "#00000000", id = "bar"}
 local row = s:group {id = "row"}
 row:line {from = {1, 2}, to = {5, 2}, id = "row/line"}
-s:warp({bar, row}, function(x, y) return x, y + 1.5 * math.sin(x) end, 1, "linear", {step = 0.1})
+s:warp({bar, row}, function(x, y) return x, y + 1.5 * math.sin(x) end, {duration = 1, curve = "linear", step = 0.1})
 local twin = s:clone(bar, {id = "twin", shift = {6, 0}})
 s:clone(row, {id = "low", shift = {0, -3}})
-s:warp(twin, function(x, y) return x, y - 1 end, 1, "linear")
+s:warp(twin, function(x, y) return x, y - 1 end, {duration = 1, curve = "linear"})
 local disc = s:circle {center = {4, -3}, radius = 0.5, id = "disc"}
-s:morph(bar, disc, 1, "linear", {copy = true})
+s:morph(bar, disc, {duration = 1, curve = "linear", copy = true})
 local slab = s:rectangle {center = {-4, -3}, size = {2, 1}, id = "slab"}
-s:match_transform(bar, slab, 1, "linear", {copy = true, shapes = true})
+s:match_transform(bar, slab, {duration = 1, curve = "linear", copy = true, shapes = true})
 return s
 )lua";
     auto scene = _loaded(source, "warped-clone.lua");
@@ -540,7 +540,7 @@ return s
 
     static constexpr auto prefix = "local s=vis.scene{}; local b=s:line{from={-2, 0}, to={2, 0}}; local g=s:group{};"
                                    " g:line{from={-2, 1}, to={2, 1}};"
-                                   " s:warp({b, g}, function(x, y) return x, y + math.sin(x) end, 1); ";
+                                   " s:warp({b, g}, function(x, y) return x, y + math.sin(x) end, {duration = 1}); ";
     char script[512];
     auto fails = [&](const char* body, const char* expected) {
         std::snprintf(script, sizeof(script), "%s%s return s", prefix, body);
@@ -549,6 +549,6 @@ return s
     fails("s:at(0.5, function() s:clone(b) end)",
           "could not clone line: the object is in the middle of a warp; clone it once the warp ends");
     fails("s:at(0.5, function() s:clone(g) end)", "could not clone group: the object is in the middle of a warp");
-    fails("s:at(0.5, function() s:morph(b, s:line{from={0, 2}, to={1, 2}}, 1, 'smooth', {copy=true}) end)",
+    fails("s:at(0.5, function() s:morph(b, s:line{from={0, 2}, to={1, 2}}, {duration = 1, curve = 'smooth', copy=true}) end)",
           "could not play animation: the object is in the middle of a warp");
 }

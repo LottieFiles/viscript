@@ -36,20 +36,20 @@ local slope = scene:text {id = "slope", text = "slope = f'(w)", point = {-0.2, 1
 
 -- Beat 1: the ball rolls part of the way; the viewer sees the tangent flatten.
 scene:wait(0.6)
-scene:track(x, -1.4, 2, "smooth")
+scene:track(x, -1.4, {duration = 2, curve = "smooth"})
 -- Beat 2: zoom on the tangent and its label, dim the rest of the curve.
 -- focus frames authored bounds, so frame the label plus a probe at the ball's spot.
 local probe = scene:circle {id = "zoom-probe", center = {-1.4, f(-1.4)}, radius = 0.9, opacity = 0}
-scene:fade(curve, 0.4, 0.6, "smooth")
+scene:fade(curve, 0.4, {duration = 0.6, curve = "smooth"})
 scene:focus({probe, slope}, {duration = 0.9, curve = "smooth"})
 scene:fade_in(slope, {duration = 0.5})
 scene:wait(0.8)
 -- Beat 3: pull back and finish the descent; the slope reaches zero at the bottom.
 scene:focus(nil, {duration = 0.9, curve = "smooth"})  -- back to the opening camera
-scene:fade(curve, 1, 0.4, "smooth")
-scene:track(x, 0, 2, "smooth")
+scene:fade(curve, 1, {duration = 0.4, curve = "smooth"})
+scene:track(x, 0, {duration = 2, curve = "smooth"})
 -- The answer caption: the label that named the slope now states where it vanishes.
-scene:tween({target = slope, text = "slope = 0 at the minimum"}, 0.6, "ease_in_out")
+scene:tween({target = slope, text = "slope = 0 at the minimum"}, {duration = 0.6, curve = "ease_in_out"})
 scene:indicate(ball, {duration = 0.6})
 scene:wait(2)
 return scene

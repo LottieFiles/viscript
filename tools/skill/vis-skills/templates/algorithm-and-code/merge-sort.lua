@@ -122,7 +122,7 @@ local function setStatus(message, color)
         text = message, point = {0, -145}, role = "code", fill = color or "foreground",
         layer = LAYER.text, id = "status:" .. statusCounter,
     }
-    if status then scene:fade_transform(status, nextStatus, 0.16, "gentle")
+    if status then scene:fade_transform(status, nextStatus, {duration = 0.16, curve = "gentle"})
     else scene:fade_in(nextStatus, {duration = 0.24, curve = "gentle"}) end
     status = nextStatus
 end
@@ -133,7 +133,7 @@ local function compareAndEmit(event, message)
     scene:tween({
         {target = leftBodies[leftHead], stroke = "focus", width = 2},
         {target = rightBodies[rightHead], stroke = "focus", width = 2},
-    }, 0.28, "ease_in_out", 0)
+    }, {duration = 0.28, curve = "ease_in_out", lag = 0})
     local token, body, sourceX
     if event.side == "left" then
         token, body, sourceX = leftTokens[leftHead], leftBodies[leftHead], INPUT_X[leftHead]
@@ -146,7 +146,7 @@ local function compareAndEmit(event, message)
         {target = body, stroke = "result", width = 1.5},
         {target = event.side == "left" and rightBodies[rightHead] or leftBodies[leftHead], stroke = "foreground", width = 1.25},
         {target = outputSlots[outputHead], stroke = "result"},
-    }, 0.55, "ease_out", 0)
+    }, {duration = 0.55, curve = "ease_out", lag = 0})
     if event.side == "left" then leftHead = leftHead + 1 else rightHead = rightHead + 1 end
     outputHead = outputHead + 1
 end
@@ -163,7 +163,7 @@ local function drain(event, message)
         {target = token, shift = {OUTPUT_X[outputHead] - sourceX, OUTPUT_Y - INPUT_Y}},
         {target = body, stroke = "result", width = 1.5},
         {target = outputSlots[outputHead], stroke = "result"},
-    }, 0.50, "ease_out", 0)
+    }, {duration = 0.50, curve = "ease_out", lag = 0})
     if event.side == "left" then leftHead = leftHead + 1 else rightHead = rightHead + 1 end
     outputHead = outputHead + 1
 end

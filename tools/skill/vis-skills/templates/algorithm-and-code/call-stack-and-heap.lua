@@ -38,13 +38,13 @@ local status, statusVersion, detailVersion = nil, 0, {main = 0, build = 0, norma
 local function setStatus(text, color)
     statusVersion = statusVersion + 1
     local nextStatus = scene:text {text = text, point = {0, -160}, role = "code", fill = color or "foreground", layer = LAYER.text, id = "status:" .. statusVersion}
-    if status then scene:fade_transform(status, nextStatus, 0.16, "gentle") else scene:fade_in(nextStatus, {duration = 0.22, curve = "gentle"}) end
+    if status then scene:fade_transform(status, nextStatus, {duration = 0.16, curve = "gentle"}) else scene:fade_in(nextStatus, {duration = 0.22, curve = "gentle"}) end
     status = nextStatus
 end
 local function setDetail(id, text, color)
     detailVersion[id] = detailVersion[id] + 1
     local nextDetail = scene:text {text = text, point = {-260, FRAME[id].y - 16}, role = "code", fill = color or "muted", layer = LAYER.text, id = "frame:" .. id .. ":detail:" .. detailVersion[id]}
-    scene:fade_transform(frameDetail[id], nextDetail, 0.18, "gentle")
+    scene:fade_transform(frameDetail[id], nextDetail, {duration = 0.18, curve = "gentle"})
     frameDetail[id] = nextDetail
 end
 
@@ -55,23 +55,23 @@ for _, event in ipairs(TRACE) do
         setStatus("call " .. event.frame .. " · create a distinct activation")
         local enter = {{target = frameBody[event.frame], opacity = 1, stroke = "focus", width = 2}, {target = frameLabel[event.frame], opacity = 1}}
         if active then enter[#enter + 1] = {target = active, stroke = "foreground", width = 1.25} end
-        scene:tween(enter, 0.30, "ease_out", 0)
+        scene:tween(enter, {duration = 0.30, curve = "ease_out", lag = 0})
         active = frameBody[event.frame]
         local labelId = event.frame
-        scene:tween({{target = frameDetail[labelId], opacity = 1}}, 0.16, "gentle", 0)
+        scene:tween({{target = frameDetail[labelId], opacity = 1}}, {duration = 0.16, curve = "gentle", lag = 0})
         setDetail(event.frame, event.detail)
     elseif event.kind == "allocate" then
         setStatus("buildUser allocates user@A0 on the heap")
-        scene:tween({{target = objectBody, opacity = 1}, {target = objectAddress, opacity = 1}, {target = objectValue, opacity = 1}}, 0.36, "ease_out", 0)
+        scene:tween({{target = objectBody, opacity = 1}, {target = objectAddress, opacity = 1}, {target = objectValue, opacity = 1}}, {duration = 0.36, curve = "ease_out", lag = 0})
     elseif event.kind == "write" then
         setStatus("normalize result becomes the object's field")
         local nextValue = scene:text {text = event.value, point = {260, -10}, role = "code", fill = "result", layer = LAYER.text, id = "object:user:value:1"}
-        scene:fade_transform(objectValue, nextValue, 0.22, "gentle"); objectValue = nextValue
-        scene:tween({{target = objectBody, stroke = "result", width = 1.5}}, 0.24, "ease_in_out", 0)
+        scene:fade_transform(objectValue, nextValue, {duration = 0.22, curve = "gentle"}); objectValue = nextValue
+        scene:tween({{target = objectBody, stroke = "result", width = 1.5}}, {duration = 0.24, curve = "ease_in_out", lag = 0})
     else
         setStatus(event.frame .. " returns " .. event.value)
         setDetail(event.frame, "return " .. event.value, "foreground")
-        if event.frame == "build" then scene:tween({{target = returnRoute, opacity = 1}}, 0.34, "ease_out", 0) end
+        if event.frame == "build" then scene:tween({{target = returnRoute, opacity = 1}}, {duration = 0.34, curve = "ease_out", lag = 0}) end
         -- The returning frame dims and hands the focus back to its caller; main's return clears it.
         local done = {{target = frameBody[event.frame], stroke = "foreground", width = 1.25}}
         if event.frame ~= "main" then
@@ -79,11 +79,11 @@ for _, event in ipairs(TRACE) do
             done[#done + 1] = {target = frameDetail[event.frame], opacity = 0.4}
             done[#done + 1] = {target = frameBody[event.to], stroke = "focus", width = 2}
         end
-        scene:tween(done, 0.28, "ease_in_out", 0)
+        scene:tween(done, {duration = 0.28, curve = "ease_in_out", lag = 0})
         active = frameBody[event.to]
     end
     scene:wait(0.18)
 end
 local result = scene:text {text = "main returns, but user@A0 remains the returned object", point = {190, -160}, role = "text", fill = "result", layer = LAYER.text, id = "result:heap-survives"}
-scene:fade_transform(status, result, 0.22, "gentle"); scene:wait(2.4)
+scene:fade_transform(status, result, {duration = 0.22, curve = "gentle"}); scene:wait(2.4)
 return scene

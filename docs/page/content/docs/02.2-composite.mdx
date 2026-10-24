@@ -6,7 +6,7 @@ parent: animation
 
 # Composite
 
-<p><code>scene:tween(descriptor, duration, curve)</code> changes several properties of one target in a single clip; <code>scene:set</code> applies
+<p><code>scene:tween(descriptor, options)</code> changes several properties of one target in a single clip; <code>scene:set</code> applies
 the same descriptor instantly.</p>
 <table>
 <tr><th>Group</th><th>Descriptor keys</th></tr>
@@ -26,9 +26,9 @@ local scene = vis.scene {}
 local card = scene:rectangle {center = {-3, 0}, size = {1.2, 1.2}, corner = 0, fill = "accent"}
 
 -- one clip, four properties, one curve
-scene:tween({target = card, shift = {6, 0}, size = {2.8, 1.4}, corner = 0.7, fill = "danger"}, 1.6, "smooth")
+scene:tween({target = card, shift = {6, 0}, size = {2.8, 1.4}, corner = 0.7, fill = "danger"}, {duration = 1.6, curve = "smooth"})
 scene:wait(0.3)
-scene:tween({target = card, shift = {-6, 0}, size = {1.2, 1.2}, corner = 0, fill = "accent"}, 1.2)
+scene:tween({target = card, shift = {-6, 0}, size = {1.2, 1.2}, corner = 0, fill = "accent"}, {duration = 1.2})
 
 return scene
 ```
@@ -39,9 +39,9 @@ const scene = vis.scene();
 const card = scene.rectangle({center: [-3, 0], size: [1.2, 1.2], corner: 0, fill: "accent"});
 
 // one clip, four properties, one curve
-scene.tween({target: card, shift: [6, 0], size: [2.8, 1.4], corner: 0.7, fill: "danger"}, 1.6, "smooth");
+scene.tween({target: card, shift: [6, 0], size: [2.8, 1.4], corner: 0.7, fill: "danger"}, {duration: 1.6, curve: "smooth"});
 scene.wait(0.3);
-scene.tween({target: card, shift: [-6, 0], size: [1.2, 1.2], corner: 0, fill: "accent"}, 1.2);
+scene.tween({target: card, shift: [-6, 0], size: [1.2, 1.2], corner: 0, fill: "accent"}, {duration: 1.2});
 
 return scene;
 ```
@@ -57,8 +57,8 @@ local straight = scene:circle {center = {-3.5, -1}, radius = 0.3, fill = "accent
 local curved = scene:circle {center = {-3.5, -1}, radius = 0.3, fill = "warning"}
 
 scene:parallel(
-    function() scene:tween({target = straight, shift = {7, 0}}, 1.6) end,
-    function() scene:tween({target = curved, shift = {7, 0}, arc = -math.pi / 2}, 1.6) end)
+    function() scene:tween({target = straight, shift = {7, 0}}, {duration = 1.6}) end,
+    function() scene:tween({target = curved, shift = {7, 0}, arc = -math.pi / 2}, {duration = 1.6}) end)
 scene:wait(0.5)
 
 return scene
@@ -71,8 +71,8 @@ const straight = scene.circle({center: [-3.5, -1], radius: 0.3, fill: "accent"})
 const curved = scene.circle({center: [-3.5, -1], radius: 0.3, fill: "warning"});
 
 scene.parallel(
-    () => scene.tween({target: straight, shift: [7, 0]}, 1.6),
-    () => scene.tween({target: curved, shift: [7, 0], arc: -Math.PI / 2}, 1.6));
+    () => scene.tween({target: straight, shift: [7, 0]}, {duration: 1.6}),
+    () => scene.tween({target: curved, shift: [7, 0], arc: -Math.PI / 2}, {duration: 1.6}));
 scene.wait(0.5);
 
 return scene;
@@ -90,7 +90,7 @@ local b = scene:rectangle {center = {2, 0}, size = {1.6, 1.6}, fill = "accent"}
 scene:set({target = b, opacity = 0.3})   -- before any animation: b starts faded
 
 scene:wait(0.5)
-scene:tween({target = a, fill = "danger"}, 1)    -- blends over a second
+scene:tween({target = a, fill = "danger"}, {duration = 1})    -- blends over a second
 scene:set({target = b, fill = "danger", opacity = 1})   -- jumps at the cursor
 scene:wait(1.5)
 
@@ -105,7 +105,7 @@ const b = scene.rectangle({center: [2, 0], size: [1.6, 1.6], fill: "accent"});
 scene.set({target: b, opacity: 0.3});   // before any animation: b starts faded
 
 scene.wait(0.5);
-scene.tween({target: a, fill: "danger"}, 1);    // blends over a second
+scene.tween({target: a, fill: "danger"}, {duration: 1});    // blends over a second
 scene.set({target: b, fill: "danger", opacity: 1});   // jumps at the cursor
 scene.wait(1.5);
 
@@ -121,7 +121,7 @@ return scene;
 
 ## A list of descriptors
 
-`tween` also takes a list, one descriptor per target, and a fourth argument `lag` staggers them.
+`tween` also takes a list, one descriptor per target, and the options table's `lag` field staggers them.
 
 ```lua live
 local scene = vis.scene {}
@@ -132,7 +132,7 @@ for i = 1, 6 do
     steps[i] = {target = bars[i], shift = {0, i * 0.3}, size = {0.8, 0.4 + i * 0.6}, fill = "success"}
 end
 
-scene:tween(steps, 0.6, "back", 0.12)   -- a list of descriptors, staggered by lag
+scene:tween(steps, {duration = 0.6, curve = "back", lag = 0.12})   -- a list of descriptors, staggered by lag
 scene:wait(0.6)
 
 return scene
@@ -147,7 +147,7 @@ for (let i = 1; i <= 6; i++) {
     steps.push({target: bar, shift: [0, i * 0.3], size: [0.8, 0.4 + i * 0.6], fill: "success"});
 }
 
-scene.tween(steps, 0.6, "back", 0.12);   // a list of descriptors, staggered by lag
+scene.tween(steps, {duration: 0.6, curve: "back", lag: 0.12});   // a list of descriptors, staggered by lag
 scene.wait(0.6);
 
 return scene;

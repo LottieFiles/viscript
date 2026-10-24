@@ -45,7 +45,7 @@ host.draw(canvas, 0.5);
 const host = await createVis({module});
 host.load(`local scene = vis.scene {width = 640, height = 360, loop = true}
 local dot = scene:circle {radius = 1, fill = "accent"}
-scene:shift(dot, {2, 0}, 1)
+scene:shift(dot, {2, 0}, {duration = 1})
 return scene`);
 write(host.loop);
 host.draw(canvas, 0.5);

@@ -156,7 +156,7 @@ local function on(b) local d = {{target = b.r, opacity = 1}}
   if b == bWait then d[#d + 1] = {target = b.t, opacity = 1} end
   return d end
 
-local function run(d, t, c) scene:tween(d, t, c or "smooth") end
+local function run(d, t, c) scene:tween(d, {duration = t, curve = c or "smooth"}) end
 scene:wait(0.5)
 -- update(): prepare() stores the inputs and calls TaskScheduler::request(task).
 run(cat(ph(1), grow(bPrep)), 0.8)

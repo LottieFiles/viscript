@@ -56,12 +56,12 @@ local input = diagram:node {id = "input", label = "Input"}
 local output = diagram:node {id = "output", label = "Output"}
 local edge = diagram:connect {id = "flow", from = input, to = output, flow = true}
 local built_diagram = diagram:build()
-built_diagram:node_body(input):label {
+built_diagram:body(input):label {
     text = "child", point = {-3.2, 2.2}, size = 12,
     role = "text", fill = "focus", id = "wasm-object-label",
 }
 
-scene:tween({target = built_diagram:edge(edge), dash_offset = -9}, 0.4, "linear")
+scene:tween({target = built_diagram:object(edge), dash_offset = -9}, {duration = 0.4, curve = "linear"})
 return scene
 `, "runtime-authoring-modules.lua");
 

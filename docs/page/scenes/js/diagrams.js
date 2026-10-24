@@ -1,7 +1,7 @@
 // JavaScript versions of the "diagrams" examples, keyed by episode id.
 import {PRELUDE as SHARED} from "./prelude.js";
 
-const PRELUDE = SHARED + `const go = (o, x, y, d = 0.45, arc) => scene.tween(toward(o, x, y, arc), d, "smooth");
+const PRELUDE = SHARED + `const go = (o, x, y, d = 0.45, arc) => scene.tween(toward(o, x, y, arc), {duration: d, curve: "smooth"});
 `;
 
 const DIAGRAM = `
@@ -70,7 +70,7 @@ function side(id, dir) {
     return [x, y - H / 2 - 0.3];
 }
 const hop = (o, id, dir, d, arc) => go(o, ...side(id, dir), d, arc);
-const mark = (id, color) => scene.stroke(N[id].body, color, 0.2);
+const mark = (id, color) => scene.stroke(N[id].body, color, {duration: 0.2});
 function tok(id, s, color, x, y) {
     const o = token(id, s, x, y, {size: [0.56, 0.3], text: 13, stroke: color});
     scene.fadeIn(o.g, {duration: 0.25});
@@ -186,7 +186,7 @@ function message(a, b) {
     return [[a.x + SW / 2, a.y], [ex, a.y], [ex, ey]];
 }
 const activate = (st, color) =>
-    together(() => scene.stroke(st.box, color, 0.2), () => scene.fill(st.text, C.text, 0.2));
+    together(() => scene.stroke(st.box, color, {duration: 0.2}), () => scene.fill(st.text, C.text, {duration: 0.2}));
 scene.wait(0.6);
 activate(steps[0], C.accent);
 say("user fills in the form", steps[0].x - SW / 2, -2.68, C.warn, [0, 0.5]);
@@ -203,14 +203,14 @@ for (let i = 1; i < steps.length; i++) {
     const a = steps[i - 1], b = steps[i];
     const pts = message(a, b);
     const r = scene.route({id: "msg:" + i, points: pts, tip: 9, stroke: C.mute, width: 1.5, layer: L.edge});
-    scene.create(r, 0.45, "ease_out");
+    scene.create(r, {duration: 0.45, curve: "ease_out"});
     // payload starts clear of the sender's box and stops before the receiver's
     const len = (pts[1][0] - pts[0][0]) + Math.abs(pts[2][1] - pts[1][1]);
     const tk = token("payload:" + i, a.send, pts[0][0] + 0.45, pts[0][1], {size: [0.74, 0.3], text: 11, stroke: C.accent});
     scene.fadeIn(tk.g, {duration: 0.15});
     scene.moveAlong(tk.g, r, {from: 0.45 / len, to: 1 - 0.36 / len, duration: 0.8, curve: "smooth"});
     together(() => scene.fadeOut(tk.g, {duration: 0.15}),
-             () => scene.stroke(a.box, C.mute, 0.2),
+             () => scene.stroke(a.box, C.mute, {duration: 0.2}),
              () => activate(b, i === steps.length - 1 ? C.ok : (i === 2 ? C.warn : C.accent)),
              () => {
                  const [text, color] = notes[i + 1];
@@ -220,7 +220,7 @@ for (let i = 1; i < steps.length; i++) {
     scene.wait(i === 4 ? 0.9 : 0.5);
 }
 // the pending row from step 3 is the one the last step flips
-together(() => scene.stroke(steps[2].box, C.ok, 0.3), () => scene.stroke(steps[6].box, C.ok, 0.3));
+together(() => scene.stroke(steps[2].box, C.ok, {duration: 0.3}), () => scene.stroke(steps[6].box, C.ok, {duration: 0.3}));
 scene.wait(2.6);
 return scene;`;
 
@@ -274,7 +274,7 @@ function out(s, from) {
     go(o, -4.75 + (outN - 1) * 0.6, -1.95, 0.55);
 }
 function line(i) {
-    scene.tween({target: cursor, position: [-3.25, code[i].y], opacity: 1}, 0.25, "smooth");
+    scene.tween({target: cursor, position: [-3.25, code[i].y], opacity: 1}, {duration: 0.25, curve: "smooth"});
 }
 function cb(id, label, color, x, y) {
     const o = token(id, label, x, y, {size: [1.1, 0.36], text: 13, stroke: color});
@@ -321,7 +321,7 @@ f = push('log("D")');
 out("D", f);
 pop();
 // script ends: stack empties, microtasks drain before the next task
-scene.fade(cursor, 0, 0.25);
+scene.fade(cursor, 0, {duration: 0.25});
 pop();
 say("stack empty: microtasks run first", SX, SY, C.alt, [0, 0.5]);
 scene.wait(0.4);
@@ -356,7 +356,7 @@ for (let k = 0; k < spec.length - 1; k++) {
 }
 d.connect({id: "test-report", from: N.test, to: N.report, fromPort: "bottom", toPort: "top"});
 d.build();
-const mark = (id, color, dur = 0.2) => scene.stroke(N[id].body, color, dur);
+const mark = (id, color, dur = 0.2) => scene.stroke(N[id].body, color, {duration: dur});
 // test detail is the stage's state: swap its Text in place
 let det = N.test.detailText, detN = 0;
 function setTest(s, color) {
@@ -387,12 +387,12 @@ stage(r1, "test");
 together(() => mark("test", C.danger), () => setTest("1 failed", C.danger),
          () => say("test fails  pipeline stops", 0.95, 2.55, C.danger, [0, 0.5]));
 together(() => mark("report", C.danger, 0.3),
-         () => scene.fade(N.package.group, 0.35, 0.3), () => scene.fade(N.deploy.group, 0.35, 0.3));
+         () => scene.fade(N.package.group, 0.35, {duration: 0.3}), () => scene.fade(N.deploy.group, 0.35, {duration: 0.3}));
 scene.wait(1.6);
 // run 2: the fix goes through every stage
 together(() => scene.fadeOut(r1.g, {duration: 0.25}),
          () => { for (const id of ["push", "build", "test", "report"]) mark(id, C.line, 0.25); },
-         () => scene.fade(N.package.group, 1, 0.25), () => scene.fade(N.deploy.group, 1, 0.25),
+         () => scene.fade(N.package.group, 1, {duration: 0.25}), () => scene.fade(N.deploy.group, 1, {duration: 0.25}),
          () => say("run 2  fix pushed", -5.1, 2.55, C.warn, [0, 0.5]));
 setTest("unit tests", C.mute);
 const r2 = run("b7c2", C.ok);
@@ -439,7 +439,7 @@ function newcommit(id, hash, lane, x, color, ...parents) {
     const es = parents.map((p) => edge(p, c));
     scene.set({target: c.g, opacity: 0});
     for (const e of es) scene.set({target: e, progress: 0});
-    for (const e of es) scene.create(e, 0.35, "ease_out");
+    for (const e of es) scene.create(e, {duration: 0.35, curve: "ease_out"});
     scene.fadeIn(c.g, {duration: 0.3});
     return c;
 }
@@ -519,10 +519,10 @@ function flow(dur, speed = {}) {
     together(...ORDER.map((id) => {
         offset[id] = (offset[id] ?? 0) - (speed[id] ?? 48) * dur;
         const o = offset[id];
-        return () => scene.tween({target: E[id], dash_offset: o}, dur, "linear");
+        return () => scene.tween({target: E[id], dash_offset: o}, {duration: dur, curve: "linear"});
     }));
 }
-const tint = (ids, color) => together(...ids.map((id) => () => scene.stroke(E[id], color, 0.3)));
+const tint = (ids, color) => together(...ids.map((id) => () => scene.stroke(E[id], color, {duration: 0.3})));
 
 scene.wait(0.6);
 // 1. events stream in at a steady rate
@@ -531,14 +531,14 @@ tint(ORDER, C.accent);
 flow(3);
 // 2. a spike: sources speed up, but the single worker cannot keep pace with the dashboard
 say("traffic spike  dashboard lags", 0, 2.55, C.warn);
-together(() => tint(["dashboard"], C.warn), () => scene.stroke(box.dashboard, C.warn, 0.3));
+together(() => tint(["dashboard"], C.warn), () => scene.stroke(box.dashboard, C.warn, {duration: 0.3}));
 flow(3, {clicks: 96, orders: 96, sensors: 96, read: 60, warehouse: 48, dashboard: 14});
 // 3. a second worker joins and the whole path runs fast
 together(() => scene.fadeOut(jobDetail, {duration: 0.2}),
          () => scene.fadeIn(T(scene, "job:detail2", "2 workers", 1.4, -0.18, 13, C.ok), {duration: 0.3}),
-         () => scene.stroke(box.job, C.ok, 0.3),
+         () => scene.stroke(box.job, C.ok, {duration: 0.3}),
          () => say("second worker  caught up", 0, 2.55, C.ok));
-together(() => tint(["dashboard"], C.accent), () => scene.stroke(box.dashboard, C.line, 0.3));
+together(() => tint(["dashboard"], C.accent), () => scene.stroke(box.dashboard, C.line, {duration: 0.3}));
 flow(3.4, {clicks: 96, orders: 96, sensors: 96, read: 96, warehouse: 72, dashboard: 72});
 return scene;`;
 

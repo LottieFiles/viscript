@@ -23,8 +23,8 @@ local dot = axes:circle {center = {-5, math.sin(-5)}, radius = 0.18, fill = "war
 
 scene:fade_in(axes, {duration = 0.5})
 scene:create(wave, {duration = 1.2, curve = "smooth"})
-scene:write(label, 0.6)
-scene:grow_from_center(dot, 0.3)
+scene:write(label, {duration = 0.6})
+scene:grow_from_center(dot, {duration = 0.3})
 scene:move_along(dot, wave, {duration = 2.4, curve = "ease_in_out"})
 
 return scene
@@ -40,8 +40,8 @@ const dot = axes.circle({center: [-5, Math.sin(-5)], radius: 0.18, fill: "warnin
 
 scene.fadeIn(axes, {duration: 0.5});
 scene.create(wave, {duration: 1.2, curve: "smooth"});
-scene.write(label, 0.6);
-scene.growFromCenter(dot, 0.3);
+scene.write(label, {duration: 0.6});
+scene.growFromCenter(dot, {duration: 0.3});
 scene.moveAlong(dot, wave, {duration: 2.4, curve: "ease_in_out"});
 
 return scene;
@@ -109,9 +109,9 @@ runtime.font("Pretendard", await font.arrayBuffer(), "ttf");
 const scene = vis.scene();
 const title = scene.text({text: "Hello, viscript", point: [0, 1.2], size: 48});
 const circle = scene.circle({center: [-2, -0.8], radius: 0.6, fill: "accent", stroke: "accent"});
-scene.write(title, 1);
-scene.growFromCenter(circle, 0.5);
-scene.shift(circle, [4, 0], 1.2, "ease_in_out");
+scene.write(title, {duration: 1});
+scene.growFromCenter(circle, {duration: 0.5});
+scene.shift(circle, [4, 0], {duration: 1.2, curve: "ease_in_out"});
 scene.wait(0.5);
 runtime.load(scene, "scene.js");
 
@@ -142,9 +142,9 @@ runtime.load(`
 local scene = vis.scene {}
 local title = scene:text {text = "Hello, viscript", point = {0, 1.2}, size = 48}
 local circle = scene:circle {center = {-2, -0.8}, radius = 0.6, fill = "accent", stroke = "accent"}
-scene:write(title, 1)
-scene:grow_from_center(circle, 0.5)
-scene:shift(circle, {4, 0}, 1.2, "ease_in_out")
+scene:write(title, {duration = 1})
+scene:grow_from_center(circle, {duration = 0.5})
+scene:shift(circle, {4, 0}, {duration = 1.2, curve = "ease_in_out"})
 scene:wait(0.5)
 return scene
 `, "scene.lua");

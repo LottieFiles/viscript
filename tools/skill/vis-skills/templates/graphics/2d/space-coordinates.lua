@@ -43,8 +43,8 @@ local scale_label = scene:text {
 }
 
 -- Reveal the same transformed geometry twice so only the number interpretation changes.
-scene:create(fixed.space, 0.7, "ease_out")
-scene:create(relative.space, 0.7, "ease_out")
+scene:create(fixed.space, {duration = 0.7, curve = "ease_out"})
+scene:create(relative.space, {duration = 0.7, curve = "ease_out"})
 scene:fade_in(fixed.mode_label, {shift = {0, -0.08}, duration = 0.24, curve = "gentle"})
 scene:fade_in(relative.mode_label, {shift = {0, -0.08}, duration = 0.24, curve = "gentle"})
 scene:wait(0.55)

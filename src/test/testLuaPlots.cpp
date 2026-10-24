@@ -13,18 +13,18 @@ local function square(x)
   return 2 * x * x
 end
 local p = s:plot {id = "graph", fn = function() return 0 end, x_range = {-2, 2, 0.5}, y_range = {-1, 1}}
-s:tween({target = p, fn = square}, 1, "linear")
+s:tween({target = p, fn = square}, {duration = 1, curve = "linear"})
 s:at(0.25, function() s:clone(p, {id = "quarter"}) end)
 s:at(0.5, function() s:clone(p, {id = "half"}) end)
 assert(calls < 200, "fn sampled more than once per grid and boundary")
 finished = true
 -- A plot from points has no source column, so different pieces still switch halfway.
 local q = s:plot {id = "points", points = {{-2, -0.5}, {2, -0.5}}}
-s:tween({target = q, fn = function(x) return x * x end, x_range = {-2, 2, 0.5}}, 1, "linear")
+s:tween({target = q, fn = function(x) return x * x end, x_range = {-2, 2, 0.5}}, {duration = 1, curve = "linear"})
 s:at(1.25, function() s:clone(q, {id = "points_before"}) end)
 s:at(1.75, function() s:clone(q, {id = "points_after"}) end)
 local r = s:plot {fn = function() return 0 end, x_range = {-2, 2, 1}}
-s:tween({target = r, fn = function() return 1 end, x_range = {-2, 2, 0.5}}, 1, "linear")
+s:tween({target = r, fn = function() return 1 end, x_range = {-2, 2, 0.5}}, {duration = 1, curve = "linear"})
 s:at(2.25, function() s:clone(r, {id = "grid_before"}) end)
 s:at(2.75, function() s:clone(r, {id = "grid_after"}) end)
 return s
@@ -73,9 +73,9 @@ local cubic = s:plot {id = "cubic", fn = function(x) return 80 * x * x * x end,
   x_range = {-1, 1, 2}, y_range = {-4, 4}}
 s:at(4, function()
   s:tween({{target = steep, fn = function(x) return 160 * x end},
-    {target = cubic, fn = function(x) return 160 * x * x * x end}}, 2, "linear")
+    {target = cubic, fn = function(x) return 160 * x * x * x end}}, {duration = 2, curve = "linear"})
 end)
-s:at(4, function() s:track(phase, math.pi / 4, 2, "ease_in_out") end)
+s:at(4, function() s:track(phase, math.pi / 4, {duration = 2, curve = "ease_in_out"}) end)
 s:wait(6.1)
 s:clone(graph, {id = "baked", opacity = 0})
 finished = true
@@ -139,19 +139,19 @@ s:bind(run, phi, function(p) return {fn = function(x) if x <= p then return 0 en
 -- Points of any count, cut to the band the plot was made with, before the timeline.
 local cut = s:plot {id = "cut", points = {{0, 0}, {1, 0.25}, {2, 0}}, y_range = {-0.5, 0.5}}
 s:set {target = cut, points = {{0, 0}, {1, 2}, {2, 0}, {3, 2}, {4, 0}}}
-s:track(phi, 1, 1, "linear")
+s:track(phi, 1, {duration = 1, curve = "linear"})
 s:plot {id = "after", fn = shifted(1), x_range = {-3, 3, 0.05}, y_range = {-4, 4}}
 -- fn for a plot of points takes x_range, which it keeps with the discontinuities for later states.
 local steps = s:plot {id = "steps", points = {{0, 0}, {3, 3}}}
-s:tween({target = steps, fn = math.floor, x_range = {0, 3, 0.25}, discontinuities = {2, 1}}, 1)
-s:tween({target = steps, fn = math.ceil}, 1)
+s:tween({target = steps, fn = math.floor, x_range = {0, 3, 0.25}, discontinuities = {2, 1}}, {duration = 1})
+s:tween({target = steps, fn = math.ceil}, {duration = 1})
 -- Nothing left inside the band leaves the plot empty until points come back, from 3 s on.
 local gone = s:plot {id = "gone", fn = math.sin, x_range = {0, 3, 0.5}, y_range = {-1, 1}}
-s:tween({target = gone, fn = function(x) return 5 end}, 1)
-s:tween({target = gone, points = {{0, 0}, {1, 0}}}, 1)
+s:tween({target = gone, fn = function(x) return 5 end}, {duration = 1})
+s:tween({target = gone, points = {{0, 0}, {1, 0}}}, {duration = 1})
 -- A copy cuts fn as its original does, over its x_range and to its band.
 local twin = s:clone(graph, {id = "twin"})
-s:tween({target = twin, fn = shifted(-1)}, 1)
+s:tween({target = twin, fn = shifted(-1)}, {duration = 1})
 s:plot {id = "before", fn = shifted(-1), x_range = {-3, 3, 0.05}, y_range = {-4, 4}}
 return s
 )lua";
@@ -231,15 +231,15 @@ return s
         std::snprintf(script, sizeof(script), "%s%s return s", prefix, body);
         _scriptError(script, expected);
     };
-    fails("s:tween({target = p, fn = f}, 1)", "plot fn requires x_range");
-    fails("s:tween({target = p, points = {{0, 0}, {1, 1}}, x_range = {0, 1, 0.5}}, 1)", "x_range needs fn");
-    fails("s:tween({target = p, y_range = {0, 1}}, 1)", "y_range needs fn or points");
-    fails("s:tween({target = p, discontinuities = {1}}, 1)", "discontinuities needs fn or points");
-    fails("s:tween({target = p, fn = f, x_range = {0, 1, 0.5}, points = {{0, 0}, {1, 1}}}, 1)",
+    fails("s:tween({target = p, fn = f}, {duration = 1})", "plot fn requires x_range");
+    fails("s:tween({target = p, points = {{0, 0}, {1, 1}}, x_range = {0, 1, 0.5}}, {duration = 1})", "x_range needs fn");
+    fails("s:tween({target = p, y_range = {0, 1}}, {duration = 1})", "y_range needs fn or points");
+    fails("s:tween({target = p, discontinuities = {1}}, {duration = 1})", "discontinuities needs fn or points");
+    fails("s:tween({target = p, fn = f, x_range = {0, 1, 0.5}, points = {{0, 0}, {1, 1}}}, {duration = 1})",
           "a plot takes either points or fn, not both");
-    fails("s:tween({target = p, fn = 3}, 1)", "fn must be a function");
-    fails("s:tween({target = p, fn = f, x_range = {0, 1, 0.5}, y_range = {1, 0}}, 1)", "y_range must have lo below hi");
-    fails("s:tween({target = q, fn = f}, 1)", "fn needs a plot");
+    fails("s:tween({target = p, fn = 3}, {duration = 1})", "fn must be a function");
+    fails("s:tween({target = p, fn = f, x_range = {0, 1, 0.5}, y_range = {1, 0}}, {duration = 1})", "y_range must have lo below hi");
+    fails("s:tween({target = q, fn = f}, {duration = 1})", "fn needs a plot");
     fails("s:set {target = q, x_range = {0, 1, 0.5}}", "x_range needs a plot");
     fails("local t = s:tracker(0) s:bind(p, t, function(v) return {fn = f} end)", "plot fn requires x_range");
 
@@ -250,16 +250,12 @@ return s
     static constexpr auto growing = "local s = vis.scene {} local function zero() return 0 end "
                                     "s:plot {fn = zero, x_range = {0, 1, 1 / 950000}} "
                                     "local p = s:plot {points = {{0, 0}, {1, 0}}} "
-                                    "s:tween({target = p, fn = zero, x_range = {0, 1, 1 / 20000}}, 0.1) "
-                                    "s:tween({target = p, fn = zero}, 0.1) "
-                                    "s:tween({target = p, points = {{0, 0}, {1, 0}}}, 0.1) "
-                                    "s:tween({target = p, fn = zero}, 0.1) "
-                                    "s:tween({target = p, fn = zero, x_range = {0, 1, 1 / 40000}}, 0.1) ";
+                                    "s:tween({target = p, fn = zero, x_range = {0, 1, 1 / 20000}}, {duration = 0.1}) s:tween({target = p, fn = zero}, {duration = 0.1}) s:tween({target = p, points = {{0, 0}, {1, 0}}}, {duration = 0.1}) s:tween({target = p, fn = zero}, {duration = 0.1}) s:tween({target = p, fn = zero, x_range = {0, 1, 1 / 40000}}, {duration = 0.1}) ";
     char room[1024];
     std::snprintf(room, sizeof(room), "%sreturn s", growing);
     scene = _loaded(room, "room.lua");
     delete scene;
-    std::snprintf(room, sizeof(room), "%ss:tween({target = p, fn = zero, x_range = {0, 1, 1 / 60000}}, 0.1) return s",
+    std::snprintf(room, sizeof(room), "%ss:tween({target = p, fn = zero, x_range = {0, 1, 1 / 60000}}, {duration = 0.1}) return s",
                   growing);
     _scriptError(room, "scene point limit exceeded");
 }
@@ -275,7 +271,7 @@ local v = s:vector {origin = {-4, -2}, value = {8, 0}, trim_distance = {2, 1}, i
 s:set {target = v, trim_distance = 1}
 local x = s:tracker(0)
 s:bind(l, x, function(t) return {to = {4, 6 * t}, trim_distance = {1 + t, 2 - t}} end)
-s:track(x, 1, 1, "linear")
+s:track(x, 1, {duration = 1, curve = "linear"})
 return s
 )lua";
     auto scene = _loaded(source, "trim-distance.lua");
@@ -301,7 +297,7 @@ return s
                  "trim_distance must be a number or {start, end}");
     _scriptError("local s = vis.scene {} s:line {from = {0, 0}, to = {1, 0}, trim_distance = '1'} return s",
                  "trim_distance must be a number or {start, end}");
-    _scriptError("local s = vis.scene {} local c = s:circle {radius = 1} s:tween({target = c, trim_distance = 1}, 1) return s",
+    _scriptError("local s = vis.scene {} local c = s:circle {radius = 1} s:tween({target = c, trim_distance = 1}, {duration = 1}) return s",
                  "trim distance needs a line, arrow or vector and non-negative distances");
     _scriptError("local s = vis.scene {} s:line {from = {0, 0}, to = {1, 0}, buff = 1} return s",
                  "unknown option 'buff'");
@@ -310,7 +306,7 @@ return s
     _scriptError("local s = vis.scene {} s:vector {value = {1, 0}, buff = 1} return s", "unknown option 'buff'");
     _scriptError("local s = vis.scene {} s:rectangle {size = {1, 1}, buff = 1} return s", "unknown option 'buff'");
     _scriptError("local s = vis.scene {} local l = s:line {from = {0, 0}, to = {1, 0}} "
-                 "s:tween({target = l, buff = 1}, 1) return s", "unknown option 'buff'");
+                 "s:tween({target = l, buff = 1}, {duration = 1}) return s", "unknown option 'buff'");
     _scriptError("local s = vis.scene {} local l = s:line {from = {0, 0}, to = {1, 0}} "
                  "local t = s:tracker(0) s:bind(l, t, function(v) return {buff = v} end) return s",
                  "a bound state cannot set 'buff'");

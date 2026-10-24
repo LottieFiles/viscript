@@ -33,9 +33,9 @@ local line = scene:line {from = {2.2, -1}, to = {4.6, 1}, width = 4}
 local arrow = scene:arrow {from = {2.2, 1}, to = {4.6, -1}, stroke = "danger", width = 4}
 local dot = scene:point {point = {0, -2}, radius = 8, fill = "success"}
 
-scene:draw_border_then_fill({rect, tri}, 1.2, "smooth", 0.3)  -- outline first, then fill
-scene:create({line, arrow}, 0.6, "smooth", 0.2)
-scene:grow_from_center(dot, 0.4)
+scene:draw_border_then_fill({rect, tri}, {duration = 1.2, curve = "smooth", lag = 0.3})  -- outline first, then fill
+scene:create({line, arrow}, {duration = 0.6, curve = "smooth", lag = 0.2})
+scene:grow_from_center(dot, {duration = 0.4})
 
 return scene
 ```
@@ -49,9 +49,9 @@ const line = scene.line({from: [2.2, -1], to: [4.6, 1], width: 4});
 const arrow = scene.arrow({from: [2.2, 1], to: [4.6, -1], stroke: "danger", width: 4});
 const dot = scene.point({point: [0, -2], radius: 8, fill: "success"});
 
-scene.drawBorderThenFill([rect, tri], 1.2, "smooth", 0.3);  // outline first, then fill
-scene.create([line, arrow], 0.6, "smooth", 0.2);
-scene.growFromCenter(dot, 0.4);
+scene.drawBorderThenFill([rect, tri], {duration: 1.2, curve: "smooth", lag: 0.3});  // outline first, then fill
+scene.create([line, arrow], {duration: 0.6, curve: "smooth", lag: 0.2});
+scene.growFromCenter(dot, {duration: 0.4});
 
 return scene;
 ```
@@ -68,7 +68,7 @@ local arch = scene:path {commands = {
     {type = "close"},
 }, fill = "accent"}
 
-scene:draw_border_then_fill(arch, 1.5)
+scene:draw_border_then_fill(arch, {duration = 1.5})
 
 return scene
 ```
@@ -82,7 +82,7 @@ const arch = scene.path({commands: [
     {type: "close"},
 ], fill: "accent"});
 
-scene.drawBorderThenFill(arch, 1.5);
+scene.drawBorderThenFill(arch, {duration: 1.5});
 
 return scene;
 ```
@@ -111,10 +111,10 @@ local k1 = scene:point {point = c1, radius = 7, fill = "muted"}
 local k2 = scene:point {point = c2, radius = 7, fill = "muted"}
 local curve = scene:curve {from = p0, control1 = c1, control2 = c2, to = p1, stroke = "warning", width = 5}
 
-scene:create({h1, h2}, 0.5, "smooth", 0.1)
-scene:grow_from_center(k1, 0.2)
-scene:grow_from_center(k2, 0.2)
-scene:create(curve, 1.2, "smooth")
+scene:create({h1, h2}, {duration = 0.5, curve = "smooth", lag = 0.1})
+scene:grow_from_center(k1, {duration = 0.2})
+scene:grow_from_center(k2, {duration = 0.2})
+scene:create(curve, {duration = 1.2, curve = "smooth"})
 
 return scene
 ```
@@ -129,10 +129,10 @@ const k1 = scene.point({point: c1, radius: 7, fill: "muted"});
 const k2 = scene.point({point: c2, radius: 7, fill: "muted"});
 const curve = scene.curve({from: p0, control1: c1, control2: c2, to: p1, stroke: "warning", width: 5});
 
-scene.create([h1, h2], 0.5, "smooth", 0.1);
-scene.growFromCenter(k1, 0.2);
-scene.growFromCenter(k2, 0.2);
-scene.create(curve, 1.2, "smooth");
+scene.create([h1, h2], {duration: 0.5, curve: "smooth", lag: 0.1});
+scene.growFromCenter(k1, {duration: 0.2});
+scene.growFromCenter(k2, {duration: 0.2});
+scene.create(curve, {duration: 1.2, curve: "smooth"});
 
 return scene;
 ```
@@ -149,7 +149,7 @@ local route = scene:route {
     stroke = "danger", width = 4, tip = 14,
 }
 
-scene:create(route, 1.5, "smooth")
+scene:create(route, {duration = 1.5, curve = "smooth"})
 
 return scene
 ```
@@ -162,7 +162,7 @@ const route = scene.route({
     stroke: "danger", width: 4, tip: 14,
 });
 
-scene.create(route, 1.5, "smooth");
+scene.create(route, {duration: 1.5, curve: "smooth"});
 
 return scene;
 ```
@@ -189,12 +189,12 @@ local theta = scene:angle {vertex = {-1, -1}, from = {1.5, -1}, to = {0.6, 1.2},
 local bar = scene:rectangle {center = {3.8, 0.5}, size = {2.4, 0.6}, fill = "secondary"}
 local brace, width = scene:brace {around = bar, direction = "down", label = "width"}
 
-scene:create({arc, pie}, 0.6)
-scene:create({a, b}, 0.5)
-scene:create(theta, 0.5)
+scene:create({arc, pie}, {duration = 0.6})
+scene:create({a, b}, {duration = 0.5})
+scene:create(theta, {duration = 0.5})
 scene:fade_in(bar, {duration = 0.3})
-scene:grow_from_center(brace, 0.5)
-scene:write(width, 0.4)
+scene:grow_from_center(brace, {duration = 0.5})
+scene:write(width, {duration = 0.4})
 
 return scene
 ```
@@ -213,12 +213,12 @@ const theta = scene.angle({vertex: [-1, -1], from: [1.5, -1], to: [0.6, 1.2], ra
 const bar = scene.rectangle({center: [3.8, 0.5], size: [2.4, 0.6], fill: "secondary"});
 const [brace, width] = scene.brace({around: bar, direction: "down", label: "width"});
 
-scene.create([arc, pie], 0.6);
-scene.create([a, b], 0.5);
-scene.create(theta, 0.5);
+scene.create([arc, pie], {duration: 0.6});
+scene.create([a, b], {duration: 0.5});
+scene.create(theta, {duration: 0.5});
 scene.fadeIn(bar, {duration: 0.3});
-scene.growFromCenter(brace, 0.5);
-scene.write(width, 0.4);
+scene.growFromCenter(brace, {duration: 0.5});
+scene.write(width, {duration: 0.4});
 
 return scene;
 ```

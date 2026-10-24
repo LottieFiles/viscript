@@ -83,7 +83,7 @@ head:line {from = {tx(0), TY - TH / 2 - 0.12}, to = {tx(0), TY + TH / 2 + 0.12},
 
 -- Caption.
 local caption = scene:text {text = "Write a line, see it render", point = {0, -2.5}, size = 16, fill = "foreground", id = "caption"}
-local function say(s) scene:tween({target = caption, text = s}, 0.35, "smooth") end
+local function say(s) scene:tween({target = caption, text = s}, {duration = 0.35, curve = "smooth"}) end
 
 local code = VERSIONS[1].slot:code {text = VERSIONS[1].text, language = "lua", size = 12, id = "code1", layer = L.text, opacity = 0}
 
@@ -92,7 +92,7 @@ local code = VERSIONS[1].slot:code {text = VERSIONS[1].text, language = "lua", s
 local function edit(k, hit, react, d)
   local v = VERSIONS[k]
   local next_code = v.slot:code {text = v.text, language = "lua", size = 12, id = "code" .. k, layer = L.text}
-  scene:match_transform(code, next_code, d or 0.5, "smooth", {diff = true})
+  scene:match_transform(code, next_code, {duration = d or 0.5, curve = "smooth", diff = true})
   code = next_code
   local tokens = hit and next_code:search(hit, {match = "last"})
   scene:parallel(
@@ -111,13 +111,13 @@ local function preview(st)
   else
     reset[#reset + 1] = {target = wave, progress = 1, opacity = 0}
   end
-  scene:tween(reset, 0.15)
+  scene:tween(reset, {duration = 0.15})
   if st.move then scene:save(dot) end
   scene:parallel(
     function() scene:shift(head, {tx(total) - tx(0), 0}, {duration = total, curve = "linear"}) end,
     function()
-      if st.verb == "create" then scene:tween({target = wave, progress = 1}, st.d, "smooth")
-      else scene:tween({target = wave, opacity = 1}, st.d, "smooth") end
+      if st.verb == "create" then scene:tween({target = wave, progress = 1}, {duration = st.d, curve = "smooth"})
+      else scene:tween({target = wave, opacity = 1}, {duration = st.d, curve = "smooth"}) end
     end,
     function()
       if not st.move then return end
@@ -125,30 +125,30 @@ local function preview(st)
       scene:move_along(dot, wave, {duration = move.d, curve = "ease_in_out"})
     end)
   scene:wait(0.5)
-  scene:tween({target = head, opacity = 0}, 0.25)
-  scene:shift(head, {tx(0) - tx(total), 0}, 0.01)
-  if st.move then scene:restore(dot, 0.3) end
+  scene:tween({target = head, opacity = 0}, {duration = 0.25})
+  scene:shift(head, {tx(0) - tx(total), 0}, {duration = 0.01})
+  if st.move then scene:restore(dot, {duration = 0.3}) end
 end
 
 -- 1. Type the first line; the wave renders.
 scene:wait(0.4)
-scene:tween({target = code, opacity = 1}, 0.01)
-scene:write(code, 0.9)
+scene:tween({target = code, opacity = 1}, {duration = 0.01})
+scene:write(code, {duration = 0.9})
 scene:passing_flash(run, {duration = 0.4})
-scene:tween({target = wave, progress = 1}, 0.5, "ease_out")
+scene:tween({target = wave, progress = 1}, {duration = 0.5, curve = "ease_out"})
 scene:wait(0.6)
 
 -- 2. Tweak a value: width is in pixels.
 say("Tweak a value")
-edit(2, "12", function() scene:tween({target = wave, width = 12}, 0.4, "ease_out") end)
+edit(2, "12", function() scene:tween({target = wave, width = 12}, {duration = 0.4, curve = "ease_out"}) end)
 scene:wait(0.6)
-edit(3, "6", function() scene:tween({target = wave, width = 6}, 0.4, "ease_out") end)
+edit(3, "6", function() scene:tween({target = wave, width = 6}, {duration = 0.4, curve = "ease_out"}) end)
 scene:wait(0.5)
 
 -- 3. Add an animation; it lands on the timeline cursor.
 say("Add an animation")
 scene:fade_in(cursor, {duration = 0.25})
-edit(4, "create", function() scene:tween({{target = anim.box, opacity = 1}, {target = anim.label, opacity = 1}}, 0.3, "ease_out") end)
+edit(4, "create", function() scene:tween({{target = anim.box, opacity = 1}, {target = anim.label, opacity = 1}}, {duration = 0.3, curve = "ease_out"}) end)
 cursor_to(1.2)
 preview {verb = "create", d = 1.2}
 
@@ -156,30 +156,30 @@ preview {verb = "create", d = 1.2}
 say("Retime it")
 edit(5, "2.0", function() scene:parallel(
   function() scene:tween({{target = anim.box, transform = stretch(TL0, (tx(2.0) - tx(0) - 0.06) / (tx(1.2) - tx(0) - 0.06))},
-    {target = anim.label, shift = {(tx(2.0) - tx(1.2)) / 2, 0}}}, 0.45, "smooth") end,
+    {target = anim.label, shift = {(tx(2.0) - tx(1.2)) / 2, 0}}}, {duration = 0.45, curve = "smooth"}) end,
   function() cursor_to(2.0, 0.45) end) end)
 preview {verb = "create", d = 2.0}
 
 -- 5. Add more to the Scene.
 say("Add more to the Scene")
 edit(6, nil, nil, 0.8)
-scene:tween({{target = label, opacity = 1}, {target = dot, opacity = 1}}, 0.35, "ease_out")
-scene:tween({{target = move.box, opacity = 1}, {target = move.label, opacity = 1}}, 0.3, "ease_out")
+scene:tween({{target = label, opacity = 1}, {target = dot, opacity = 1}}, {duration = 0.35, curve = "ease_out"})
+scene:tween({{target = move.box, opacity = 1}, {target = move.label, opacity = 1}}, {duration = 0.3, curve = "ease_out"})
 cursor_to(4.4)
 preview {verb = "create", d = 2.0, move = true}
 
 -- 6. Remove what you don't need.
 say("Delete what you don't need")
 edit(7)
-scene:tween({target = label, opacity = 0}, 0.35, "smooth")
+scene:tween({target = label, opacity = 0}, {duration = 0.35, curve = "smooth"})
 scene:wait(0.4)
 
 -- 7. Swap the animation call.
 say("Swap the animation")
-edit(8, "fade_in", function() scene:tween({target = anim.label, text = "fade_in"}, 0.35, "smooth") end)
+edit(8, "fade_in", function() scene:tween({target = anim.label, text = "fade_in"}, {duration = 0.35, curve = "smooth"}) end)
 preview {verb = "fade_in", d = 2.0, move = true}
 
 say("Lua → Scene")
-scene:tween({target = cursor, opacity = 0}, 0.3)
+scene:tween({target = cursor, opacity = 0}, {duration = 0.3})
 scene:wait(1.5)
 return scene

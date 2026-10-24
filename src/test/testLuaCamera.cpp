@@ -45,10 +45,10 @@ void _cameraCenters()
 local s = vis.scene {width = 160, height = 90}
 local box = s:rectangle {center = {3, 1}, size = {2, 1}}
 s:parallel(
-    function() s:look({target = {-4, 0}}, 2, "linear") end,
+    function() s:look({target = {-4, 0}}, {duration = 2, curve = "linear"}) end,
     function()
         s:wait(1)
-        s:look({target = box}, 2, "linear")
+        s:look({target = box}, {duration = 2, curve = "linear"})
     end)
 return s
 )lua";
@@ -81,7 +81,7 @@ s:parallel(
     function() s:orbit(2 * math.pi, {duration = 4, curve = "linear"}) end,
     function()
         s:wait(1)
-        s:look({target = edge}, 2, "linear")
+        s:look({target = edge}, {duration = 2, curve = "linear"})
     end)
 return s
 )lua";
@@ -107,8 +107,8 @@ return s
 local s = vis.scene {camera = {mode = "fixed", view = "3d", eye = {0, -8, 6}}}
 local disc = s:circle {center = {-1, 0}, radius = 1}
 local edge = s:line {from = {2, 2, 1}, to = {3, 1, 1}}
-s:look({target = {disc, edge}, eye = {6, -6, 6}, fov = 0.5}, 1)
-s:look({target = {disc}, height = 3}, 1)
+s:look({target = {disc, edge}, eye = {6, -6, 6}, fov = 0.5}, {duration = 1})
+s:look({target = {disc}, height = 3}, {duration = 1})
 return s
 )lua";
     auto aiming = _cameraScene(aim, "center-aim.lua", sample);
@@ -127,8 +127,8 @@ return s
 local s = vis.scene {}
 local dot = s:circle {radius = 0.25}
 s:parallel(
-    function() s:shift(dot, {3, 1}, 2, "linear") end,
-    function() s:look({target = dot}, 2, "linear") end)
+    function() s:shift(dot, {3, 1}, {duration = 2, curve = "linear"}) end,
+    function() s:look({target = dot}, {duration = 2, curve = "linear"}) end)
 return s
 )lua";
     auto following = _cameraScene(follow, "center-follow.lua", sample);
@@ -165,7 +165,7 @@ local s = vis.scene {width = 160, height = 90,
                        camera = {mode = "fixed", view = "3d", eye = {4, -6, 5}, target = {1, 0, 0}, up = {0, 0, 1},
                                  projection = "perspective", fov = 0.6}}
 s:orbit(math.pi / 2, {duration = 1})
-s:look({target = {2, 1, 0}, fov = 0.9, far = 50}, 1)
+s:look({target = {2, 1, 0}, fov = 0.9, far = 50}, {duration = 1})
 s:focus(nil, {duration = 1})
 return s
 )lua";
@@ -214,7 +214,7 @@ return s
     // A scene that opened in 2D turns back into it at the end of the return, exactly.
     static constexpr auto planar = R"lua(
 local s = vis.scene {width = 160, height = 90, camera = {mode = "fixed", view = "2d", target = {1, 2}, height = 6}}
-s:look({view = "3d", eye = {1, -6, 8}, projection = "perspective", fov = 0.7}, 1)
+s:look({view = "3d", eye = {1, -6, 8}, projection = "perspective", fov = 0.7}, {duration = 1})
 s:orbit(math.pi / 3, {axis = {0, 0, 1}, duration = 1})
 s:focus(nil, {duration = 1})
 return s
@@ -233,7 +233,7 @@ return s
     // Over a running orbit a return to the 2D view ends no earlier than the orbit.
     static constexpr auto late = R"lua(
 local s = vis.scene {width = 160, height = 90}
-s:look({view = "3d", eye = {0, -8, 6}}, 1)
+s:look({view = "3d", eye = {0, -8, 6}}, {duration = 1})
 s:parallel(
     function() s:orbit(math.pi, {axis = {0, 0, 1}, duration = 2}) end,
     function() s:focus(nil, {duration = 2}) end)
@@ -248,7 +248,7 @@ return s
               && _sameCamera(sample.camera, opening));
     }
     delete settling;
-    _scriptError("local s = vis.scene {} s:look({view = '3d', eye = {0, -8, 6}}, 1) "
+    _scriptError("local s = vis.scene {} s:look({view = '3d', eye = {0, -8, 6}}, {duration = 1}) "
                  "s:parallel(function() s:orbit(math.pi, {axis = {0, 0, 1}, duration = 2}) end, "
                  "function() s:focus(nil, {duration = 1}) end) return s",
                  "could not animate camera: the camera already moves until 3.00 s; a look that returns to the 2D "
@@ -304,10 +304,10 @@ local deep = s:view({x = 0, y = 0.5, width = 0.25, height = 0.5},
                     {camera = {view = "3d", eye = {0, -8, 6}, target = {0, 0, 0}, up = {0, 0, 1},
                                projection = "perspective"}, background = "#00000000"})
 s:at(4.5, function(t) t:view({x = 0.75, y = 0, width = 0.25, height = 0.25}) end)
-lens:look({height = 2.5}, 1)
+lens:look({height = 2.5}, {duration = 1})
 strip:focus(box, {padding = 0, duration = 1})
 deep:orbit(math.pi / 2, {axis = {0, 0, 1}, duration = 1})
-lens:fade(0.5, 1)
+lens:fade(0.5, {duration = 1})
 strip:focus()
 return s
 )lua";
@@ -373,9 +373,9 @@ return s
           "a view hides at most 256 objects");
     fails("for i = 1, 9 do s:view(rect) end", "a scene holds at most 8 views in a script, as each draws the scene again");
     fails("s:view(rect):orbit(1)", "could not orbit view camera: only a 3D camera orbits");
-    fails("local v s:at(2, function() v = s:view(rect) end) v:look({height = 1}, 1)",
+    fails("local v s:at(2, function() v = s:view(rect) end) v:look({height = 1}, {duration = 1})",
           "could not animate view camera: the view is made after this time");
-    fails("local v = s:view(rect) s:parallel(function() v:fade(0, 2) end, function() s:wait(1) v:fade(1, 1) end)",
+    fails("local v = s:view(rect) s:parallel(function() v:fade(0, {duration = 2}) end, function() s:wait(1) v:fade(1, {duration = 1}) end)",
           "could not fade view: the view already fades until 2.00 s");
     fails("local v = s:view(rect, {camera = {view = '3d', eye = {0, -8, 6}}}) v:focus(s:circle {})",
           "focus requires a 2D camera; use look in 3D");

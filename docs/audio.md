@@ -28,7 +28,7 @@ local music = vis.audio.cue(scene, {
     asset = "music.mp3", bus = "music", begin = 0, ["end"] = 18,
     gain = 0.7, loop = true,
 })
-music:gain(0.25, 14, 2, "smooth")
+music:gain(0.25, 14, {duration = 2, curve = "smooth"})
 
 vis.audio.cue(scene, {asset = "hit.wav", bus = "effect", begin = 2.4})
 scene:wait(18)
@@ -122,7 +122,7 @@ const music = definition.sound({
     asset: "music.wav", bus: "music", begin: 0, end: 18,
     gain: 0.7, loop: true,
 });
-music.gain(0.25, 14, 2, "smooth");
+music.gain(0.25, 14, {duration: 2, curve: "smooth"});
 definition.wait(18);
 ```
 

@@ -898,8 +898,7 @@ export interface SpaceHandle extends ObjectHandle {
 declare const audioCueHandle: unique symbol;
 export interface AudioCueHandle {
     readonly [audioCueHandle]: true;
-    gain(value: number, begin: number, duration?: number, curve?: AnimCurve): this;
-    gain(value: number, begin: number, options: TimingOptions): this;
+    gain(value: number, begin: number, options?: TimingOptions): this;
 }
 
 export interface ViewOptions {
@@ -923,14 +922,12 @@ declare const viewHandle: unique symbol;
 /** A view from SceneBuilder.view: its camera moves and the whole view fades with the calls the scene's camera takes. */
 export interface ViewHandle {
     readonly [viewHandle]: true;
-    look(camera: CameraTarget, duration?: number, curve?: AnimCurve): this;
-    look(camera: CameraTarget, options: TimingOptions): this;
+    look(camera: CameraTarget, options?: TimingOptions): this;
     orbit(radians: number, options?: OrbitOptions): this;
     /** Frame the targets in the view's rectangle with its 2D camera; no target returns to the camera the view opened with. */
     focus(target?: Handle | readonly Handle[] | null, options?: FocusOptions): this;
     /** Fade the whole view; the fades of one view follow one another. */
-    fade(opacity: number, duration?: number, curve?: AnimCurve): this;
-    fade(opacity: number, options: TimingOptions): this;
+    fade(opacity: number, options?: TimingOptions): this;
 }
 
 interface FadeEffectOptions {
@@ -1252,11 +1249,9 @@ export type WarpOptions = TimingOptions & {
     step?: number;
 };
 
-export interface SceneBuilder extends ObjectFactory {}
 /** Definitions share Lua budgets: 4096 objects, 65536 clips, 1000000 points, 64 MiB native memory.
  * Retained geometry uses 12 bytes per point per state plus 512 bytes per clip. */
-export class SceneBuilder {
-    constructor(config?: SceneConfig);
+export interface SceneBuilder extends ObjectFactory {
     /** Transfers and seals child; author it fully before attachment. Scene cycles are rejected. */
     viewport(child: SceneBuilder, bounds: ViewportBounds): this;
     /** Draw this scene's own objects again in a rectangle of the frame through a camera of its own, as a magnifier or an inset; at most 8 per scene. */
@@ -1266,24 +1261,16 @@ export class SceneBuilder {
     /** A cue the audio module plays; the Lua guards it and its gains by vis.audio, so a host without the
      * module plays the scene without sound. */
     sound(options: SoundOptions): AudioCueHandle;
-    create(target: Handle | readonly Handle[], duration?: number, curve?: AnimCurve, lag?: number, direction?: CreateDirection): this;
-    create(target: Handle | readonly Handle[], options: RevealOptions): this;
-    uncreate(target: Handle | readonly Handle[], duration?: number, curve?: AnimCurve, lag?: number, direction?: CreateDirection): this;
-    uncreate(target: Handle | readonly Handle[], options: RevealOptions): this;
-    fillReveal(target: Handle | readonly Handle[], duration?: number, curve?: AnimCurve, lag?: number): this;
-    fillReveal(target: Handle | readonly Handle[], options: AnimationOptions): this;
-    drawBorderThenFill(target: Handle | readonly Handle[], duration?: number, curve?: AnimCurve, lag?: number, direction?: CreateDirection): this;
-    drawBorderThenFill(target: Handle | readonly Handle[], options: RevealOptions): this;
-    write(target: Handle | readonly Handle[], duration?: number, curve?: AnimCurve, lag?: number, direction?: CreateDirection): this;
-    write(target: Handle | readonly Handle[], options: RevealOptions): this;
+    create(target: Handle | readonly Handle[], options?: RevealOptions): this;
+    uncreate(target: Handle | readonly Handle[], options?: RevealOptions): this;
+    fillReveal(target: Handle | readonly Handle[], options?: AnimationOptions): this;
+    drawBorderThenFill(target: Handle | readonly Handle[], options?: RevealOptions): this;
+    write(target: Handle | readonly Handle[], options?: RevealOptions): this;
     fadeIn(target: Handle, options?: FadeOptions): this;
     fadeOut(target: Handle, options?: FadeOptions): this;
-    growFromCenter(target: Handle, duration?: number, curve?: AnimCurve): this;
-    growFromCenter(target: Handle, options: TimingOptions): this;
-    growFromEdge(target: Handle, edge: GrowthEdge, duration?: number, curve?: AnimCurve): this;
-    growFromEdge(target: Handle, edge: GrowthEdge, options: TimingOptions): this;
-    shrinkToCenter(target: Handle, duration?: number, curve?: AnimCurve): this;
-    shrinkToCenter(target: Handle, options: TimingOptions): this;
+    growFromCenter(target: Handle, options?: TimingOptions): this;
+    growFromEdge(target: Handle, edge: GrowthEdge, options?: TimingOptions): this;
+    shrinkToCenter(target: Handle, options?: TimingOptions): this;
     /** An array of handles, such as the tokens a search finds, indicates at once. */
     indicate(target: Handle | readonly Handle[], options?: IndicateOptions): this;
     /** Grows the target a little while it turns back and forth, then leaves it as it was. */
@@ -1298,27 +1285,21 @@ export class SceneBuilder {
     ripple(target: Handle, options?: RippleOptions): this;
     /** Source draws the interpolated shape until target takes over at completion.
      * Source then leaves the timeline; copy preserves it by morphing a sampled copy. */
-    morph(source: Handle | readonly Handle[], target: Handle | readonly Handle[], duration?: number, curve?: AnimCurve, lag?: number | Omit<MorphOptions, keyof TimingOptions>): this;
-    morph(source: Handle | readonly Handle[], target: Handle | readonly Handle[], options: MorphOptions): this;
+    morph(source: Handle | readonly Handle[], target: Handle | readonly Handle[], options?: MorphOptions): this;
     /** Cross-fades disjoint families and removes source from the timeline at completion.
      * Attach target at the cursor without clips; source clips must finish by the fade's end.
      * Objects remain Scene-owned and can still be sampled at earlier times. */
-    fadeTransform(source: Handle, target: Handle, duration?: number, curve?: AnimCurve): this;
-    fadeTransform(source: Handle, target: Handle, options: TimingOptions): this;
+    fadeTransform(source: Handle, target: Handle, options?: TimingOptions): this;
     /** Carries matching pieces into a newly attached target. Source must be at rest unless
      * copy snapshots it. Completion removes source or its temporary copy from the timeline. */
-    matchTransform(source: Handle, target: Handle, duration?: number, curve?: AnimCurve, options?: Omit<MatchOptions, keyof TimingOptions>): this;
-    matchTransform(source: Handle, target: Handle, options: MatchOptions): this;
+    matchTransform(source: Handle, target: Handle, options?: MatchOptions): this;
     /**
      * The code block that block's text becomes after the edits, applied in order, in block's look,
      * place and parent; block turns into it as matchTransform with diff does.
      */
-    edit(block: GroupHandle, edits: CodeEdit | readonly CodeEdit[], duration?: number, curve?: AnimCurve,
-        options?: Omit<EditOptions, keyof TimingOptions>): GroupHandle;
-    edit(block: GroupHandle, edits: CodeEdit | readonly CodeEdit[], options: EditOptions): GroupHandle;
+    edit(block: GroupHandle, edits: CodeEdit | readonly CodeEdit[], options?: EditOptions): GroupHandle;
     /** Lays a group's children, or sibling handles in order, one after another; an item added now grows in. */
-    arrange(items: GroupHandle | readonly Handle[], duration?: number, curve?: AnimCurve, options?: Omit<ArrangeOptions, keyof TimingOptions>): this;
-    arrange(items: GroupHandle | readonly Handle[], options: ArrangeOptions): this;
+    arrange(items: GroupHandle | readonly Handle[], options?: ArrangeOptions): this;
     /** Children first to last of target, counting from 1, stay at full opacity and the rest of target dims. */
     highlight(target: Handle, first: number, last: number, options?: HighlightOptions): this;
     highlight(target: Handle, first: number, options?: HighlightOptions): this;
@@ -1326,8 +1307,7 @@ export class SceneBuilder {
     highlight(target: Handle, selection: Handle | readonly Handle[], options?: HighlightOptions): this;
     /** Brings everything below target back to full opacity. */
     highlight(target: Handle, options?: HighlightOptions): this;
-    shift(target: Handle, by: WorldVector, duration?: number, curve?: AnimCurve): this;
-    shift(target: Handle, by: WorldVector, options: TimingOptions): this;
+    shift(target: Handle, by: WorldVector, options?: TimingOptions): this;
     rotate(target: Handle | readonly Handle[], radians: number, options?: RotateOptions): this;
     scale(target: Handle | readonly Handle[], factor: number | WorldVector, options?: ScaleOptions): this;
     /** Follows a copied outline, or a connector's live trimmed ends. Connector dependencies must not form a cycle. */
@@ -1339,24 +1319,16 @@ export class SceneBuilder {
      */
     warp(target: Handle | readonly Handle[], fn: (x: number, y: number) => readonly [number, number],
         options: WarpOptions): this;
-    warp(target: Handle | readonly Handle[], fn: (x: number, y: number) => readonly [number, number],
-        duration: number, curve: AnimCurve | undefined, options: Omit<WarpOptions, keyof TimingOptions>): this;
-    transform(target: Handle, matrix: Mat4, duration?: number, curve?: AnimCurve): this;
-    transform(target: Handle, matrix: Mat4, options: TimingOptions): this;
-    fade(target: Handle, opacity: number, duration?: number, curve?: AnimCurve): this;
-    fade(target: Handle, opacity: number, options: TimingOptions): this;
+    transform(target: Handle, matrix: Mat4, options?: TimingOptions): this;
+    fade(target: Handle, opacity: number, options?: TimingOptions): this;
     /**
      * Fades the from targets to opacity 0 and the to targets to 1 together. Unlike fadeTransform, it takes any
      * targets and keeps from in the scene, invisible.
      */
-    transition(from: Handle | readonly Handle[], to: Handle | readonly Handle[], duration?: number, curve?: AnimCurve): this;
-    transition(from: Handle | readonly Handle[], to: Handle | readonly Handle[], options: TimingOptions): this;
-    stroke(target: Handle, color: Color, duration?: number, curve?: AnimCurve): this;
-    stroke(target: Handle, color: Color, options: TimingOptions): this;
-    fill(target: Handle, color: Color, duration?: number, curve?: AnimCurve): this;
-    fill(target: Handle, color: Color, options: TimingOptions): this;
-    tween(specification: AnimationSpec | readonly AnimationSpec[], duration?: number, curve?: AnimCurve, lag?: number): this;
-    tween(specification: AnimationSpec | readonly AnimationSpec[], options: AnimationOptions): this;
+    transition(from: Handle | readonly Handle[], to: Handle | readonly Handle[], options?: TimingOptions): this;
+    stroke(target: Handle, color: Color, options?: TimingOptions): this;
+    fill(target: Handle, color: Color, options?: TimingOptions): this;
+    tween(specification: AnimationSpec | readonly AnimationSpec[], options?: AnimationOptions): this;
     /** Applies the values at once: as the starting state before the timeline starts, at the cursor afterwards. */
     set(specification: SetSpec | readonly SetSpec[]): this;
     /**
@@ -1371,8 +1343,7 @@ export class SceneBuilder {
      * when duration is 0, the default. Removed descendants stay removed; restores do not undo
      * warps or switch plain/counting text modes.
      */
-    restore(target: Handle | readonly Handle[], duration?: number, curve?: AnimCurve, lag?: number): this;
-    restore(target: Handle | readonly Handle[], options: AnimationOptions): this;
+    restore(target: Handle | readonly Handle[], options?: AnimationOptions): this;
     /** A number for objects to follow, starting at value. */
     tracker(value: number): Tracker;
     /** Bind one object to tracker values and apply its initial state immediately.
@@ -1383,14 +1354,11 @@ export class SceneBuilder {
      * Different trackers can overlap on a shared object; one tracker cannot run overlapping tracks.
      * Clips are flushed by animation calls, clone, warp, view, and view-camera calls; tracks cannot
      * merge after a flush. A call exceeding 65536 target segments fails before sampling. */
-    track(tracker: Tracker, value: number, duration: number, curve?: AnimCurve): this;
     track(tracker: Tracker, value: number, options: TimingOptions): this;
     /** Moves several trackers at once, each to its value. */
-    track(moves: readonly (readonly [Tracker, number])[], duration: number, curve?: AnimCurve): this;
     track(moves: readonly (readonly [Tracker, number])[], options: TimingOptions): this;
     /** Move the camera; omitted fields keep their value, and a target of handles centers the camera on them. */
-    look(camera: CameraTarget, duration?: number, curve?: AnimCurve): this;
-    look(camera: CameraTarget, options: TimingOptions): this;
+    look(camera: CameraTarget, options?: TimingOptions): this;
     /** Circle a 3D camera about its target by any angle; 2 * Math.PI is one full turn. */
     orbit(radians: number, options?: OrbitOptions): this;
     /** Frame target bounds with a 2D camera. A target in a 3D camera is rejected.
@@ -1409,7 +1377,6 @@ export class SceneBuilder {
     parallel(...tracks: Array<(scene: this) => void>): this;
     parallel(tracks: ReadonlyArray<(scene: this) => void>): this;
     mark(name: string): this;
-    compile(): string;
 }
 
 /**

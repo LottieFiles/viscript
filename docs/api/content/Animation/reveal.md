@@ -13,11 +13,11 @@ parent: animation
 
 | Lua | JavaScript | Purpose |
 | --- | --- | --- |
-| `scene:create(targets, duration?, curve?, lag?, direction?)`<br />`scene:create(targets, options)` | `scene.create(targets, duration?, curve?, lag?, direction?)`<br />`scene.create(targets, options)` | Draw outlines progressively. Options: `duration`, `curve`, `lag`, `direction`. |
-| `scene:uncreate(targets, duration?, curve?, lag?, direction?)`<br />`scene:uncreate(targets, options)` | `scene.uncreate(targets, duration?, curve?, lag?, direction?)`<br />`scene.uncreate(targets, options)` | Erase outlines progressively. Options: `duration`, `curve`, `lag`, `direction`. |
-| `scene:fill_reveal(targets, duration?, curve?, lag?)`<br />`scene:fill_reveal(targets, options)` | `scene.fillReveal(targets, duration?, curve?, lag?)`<br />`scene.fillReveal(targets, options)` | Reveal filled shapes progressively. Options: `duration`, `curve`, `lag`. |
-| `scene:draw_border_then_fill(targets, duration?, curve?, lag?, direction?)`<br />`scene:draw_border_then_fill(targets, options)` | `scene.drawBorderThenFill(targets, duration?, curve?, lag?, direction?)`<br />`scene.drawBorderThenFill(targets, options)` | Draw the border, then bring in the fill. Options: `duration`, `curve`, `lag`, `direction`. |
-| `scene:write(targets, duration?, curve?, lag?, direction?)`<br />`scene:write(targets, options)` | `scene.write(targets, duration?, curve?, lag?, direction?)`<br />`scene.write(targets, options)` | Reveal text glyphs or composite pieces in order. Options: `duration`, `curve`, `lag`, `direction`. |
+| `scene:create(targets, options?)` | `scene.create(targets, options?)` | Draw outlines progressively. Options: `duration`, `curve`, `lag`, `direction`. |
+| `scene:uncreate(targets, options?)` | `scene.uncreate(targets, options?)` | Erase outlines progressively. Options: `duration`, `curve`, `lag`, `direction`. |
+| `scene:fill_reveal(targets, options?)` | `scene.fillReveal(targets, options?)` | Reveal filled shapes progressively. Options: `duration`, `curve`, `lag`. |
+| `scene:draw_border_then_fill(targets, options?)` | `scene.drawBorderThenFill(targets, options?)` | Draw the border, then bring in the fill. Options: `duration`, `curve`, `lag`, `direction`. |
+| `scene:write(targets, options?)` | `scene.write(targets, options?)` | Reveal text glyphs or composite pieces in order. Options: `duration`, `curve`, `lag`, `direction`. |
 
 `direction` accepts `forward`, `reverse`, `clockwise`, `counterclockwise`; omitted direction is forward. Timing follows the [shared rules](./index.md).
 
@@ -43,8 +43,8 @@ local scene = vis.scene {
 }
 
 local circle = scene:circle {id = "circle", radius = 1.1, stroke = "accent", fill = "#00000000", width = 3}
-scene:create(circle, 1)
-scene:uncreate(circle, 1)
+scene:create(circle, {duration = 1})
+scene:uncreate(circle, {duration = 1})
 
 return scene
 ```
@@ -56,8 +56,8 @@ const scene = vis.scene({
 });
 
 const circle = scene.circle({id: "circle", radius: 1.1, stroke: "accent", fill: "#00000000", width: 3});
-scene.create(circle, 1);
-scene.uncreate(circle, 1);
+scene.create(circle, {duration: 1});
+scene.uncreate(circle, {duration: 1});
 
 return scene;
 ```
@@ -74,7 +74,7 @@ local scene = vis.scene {
 
 scene:text {id = "caption", text = "fill_reveal", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
 local subject = scene:rectangle {id = "subject", size = {2.6, 1.5}, stroke = "accent", fill = "accent", width = 3}
-scene:fill_reveal(subject, 1.4)
+scene:fill_reveal(subject, {duration = 1.4})
 
 return scene
 ```
@@ -87,7 +87,7 @@ const scene = vis.scene({
 
 scene.text({id: "caption", text: "fill_reveal", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
 const subject = scene.rectangle({id: "subject", size: [2.6, 1.5], stroke: "accent", fill: "accent", width: 3});
-scene.fillReveal(subject, 1.4);
+scene.fillReveal(subject, {duration: 1.4});
 
 return scene;
 ```
@@ -104,7 +104,7 @@ local scene = vis.scene {
 
 scene:text {id = "caption", text = "draw_border_then_fill", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
 local subject = scene:rectangle {id = "subject", size = {2.6, 1.5}, stroke = "accent", fill = "accent", width = 3}
-scene:draw_border_then_fill(subject, 1.4)
+scene:draw_border_then_fill(subject, {duration = 1.4})
 
 return scene
 ```
@@ -117,7 +117,7 @@ const scene = vis.scene({
 
 scene.text({id: "caption", text: "draw_border_then_fill", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
 const subject = scene.rectangle({id: "subject", size: [2.6, 1.5], stroke: "accent", fill: "accent", width: 3});
-scene.drawBorderThenFill(subject, 1.4);
+scene.drawBorderThenFill(subject, {duration: 1.4});
 
 return scene;
 ```
@@ -134,7 +134,7 @@ local scene = vis.scene {
 
 scene:text {id = "caption", text = "write", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
 local subject = scene:text {id = "subject", text = "VISCRIPT", size = 42, font = "Pretendard", fill = "accent"}
-scene:write(subject, 1.4)
+scene:write(subject, {duration = 1.4})
 
 return scene
 ```
@@ -147,7 +147,7 @@ const scene = vis.scene({
 
 scene.text({id: "caption", text: "write", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
 const subject = scene.text({id: "subject", text: "VISCRIPT", size: 42, font: "Pretendard", fill: "accent"});
-scene.write(subject, 1.4);
+scene.write(subject, {duration: 1.4});
 
 return scene;
 ```
@@ -164,7 +164,7 @@ local scene = vis.scene {
 
 scene:text {id = "caption", text = "tween: progress", point = {0, 2.2}, size = 20, font = "JetBrainsMono", fill = "muted"}
 local subject = scene:circle {id = "subject", radius = 1.1, stroke = "accent", fill = "#00000000", width = 3}
-scene:tween({target = subject, progress = 0.15}, 1.4)
+scene:tween({target = subject, progress = 0.15}, {duration = 1.4})
 
 return scene
 ```
@@ -177,7 +177,7 @@ const scene = vis.scene({
 
 scene.text({id: "caption", text: "tween: progress", point: [0, 2.2], size: 20, font: "JetBrainsMono", fill: "muted"});
 const subject = scene.circle({id: "subject", radius: 1.1, stroke: "accent", fill: "#00000000", width: 3});
-scene.tween({target: subject, progress: 0.15}, 1.4);
+scene.tween({target: subject, progress: 0.15}, {duration: 1.4});
 
 return scene;
 ```

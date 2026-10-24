@@ -18,15 +18,15 @@ Host examples run in a web application, outside a scene. Place the following set
 ## example.js
 
 ```javascript
-import {createVis, createVisModule, vis, SceneBuilder, compileScene,
+import {createVis, createVisModule, vis, compileScene,
     evaluateScene, inputKeyName} from "./runtime/client.js";
 const canvas = document.querySelector("canvas");
 const module = await createVisModule();
-// load accepts a SceneBuilder or Lua source. Evaluate JavaScript source with evaluateScene().
+// load accepts a builder or Lua source. Evaluate JavaScript source with evaluateScene().
 const source = vis.scene({width: 640, height: 360, camera: {mode: "interactive"}});
 const dot = source.circle({id: "dot", center: [-1, 0], radius: 0.6, fill: "accent"});
 source.rectangle({id: "box", center: [1.3, 0], size: [2, 2], stroke: "foreground", fill: "#00000000"});
-source.shift(dot, [1.5, 0], 1);
+source.shift(dot, [1.5, 0], {duration: 1});
 const fontBytes = new Uint8Array(await (await fetch("./runtime/PretendardStd-Regular.ttf")).arrayBuffer());
 const imageBytes = new Uint8Array(await (await fetch("./assets/earth.png")).arrayBuffer());
 const toneBytes = makeToneBytes(); // a generated 150 ms WAV

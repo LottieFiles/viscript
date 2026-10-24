@@ -13,9 +13,9 @@ local hand = s:vector {value = {1, 0}, origin = {-2, 1}, id = "hand"}
 s:bind(hand, x, function(v) return {value = {0, v}} end)
 local wave = s:plot {points = {{-3, 2}, {0, 2}, {3, 2}}, id = "wave"}
 s:bind(wave, x, function(v) return {points = {{-3, 2}, {0, 2 + v}, {3, 2}}, opacity = 1 - v / 4} end)
-s:track(x, 2, 1, "linear")
+s:track(x, 2, {duration = 1, curve = "linear"})
 local wedge = s:polygon {points = {{0, 0}, {1, 0}, {0, 1}}, id = "wedge"}
-s:tween({target = wedge, points = {{0, 0}, {2, 0}, {0, 2}}}, 0.5)
+s:tween({target = wedge, points = {{0, 0}, {2, 0}, {0, 2}}}, {duration = 0.5})
 local pointer = s:arrow {from = {0, 0}, to = {1, 0}, id = "pointer"}
 s:set {target = pointer, to = {0, 1}}
 return s
@@ -61,25 +61,25 @@ return s
                  "diagnostic.lua:2: points must have 3 points, as the polygon has, not 2; a shape keeps its point count");
     _scriptError("local s = vis.scene {}\nlocal p = s:polygon {points = {{0, 0}, {1, 1}, {2, 0}}}\nlocal t = s:tracker(0)\n"
                  "s:bind(p, t, function(v) local q = {{0, v}, {1, 1}, {2, 0}} if v > 0.5 then q[4] = {3, 0} end "
-                 "return {points = q} end)\ns:track(t, 1, 1)\nreturn s",
+                 "return {points = q} end)\ns:track(t, 1, {duration = 1})\nreturn s",
                  "diagnostic.lua:5: points must have 3 points, as the polygon has, not 4");
     _scriptError("local s = vis.scene {} local c = s:circle {radius = 1} local t = s:tracker(0) "
                  "s:bind(c, t, function(v) return {from = {v, 0}} end) return s",
                  "from needs a line, arrow, curve or angle; move other objects with shift");
     _scriptError("local s = vis.scene {} local l = s:line {from = {0, 0}, to = {1, 0}} "
-                 "s:tween({target = l, origin = {1, 1}}, 1) return s", "origin needs a vector");
+                 "s:tween({target = l, origin = {1, 1}}, {duration = 1}) return s", "origin needs a vector");
     _scriptError("local s = vis.scene {} local l = s:line {from = {0, 0}, to = {1, 0}} "
                  "s:set {target = l, control1 = {1, 1}} return s", "control1 needs a curve");
     _scriptError("local s = vis.scene {} local l = s:line {from = {0, 0}, to = {1, 0}} "
-                 "s:tween({target = l, points = {{1, 1}, {2, 2}}}, 1) return s",
+                 "s:tween({target = l, points = {{1, 1}, {2, 2}}}, {duration = 1}) return s",
                  "points needs a polygon, plot, route or path of one contour");
     _scriptError("local s = vis.scene {} local p = s:path {commands = {{type = 'move', to = {0, 0}}, "
                  "{type = 'line', to = {1, 0}}, {type = 'line', to = {0, 1}}, {type = 'close'}, "
                  "{type = 'move', to = {2, 0}}, {type = 'line', to = {3, 0}}, {type = 'line', to = {2, 1}}, "
-                 "{type = 'close'}}} s:tween({target = p, points = {}}, 1) return s",
+                 "{type = 'close'}}} s:tween({target = p, points = {}}, {duration = 1}) return s",
                  "points cannot reshape a path of several contours");
     _scriptError("local s = vis.scene {} local l = s:line {from = {0, 0}, to = {1, 0}} "
-                 "s:tween({target = l, to = {0 / 0, 1}}, 1) return s", "vector component must be a finite number");
+                 "s:tween({target = l, to = {0 / 0, 1}}, {duration = 1}) return s", "vector component must be a finite number");
 
     // A copy keeps the points a bound shape shows as it is made, and a warp maps the points a
     // track ends at.
@@ -88,9 +88,9 @@ local s = vis.scene {width = 160, height = 90, fps = 10}
 local x = s:tracker(0)
 local beam = s:line {from = {-3, -2}, to = {3, -2}, id = "beam"}
 s:bind(beam, x, function(v) return {to = {3, -2 + v}} end)
-s:track(x, 2, 1, "linear")
+s:track(x, 2, {duration = 1, curve = "linear"})
 s:at(0.5, function() s:clone(beam, {id = "copy"}) end)
-s:warp(beam, function(px, py) return px, py + 1 end, 1, "linear")
+s:warp(beam, function(px, py) return px, py + 1 end, {duration = 1, curve = "linear"})
 return s
 )lua";
     scene = nullptr;
@@ -110,20 +110,19 @@ return s
     delete scene;
     // A warp waits for a track that runs, and a warped shape, bound or not, takes no new points.
     _scriptError("local s = vis.scene {}\nlocal x = s:tracker(0)\nlocal beam = s:line {from = {-3, -2}, to = {3, -2}, id = 'beam'}\n"
-                 "s:bind(beam, x, function(v) return {to = {3, -2 + v}} end)\ns:track(x, 2, 1, 'linear')\ns:seek(0.5)\n"
+                 "s:bind(beam, x, function(v) return {to = {3, -2 + v}} end)\ns:track(x, 2, {duration = 1, curve = 'linear'})\ns:seek(0.5)\n"
                  "s:warp(beam, function(px, py) return px, py + 1 end)\nreturn s",
                  "'beam' already animates its geometry until 1.00 s");
     _scriptError("local s = vis.scene {}\nlocal x = s:tracker(0)\nlocal beam = s:line {from = {-3, -2}, to = {3, -2}}\n"
                  "s:bind(beam, x, function(v) return {to = {3, -2 + v}} end)\n"
-                 "s:warp(beam, function(px, py) return px, py + 1 end)\ns:track(x, 2, 1)\nreturn s",
+                 "s:warp(beam, function(px, py) return px, py + 1 end)\ns:track(x, 2, {duration = 1})\nreturn s",
                  "diagnostic.lua:6: could not play animation: a warped shape keeps the outline its warp gave");
     _scriptError("local s = vis.scene {} local l = s:line {from = {0, 0}, to = {1, 0}} "
                  "s:warp(l, function(px, py) return px, py + 1 end) s:set {target = l, to = {1, 1}} return s",
                  "a warped shape keeps the outline its warp gave, so the points that define it no longer change");
     // A scene call that fails while a track bakes names the author's track call.
     _scriptError("local s = vis.scene {}\nlocal c = s:circle {radius = 1}\nlocal t = s:tracker(1)\n"
-                 "s:bind(c, t, function(v) return {opacity = v} end)\ns:fade(c, 0.5, 5)\ns:seek(0)\n"
-                 "s:track(t, 0, 1)\nreturn s",
+                 "s:bind(c, t, function(v) return {opacity = v} end)\ns:fade(c, 0.5, {duration = 5})\ns:seek(0)\ns:track(t, 0, {duration = 1})\nreturn s",
                  "diagnostic.lua:7: could not play animation: the object already animates its opacity until 5.00 s");
 }
 
@@ -141,15 +140,15 @@ local dot = s:circle {radius = 0.2, id = "dot"}
 s:bind(dot, {x, z}, function(xv, zv) return {shift = {xv, 0}, radius = 0.2 * zv} end)
 local other = s:circle {radius = 0.1, id = "other"}
 s:bind(other, x, function(xv) return {opacity = 1 - xv / 8} end)
-s:parallel(function() s:track(x, 4, 4, "linear") end, function() s:wait(1) s:track(z, 3, 1, "linear") end)
+s:parallel(function() s:track(x, 4, {duration = 4, curve = "linear"}) end, function() s:wait(1) s:track(z, 3, {duration = 1, curve = "linear"}) end)
 if math.abs(s:time() - 4) > 1e-4 or math.abs(s:duration() - 4) > 1e-4 then error("parallel timeline") end
-s:fade(other, 0.2, 1)
+s:fade(other, 0.2, {duration = 1})
 if math.abs(s:time() - 5) > 1e-4 then error("a flush keeps the authoring time") end
 local w = s:tracker(0)
 local m = s:number {value = 0, decimals = 2, id = "m"}
 s:bind(m, {x, w}, function(xv, wv) return {value = 10 * xv + wv} end)
-s:track(x, 0, 2, "linear")
-s:at(5.5, function() s:track(w, 1, 1, "linear") end)
+s:track(x, 0, {duration = 2, curve = "linear"})
+s:at(5.5, function() s:track(w, 1, {duration = 1, curve = "linear"}) end)
 if math.abs(s:time() - 7) > 1e-4 then error("at keeps the authoring time") end
 return s
 )lua";
@@ -201,19 +200,18 @@ return s
     // A tracker has one value at a time, and a track cannot merge with one that has played.
     _scriptError("local s = vis.scene {}\nlocal x = s:tracker(0)\n"
                  "s:bind(s:circle {radius = 1}, x, function(v) return {opacity = v} end)\n"
-                 "s:parallel(function() s:track(x, 1, 2) end,\nfunction() s:wait(1) s:track(x, 0, 2) end)\nreturn s",
+                 "s:parallel(function() s:track(x, 1, {duration = 2}) end,\nfunction() s:wait(1) s:track(x, 0, {duration = 2}) end)\nreturn s",
                  "diagnostic.lua:5: this track and the track at diagnostic.lua:4 move the same tracker at once, "
                  "until 2.00 s; a tracker has one value at a time");
     _scriptError("local s = vis.scene {}\nlocal x = s:tracker(0)\nlocal z = s:tracker(0)\n"
                  "s:bind(s:circle {radius = 1}, {x, z}, function(a, b) return {opacity = a, radius = 1 + b} end)\n"
-                 "s:track(x, 1, 2)\ns:fade(s:circle {radius = 0.5}, 0.5, 1)\ns:seek(1)\ns:track(z, 1, 1)\nreturn s",
+                 "s:track(x, 1, {duration = 2})\ns:fade(s:circle {radius = 0.5}, 0.5, {duration = 1})\ns:seek(1)\ns:track(z, 1, {duration = 1})\nreturn s",
                  "diagnostic.lua:8: this track overlaps the track at diagnostic.lua:5, whose segments have already "
                  "played on the same object");
     // A merged sample that fails names the track that made the overlap.
     _scriptError("local s = vis.scene {}\nlocal x = s:tracker(0)\nlocal z = s:tracker(0)\n"
                  "s:bind(s:circle {radius = 1}, {x, z}, function(a, b) if b > 0.5 then return 1 end "
-                 "return {opacity = a} end)\ns:parallel(function() s:track(x, 1, 2) end,\n"
-                 "function() s:wait(1) s:track(z, 1, 1) end)\nreturn s",
+                 "return {opacity = a} end)\ns:parallel(function() s:track(x, 1, {duration = 2}) end,\nfunction() s:wait(1) s:track(z, 1, {duration = 1}) end)\nreturn s",
                  "diagnostic.lua:6: a bound function must return a state table");
 }
 
@@ -233,14 +231,14 @@ s:bind(dot, x, function(a) return {shift = {a, -1}} end)
 local beam = s:line {from = {-2, 2}, to = {2, 2}, id = "beam"}
 s:bind(beam, z, function(b) return {to = {2, 2 + b}} end)
 local lens = s:view({x = 0.5, y = 0.5, width = 0.5, height = 0.5}, {camera = {height = 2}})
-s:parallel(function() s:track(x, 2, 2, "linear") end, function() s:wait(1) s:track(z, 1, 2, "linear") end)
+s:parallel(function() s:track(x, 2, {duration = 2, curve = "linear"}) end, function() s:wait(1) s:track(z, 1, {duration = 2, curve = "linear"}) end)
 s:at(1.5, function() s:clone(bow, {id = "copy"}) end)
-s:track(x, 3, 1, "linear")
-lens:look({target = dot}, 0.5)
-s:track(x, 4, 1, "linear")
+s:track(x, 3, {duration = 1, curve = "linear"})
+lens:look({target = dot}, {duration = 0.5})
+s:track(x, 4, {duration = 1, curve = "linear"})
 s:view({x = 0, y = 0, width = 0.5, height = 0.5}, {camera = {target = dot, height = 2}})
-s:track(z, 0, 1, "linear")
-s:warp(beam, function(px, py) return px, py + 1 end, 1, "linear")
+s:track(z, 0, {duration = 1, curve = "linear"})
+s:warp(beam, function(px, py) return px, py + 1 end, {duration = 1, curve = "linear"})
 return s
 )lua";
     char error[512] = {};
@@ -285,7 +283,7 @@ if %u == 30 then
     local line = s:line {from = {0, 0}, to = {1, 0}, id = "line"}
     s:bind(line, t, function(v) return {to = {1, v * v}} end)
 end
-s:track(t, 1, %u, "linear")
+s:track(t, 1, {duration = %u, curve = "linear"})
 if calls ~= %u + 1 then error("track must sample every frame") end
 if t.get() ~= 1 then error("tracker endpoint") end
 return s
@@ -326,12 +324,12 @@ return s
     // Reused point tables keep temporary Lua storage small; saved states still use native memory.
     _scriptError("local s=vis.scene{fps=30}; local pts={}; for i=1,12000 do pts[i]={i/12000,0} end; "
                  "local p=s:polygon{points=pts}; local t=s:tracker(0); "
-                 "s:bind(p,t,function(v) return {points=pts,opacity=v} end); s:track(t,1,20); return s",
+                 "s:bind(p,t,function(v) return {points=pts,opacity=v} end); s:track(t,1,{duration = 20}); return s",
                  "scene native memory limit exceeded: retained states share the 64 MiB budget");
     _scriptError("local s=vis.scene{fps=30}; local vals={}; for i=1,2500 do vals[i]=0 end; "
                  "local g=s:contour{values=vals,levels={1},x_range={0,49,1},y_range={0,49,1}}; "
                  "local t=s:tracker(0); s:bind(g:children()[1],t,function(v) return {values=vals} end); "
-                 "s:track(t,1,20); return s",
+                 "s:track(t,1,{duration = 20}); return s",
                  "scene point limit exceeded: contour grids share the 1000000-point budget");
 }
 
@@ -387,7 +385,7 @@ for i, zeta in ipairs({0.15, 1}) do
   end)
 end
 s:wait(0.5)
-s:track(seconds, 7.5, 7.5, "linear")
+s:track(seconds, 7.5, {duration = 7.5, curve = "linear"})
 s:seek(8)
 return s
 )lua";
@@ -464,7 +462,7 @@ s:bind(n, count, function(v)
     return {value = math.floor(v)}
 end)
 s:wait(1)
-s:track(count, 2000, 8, "linear")
+s:track(count, 2000, {duration = 8, curve = "linear"})
 s:wait(1)
 return s
 )lua";
@@ -498,7 +496,7 @@ s:bind(s:circle {radius=1}, t, function(v)
     step = step + 1
     return {opacity=0.5}
 end)
-s:track(t, 2000, 8, %s)
+s:track(t, 2000, {duration = 8, curve = %s})
 return s
 )lua", curve);
         scene = nullptr;
@@ -519,7 +517,7 @@ local seconds = s:tracker(0)
 local n = s:number {value = 0, decimals = 6, id = "n"}
 s:bind(n, seconds, function(v) return {value = v} end)
 s:wait(0.5)
-s:track(seconds, 7.5, 7.5, "linear")
+s:track(seconds, 7.5, {duration = 7.5, curve = "linear"})
 s:mark("end")
 return s
 )lua", fps);
@@ -547,11 +545,11 @@ local line = s:plot {fn = function(x) return x end, x_range = {0, 2, 0.1}, id = 
 local x = s:tracker(0)
 s:bind(dot, x, function(v) return {shift = {v, 0}, opacity = 1 - v / 4} end)
 s:bind(line, x, function(v) return {progress = v / 2} end)
-s:track(x, 2, 1, "linear")
+s:track(x, 2, {duration = 1, curve = "linear"})
 if math.abs(x.get() - 2) > 1e-6 then error("tracker value") end
-s:track({{x, 1}}, 0.5)
+s:track({{x, 1}}, {duration = 0.5})
 local idle = s:tracker(0)
-s:track(idle, 1, 0.25)
+s:track(idle, 1, {duration = 0.25})
 s:focus(dot, {padding = 0.5, duration = 0.25})
 s:focus({dot, line})
 s:focus(nil, {duration = 0.5})
@@ -565,7 +563,7 @@ return s
     else CHECK(std::fabs(scene->duration() - 3.5f) < 1.0e-4f);
     delete scene;
 
-    _error("local s = vis.scene {} local c = s:circle {radius = 1} s:fade(c, 0.5, 2) s:seek(1) "
+    _error("local s = vis.scene {} local c = s:circle {radius = 1} s:fade(c, 0.5, {duration = 2}) s:seek(1) "
            "s:bind(c, s:tracker(0), function(v) return {opacity = v} end) return s", "bind-inside-play.lua");
     _error("local s = vis.scene {} local c = s:circle {radius = 1} local t = s:tracker(0) "
            "s:bind(c, t, function(v) return {spin = v} end) return s", "bind-unknown-key.lua");
@@ -580,10 +578,10 @@ local arrow = s:arrow {from = {-1, 1}, to = {1, 1}, id = "arrow"}
 local x = s:tracker(0)
 s:bind(dashed, x, function(v) return {dash_offset = 0.25 + v, width = 2 + v} end)
 s:bind(arrow, s:tracker(0), function(v) return {tip = 9 + v, tail = 3} end)
-s:fade(dot, 0.5, 1)
+s:fade(dot, 0.5, {duration = 1})
 s:bind(dot, x, function(v) return {radius = 0.5 + v} end)
 s:bind(box, x, function(v) return {size = {1 + v, 1}, corner = 0.1} end)
-s:track(x, 1, 1, "linear")
+s:track(x, 1, {duration = 1, curve = "linear"})
 return s
 )lua";
     char lateError[512] = {};
@@ -616,14 +614,14 @@ void _trackerLines()
     // A curve the scene does not know, with a binding to sample and without one.
     _scriptError("local s = vis.scene {}\nlocal t = s:tracker(0)\n"
                  "s:bind(s:circle {radius = 1}, t, function(v) return {opacity = v} end)\n"
-                 "s:track(t, 1, 1, \"nope\")\nreturn s",
+                 "s:track(t, 1, {duration = 1, curve = \"nope\"})\nreturn s",
                  "diagnostic.lua:4: animation curve preset must be 'linear', 'smooth'");
-    _scriptError("local s = vis.scene {}\nlocal t = s:tracker(0)\ns:track(t, 1, 1, \"nope\")\nreturn s",
+    _scriptError("local s = vis.scene {}\nlocal t = s:tracker(0)\ns:track(t, 1, {duration = 1, curve = \"nope\"})\nreturn s",
                  "diagnostic.lua:3: animation curve preset must be 'linear', 'smooth'");
-    _scriptError("local s = vis.scene {}\nlocal t = s:tracker(0)\ns:track(t, 1, 1, true)\nreturn s",
+    _scriptError("local s = vis.scene {}\nlocal t = s:tracker(0)\ns:track(t, 1, {duration = 1, curve = true})\nreturn s",
                  "diagnostic.lua:3: animation curve must be a preset name or a table");
     // An entry of the array form that is no {tracker, value} pair.
-    _scriptError("local s = vis.scene {}\nlocal t = s:tracker(0)\ns:track({1, 2}, 1)\nreturn s",
+    _scriptError("local s = vis.scene {}\nlocal t = s:tracker(0)\ns:track({1, 2}, {duration = 1})\nreturn s",
                  "diagnostic.lua:3: track requires a tracker or an array of {tracker, value}");
     // A shift that holds no numbers, from the first state bind applies and from a sample of a
     // track.
@@ -632,20 +630,19 @@ void _trackerLines()
                  "diagnostic.lua:3: a bound shift must be a table of numbers");
     _scriptError("local s = vis.scene {}\nlocal t = s:tracker(0)\n"
                  "s:bind(s:circle {radius = 1}, t, function(v) return {shift = {v > 0.5 and \"a\" or v, 0}} end)\n"
-                 "s:track(t, 1, 1)\nreturn s",
+                 "s:track(t, 1, {duration = 1})\nreturn s",
                  "diagnostic.lua:4: a bound shift must be a table of numbers");
     // A scene given to a viewport takes no more tracks.
     _scriptError("local s = vis.scene {}\nlocal t = s:tracker(0)\nlocal p = vis.scene {}\n"
-                 "p:viewport(s, {x = 0, y = 0, width = 1, height = 1})\ns:track(t, 1, 1)\nreturn p",
+                 "p:viewport(s, {x = 0, y = 0, width = 1, height = 1})\ns:track(t, 1, {duration = 1})\nreturn p",
                  "diagnostic.lua:5: scene is no longer available");
     // Segments that fail as they play name the track that made them, whether a later call or
     // the end of the script plays them.
     _scriptError("local s = vis.scene {}\nlocal t = s:tracker(0)\nlocal c = s:circle {radius = 1}\n"
-                 "s:bind(c, t, function(v) return {opacity = v} end)\ns:remove(c)\ns:track(t, 1, 1)\n"
-                 "s:wait(1)\ns:fade(s:circle {}, 0.5, 1)\nreturn s",
+                 "s:bind(c, t, function(v) return {opacity = v} end)\ns:remove(c)\ns:track(t, 1, {duration = 1})\ns:wait(1)\ns:fade(s:circle {}, 0.5, {duration = 1})\nreturn s",
                  "diagnostic.lua:6: could not play animation: the object was removed earlier in the timeline");
     _scriptError("local s = vis.scene {}\nlocal t = s:tracker(0)\nlocal c = s:circle {radius = 1}\n"
-                 "s:bind(c, t, function(v) return {opacity = v} end)\ns:remove(c)\ns:track(t, 1, 1)\nreturn s",
+                 "s:bind(c, t, function(v) return {opacity = v} end)\ns:remove(c)\ns:track(t, 1, {duration = 1})\nreturn s",
                  "diagnostic.lua:6: could not play animation: the object was removed earlier in the timeline");
 }
 
@@ -656,7 +653,7 @@ local s = vis.scene {width = 160, height = 90}
 local a = s:circle {radius = 0.5, id = "a"}
 local b = s:rectangle {size = {1, 1}, id = "b"}
 s:parallel(
-    function() s:shift(a, {2, 0}, 3, "linear") end,
+    function() s:shift(a, {2, 0}, {duration = 3, curve = "linear"}) end,
     function()
         s:fade_in(b, {duration = 1})
         s:mark("b-in")
@@ -664,13 +661,13 @@ s:parallel(
     end)
 if math.abs(s:time() - 3) > 1e-6 then error("parallel continues after the longest track") end
 if math.abs(s:time("b-in") - 1) > 1e-6 then error("marker time") end
-s:at("b-in", function() s:fill(a, "#ff0000", 0.5) end)
+s:at("b-in", function() s:fill(a, "#ff0000", {duration = 0.5}) end)
 if math.abs(s:time() - 3) > 1e-6 then error("at returns to the current time") end
-s:at(4, function() s:fade(a, 0.5, 1) end)
+s:at(4, function() s:fade(a, 0.5, {duration = 1}) end)
 if math.abs(s:duration() - 5) > 1e-6 then error("duration keeps the latest time") end
 s:parallel({
-    function() s:look({height = 4}, 1) end,
-    function() s:shift(b, {0, 1}, 2) end,
+    function() s:look({height = 4}, {duration = 1}) end,
+    function() s:shift(b, {0, 1}, {duration = 2}) end,
 })
 s:mark("end")
 return s
@@ -690,16 +687,16 @@ return s
     delete scene;
 
     _error("local s = vis.scene {} local a = s:circle {radius = 1} "
-           "s:parallel(function() s:fade(a, 0.5, 2) end, function() s:fade(a, 1, 1) end) return s",
+           "s:parallel(function() s:fade(a, 0.5, {duration = 2}) end, function() s:fade(a, 1, {duration = 1}) end) return s",
            "parallel-same-property.lua");
     // Camera moves in parallel tracks add up, view and lens changes included.
     static constexpr auto zoom = R"lua(
 local s = vis.scene {}
 s:parallel(
-    function() s:look({target = {4, 0}}, 2) end,
+    function() s:look({target = {4, 0}}, {duration = 2}) end,
     function()
         s:wait(0.5)
-        s:look({height = 4}, 3)
+        s:look({height = 4}, {duration = 3})
     end)
 return s
 )lua";
@@ -719,9 +716,9 @@ return s
     static constexpr auto pan = R"lua(
 local s = vis.scene {}
 local dot = s:circle {center = {-1.4, -1.1}, radius = 0.5}
-s:look({target = {-5, -5}}, 1)
-s:look({target = {-1.9, -1.6}}, 1)
-s:look({target = {-5, -5}}, 1)
+s:look({target = {-5, -5}}, {duration = 1})
+s:look({target = {-1.9, -1.6}}, {duration = 1})
+s:look({target = {-5, -5}}, {duration = 1})
 s:focus(dot)
 return s
 )lua";
@@ -738,8 +735,8 @@ return s
     static constexpr auto lens = R"lua(
 local s = vis.scene {}
 s:parallel(
-    function() s:look({height = 4}, 2) end,
-    function() s:look({view = '3d', fov = 0.5, far = 50}, 1) end)
+    function() s:look({height = 4}, {duration = 2}) end,
+    function() s:look({view = '3d', fov = 0.5, far = 50}, {duration = 1}) end)
 return s
 )lua";
     Scene* lensed = nullptr;
@@ -757,8 +754,7 @@ return s
     delete lensed;
     // A look back to the 2D view faces the plane straight on only once the moves it adds to end.
     _scriptError("local s = vis.scene {camera = {view = '3d', eye = {0, -8, 6}}} "
-                 "s:parallel(function() s:look({height = 4}, 2) end, "
-                 "function() s:look({view = '2d', eye = {0, 0, 10}, projection = 'orthographic'}, 1) end) return s",
+                 "s:parallel(function() s:look({height = 4}, {duration = 2}) end, function() s:look({view = '2d', eye = {0, 0, 10}, projection = 'orthographic'}, {duration = 1}) end) return s",
                  "could not animate camera: the camera already moves until 2.00 s; a look that returns to the 2D "
                  "view ends at that time or later");
     // An orbit turns through any angle as one camera move, in parallel with object tracks.
@@ -769,7 +765,7 @@ local s = vis.scene {width = 160, height = 90,
 local dot = s:point {point = {2, 0, 0}}
 s:parallel(
     function() s:orbit(2 * math.pi, {duration = 4, curve = "linear"}) end,
-    function() s:fade(dot, 0.5, 1) end)
+    function() s:fade(dot, 0.5, {duration = 1}) end)
 s:orbit(math.pi, {axis = {1, 0, 0}, duration = 1})
 return s
 )lua";
@@ -798,7 +794,7 @@ return s
     _error("local s = vis.scene {} s:mark('x') s:mark('x') return s", "mark-duplicate.lua");
     _error("local s = vis.scene {} s:mark('') return s", "mark-empty.lua");
     _error("local s = vis.scene {} local a = s:circle {radius = 1} "
-           "s:at(1, function() s:shift(a, {1, 0}, 2) end) s:remove(a) return s", "remove-animating.lua");
+           "s:at(1, function() s:shift(a, {1, 0}, {duration = 2}) end) s:remove(a) return s", "remove-animating.lua");
     _error("local s = vis.scene {} s:wait(2) local a = s:circle {radius = 1} "
            "s:at(0, function() s:fade_in(a) end) return s", "animate-before-add.lua");
 }

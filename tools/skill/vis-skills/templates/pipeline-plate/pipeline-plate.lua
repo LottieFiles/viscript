@@ -222,15 +222,15 @@ fragment(ONE, "load:code", "count = items.size();", X0, Y1.code, "count")
 local function playLoad(S)
     local clear = {{target = copied, opacity = 0}, {target = fixed, opacity = 0}, {target = register, stroke = "border"}}
     for i = 0, LOADED - 1 do clear[#clear + 1] = {target = loaded[i], opacity = 0} end
-    S:tween(clear, 0.4, "ease_out")
-    S:tween({target = copied, transform = copyFrom}, 0.05, "linear")
+    S:tween(clear, {duration = 0.4, curve = "ease_out"})
+    S:tween({target = copied, transform = copyFrom}, {duration = 0.05, curve = "linear"})
     local fill = {}
     for i = 0, LOADED - 1 do fill[#fill + 1] = {target = loaded[i], opacity = 1} end
-    S:tween(fill, 0.3, "ease_out", 0.18)
+    S:tween(fill, {duration = 0.3, curve = "ease_out", lag = 0.18})
     S:wait(0.4)
-    S:tween({target = copied, opacity = 1}, 0.25, "ease_out")
-    S:tween({target = copied, transform = M(REGISTER.x + REGISTER.w / 2, Y1.items)}, 0.7, "ease_in_out")
-    S:tween({{target = register, stroke = "danger"}, {target = fixed, opacity = 1}}, 0.3, "ease_out")
+    S:tween({target = copied, opacity = 1}, {duration = 0.25, curve = "ease_out"})
+    S:tween({target = copied, transform = M(REGISTER.x + REGISTER.w / 2, Y1.items)}, {duration = 0.7, curve = "ease_in_out"})
+    S:tween({{target = register, stroke = "danger"}, {target = fixed, opacity = 1}}, {duration = 0.3, curve = "ease_out"})
 end
 
 -- ② update(dt): items grows on spawn frames; count still says LOADED ----------------------------
@@ -268,14 +268,14 @@ local function playUpdate(S)
     local clear = {{target = cursor, transform = M(frameX(0), Y2.frame)},
         {target = sizeText, text = "items.size() = " .. LOADED}}
     for i = LOADED, SIZE - 1 do clear[#clear + 1] = {target = grown[i], opacity = 0} end
-    S:tween(clear, 0.4, "ease_out")
+    S:tween(clear, {duration = 0.4, curve = "ease_out"})
     S:wait(0.3)
     for f = 1, FRAMES do
-        S:tween({target = cursor, transform = M(frameX(f), Y2.frame)}, 0.35, "linear")
+        S:tween({target = cursor, transform = M(frameX(f), Y2.frame)}, {duration = 0.35, curve = "linear"})
         if sizes[f] > sizes[f - 1] then
             local i = sizes[f] - 1
             S:tween({{target = grown[i], opacity = 1}, {target = sizeText, text = "items.size() = " .. sizes[f]}},
-                0.3, "ease_out")
+                {duration = 0.3, curve = "ease_out"})
         end
     end
 end
@@ -325,19 +325,19 @@ local function playDraw(S)
         clear[#clear + 1] = {target = shown[i], transform = M(slotX(i), Y3.items), opacity = 0}
     end
     for _, g in ipairs(missing) do clear[#clear + 1] = {target = g, opacity = 0} end
-    S:tween(clear, 0.4, "ease_out")
-    S:tween({target = head, opacity = 1}, 0.2, "ease_out")
+    S:tween(clear, {duration = 0.4, curve = "ease_out"})
+    S:tween({target = head, opacity = 1}, {duration = 0.2, curve = "ease_out"})
     for i = 0, DRAWN - 1 do
-        if i > 0 then S:tween({target = head, transform = M(slotX(i), Y3.items)}, 0.3, "ease_in_out") end
-        S:tween({target = shown[i], opacity = 1}, 0.15, "ease_out")
-        S:tween({target = shown[i], transform = M(slotX(i), Y3.screen)}, 0.5, "ease_in_out")
+        if i > 0 then S:tween({target = head, transform = M(slotX(i), Y3.items)}, {duration = 0.3, curve = "ease_in_out"}) end
+        S:tween({target = shown[i], opacity = 1}, {duration = 0.15, curve = "ease_out"})
+        S:tween({target = shown[i], transform = M(slotX(i), Y3.screen)}, {duration = 0.5, curve = "ease_in_out"})
     end
-    S:tween({target = head, transform = M(slotX(DRAWN), Y3.items)}, 0.3, "ease_in_out")
-    S:tween({target = headBox, stroke = "danger"}, 0.25, "ease_out")
+    S:tween({target = head, transform = M(slotX(DRAWN), Y3.items)}, {duration = 0.3, curve = "ease_in_out"})
+    S:tween({target = headBox, stroke = "danger"}, {duration = 0.25, curve = "ease_out"})
     local absent = {}
     for _, g in ipairs(missing) do absent[#absent + 1] = {target = g, opacity = 1} end
-    S:tween(absent, 0.35, "ease_out", 0.12)
-    S:tween({target = caption, opacity = 1}, 0.35, "ease_out")
+    S:tween(absent, {duration = 0.35, curve = "ease_out", lag = 0.12})
+    S:tween({target = caption, opacity = 1}, {duration = 0.35, curve = "ease_out"})
 end
 
 -- Timeline ---------------------------------------------------------------------------------------
@@ -355,7 +355,7 @@ if MODE == "loops" then
     -- seek(loop), not wait(loop - duration()): wait counts from the cursor, which at() puts back.
     for _, section in ipairs(SECTIONS) do section.scene:seek(loop) end
     -- The return route flows by whole dash periods ({5, 4} = 9 px), so the root seam matches too.
-    root:tween({target = repeatRoute, dash_offset = -9 * math.ceil(loop)}, loop, "linear")
+    root:tween({target = repeatRoute, dash_offset = -9 * math.ceil(loop)}, {duration = loop, curve = "linear"})
 else
     -- One section at a time, top to bottom; the spine marks the stages being explained.
     local cursor = LEAD
@@ -376,9 +376,9 @@ else
                 on[#on + 1] = {target = body, stroke = "focus", width = 2}
                 off[#off + 1] = {target = body, stroke = "foreground", width = 1.25}
             end
-            root:tween(on, 0.25, "ease_out")
+            root:tween(on, {duration = 0.25, curve = "ease_out"})
             root:wait(section.to - section.from - 0.5)
-            root:tween(off, 0.25, "ease_out")
+            root:tween(off, {duration = 0.25, curve = "ease_out"})
         end)
     end
     -- Each at() put the root's cursor back to 0, so wait(total - root:duration()) would end early.

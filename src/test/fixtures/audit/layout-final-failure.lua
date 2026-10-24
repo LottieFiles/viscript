@@ -13,5 +13,5 @@ local label = scene:text {
 }
 
 -- The single encoded frame is t=0; only the exact final sample sees this failure.
-scene:shift(label, {2.2, 0}, 0.05, "linear")
+scene:shift(label, {2.2, 0}, {duration = 0.05, curve = "linear"})
 return scene

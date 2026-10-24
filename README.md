@@ -47,8 +47,8 @@ local dot = axes:circle {center = {-5, math.sin(-5)}, radius = 0.18, fill = "war
 
 scene:fade_in(axes, {duration = 0.5})
 scene:create(wave, {duration = 1.2, curve = "smooth"})
-scene:write(label, 0.6)
-scene:grow_from_center(dot, 0.3)
+scene:write(label, {duration = 0.6})
+scene:grow_from_center(dot, {duration = 0.3})
 scene:move_along(dot, wave, {duration = 2.4, curve = "ease_in_out"})
 
 return scene
@@ -66,8 +66,8 @@ const dot = axes.circle({center: [-5, Math.sin(-5)], radius: 0.18, fill: "warnin
 
 scene.fadeIn(axes, {duration: 0.5});
 scene.create(wave, {duration: 1.2, curve: "smooth"});
-scene.write(label, 0.6);
-scene.growFromCenter(dot, 0.3);
+scene.write(label, {duration: 0.6});
+scene.growFromCenter(dot, {duration: 0.3});
 scene.moveAlong(dot, wave, {duration: 2.4, curve: "ease_in_out"});
 
 return scene;

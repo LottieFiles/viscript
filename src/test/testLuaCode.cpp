@@ -21,7 +21,7 @@ local holder = s:group {id = "holder"}
 holder:code {id = "nested", text = "x", size = 20}
 s:wait(1)
 local late = s:code {id = "late", text = "one two", size = 20, point = {0, 3}}
-s:write(late:children()[1]:children(), 1)
+s:write(late:children()[1]:children(), {duration = 1})
 return s
 )lua";
     auto scene = _loaded(source, "code.lua");
@@ -157,7 +157,7 @@ s:code {text = "a\nb", point = {0, 20}, align = {0, 1}, baseline = true, leading
 local g = s:group {}
 local b = g:code {text = "a\n\nb", point = {5, 7}, align = {0, 1}, baseline = true,
                   pitch = 3, orientation = "plane", size = 0.5, id = "plane"}
-s:edit(b, {replace = "a", with = "wide"}, 1)
+s:edit(b, {replace = "a", with = "wide"}, {duration = 1})
 return s
 )lua";
     auto scene = _loaded(source, "code-baselines.lua");
@@ -364,7 +364,7 @@ for i = 1, 10 do
 end
 print(total)
 ]]}
-s:shift(v1, {1, 0}, 1)
+s:shift(v1, {1, 0}, {duration = 1})
 -- Each edit reads the text the one before left, so 10 turns into n before the line that sets
 -- n to 10 comes in.
 local v2 = s:edit(v1, {
@@ -383,7 +383,7 @@ local v3 = s:edit(v2, {
 }, {duration = 2, curve = "linear", fade = 0.5})
 if v3 ~= s:find("sum.3") then error("an edit counts on from the id it edits") end
 local v4 = s:edit(v3, {{remove = {4, 4}}, {remove = " * i"}, {replace = "sum", with = "total", match = "last"}},
-                  0.5, "smooth", {id = "final"})
+                  {duration = 0.5, curve = "smooth", id = "final"})
 if v4 ~= s:find("final") then error("an edit takes a given id") end
 -- A block without an id at the root makes one without an id there too.
 local bare = s:code {text = "x = 1", point = {0, -2}}
@@ -450,17 +450,17 @@ return s
     fails("s:edit(b, {remove = ''})", "the text to find cannot be empty");
     fails("s:edit(b, {remove = {1, 2}})", "code needs at least one character that is not blank");
     fails("s:edit(b, {{append = 'c'}, 5})", "edit takes an edit table or a list of edit tables");
-    fails("s:edit(b, {append = 'c'}, 1, 'smooth', {spin = 1})", "unknown option 'spin'");
-    fails("s:edit(b, {append = 'c'}, 1, 'smooth', {id = 'b'})", "duplicate id 'b'");
-    fails("s:edit(b, {append = 'c'}, 1, 'smooth', {fade = 0})",
+    fails("s:edit(b, {append = 'c'}, {duration = 1, curve = 'smooth', spin = 1})", "unknown option 'spin'");
+    fails("s:edit(b, {append = 'c'}, {duration = 1, curve = 'smooth', id = 'b'})", "duplicate id 'b'");
+    fails("s:edit(b, {append = 'c'}, {duration = 1, curve = 'smooth', fade = 0})",
           "fade must be a share of the duration greater than 0 and at most 1");
     fails("s:edit(s:circle{radius = 1}, {append = 'c'})", "edit needs a block that code made");
     // edit makes the new block and the match through calls of its own, whose errors still name
     // the line of the edit, and edit in a bad argument.
-    fails("\ns:edit(b, {append = 'c'}, 1, 'smooth', {id = 'b'})", "diagnostic.lua:2: duplicate id 'b'");
-    fails("\ns:edit(b, {append = 'c'}, 1, 'smooth', {fade = 2})", "diagnostic.lua:2: fade must be a share");
-    fails("\ns:edit(b, {append = 'c'}, 'long')",
+    fails("\ns:edit(b, {append = 'c'}, {duration = 1, curve = 'smooth', id = 'b'})", "diagnostic.lua:2: duplicate id 'b'");
+    fails("\ns:edit(b, {append = 'c'}, {duration = 1, curve = 'smooth', fade = 2})", "diagnostic.lua:2: fade must be a share");
+    fails("\ns:edit(b, {append = 'c'}, {duration = 'long'})",
           "diagnostic.lua:2: bad argument #3 to 'edit' (number expected, got string)");
-    fails("s:shift(b, {1, 0}, 1); s:seek(0.5)\ns:edit(b, {append = 'c'})",
+    fails("s:shift(b, {1, 0}, {duration = 1}); s:seek(0.5)\ns:edit(b, {append = 'c'})",
           "diagnostic.lua:2: could not match transform: the matched object and its pieces must be at rest");
 }

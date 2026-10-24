@@ -37,7 +37,7 @@ local scene = vis.scene {
 scene:rectangle {id = "frame", center = {0, 0}, size = {5.3, 3}, stroke = "border"}
 local child = vis.scene {width = 480, height = 270, camera = {height = 3}}
 local ball = child:circle {id = "child-ball", center = {-1, 0}, radius = 0.4, fill = "accent"}
-child:shift(ball, {2, 0}, 1.5)
+child:shift(ball, {2, 0}, {duration = 1.5})
 scene:viewport(child, {x = 0.25, y = 0.25, width = 0.5, height = 0.5})
 
 return scene
@@ -52,7 +52,7 @@ const scene = vis.scene({
 scene.rectangle({id: "frame", center: [0, 0], size: [5.3, 3], stroke: "border"});
 const child = vis.scene({width: 480, height: 270, camera: {height: 3}});
 const ball = child.circle({id: "child-ball", center: [-1, 0], radius: 0.4, fill: "accent"});
-child.shift(ball, [2, 0], 1.5);
+child.shift(ball, [2, 0], {duration: 1.5});
 scene.viewport(child, {x: 0.25, y: 0.25, width: 0.5, height: 0.5});
 
 return scene;

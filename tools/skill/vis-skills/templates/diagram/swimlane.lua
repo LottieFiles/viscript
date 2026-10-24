@@ -150,7 +150,7 @@ local caption = root:text {
 scene:fade_in(frame, {duration = 0.5, curve = "gentle"})
 scene:fade_in(nodes, {shift = {0, -6}, duration = 0.6, curve = "gentle"})
 for _, handoff in ipairs(handoffs) do
-    scene:create(handoff.route, 0.5, "ease_out")
+    scene:create(handoff.route, {duration = 0.5, curve = "ease_out"})
     scene:fade_in(handoff.label, {shift = {0, -4}, duration = 0.18, curve = "gentle"})
 end
 scene:fade_in(caption, {duration = 0.3, curve = "gentle"})

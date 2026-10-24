@@ -72,11 +72,11 @@ local function token(id,label,x,y,w,h,o)
   end
   return g
 end
-local function shift(target,dx,dy,dur,curve) scene:shift(target,D(dx,dy),dur,curve or "ease_in_out") end
+local function shift(target,dx,dy,dur,curve) scene:shift(target,D(dx,dy),{duration = dur, curve = curve or "ease_in_out"}) end
 -- A token that remembers where it is, so moves are written as destinations.
 local function mover(g,x,y) return {g=g,x=x,y=y} end
 local function goTo(m,x,y,dur,curve)
-  scene:shift(m.g,D(x-m.x,y-m.y),dur,curve or "ease_in_out")
+  scene:shift(m.g,D(x-m.x,y-m.y),{duration = dur, curve = curve or "ease_in_out"})
   m.x,m.y=x,y
 end
 local function to(m,x,y) local d={target=m.g,shift=D(x-m.x,y-m.y)} m.x,m.y=x,y return d end
@@ -132,7 +132,7 @@ local function runTracks(tracks,beat)
       local k=b-1
       if k<math.floor(len/#t)*#t then for _,x in ipairs(t[k%#t+1]) do q[#q+1]=x end end
     end
-    if #q>0 then scene:tween(q,beat) else scene:wait(beat) end
+    if #q>0 then scene:tween(q,{duration = beat}) else scene:wait(beat) end
   end
 end
 

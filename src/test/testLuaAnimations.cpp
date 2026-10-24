@@ -9,7 +9,7 @@ void _emphasizing(Renderer* renderer)
 local s = vis.scene {width = 200, height = 200, camera = {height = 10}}
 local box = s:rectangle {id = "box", center = {-2, 0}, size = {1, 1}, fill = "#ffffff"}
 s:parallel(
-    function() s:shift(box, {4, 0}, 2, "linear") end,
+    function() s:shift(box, {4, 0}, {duration = 2, curve = "linear"}) end,
     function()
         s:wait(0.5)
         s:wiggle(box, {scale = 1.5, angle = 0.5, swings = 1, duration = 1, curve = "linear"})
@@ -49,7 +49,7 @@ local s = vis.scene {width = 200, height = 200, camera = {height = 10}}
 local box = s:rectangle {id = "box", center = {0, -2}, size = {2, 1}, fill = "#ffffff"}
 s:circumscribe(box, {padding = 0, width = 1, window = 0.5, curve = "linear"})
 s:parallel(
-    function() s:shift(box, {2, 0}, 2, "linear") end,
+    function() s:shift(box, {2, 0}, {duration = 2, curve = "linear"}) end,
     function() s:circumscribe(box, {shape = "ellipse", color = "#ff0000", duration = 1.5}) end)
 return s
 )lua";
@@ -88,7 +88,7 @@ local b = s:rectangle {id = "b", center = {3, 2}, size = {1, 1}, fill = "#ffffff
 local edge = s:connector {id = "edge", from = a, to = b}
 local mover = s:rectangle {id = "mover", center = {0, -2}, size = {1, 1}, fill = "#ffffff"}
 s:parallel(
-    function() s:shift(mover, {2, 0}, 2, "linear") end,
+    function() s:shift(mover, {2, 0}, {duration = 2, curve = "linear"}) end,
     function() s:passing_flash(edge, {color = "#ff0000", width = 2, window = 0.2, curve = "linear"}) end)
 return s
 )lua";
@@ -120,7 +120,7 @@ return s
 local s = vis.scene {width = 200, height = 200, camera = {height = 10}}
 local box = s:rectangle {id = "box", center = {0, 0}, size = {2, 1}, fill = "#ffffff"}
 s:parallel(
-    function() s:shift(box, {0, 3}, 2, "linear") end,
+    function() s:shift(box, {0, 3}, {duration = 2, curve = "linear"}) end,
     function() s:flash(box, {lines = 4, padding = 0.5, size = 1, width = 1, curve = "linear"}) end,
     function() s:flash({-3, -3}, {lines = 6, color = "#ff0000"}) end)
 return s
@@ -155,7 +155,7 @@ return s
 local s = vis.scene {width = 200, height = 200, camera = {height = 10}}
 local box = s:rectangle {id = "box", center = {0, 0}, size = {2, 1}, corner = 0.2, fill = "#ffffff"}
 s:parallel(
-    function() s:shift(box, {0, 3}, 2, "linear") end,
+    function() s:shift(box, {0, 3}, {duration = 2, curve = "linear"}) end,
     function() s:ripple(box, {size = 1, width = 1}) end,
     function() s:wait(1); s:ripple(box, {padding = 0.5, color = "#ff0000", curve = "linear"}) end)
 return s
@@ -198,25 +198,25 @@ local scene = vis.scene {
 
 local forward = scene:line {from = {-3, 3}, to = {-1, 3}, stroke = "#4cc9f0", id = "forward"}
 local reverse = scene:line {from = {1, 3}, to = {3, 3}, stroke = "#f72585", id = "reverse"}
-scene:create({forward, reverse}, 0.1, "linear", 0.5, "forward")
-scene:uncreate({forward, reverse}, 0.1, "linear", 0.5, "reverse")
+scene:create({forward, reverse}, {duration = 0.1, curve = "linear", lag = 0.5, direction = "forward"})
+scene:uncreate({forward, reverse}, {duration = 0.1, curve = "linear", lag = 0.5, direction = "reverse"})
 
 local circle = scene:circle {center = {0, 2}, radius = 0.6, stroke = "#ffd166", id = "circle"}
-scene:create(circle, 0.1, "linear", 0, "clockwise")
-scene:uncreate(circle, 0.1, "linear", 0, "counterclockwise")
+scene:create(circle, {duration = 0.1, curve = "linear", lag = 0, direction = "clockwise"})
+scene:uncreate(circle, {duration = 0.1, curve = "linear", lag = 0, direction = "counterclockwise"})
 
 local fill_reveal = scene:rectangle {
     center = {-2.5, 2}, size = {0.8, 0.8}, fill = "#4cc9f0", stroke = "#f4f7fb",
     id = "fill-reveal"
 }
-scene:create(fill_reveal, 0.1, "linear")
-scene:fill_reveal(fill_reveal, 0.1, "linear")
+scene:create(fill_reveal, {duration = 0.1, curve = "linear"})
+scene:fill_reveal(fill_reveal, {duration = 0.1, curve = "linear"})
 
 local border_fill = scene:rectangle {
     center = {2.5, 2}, size = {0.8, 0.8}, fill = "#f72585", stroke = "#f4f7fb",
     id = "border-fill"
 }
-scene:draw_border_then_fill(border_fill, 0.2, "linear", 0, "reverse")
+scene:draw_border_then_fill(border_fill, {duration = 0.2, curve = "linear", lag = 0, direction = "reverse"})
 
 local default_fade = scene:rectangle {
     center = {-2.5, 0.5}, size = {1.2, 0.7}, fill = "#4cc9f0", id = "default-fade"
@@ -239,9 +239,9 @@ scene:fade_out(shifted_fade, {
 local growing = scene:circle {
     center = {1, 0.5}, radius = 0.5, fill = "#7bd88f", id = "growing"
 }
-scene:grow_from_center(growing, 0.1, "smooth")
-scene:grow_from_edge(growing, "bottom", 0.1, "smooth")
-scene:shrink_to_center(growing, 0.1, "smooth")
+scene:grow_from_center(growing, {duration = 0.1, curve = "smooth"})
+scene:grow_from_edge(growing, "bottom", {duration = 0.1, curve = "smooth"})
+scene:shrink_to_center(growing, {duration = 0.1, curve = "smooth"})
 
 local indicated = scene:rectangle {
     center = {2.5, 0.5}, size = {1.0, 0.7}, fill = "#4cc9f0", id = "indicated"
@@ -256,7 +256,7 @@ local morph_target = scene:polygon {
     points = {{-3, -2.5}, {-1.8, -2.5}, {-1.8, -1.3}},
     fill = "#7bd88f55", stroke = "#7bd88f", id = "morph-target"
 }
-scene:morph(morph_source, morph_target, 0.2, "ease_in_out")
+scene:morph(morph_source, morph_target, {duration = 0.2, curve = "ease_in_out"})
 scene:indicate(morph_target, {duration = 0.1, scale = 1.1})
 
 local replacement_source = scene:plot {
@@ -267,7 +267,7 @@ local replacement_target = scene:plot {
     points = {{0.5, -1.3}, {1.2, -2.5}, {1.9, -1.3}},
     stroke = "#7bd88f", id = "replacement-target"
 }
-scene:morph(replacement_source, replacement_target, 0.2, "ease_in_out")
+scene:morph(replacement_source, replacement_target, {duration = 0.2, curve = "ease_in_out"})
 scene:indicate(replacement_target, {color = "#ffd166", scale = 1.1, duration = 0.1})
 
 local fade_source = scene:rectangle {
@@ -276,7 +276,7 @@ local fade_source = scene:rectangle {
 local fade_target = scene:circle {
     center = {2.4, -2.0}, radius = 0.4, fill = "#4cc9f0", id = "fade-target"
 }
-scene:fade_transform(fade_source, fade_target, 0.2, "gentle")
+scene:fade_transform(fade_source, fade_target, {duration = 0.2, curve = "gentle"})
 
 local batch_source_a = scene:plot {
     points = {{-3, -3.2}, {-2.4, -2.8}, {-1.8, -3.2}},
@@ -297,7 +297,7 @@ local batch_target_b = scene:plot {
 scene:morph(
     {batch_source_a, batch_source_b},
     {batch_target_a, batch_target_b},
-    0.2, "ease_in_out", 0.25
+    {duration = 0.2, curve = "ease_in_out", lag = 0.25}
 )
 
 if math.abs(scene:duration() - 4.75) > 0.0001 then error("animation duration mismatch") end
@@ -331,7 +331,7 @@ local flow = scene:line {
     from = {-2, 0}, to = {2, 0}, stroke = "#4cc9f0", width = 8,
     dash = {20, 12}, dash_offset = 0, id = "flow"
 }
-scene:tween({target = flow, dash_offset = -32}, 1, "linear")
+scene:tween({target = flow, dash_offset = -32}, {duration = 1, curve = "linear"})
 return scene
 )lua";
     auto scene = _loaded(source, "dash-timeline.lua");
@@ -367,7 +367,7 @@ local sun = s:circle {center = {-3, -1}, radius = 0.1, id = "sun"}
 local planet = s:circle(shape {center = {-2.5, -1}, radius = 0.05, id = "planet"})
 s:parallel(
     function() s:rotate(box, math.pi / 2, {about = "bottom_left", duration = 1, curve = "linear"}) end,
-    function() s:tween({target = dot, shift = {-2, 0}, arc = math.pi}, 1, "linear") end,
+    function() s:tween({target = dot, shift = {-2, 0}, arc = math.pi}, {duration = 1, curve = "linear"}) end,
     function() s:move_along(car, ring, {orient = true, duration = 1, curve = "linear"}) end,
     function() s:rotate(planet, 2 * math.pi, {about = sun, duration = 1, curve = "linear"}) end)
 s:scale(box, 2, {about = {-3.5, -0.5}})
@@ -400,7 +400,7 @@ return s
 local s = vis.scene {width = 160, height = 80, camera = {mode = "fixed", view = "2d", height = 4}}
 local dot = s:rectangle {center = {-2, 0}, size = {1, 1}, fill = "#ffffff", stroke = "#00000000", id = "dot"}
 s:parallel(
-    function() s:shift(dot, {4, 0}, 2, "linear") end,
+    function() s:shift(dot, {4, 0}, {duration = 2, curve = "linear"}) end,
     function()
         s:wait(0.5)
         s:scale(dot, 2, {duration = 1, curve = "linear"})
@@ -429,13 +429,12 @@ return s
 local s = vis.scene {width = 160, height = 80, camera = {mode = "fixed", view = "2d", height = 4}}
 local bar = s:rectangle {center = {-2, 0}, size = {2, 0.5}, fill = "#ffffff", stroke = "#00000000", id = "bar"}
 s:parallel(
-    function() s:shift(bar, {4, 0}, 2, "linear") end,
+    function() s:shift(bar, {4, 0}, {duration = 2, curve = "linear"}) end,
     function()
         s:wait(0.5)
-        s:tween({target = bar, transform = {0, -1, 0, 2, 1, 0, 0, 2, 0, 0, 1, 0, 0, 0, 0, 1}, arc = math.pi / 2}, 1,
-               "linear")
+        s:tween({target = bar, transform = {0, -1, 0, 2, 1, 0, 0, 2, 0, 0, 1, 0, 0, 0, 0, 1}, arc = math.pi / 2}, {duration = 1, curve = "linear"})
     end)
-s:shift(bar, {0, -1}, 1, "linear")
+s:shift(bar, {0, -1}, {duration = 1, curve = "linear"})
 s:at(2.5, function() s:set {target = bar, transform = {1, 0, 0, 4, 0, 1, 0, -1, 0, 0, 1, 0, 0, 0, 0, 1}} end)
 return s
 )lua";
@@ -461,11 +460,11 @@ return s
 local s = vis.scene {width = 160, height = 80, camera = {mode = "fixed", view = "2d", height = 4}}
 local dot = s:circle {center = {-2, 0}, radius = 0.5, fill = "#ffffff", stroke = "#00000000", id = "dot"}
 s:parallel(
-    function() s:shift(dot, {4, 0}, 2, "linear") end,
+    function() s:shift(dot, {4, 0}, {duration = 2, curve = "linear"}) end,
     function()
         s:wait(1)
         local box = s:rectangle {center = {2, 1}, size = {1, 1}, fill = "#ffffff", stroke = "#00000000", id = "box"}
-        s:morph(dot, box, 1, "linear")
+        s:morph(dot, box, {duration = 1, curve = "linear"})
     end)
 return s
 )lua";
@@ -487,7 +486,7 @@ local dot = s:rectangle {center = {-2, 0}, size = {1, 1}, fill = "#ffffff", stro
 local x = s:tracker(0)
 s:bind(dot, x, function(v) return {shift = {v, 0}} end)
 s:parallel(
-    function() s:track(x, 4, 2, "linear") end,
+    function() s:track(x, 4, {duration = 2, curve = "linear"}) end,
     function()
         s:wait(0.5)
         s:scale(dot, 2, {duration = 1, curve = "linear"})
@@ -512,11 +511,11 @@ node:circle {radius = 1}
 node:text {text = "node"}
 local sink = s:circle {center = {3, 3}, radius = 0.5}
 local edge = s:connector {from = node, to = sink, id = "edge", padding = 0.1}
-s:create(edge, 0.5, "linear")
+s:create(edge, {duration = 0.5, curve = "linear"})
 s:fade_in(node, {duration = 0.5})
 local token = s:circle {radius = 0.1, id = "token"}
 s:parallel(
-    function() s:shift(sink, {1, 0}, 1, "linear") end,
+    function() s:shift(sink, {1, 0}, {duration = 1, curve = "linear"}) end,
     function() s:move_along(token, edge, {from = 1, to = 0, duration = 1, curve = "linear"}) end)
 return s
 )lua";
@@ -595,9 +594,9 @@ local low = s:rectangle {center = {-2, 0}, size = {2, 2}, id = "low"}
 local card = s:group {id = "card"}
 card:rectangle {center = {2, 0}, size = {2, 2}, id = "face", layer = 1}
 s:set {target = card, layer = 2}
-s:tween({target = low, layer = 4}, 1)
+s:tween({target = low, layer = 4}, {duration = 1})
 s:set {target = card, layer = 0}
-s:tween({target = low, layer = -1, shift = {0, 0.5}}, 1)
+s:tween({target = low, layer = -1, shift = {0, 0.5}}, {duration = 1})
 return s
 )lua";
     auto scene = _loaded(source, "layers.lua");
@@ -617,11 +616,11 @@ return s
     }
     delete scene;
 
-    _scriptError("local s=vis.scene{}; local c=s:circle{}; s:tween({target=c, layer=1.5}, 1); return s",
+    _scriptError("local s=vis.scene{}; local c=s:circle{}; s:tween({target=c, layer=1.5}, {duration = 1}); return s",
                  "layer must be an integer");
     _scriptError("local s=vis.scene{}; local c=s:circle{}; s:set{target=c, layer=math.maxinteger}; return s",
                  "layer is out of range");
-    _scriptError("local s=vis.scene{}; local c=s:circle{}; s:tween({target=c, layer=1}, 2); "
+    _scriptError("local s=vis.scene{}; local c=s:circle{}; s:tween({target=c, layer=1}, {duration = 2}); "
                  "s:at(1, function() s:set{target=c, layer=2} end); return s",
                  "already animates its layer until 2.00 s");
     _scriptError("local s=vis.scene{}; local x=s:tracker(0); local c=s:circle{}; "
@@ -656,7 +655,7 @@ local s = vis.scene {width = 320, height = 180, camera = {height = 6}}
 local a = s:plot {points = {{-2,0},{-1,0},{0/0,0},{1,0},{2,0}}, id = "source"}
 local b = s:path {commands = {{type="move",to={-2,2}},{type="line",to={-1,2}},{type="move",to={1,2}},{type="line",to={2,2}}}, id = "first"}
 local c = s:plot {points = {{-2,-2},{-1,-2},{0/0,0},{1,-2},{2,-2}}, id = "second"}
-s:morph({a,a}, {b,c}, 1, "linear", {copy=true, lag=0.25, pairs={{1,2}}})
+s:morph({a,a}, {b,c}, {duration = 1, curve = "linear", copy=true, lag=0.25, pairs={{1,2}}})
 return s
 )lua";
     auto scene = _loaded(source, "piece-morph.lua");
@@ -681,7 +680,7 @@ return s
         std::snprintf(script, sizeof(script), "local s=vis.scene{} "
             "local a=s:plot{points={{0,0},{1,0},{0/0,0},{2,0},{3,0}}} "
             "local b=s:plot{points={{0,1},{1,1},{0/0,0},{2,1},{3,1}}} "
-            "s:morph(a,b,1,'linear',%s) return s", options);
+            "s:morph(a,b,vis.merge({duration=1,curve='linear'},%s)) return s", options);
         _scriptError(script, expected);
     };
     fails("{pairs=1}", "morph pairs must be an array of {source_index, target_index}");
@@ -724,7 +723,7 @@ local bowl = s:surface {points = grid(21, function(x, y) return (x * x + y * y) 
     size = {21, 21}, shading = false, colors = height}
 local saddle = s:surface {points = grid(21, function(x, y) return (x * x - y * y) / 4 end),
     size = {21, 21}, shading = false, colors = height}
-s:morph(bowl, saddle, 1, "linear")
+s:morph(bowl, saddle, {duration = 1, curve = "linear"})
 return s
 )lua";
     auto scene = _loaded(source, "morph.lua");
@@ -782,21 +781,21 @@ s:save(dot)
 s:set {target = word, text = "dog"}
 s:tween({{target = card, shift = {1, 1}, fill = "#00ff00", size = {2, 1}, corner = 0.25},
         {target = word, text = "horse"}, {target = total, value = 100},
-        {target = dot, opacity = 0.25, layer = 3}}, 1, "linear")
-s:restore({card, word, total}, 1, "linear")
+        {target = dot, opacity = 0.25, layer = 3}}, {duration = 1, curve = "linear"})
+s:restore({card, word, total}, {duration = 1, curve = "linear"})
 s:restore(dot)
 s:save(card)
-s:tween({target = card, fill = "#0000ff"}, 1)
+s:tween({target = card, fill = "#0000ff"}, {duration = 1})
 s:save(card)
-s:tween({target = card, shift = {0, 1}, opacity = 0.5}, 1)
+s:tween({target = card, shift = {0, 1}, opacity = 0.5}, {duration = 1})
 s:restore(card)
-s:restore(card, 1)
+s:restore(card, {duration = 1})
 s:save {card, dot}
-s:tween({{target = card, shift = {0, 1}}, {target = dot, shift = {0, 1}}}, 1)
-s:restore({card, dot}, 1, "linear", 0.5)
+s:tween({{target = card, shift = {0, 1}}, {target = dot, shift = {0, 1}}}, {duration = 1})
+s:restore({card, dot}, {duration = 1, curve = "linear", lag = 0.5})
 s:save(card)
-s:tween({target = card, shift = {2, 0}}, 2, "linear")
-s:at(8.5, function() s:restore(card, 1, "linear") end)
+s:tween({target = card, shift = {2, 0}}, {duration = 2, curve = "linear"})
+s:at(8.5, function() s:restore(card, {duration = 1, curve = "linear"}) end)
 return s
 )lua";
     auto scene = _loaded(source, "save.lua");
@@ -845,7 +844,7 @@ return s
     }
     delete scene;
 
-    _scriptError("local s=vis.scene{}; local c=s:circle{id='c'}; s:restore(c, 1); return s",
+    _scriptError("local s=vis.scene{}; local c=s:circle{id='c'}; s:restore(c, {duration = 1}); return s",
                  "could not restore: 'c' has no saved state; save it before restoring");
     _scriptError("local s=vis.scene{}; local c=s:circle{}; s:save(c); s:restore(c); s:restore(c); return s",
                  "could not restore: the object has no saved state");
@@ -856,11 +855,11 @@ return s
                  "expected an object handle, got number");
     _scriptError("local s=vis.scene{}; local c=s:circle{}; s:save({c, c}); return s",
                  "could not save: an object can take part only once in one call");
-    _scriptError("local s=vis.scene{}; local c=s:circle{}; s:save(c); s:restore(c, -1); return s",
+    _scriptError("local s=vis.scene{}; local c=s:circle{}; s:save(c); s:restore(c, {duration = -1}); return s",
                  "duration must be non-negative");
-    _scriptError("local s=vis.scene{}; local c=s:circle{}; s:save(c); s:restore(c, 1, 'linear', -1); return s",
+    _scriptError("local s=vis.scene{}; local c=s:circle{}; s:save(c); s:restore(c, {duration = 1, curve = 'linear', lag = -1}); return s",
                  "lag cannot be negative");
-    _scriptError("local s=vis.scene{}; local c=s:circle{}; s:save(c); s:tween({target=c, fill='#ff0000'}, 2); "
+    _scriptError("local s=vis.scene{}; local c=s:circle{}; s:save(c); s:tween({target=c, fill='#ff0000'}, {duration = 2}); "
                  "s:at(1, function() s:restore(c) end); return s",
                  "already animates its fill color until 2.00 s");
     // Each save is charged to the script by the objects it records.
@@ -883,8 +882,8 @@ local card = s:group {id = "card"}
 card:rectangle {id = "face", size = {1, 0.5}, fill = solid.fill, stroke = solid.stroke}
 s:set {{target = box, position = {-1, 2}}, {target = card, position = {0, 3}}}
 s:tween({{target = box, position = {3, 2}, opacity = 0.5}, {target = dot, position = {-2, -2}, arc = math.pi}},
-    2, "linear")
-s:at(1, function() s:tween({target = box, position = {3, -1}}, 2, "linear") end)
+    {duration = 2, curve = "linear"})
+s:at(1, function() s:tween({target = box, position = {3, -1}}, {duration = 2, curve = "linear"}) end)
 s:at(2.5, function() s:set {target = card, position = {-3, -3}} end)
 return s
 )lua";

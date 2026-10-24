@@ -35,7 +35,7 @@ if not vis.states then error("this scene requires -Dmodules=interactive") end
 local dot = scene:circle {id = "dot", radius = 0.45, fill = "accent"}
 local states = vis.states(scene)
 states:define(dot, "right", {shift = {2, 0}})
-states:transition(dot, "right", 1, "linear")
+states:transition(dot, "right", {duration = 1, curve = "linear"})
 states:advance(0.5)
 scene:text {id = "hint", text = "Named states: halfway to the right", point = {0, 2}, size = 18, fill = "foreground"}
 
@@ -57,7 +57,7 @@ local dot = scene:circle {id = "dot", radius = 0.45, fill = "accent"}
 local states = vis.states(scene)
 states:define(dot, "right", {shift = {2, 0}})
 states:define(dot, "large", {scale = {2, 2}})
-states:transition(dot, "large", 0)
+states:transition(dot, "large", {duration = 0})
 scene:text {id = "hint", text = "The large state doubles the circle", point = {0, 2}, size = 18, fill = "foreground"}
 
 return scene

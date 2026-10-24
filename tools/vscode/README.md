@@ -26,7 +26,7 @@ Requires VS Code 1.96 or newer.
 ```lua
 local scene = vis.scene {camera = {height = 7}}
 local circle = scene:circle {fill = "accent", id = "circle"}
-scene:grow_from_center(circle, 0.6)
+scene:grow_from_center(circle, {duration = 0.6})
 scene:wait(1)
 return scene
 ```

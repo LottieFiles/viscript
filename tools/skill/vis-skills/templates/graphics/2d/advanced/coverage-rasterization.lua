@@ -91,12 +91,12 @@ local labels = {
 }
 
 -- Reveal the continuous boundary first, then its discrete area estimate.
-scene:create(base, 0.55, "ease_out")
-scene:create(boundary, 0.75, "ease_out")
-scene:create(coverage, 0.75, "linear")
-scene:create(focus, 0.28, "ease_out")
-scene:create(wedge, 0.4, "ease_out", 0.06)
-scene:create({detailCell, detailFrame}, 0.65, "ease_out", 0.04)
+scene:create(base, {duration = 0.55, curve = "ease_out"})
+scene:create(boundary, {duration = 0.75, curve = "ease_out"})
+scene:create(coverage, {duration = 0.75, curve = "linear"})
+scene:create(focus, {duration = 0.28, curve = "ease_out"})
+scene:create(wedge, {duration = 0.4, curve = "ease_out", lag = 0.06})
+scene:create({detailCell, detailFrame}, {duration = 0.65, curve = "ease_out", lag = 0.04})
 scene:fade_in(labels[1], {shift = {0, 0.08}, duration = 0.28, curve = "gentle"})
 scene:fade_in(labels[2], {shift = {0, 0.08}, duration = 0.3, curve = "gentle"})
 scene:wait(1.3)

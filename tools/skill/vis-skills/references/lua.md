@@ -5,7 +5,7 @@ The host provides the `vis` global. Create a Scene, author its objects and timel
 ```lua
 local scene = vis.scene {camera = {height = 7}}
 local ball = scene:circle {radius = 0.5, fill = "accent", id = "ball"}
-scene:grow_from_center(ball, 0.6)
+scene:grow_from_center(ball, {duration = 0.6})
 scene:wait(0.5)
 return scene
 ```
@@ -57,7 +57,7 @@ Arcs use radians counterclockwise from +x; a negative sweep runs clockwise, and 
 local axes = scene:space {x = {-5, 5, 1}, y = {-3, 3, 1}, stroke = "#00000000", ticks = {x = math.pi / 2, y = 1}}
 axes:labels {x = {{-math.pi, "-pi"}, {math.pi, "pi"}}}
 local graph = axes:plot {fn = math.tan, x_range = {-5, 5, 0.01}, y_range = {-3, 3}}
-scene:create(graph, 2, "linear")
+scene:create(graph, {duration = 2, curve = "linear"})
 ```
 
 `y_range` clips branches, `discontinuities` separates known jumps, and a non-finite sample breaks the line. `endpoint_radius` adds a marker at the active draw endpoint. A plot state may supply new `fn` or `points`; matching function grids blend vertically. `area` fills between a graph and a numeric or function `base`; `riemann` returns rectangles left to right with left, right, or midpoint sampling, refined with `match_transform(..., {shapes = true})`.
@@ -103,7 +103,7 @@ scene:shift(ball, {2, 0}, timing)
 scene:create({ball, label}, {duration = 0.6, lag = 0.15})
 ```
 
-Move, draw, and replace calls also take a positional duration and curve: `scene:shift(ball, {2, 0}, 1, "smooth")`. Effects and the camera take only the table: `fade_in` and `fade_out` (one handle each), `indicate`, `wiggle`, `circumscribe`, `flash`, `ripple`, `passing_flash`, and `focus`, as in `scene:fade_in(label, {duration = 0.4})`. To fade several handles at once, `tween` a list of `{target = handle, opacity = 1}` descriptors.
+Move, draw, replace, effect, and camera calls use one options table for timing and any operation-specific fields, as in `scene:fade_in(label, {duration = 0.4})`. Omit the table to use the operation's defaults; `track` requires a table. `fade_in` and `fade_out` take one handle each. To fade several handles at once, `tween` a list of `{target = handle, opacity = 1}` descriptors. `wait(seconds)` holds the cursor for a numeric duration.
 
 | Purpose | Calls |
 |---|---|
@@ -117,11 +117,11 @@ Move, draw, and replace calls also take a positional duration and curve: `scene:
 `tween` takes one descriptor or a list naming each target once, with properties such as shift, transform, position, opacity, colors, points, text, value, and layer. A descriptor moves with only one of `shift` (by a vector), `transform` (the local matrix), or `position` (the bounds' center to a point in the parent's space, failing on an object without bounds); `arc` bends the move by a central angle. Geometry uses the factory's names (`points`, `from`, `to`, `size`, `radius`); `center` animates arcs only. `set` applies the same descriptors at once, `scene:set({target = label, opacity = 0})`: a starting state before the timeline, a change at the cursor after it. `save` and `restore` keep a stack per target.
 
 ```lua
-scene:tween({target = ball, shift = {2, 0}, fill = "success"}, 1, "smooth")
-scene:tween({target = ball, position = {0, 1}, arc = math.pi / 2}, 1)
+scene:tween({target = ball, shift = {2, 0}, fill = "success"}, {duration = 1, curve = "smooth"})
+scene:tween({target = ball, position = {0, 1}, arc = math.pi / 2}, {duration = 1})
 scene:parallel(
-    function() scene:shift(ball, {-1, 0}, 1) end,
-    function() scene:fade(ball, 0.5, 1) end
+    function() scene:shift(ball, {-1, 0}, {duration = 1}) end,
+    function() scene:fade(ball, 0.5, {duration = 1}) end
 )
 ```
 
@@ -145,7 +145,7 @@ Trackers express continuous relationships. Bind each dependent to a callback, th
 ```lua
 local x = scene:tracker(-2)
 scene:bind(ball, x, function(v) return {shift = {v, v * v / 2}} end)
-scene:track(x, 2, 3, "linear")
+scene:track(x, 2, {duration = 3, curve = "linear"})
 ```
 
 A callback receives tracker values in order and returns a property state: `shift` relative to the bound pose or an absolute `transform`, never `position` or `text`. A live readout is a `number` whose `value` the callback returns: `scene:number {value = 1.6, decimals = 2, prefix = "x = "}`. `track` bakes frame samples into clips, and overlapping tracks of different trackers merge on a bound object. Keep callbacks pure, and give a discrete counter or reveal one `at` event and sample index across all its dependents.

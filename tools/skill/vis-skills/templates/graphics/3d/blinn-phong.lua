@@ -187,16 +187,16 @@ local lightLabel = lightOwner:text {
     layer = 20, id = "blinn:light-label",
 }
 
-spatial:create(space, 0.30, "ease_out")
-spatial:draw_border_then_fill(faceObjects, 0.62, "ease_out", 0.018)
-spatial:create(samplePoint, 0.24, "ease_out")
-spatial:create(lightOwner, 0.32, "ease_out")
-spatial:create({normalVector, lightVector, viewVector}, 0.62, "ease_out", 0.08)
+spatial:create(space, {duration = 0.30, curve = "ease_out"})
+spatial:draw_border_then_fill(faceObjects, {duration = 0.62, curve = "ease_out", lag = 0.018})
+spatial:create(samplePoint, {duration = 0.24, curve = "ease_out"})
+spatial:create(lightOwner, {duration = 0.32, curve = "ease_out"})
+spatial:create({normalVector, lightVector, viewVector}, {duration = 0.62, curve = "ease_out", lag = 0.08})
 spatial:fade_in(normalLabel, {duration = 0.16, curve = "gentle"})
 spatial:fade_in(lightVectorLabel, {duration = 0.16, curve = "gentle"})
 spatial:fade_in(viewVectorLabel, {duration = 0.16, curve = "gentle"})
 spatial:wait(0.38)
-spatial:create(halfVector, 0.48, "ease_out")
+spatial:create(halfVector, {duration = 0.48, curve = "ease_out"})
 spatial:fade_in(halfVectorLabel, {duration = 0.18, curve = "gentle"})
 spatial:wait(0.72)
 local lightMoveStart = spatial:duration()
@@ -209,7 +209,7 @@ local changes = {
 for index, object in ipairs(faceObjects) do
     changes[#changes + 1] = {target = object, fill = faceColorsB[index]}
 end
-spatial:tween(changes, 1.45, "ease_in_out", 0)
+spatial:tween(changes, {duration = 1.45, curve = "ease_in_out", lag = 0})
 local lightMoveEnd = spatial:duration()
 spatial:wait(2.15)
 local spatialEnd = spatial:duration()

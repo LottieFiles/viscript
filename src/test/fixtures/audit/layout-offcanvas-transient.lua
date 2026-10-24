@@ -9,6 +9,6 @@ local label = scene:text {
 }
 
 -- The encoded samples are t=0 and t=0.05; at t=0.05 the Text is wholly clipped.
-scene:shift(label, {10, 0}, 0.05, "linear")
-scene:shift(label, {-10, 0}, 0.05, "linear")
+scene:shift(label, {10, 0}, {duration = 0.05, curve = "linear"})
+scene:shift(label, {-10, 0}, {duration = 0.05, curve = "linear"})
 return scene

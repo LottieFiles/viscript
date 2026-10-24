@@ -42,7 +42,7 @@ local b = scene:rectangle {size = {1.4, 1.4}, fill = "accent"}
 local c = scene:circle {center = {2.6, 0}, radius = 0.7}
 scene:text {text = "the page's colours, light or dark", point = {0, -1.8}, color = "muted", size = 20}
 
-scene:create({a, b, c}, 0.6, "smooth", 0.1)
+scene:create({a, b, c}, {duration = 0.6, curve = "smooth", lag = 0.1})
 scene:indicate(b)
 
 return scene
@@ -57,7 +57,7 @@ const b = scene.rectangle({size: [1.4, 1.4], fill: "accent"});
 const c = scene.circle({center: [2.6, 0], radius: 0.7});
 scene.text({text: "the page's colours, light or dark", point: [0, -1.8], color: "muted", size: 20});
 
-scene.create([a, b, c], 0.6, "smooth", 0.1);
+scene.create([a, b, c], {duration: 0.6, curve: "smooth", lag: 0.1});
 scene.indicate(b);
 
 return scene;
@@ -106,7 +106,7 @@ local b = scene:rectangle {size = {1.6, 1.6}}
 local c = scene:polygon {points = {{2.2, -0.8}, {3.8, -0.8}, {3, 0.8}}}
 scene:text {text = "result", point = {0, -1.6}, color = "result", size = 22}
 
-scene:create({a, b, c}, 0.8, "smooth", 0.15)
+scene:create({a, b, c}, {duration = 0.8, curve = "smooth", lag = 0.15})
 scene:indicate(b)
 
 return scene
@@ -129,7 +129,7 @@ const b = scene.rectangle({size: [1.6, 1.6]});
 const c = scene.polygon({points: [[2.2, -0.8], [3.8, -0.8], [3, 0.8]]});
 scene.text({text: "result", point: [0, -1.6], color: "result", size: 22});
 
-scene.create([a, b, c], 0.8, "smooth", 0.15);
+scene.create([a, b, c], {duration: 0.8, curve: "smooth", lag: 0.15});
 scene.indicate(b);
 
 return scene;
@@ -167,8 +167,8 @@ local function swatch(theme, name)
     end
     local bar = s:rectangle {center = {-0.5, -1.05}, size = {1.8, 0.3}, fill = "accent"}
     s:text {text = "result", point = {1.2, -1.05}, color = "result", size = 16}
-    s:create(shapes, 0.6, "smooth", 0.1)
-    s:grow_from_edge(bar, "left", 0.5)
+    s:create(shapes, {duration = 0.6, curve = "smooth", lag = 0.1})
+    s:grow_from_edge(bar, "left", {duration = 0.5})
     s:indicate(shapes[2])
     return s
 end
@@ -202,8 +202,8 @@ function swatch(theme, name) {
     const shapes = [-1.4, 0, 1.4].map((x) => s.circle({center: [x, 0.2], radius: 0.45}));
     const bar = s.rectangle({center: [-0.5, -1.05], size: [1.8, 0.3], fill: "accent"});
     s.text({text: "result", point: [1.2, -1.05], color: "result", size: 16});
-    s.create(shapes, 0.6, "smooth", 0.1);
-    s.growFromEdge(bar, "left", 0.5);
+    s.create(shapes, {duration: 0.6, curve: "smooth", lag: 0.1});
+    s.growFromEdge(bar, "left", {duration: 0.5});
     s.indicate(shapes[1]);
     return s;
 }
@@ -245,7 +245,7 @@ local function scene_in(theme)
     local a = s:circle {center = {-2.6, 0}, radius = 0.7}
     local b = s:rectangle {size = {1.4, 1.4}}
     local c = s:circle {center = {2.6, 0}, radius = 0.7, fill = "result"}
-    s:create({a, b, c}, 0.6, "smooth", 0.1)
+    s:create({a, b, c}, {duration = 0.6, curve = "smooth", lag = 0.1})
     s:indicate(a)
     s:circumscribe(b)
     s:flash(c)
@@ -269,7 +269,7 @@ function sceneIn(theme) {
     const a = s.circle({center: [-2.6, 0], radius: 0.7});
     const b = s.rectangle({size: [1.4, 1.4]});
     const c = s.circle({center: [2.6, 0], radius: 0.7, fill: "result"});
-    s.create([a, b, c], 0.6, "smooth", 0.1);
+    s.create([a, b, c], {duration: 0.6, curve: "smooth", lag: 0.1});
     s.indicate(a);
     s.circumscribe(b);
     s.flash(c);

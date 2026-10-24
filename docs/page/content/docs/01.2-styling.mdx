@@ -30,13 +30,13 @@ for i, token in ipairs(tokens) do
     local dot = scene:circle {center = {x, 0.6}, radius = 0.45, fill = token}
     dot:label {text = token, point = {x, -0.3}, size = 13,
                font = "JetBrainsMono", color = "#7d8596"}
-    scene:grow_from_center(dot, 0.18)
+    scene:grow_from_center(dot, {duration = 0.18})
 end
 
 local swatch = scene:rectangle {center = {0, -1.8}, size = {8.4, 0.5}, corner = 0.25, fill = "accent"}
 scene:fade_in(swatch, {duration = 0.3})
 for _, token in ipairs({"success", "warning", "danger", "accent"}) do
-    scene:fill(swatch, token, 0.5)
+    scene:fill(swatch, token, {duration = 0.5})
     scene:wait(0.2)
 end
 
@@ -52,13 +52,13 @@ tokens.forEach((token, i) => {
     const dot = scene.circle({center: [x, 0.6], radius: 0.45, fill: token});
     dot.label({text: token, point: [x, -0.3], size: 13,
                font: "JetBrainsMono", color: "#7d8596"});
-    scene.growFromCenter(dot, 0.18);
+    scene.growFromCenter(dot, {duration: 0.18});
 });
 
 const swatch = scene.rectangle({center: [0, -1.8], size: [8.4, 0.5], corner: 0.25, fill: "accent"});
 scene.fadeIn(swatch, {duration: 0.3});
 for (const token of ["success", "warning", "danger", "accent"]) {
-    scene.fill(swatch, token, 0.5);
+    scene.fill(swatch, token, {duration: 0.5});
     scene.wait(0.2);
 }
 
@@ -88,9 +88,9 @@ for _, item in ipairs({{-3.4, "width"}, {0, "dash"}, {3.4, "opacity"}}) do
 end
 
 scene:parallel(
-    function() scene:tween({target = solid, width = 10}, 1.5, "ease_in_out") end,
-    function() scene:tween({target = dashed, dash_offset = 44}, 2, "linear") end,
-    function() scene:tween({target = faded, opacity = 0.2}, 1.5, "ease_in_out") end)
+    function() scene:tween({target = solid, width = 10}, {duration = 1.5, curve = "ease_in_out"}) end,
+    function() scene:tween({target = dashed, dash_offset = 44}, {duration = 2, curve = "linear"}) end,
+    function() scene:tween({target = faded, opacity = 0.2}, {duration = 1.5, curve = "ease_in_out"}) end)
 
 return scene
 ```
@@ -108,9 +108,9 @@ for (const [x, name] of [[-3.4, "width"], [0, "dash"], [3.4, "opacity"]]) {
 }
 
 scene.parallel(
-    () => scene.tween({target: solid, width: 10}, 1.5, "ease_in_out"),
-    () => scene.tween({target: dashed, dash_offset: 44}, 2, "linear"),
-    () => scene.tween({target: faded, opacity: 0.2}, 1.5, "ease_in_out"));
+    () => scene.tween({target: solid, width: 10}, {duration: 1.5, curve: "ease_in_out"}),
+    () => scene.tween({target: dashed, dash_offset: 44}, {duration: 2, curve: "linear"}),
+    () => scene.tween({target: faded, opacity: 0.2}, {duration: 1.5, curve: "ease_in_out"}));
 
 return scene;
 ```

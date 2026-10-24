@@ -20,11 +20,11 @@ local vertical = diagram:connect {
 }
 local built = diagram:build()
 
-scene:shift(built:node(blocker), {0, -2}, 0.5, "linear")
-scene:shift(built:node(blocker), {0, 2}, 0.5, "linear")
-scene:shift(built:edge(vertical), {-4, 0}, 0.5, "linear")
-scene:shift(built:edge(vertical), {4, 0}, 0.5, "linear")
-scene:shift(built:root(), {12, 0}, 0.5, "linear")
-scene:shift(built:root(), {-12, 0}, 0.5, "linear")
+scene:shift(built:object(blocker), {0, -2}, {duration = 0.5, curve = "linear"})
+scene:shift(built:object(blocker), {0, 2}, {duration = 0.5, curve = "linear"})
+scene:shift(built:object(vertical), {-4, 0}, {duration = 0.5, curve = "linear"})
+scene:shift(built:object(vertical), {4, 0}, {duration = 0.5, curve = "linear"})
+scene:shift(built:root(), {12, 0}, {duration = 0.5, curve = "linear"})
+scene:shift(built:root(), {-12, 0}, {duration = 0.5, curve = "linear"})
 
 return scene

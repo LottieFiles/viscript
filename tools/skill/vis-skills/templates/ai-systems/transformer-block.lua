@@ -103,8 +103,8 @@ local conclusion = root:text {
 
 scene:fade_in(header, {shift = {0, -6}, duration = 0.55, curve = "gentle"})
 scene:fade_in(nodes, {shift = {0, -7}, duration = 0.7, curve = "ease_out"})
-scene:create(main_routes, 0.85, "ease_out", 0.06, "forward")
-scene:create(residual_routes, 0.7, "ease_out", 0.08, "forward")
+scene:create(main_routes, {duration = 0.85, curve = "ease_out", lag = 0.06, direction = "forward"})
+scene:create(residual_routes, {duration = 0.7, curve = "ease_out", lag = 0.08, direction = "forward"})
 scene:fade_in(evidence, {shift = {0, -6}, duration = 0.7, curve = "gentle"})
 scene:indicate(handles[3].body, {color = "focus", scale = 1.025, duration = 0.42, curve = "ease_in_out"})
 scene:fade_in(conclusion, {shift = {0, -5}, duration = 0.35, curve = "gentle"})

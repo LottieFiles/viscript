@@ -47,7 +47,7 @@ return scene;
 
 ## Pan and zoom
 
-`scene:look(camera, duration)` moves the camera to explicit fields: `target` pans, `height` zooms (smaller is closer). Fields you leave out keep their value.
+`scene:look(camera, options?)` moves the camera to explicit fields: `target` pans, `height` zooms (smaller is closer). Fields you leave out keep their value.
 
 ```lua live
 local scene = vis.scene {}
@@ -59,11 +59,11 @@ for i, p in ipairs({{-3, 1.5}, {2, 2}, {3.5, -1.5}, {-2, -2}}) do
 end
 
 scene:wait(0.3)
-scene:look({target = {2, 2}, height = 2}, 1.2)      -- pan and zoom in
+scene:look({target = {2, 2}, height = 2}, {duration = 1.2})      -- pan and zoom in
 scene:wait(0.4)
-scene:look({target = {-2, -2}}, 1.2)                -- pan, same zoom
+scene:look({target = {-2, -2}}, {duration = 1.2})                -- pan, same zoom
 scene:wait(0.4)
-scene:look({target = {0, 0}, height = 6}, 1.2)      -- back out
+scene:look({target = {0, 0}, height = 6}, {duration = 1.2})      -- back out
 
 return scene
 ```
@@ -76,11 +76,11 @@ const colors = ["accent", "warning", "success", "danger"];
 [[-3, 1.5], [2, 2], [3.5, -1.5], [-2, -2]].forEach((p, i) => axes.circle({center: p, radius: 0.3, fill: colors[i]}));
 
 scene.wait(0.3);
-scene.look({target: [2, 2], height: 2}, 1.2);      // pan and zoom in
+scene.look({target: [2, 2], height: 2}, {duration: 1.2});      // pan and zoom in
 scene.wait(0.4);
-scene.look({target: [-2, -2]}, 1.2);               // pan, same zoom
+scene.look({target: [-2, -2]}, {duration: 1.2});               // pan, same zoom
 scene.wait(0.4);
-scene.look({target: [0, 0], height: 6}, 1.2);      // back out
+scene.look({target: [0, 0], height: 6}, {duration: 1.2});      // back out
 
 return scene;
 ```
@@ -99,7 +99,7 @@ for i, p in ipairs({{-3, 1.5}, {2, 2}, {3.5, -1.5}, {-2, -2}}) do
 end
 
 scene:wait(0.3)
-scene:look({view = "3d", eye = {0, -7, 6}}, 1.6)   -- tip the plane back
+scene:look({view = "3d", eye = {0, -7, 6}}, {duration = 1.6})   -- tip the plane back
 scene:orbit(math.pi / 2, {duration = 2})            -- then circle around it
 scene:wait(0.3)
 
@@ -114,7 +114,7 @@ const colors = ["accent", "warning", "success", "danger"];
 [[-3, 1.5], [2, 2], [3.5, -1.5], [-2, -2]].forEach((p, i) => axes.circle({center: p, radius: 0.3, fill: colors[i]}));
 
 scene.wait(0.3);
-scene.look({view: "3d", eye: [0, -7, 6]}, 1.6);   // tip the plane back
+scene.look({view: "3d", eye: [0, -7, 6]}, {duration: 1.6});   // tip the plane back
 scene.orbit(Math.PI / 2, {duration: 2});          // then circle around it
 scene.wait(0.3);
 

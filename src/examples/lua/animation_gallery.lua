@@ -140,7 +140,7 @@ local function direction_panel(background, index, title, direction, color)
     panel:wait(0.35)
     panel:create(path, {duration = 1.20, curve = "linear", direction = direction})
     panel:wait(0.35)
-    panel:uncreate(path, 1.00, "linear", 0, direction)
+    panel:uncreate(path, {duration = 1.00, curve = "linear", lag = 0, direction = direction})
     panel:wait(0.55)
     return panel
 end
@@ -225,9 +225,9 @@ growSubject:point {
     id = "grow-anchor",
 }
 grow:wait(0.35)
-grow:grow_from_center(growSubject, 1.20, "ease_out")
+grow:grow_from_center(growSubject, {duration = 1.20, curve = "ease_out"})
 grow:wait(0.35)
-grow:shrink_to_center(growSubject, 1.00, "ease_in")
+grow:shrink_to_center(growSubject, {duration = 1.00, curve = "ease_in"})
 grow:wait(0.55)
 
 local function radial_points(radius, square, count)
@@ -311,7 +311,7 @@ local morphSquare = morph:polygon {
     width = 4,
     id = "morph-square-template",
 }
-morph:morph(morphSubject, morphSquare, 1.20, "ease_in_out")
+morph:morph(morphSubject, morphSquare, {duration = 1.20, curve = "ease_in_out"})
 morph:wait(0.35)
 local morphOrigin = morph:polygon {
     points = radial_points(1.02, false, 32),
@@ -320,7 +320,7 @@ local morphOrigin = morph:polygon {
     width = 4,
     id = "morph-origin-template",
 }
-morph:morph(morphSquare, morphOrigin, 1.00, "ease_in_out")
+morph:morph(morphSquare, morphOrigin, {duration = 1.00, curve = "ease_in_out"})
 morph:wait(0.55)
 
 local replacement =
@@ -366,7 +366,7 @@ local replacementTarget = replacement:polygon {
     width = 4,
     id = "replacement-target",
 }
-replacement:morph(replacementSource, replacementTarget, 1.20, "ease_in_out")
+replacement:morph(replacementSource, replacementTarget, {duration = 1.20, curve = "ease_in_out"})
 replacement:wait(0.35)
 replacement:indicate(replacementTarget, {
     color = p.gold,

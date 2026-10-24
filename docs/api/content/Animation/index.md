@@ -27,4 +27,4 @@ Schedule one change or combine related changes in a `tween` descriptor. Each pag
 
 Methods schedule changes at the scene cursor. `target` is one object; `targets` accepts one object or a list. `?` marks an optional argument. Unless stated otherwise, duration defaults to 1 second, curve to `smooth`, and lag to 0.
 
-For methods with positional `duration?, curve?`, a `timing` table/object may replace both. Methods with positional `lag?` also accept it inside that table/object. Do not mix table/object timing with later positional arguments. `lag` delays each subsequent item by `duration * lag` seconds.
+Animation methods take one options table/object containing `duration` and `curve`, plus operation-specific fields. Staggered methods also accept `lag`, which delays each subsequent item by `duration * lag` seconds. Omit the options argument to use its defaults, except for `track` and JavaScript `warp`, which require it. `wait(duration?)` advances the cursor by a number of seconds.

@@ -214,7 +214,7 @@ local a = scene:circle {center = {-2, 0}, radius = 0.6, stroke = "foreground"}
 local b = scene:rectangle {center = {2, 0.6}, size = {1.2, 1}, stroke = "foreground"}
 scene:connector {from = a, to = b, padding = 0.12, stroke = "accent", width = 2, tip = 10}
 scene:text {id = "caption", text = "Connector follows the moving object's outline", point = {0, -2.25}, size = 16, fill = "muted"}
-scene:shift(b, {-1, 1}, 1.2)
+scene:shift(b, {-1, 1}, {duration = 1.2})
 
 return scene
 ```
@@ -229,7 +229,7 @@ const a = scene.circle({center: [-2, 0], radius: 0.6, stroke: "foreground"});
 const b = scene.rectangle({center: [2, 0.6], size: [1.2, 1], stroke: "foreground"});
 scene.connector(a, b, {padding: 0.12, stroke: "accent", width: 2, tip: 10});
 scene.text({id: "caption", text: "Connector follows the moving object's outline", point: [0, -2.25], size: 16, fill: "muted"});
-scene.shift(b, [-1, 1], 1.2);
+scene.shift(b, [-1, 1], {duration: 1.2});
 
 return scene;
 ```

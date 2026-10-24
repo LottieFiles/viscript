@@ -338,7 +338,7 @@ return scene
 local scene = vis.scene {width=400, height=240, fps=20, theme="pro_white"}
 local into = scene:text {id="into", text="A and B", point={0,0.8}}
 local away = scene:text {id="away", text="A ∪ B", point={0,-0.8}}
-scene:tween({{target=into, text="A ∩ B"}, {target=away, text="A or B", retype=true}}, 1)
+scene:tween({{target=into, text="A ∩ B"}, {target=away, text="A or B", retype=true}}, {duration = 1})
 return scene
 `);
     const changingIssues = JSON.parse(run(changing, [], 1).stdout).issues
@@ -415,9 +415,9 @@ return scene
 `);
         return path;
     };
-    const diffReport = JSON.parse(run(edit(`scene:match_transform(before, after, 1, "linear", {diff = true})`)).stdout);
+    const diffReport = JSON.parse(run(edit(`scene:match_transform(before, after, {duration = 1, curve = "linear", diff = true})`)).stdout);
     assert.equal(diffReport.valid, true, JSON.stringify(diffReport.issues));
-    const fadeReport = JSON.parse(run(edit("scene:fade_transform(before, after, 1)")).stdout);
+    const fadeReport = JSON.parse(run(edit("scene:fade_transform(before, after, {duration = 1})")).stdout);
     assert.equal(fadeReport.valid, true, JSON.stringify(fadeReport.issues));
     const apart = JSON.parse(run(edit(`scene:parallel(
     function() scene:fade_out(before, {duration = 1}) end,
@@ -443,7 +443,7 @@ scene:wait(0.5)
 scene:remove(gone)
 local after = scene:group {id="after"}
 after:text {id="after/sum", text="a + b", point={0,-0.8}, align={0.5,0.5}}
-scene:match_transform(before, after, 1, "smooth", {copy=true})
+scene:match_transform(before, after, {duration = 1, curve = "smooth", copy=true})
 scene:clone(note, {id="twin", shift={4.8,0}})
 scene:wait(0.5)
 return scene

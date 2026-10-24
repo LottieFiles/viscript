@@ -28,7 +28,7 @@ states:define(answer, "answer.correct", {
     rotation = 0.03,
     scale = {1.08, 1.08},
 })
-states:transition(answer, "answer.correct", 0.18, "smooth")
+states:transition(answer, "answer.correct", {duration = 0.18, curve = "smooth"})
 return scene
 ```
 
