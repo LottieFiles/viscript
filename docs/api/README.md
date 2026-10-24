@@ -1,8 +1,9 @@
 # API Markdown
 
-The API lives in the existing VISCRIPT website at `#/api`. Quartz compiles its
-article content; the site keeps its header, navigation, page tree, theme and
-shared animation player. There is one website and one deployment.
+The API reference is local-only. Start its local server explicitly to open
+`http://127.0.0.1:8000/#/api`, or read the Markdown in Obsidian. Quartz compiles
+its article content into the website's shared shell, navigation, theme and player.
+The public website build and GitHub Pages deployment exclude the API.
 
 Open [`content/`](content) as an Obsidian vault. Each category has an `index.md`
 and focused child pages. Use ordinary relative Markdown links or Obsidian
@@ -78,7 +79,7 @@ comment. The same example ID repeated on another page must have identical source
 Host examples use an ordinary `javascript` fence after the ID comment, with the
 variables documented in [Shared Host Setup](content/Host/setup.md).
 
-Build and serve the whole website from the repository root (Node 22+):
+Start the website with the local API reference from the repository root (Node 22+):
 
 ```sh
 npm ci --prefix tools/player
@@ -87,17 +88,23 @@ npm ci --prefix docs/api
 npm start --prefix docs/page
 ```
 
-Open `http://localhost:8000/#/api`. After editing Markdown, rebuild with
-`npm run build --prefix docs/page`. Run `npm run check --prefix docs/page` to
-check API coverage against the bindings and render every published Lua/JS scene.
+Open `http://127.0.0.1:8000/#/api`. The server listens only on this machine and
+runs until you stop it. After editing Markdown, rebuild with
+`npm run build:local --prefix docs/page`, then refresh the page. Run
+`npm run check --prefix docs/page` to check API coverage against the bindings
+and render the documentation's Lua/JS scenes.
+
+`npm run build --prefix docs/page` creates the public site and removes any
+previous local API output. To build local API content without starting a server,
+use `npm run build:local --prefix docs/page` or
+`node scripts/build-page.mjs --with-api`.
 
 `quartz.config.ts` selects the Markdown transformers, `plugins/viscript.ts` marks
 live scene fences, and `render-content.ts` emits article fragments, page metadata
 and `graph.json`. The graph follows Markdown links and the `parent` hierarchy,
 with categories grouped by the page tree. `scripts/build-api.mjs` places these
-in `docs/page/build/api/` for the
-existing router. API examples use the same render worker and runtime bundle as
-the rest of the site.
+in `docs/page/build/api/` only for the explicit local build. API examples use the
+same render worker and runtime bundle as the rest of the site.
 
 Quartz is pinned to the official [v4.5.2 source](https://github.com/jackyzha0/quartz/tree/v4.5.2)
 and verified by `package-lock.json`. Installation links its engine into the

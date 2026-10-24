@@ -43,8 +43,8 @@ jobs:
           node-version: '22'
       - name: Check the player
         run: npm ci --prefix tools/player && npm run check --prefix tools/player && npm test --prefix tools/player
-      - name: Compile MDX and Quartz content and build the player
-        run: npm ci --prefix docs/page && npm ci --prefix docs/api && node scripts/build-page.mjs
+      - name: Build the public documentation and player
+        run: npm ci --prefix docs/page && node scripts/build-page.mjs
       - name: Verify documentation scenes and runtime
         run: npm run check --prefix docs/page && node --test scripts/page-resources.test.mjs
       - name: Drop build tooling from the site

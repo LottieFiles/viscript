@@ -1,6 +1,6 @@
 // Compile docs/page/content/**/*.mdx into ES modules the page shell imports, copy the runtime into
 // docs/page/runtime/, and build the shared player (tools/player) into docs/page/build/player/.
-// Usage: node scripts/build-page.mjs   (needs `npm ci` in docs/page and tools/player)
+// Usage: node scripts/build-page.mjs [--with-api] (API content is opt-in for local use)
 import {cpSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync} from "node:fs";
 import {dirname, join, relative, resolve} from "node:path";
 import {fileURLToPath} from "node:url";
@@ -11,6 +11,7 @@ const {compile} = await import(resolve(page, "node_modules/@mdx-js/mdx/index.js"
 const {default: remarkGfm} = await import(resolve(page, "node_modules/remark-gfm/index.js"));
 const {default: rehypeHighlight} = await import(resolve(page, "node_modules/rehype-highlight/index.js"));
 const content = join(page, "content"), out = join(page, "build");
+const withApi = process.argv.includes("--with-api");
 
 // ```lua live``` fences become <Scene code="..." editable /> players; a ```js live``` fence
 // right after one is the same scene in JavaScript and joins that player. Other adjacent fences
@@ -53,8 +54,11 @@ const scan = (dir) => readdirSync(dir, {withFileTypes: true}).forEach((e) =>
 scan(content);
 rmSync(out, {recursive: true, force: true});
 
-buildApi(join(out, "api"));
-const api = JSON.parse(readFileSync(join(out, "api/manifest.json"), "utf8"));
+let api = [];
+if (withApi) {
+    buildApi(join(out, "api"));
+    api = JSON.parse(readFileSync(join(out, "api/manifest.json"), "utf8"));
+}
 const docs = [];
 for (const file of files.sort((a, b) => a.localeCompare(b, "en", {numeric: true}))) {
     const id = relative(content, file).replace(/\.mdx$/, "");

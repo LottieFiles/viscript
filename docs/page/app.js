@@ -2,11 +2,10 @@
 import * as components from "./components.js";
 import {DOCS, API} from "./build/manifest.js";
 import {createPlayer, destroyAll, retheme} from "./player.js";
-import {createHostExample, destroyHostExamples} from "./host-example.js";
 
 const app = document.getElementById("app");
 const mdx = (file) => import(`./build/${file}.js`);
-let graphData;
+let graphData, hostExamples;
 const apiGraphData = () => graphData ??= fetch("./build/api/graph.json").then((response) => {
   if (!response.ok) throw new Error(`API graph (${response.status})`);
   return response.json();
@@ -16,6 +15,15 @@ const h = (tag, attrs = {}, ...children) => {
   el.append(...children);
   return el;
 };
+
+if (API.length) {
+  const link = h("a", {href: "#/api", textContent: "API"});
+  link.dataset.route = "api";
+  document.querySelector('header nav [data-route="examples"]').before(link);
+  for (const href of ["api-graph.css", "build/api/static/viscript/viewer.css"]) {
+    document.head.append(h("link", {rel: "stylesheet", href}));
+  }
+}
 
 function apiSidebar(pages, current) {
   const ancestors = new Set([current.id]);
@@ -119,6 +127,10 @@ const scrollToHeading = (anchor) => {
 let shownDoc = null, apiCleanup = null, generation = 0;
 async function render() {
   const [route = "", id, anchor] = location.hash.replace(/^#\/?/, "").split("/");
+  if (route === "api" && !API.length) {
+    location.replace("#/");
+    return;
+  }
   const pages = route === "api" ? API : route === "docs" ? DOCS : null;
   const doc = pages && (pages.find((d) => d.id === id) ?? pages[0]);
   const docKey = doc && `${route}/${doc.id}`;
@@ -128,7 +140,7 @@ async function render() {
   apiCleanup?.();
   apiCleanup = null;
   destroyAll();
-  destroyHostExamples();
+  hostExamples?.destroyHostExamples();
   tocObserver?.disconnect();
   shownDoc = docKey;
   let view;
@@ -141,11 +153,13 @@ async function render() {
   app.replaceChildren(view);
   observeToc(view);
   if (route === "api") {
-    const [{mountApiExamples}, {mountApiGraph}, graph] = await Promise.all([
+    const [{mountApiExamples}, {mountApiGraph}, graph, host] = await Promise.all([
       import("./build/api/static/viscript/viewer.js"), import("./api-graph.js"), apiGraphData(),
+      import("./host-example.js"),
     ]);
     if (mine !== generation) return;
-    const cleanups = [mountApiExamples(view, {createPlayer, createHostExample})];
+    hostExamples = host;
+    const cleanups = [mountApiExamples(view, {createPlayer, createHostExample: host.createHostExample})];
     for (const container of view.querySelectorAll("[data-graph-mount]")) {
       cleanups.push(mountApiGraph(container, graph, {current: doc.id, global: container.dataset.graphMount === "global"}));
     }

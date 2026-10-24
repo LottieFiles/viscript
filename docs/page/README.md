@@ -1,25 +1,38 @@
 # viscript website
 
-One website with a shared HTML shell (`index.html`, `app.js`). Docs use MDX; the API article content is compiled from Obsidian-compatible Markdown by Quartz. Four routes:
+The website uses a shared HTML shell (`index.html`, `app.js`) and MDX guides.
+The public build includes Home, Docs and Examples. An explicit local build adds
+the API reference, compiled from Obsidian-compatible Markdown by Quartz:
 
 | Route | Source |
 |---|---|
 | Home `#/` | `content/index.mdx` |
 | Docs `#/docs/<id>` | `content/docs/NN-<id>.mdx` (frontmatter: `title`, `group`, `parent`) |
-| API `#/api/<id>` | `../api/content/**/*.md` → Quartz HTML fragments |
+| API `#/api/<id>` (local build only) | `../api/content/**/*.md` → Quartz HTML fragments |
 | Examples `#/examples/<id>` | `content/examples.mdx` + `scenes/collections.js` |
 
 A ` ```lua live ` fence becomes an editable player. MDX pages may use the
 components in `components.js`: `Scene`, `Hero`, `Feature`, `BubbleSortDemo`, `SkillsDemo`, `Gallery`.
 
 ```sh
-npm ci --prefix docs/page && npm ci --prefix docs/api && npm ci --prefix tools/player
-node scripts/build-page.mjs   # MDX + Quartz API content + shared player -> build/
+npm ci --prefix docs/page && npm ci --prefix tools/player
+npm run build --prefix docs/page  # public MDX + shared player -> build/, excluding API
 npm run check --prefix docs/page  # render every scene and validate interactive playback ranges
 node scripts/check-page-api.mjs  # check the API catalog against Lua registrations and JS declarations
 node --test scripts/page-resources.test.mjs  # the fonts and images the page offers
-npm start --prefix docs/page  # build, then serve the page at http://localhost:8000
 ```
+
+To open the API locally, start the server explicitly:
+
+```sh
+npm ci --prefix docs/api
+npm start --prefix docs/page  # build with API, then serve at http://127.0.0.1:8000
+```
+
+Stop the server when finished. `npm run build:local --prefix docs/page` (or
+`node scripts/build-page.mjs --with-api`) rebuilds the local API without starting
+a server. The default build removes previous `build/api/` output and exports an
+empty API catalog, so a later public build cannot retain local API articles.
 
 Scenes play through the shared player in [`tools/player`](../../tools/player): one render
 worker draws every figure on the page, and `player.js` adds the editor, controls, language
@@ -32,11 +45,13 @@ only the full Pretendard has. The runtime and the first figures' fonts are prelo
 
 For GitHub Pages, set **Settings → Pages → Build and deployment → Source** to
 **GitHub Actions**. The [Documentation workflow](../../.github/workflows/pages.yml)
-builds the MDX and deploys `docs/page` on matching pushes to `viscript`, or when
-manually run on that branch. Pull requests run the build and scene checks.
+builds the public MDX and deploys `docs/page` on matching pushes to `viscript`, or
+when manually run on that branch. It does not install Quartz or publish API
+articles. Pull requests run the public build and scene checks.
 
 `jsx-runtime.js` turns compiled MDX straight into DOM nodes; there is no framework.
-The API navigation follows each Markdown page's `parent` metadata as a collapsible page tree.
+In the local build, API navigation follows each Markdown page's `parent`
+metadata as a collapsible page tree.
 [`../api/content`](../api/content) is the API's source vault: ordinary `.md` files,
 relative Markdown links, and complete `viscript` / `viscript-js` scene fences. Open
 that folder directly in Obsidian. See [API authoring](../api/README.md) for the format.
